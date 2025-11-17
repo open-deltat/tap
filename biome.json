@@ -1,18 +1,18 @@
 {
-  "$schema": "https://biomejs.dev/schemas/latest/schema.json",
-  "linter": { "enabled": true },
-  "formatter": { "enabled": true },
-  "files": {
-    "includes": [
-      "packages/*/src/**/*.ts",
-      "packages/*/*.ts",
-      "packages/*/package.json"
-    ]
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single",
-      "trailingCommas": "all"
-    }
-  }
+	"$schema": "https://biomejs.dev/schemas/latest/schema.json",
+	"linter": { "enabled": true },
+	"formatter": { "enabled": true },
+	"files": {
+		"includes": [
+			"packages/*/src/**/*.ts",
+			"packages/*/*.ts",
+			"packages/*/package.json"
+		]
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "single",
+			"trailingCommas": "all"
+		}
+	}
 }
