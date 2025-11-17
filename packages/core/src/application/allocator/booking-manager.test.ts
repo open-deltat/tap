@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
-import type { BookingId, ResourceId, TenantId } from '../../domain/ids';
+import type { BookingId, HoldId, ResourceId, TenantId } from '../../domain/ids';
 import { createMutex } from '../../infrastructure/mutex';
 import { createBookingManager } from './booking-manager';
 import { createHoldManager } from './hold-manager';
@@ -9,7 +9,7 @@ import type { HoldMetadata } from './types';
 
 test('confirmBooking succeeds when hold exists', async () => {
 	const { manager } = createStateManager();
-	const holds = new Map<string, HoldMetadata>();
+	const holds = new Map<HoldId, HoldMetadata>();
 	const withLock = createMutex();
 	const holdManager = createHoldManager({
 		getState: manager.getState,
@@ -55,7 +55,7 @@ test('confirmBooking succeeds when hold exists', async () => {
 
 test('confirmBooking returns null when hold does not exist', async () => {
 	const { manager } = createStateManager();
-	const holds = new Map<string, HoldMetadata>();
+	const holds = new Map<HoldId, HoldMetadata>();
 	const withLock = createMutex();
 	const bookingManager = createBookingManager({
 		getState: manager.getState,

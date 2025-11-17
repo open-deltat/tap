@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
-import type { ResourceId, TenantId } from '../../domain/ids';
+import type { HoldId, ResourceId, TenantId } from '../../domain/ids';
 import { createMutex } from '../../infrastructure/mutex';
 import { createExpiryManager } from './expiry-manager';
 import { createHoldManager } from './hold-manager';
@@ -9,7 +9,7 @@ import type { HoldMetadata } from './types';
 
 test('expireHolds removes expired holds', async () => {
 	const { manager } = createStateManager();
-	const holds = new Map<string, HoldMetadata>();
+	const holds = new Map<HoldId, HoldMetadata>();
 	const withLock = createMutex();
 	const holdManager = createHoldManager({
 		getState: manager.getState,
@@ -47,7 +47,7 @@ test('expireHolds removes expired holds', async () => {
 
 test('expireHolds does not remove non-expired holds', async () => {
 	const { manager } = createStateManager();
-	const holds = new Map<string, HoldMetadata>();
+	const holds = new Map<HoldId, HoldMetadata>();
 	const withLock = createMutex();
 	const holdManager = createHoldManager({
 		getState: manager.getState,
