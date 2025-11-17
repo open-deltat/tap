@@ -73,7 +73,7 @@ export const createHoldManager = (params: {
 					expiresAt,
 				});
 
-				const event = createHoldPlacedEvent({
+				const eventParams: Parameters<typeof createHoldPlacedEvent>[0] = {
 					tenantId,
 					resourceId,
 					holdId,
@@ -81,8 +81,13 @@ export const createHoldManager = (params: {
 					startMinute,
 					endMinute,
 					expiresAt,
-					clientRef,
-				});
+				};
+
+				if (clientRef !== undefined) {
+					eventParams.clientRef = clientRef;
+				}
+
+				const event = createHoldPlacedEvent(eventParams);
 
 				return { success: true, holdId, event };
 			} finally {
