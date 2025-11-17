@@ -1,13 +1,13 @@
-import type { ResourceId, TenantId } from '@tap/core';
-import { ulid } from 'ulid';
 import { handlePrivateRequest } from './handlers/private';
-import {
-	handlePublicRequest,
-	registerResource,
-	registerTenant,
-} from './handlers/public';
+import { handlePublicRequest } from './handlers/public';
+import { initializeContext } from './services/context';
+import { startHoldExpiryWorker } from './workers/hold-expiry';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
+
+await initializeContext();
+
+const stopHoldExpiryWorker = startHoldExpiryWorker(5000);
 
 const _server = Bun.serve({
 	port: PORT,
@@ -32,11 +32,15 @@ const _server = Bun.serve({
 	},
 });
 
-const tenantId = ulid() as TenantId;
-const resourceId = ulid() as ResourceId;
+process.on('SIGINT', () => {
+	stopHoldExpiryWorker();
+	process.exit(0);
+});
 
-registerTenant('demo', tenantId);
-registerResource('demo', 'room-1', resourceId, tenantId);
+process.on('SIGTERM', () => {
+	stopHoldExpiryWorker();
+	process.exit(0);
+});
 
 console.log(`🚀 TAP API running at http://localhost:${PORT}`);
 console.log(`\n📋 Endpoints:`);
@@ -54,5 +58,7 @@ console.log(`  POST /v1/holds                                 - Place hold`);
 console.log(
 	`  POST /v1/bookings                              - Confirm booking`,
 );
+console.log(
+	`  POST /v1/bookings/:id/cancel                   - Cancel booking`,
+);
 console.log(`  GET  /v1/events                                - Get events`);
-console.log(`\n🧪 Demo tenant: demo, resource: room-1`);

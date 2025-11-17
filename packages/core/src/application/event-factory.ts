@@ -2,6 +2,7 @@ import { ulid } from 'ulid';
 import type {
 	BookingCancelledEvent,
 	BookingConfirmedEvent,
+	HoldExpiredEvent,
 	HoldPlacedEvent,
 } from '../domain/events';
 import type {
@@ -85,5 +86,21 @@ export const createBookingCancelledEvent = (params: {
 	createdAt: Date.now(),
 	payload: {
 		bookingId: params.bookingId,
+	},
+});
+
+export const createHoldExpiredEvent = (params: {
+	tenantId: TenantId;
+	resourceId: ResourceId;
+	holdId: HoldId;
+}): HoldExpiredEvent => ({
+	eventId: ulid() as EventId,
+	tenantId: params.tenantId,
+	resourceId: params.resourceId,
+	type: 'HoldExpired',
+	version: 1,
+	createdAt: Date.now(),
+	payload: {
+		holdId: params.holdId,
 	},
 });

@@ -1,10 +1,11 @@
 import type { BookingId, ResourceId, TenantId } from '@tap/core';
-import { createAllocator, createInMemoryEventStore } from '@tap/core';
 import { ulid } from 'ulid';
+import {
+	bookingRepository,
+	getAllocator,
+	getEventStore,
+} from '../services/context';
 import type { ConfirmBookingRequest, PlaceHoldRequest } from '../types';
-
-const allocator = createAllocator();
-const eventStore = createInMemoryEventStore();
 
 export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 	const url = new URL(req.url);
@@ -28,6 +29,7 @@ export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 				);
 			}
 
+			const allocator = getAllocator();
 			const state = allocator.getState(tenantId, resourceId);
 			const dayState = state.get(day);
 
@@ -95,6 +97,7 @@ export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 
 			const expiresAt = body.expiresAtMs || Date.now() + 60_000;
 
+			const allocator = getAllocator();
 			const holdParams: Parameters<typeof allocator.placeHold>[0] = {
 				tenantId: body.tenantId,
 				resourceId: body.resourceId,
@@ -117,6 +120,7 @@ export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 				});
 			}
 
+			const eventStore = getEventStore();
 			await eventStore.append(result.event);
 
 			return new Response(
@@ -150,6 +154,8 @@ export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 			}
 
 			const bookingId = body.bookingId || (ulid() as BookingId);
+			const allocator = getAllocator();
+			const eventStore = getEventStore();
 
 			if (!body.start || !body.end) {
 				const events = await eventStore.getByTenant(body.tenantId);
@@ -257,6 +263,84 @@ export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 		}
 	}
 
+	if (
+		req.method === 'POST' &&
+		pathname.match(/^\/v1\/bookings\/[^/]+\/cancel$/)
+	) {
+		try {
+			const match = pathname.match(/^\/v1\/bookings\/([^/]+)\/cancel$/);
+			if (!match || !match[1]) {
+				return new Response('Not Found', { status: 404 });
+			}
+
+			const bookingId = match[1] as BookingId;
+			const body = (await req.json()) as {
+				tenantId: TenantId;
+				resourceId: ResourceId;
+				day: string;
+				startMinute: number;
+				endMinute: number;
+			};
+
+			if (
+				!body.tenantId ||
+				!body.resourceId ||
+				!body.day ||
+				typeof body.startMinute !== 'number' ||
+				typeof body.endMinute !== 'number'
+			) {
+				return new Response(
+					JSON.stringify({
+						error:
+							'Missing required fields: tenantId, resourceId, day, startMinute, endMinute',
+					}),
+					{ status: 400, headers: { 'Content-Type': 'application/json' } },
+				);
+			}
+
+			const booking = await bookingRepository.getById(bookingId);
+			if (!booking || booking.status === 'CANCELLED') {
+				return new Response(JSON.stringify({ error: 'Booking not found' }), {
+					status: 404,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+
+			const allocator = getAllocator();
+			const cancelEvent = await allocator.cancelBooking({
+				tenantId: body.tenantId,
+				resourceId: body.resourceId,
+				bookingId,
+				day: body.day,
+				startMinute: body.startMinute,
+				endMinute: body.endMinute,
+			});
+
+			if (!cancelEvent) {
+				return new Response(
+					JSON.stringify({ error: 'Booking not found or already cancelled' }),
+					{ status: 404, headers: { 'Content-Type': 'application/json' } },
+				);
+			}
+
+			const eventStore = getEventStore();
+			await eventStore.append(cancelEvent);
+			await bookingRepository.update(bookingId, { status: 'CANCELLED' });
+
+			return new Response(JSON.stringify({ bookingId, event: cancelEvent }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' },
+			});
+		} catch (error) {
+			return new Response(
+				JSON.stringify({
+					error: error instanceof Error ? error.message : 'Unknown error',
+				}),
+				{ status: 500, headers: { 'Content-Type': 'application/json' } },
+			);
+		}
+	}
+
 	if (req.method === 'GET' && pathname === '/v1/events') {
 		try {
 			const url = new URL(req.url);
@@ -264,6 +348,7 @@ export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 			const cursor = url.searchParams.get('cursor');
 			const limit = parseInt(url.searchParams.get('limit') || '100', 10);
 
+			const eventStore = getEventStore();
 			let events = await eventStore.getAll();
 
 			if (tenantId) {

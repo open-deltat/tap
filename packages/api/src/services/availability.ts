@@ -1,10 +1,11 @@
-import type { AllocatorState, DayKey, Minute } from '@tap/core';
-import { isRangeFree } from '@tap/core';
+import type { AllocatorState, DayKey, Minute, Offer } from '@tap/core';
+import { getAvailableMinutesFromOffers, isRangeFree } from '@tap/core';
 import type { AvailabilitySlot } from '../types';
 
 export const getAvailability = (params: {
 	state: AllocatorState;
 	day: DayKey;
+	offers?: Offer[];
 	fromMinute?: Minute;
 	toMinute?: Minute;
 	durationMinutes?: number;
@@ -12,15 +13,17 @@ export const getAvailability = (params: {
 	const {
 		state,
 		day,
+		offers = [],
 		fromMinute = 0,
 		toMinute = 1440,
 		durationMinutes = 60,
 	} = params;
 
 	const dayState = state.get(day);
-	if (!dayState) {
-		return [];
-	}
+	const availableMinutesFromOffers =
+		offers.length > 0
+			? getAvailableMinutesFromOffers(day, offers)
+			: new Set<Minute>();
 
 	const slots: AvailabilitySlot[] = [];
 	const dayStart = new Date(day).setHours(0, 0, 0, 0);
@@ -30,7 +33,16 @@ export const getAvailability = (params: {
 	while (currentStart + durationMinutes <= toMinute) {
 		const currentEnd = currentStart + durationMinutes;
 
-		if (isRangeFree(dayState.booked, dayState.held, currentStart, currentEnd)) {
+		const isInOfferRange =
+			offers.length === 0 ||
+			(availableMinutesFromOffers.has(currentStart) &&
+				availableMinutesFromOffers.has(currentEnd - 1));
+
+		if (
+			isInOfferRange &&
+			dayState &&
+			isRangeFree(dayState.booked, dayState.held, currentStart, currentEnd)
+		) {
 			slots.push({
 				start: dayStart + currentStart * 60 * 1000,
 				end: dayStart + currentEnd * 60 * 1000,

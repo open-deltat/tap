@@ -1,16 +1,15 @@
 import type { BookingId, ResourceId, TenantId } from '@tap/core';
-import { createAllocator, createInMemoryEventStore } from '@tap/core';
 import { ulid } from 'ulid';
 import { getAvailability } from '../services/availability';
-import { createTenantResolver } from '../services/tenant-resolver';
+import {
+	getAllocator,
+	getEventStore,
+	offerRepository,
+	resourceRepository,
+	tenantRepository,
+	validateHorizon,
+} from '../services/context';
 import type { PublicBookRequest } from '../types';
-
-const allocator = createAllocator();
-const eventStore = createInMemoryEventStore();
-const tenantResolver = createTenantResolver();
-
-const tenants = new Map<string, TenantId>();
-const resources = new Map<string, { id: ResourceId; tenantId: TenantId }>();
 
 const matchRoute = (
 	pathname: string,
@@ -75,22 +74,27 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				);
 			}
 
-			const tenantId = await tenantResolver.resolveBySlug(tenantSlug);
-			if (!tenantId) {
+			const tenant = await tenantRepository.getBySlug(tenantSlug);
+			if (!tenant) {
 				return new Response(JSON.stringify({ error: 'Tenant not found' }), {
 					status: 404,
 					headers: { 'Content-Type': 'application/json' },
 				});
 			}
 
-			const resource = resources.get(`${tenantSlug}:${resourceSlug}`);
-			if (!resource || resource.tenantId !== tenantId) {
+			const resource = await resourceRepository.getBySlug(
+				tenantSlug,
+				resourceSlug,
+			);
+			if (!resource || resource.tenantId !== tenant.id) {
 				return new Response(JSON.stringify({ error: 'Resource not found' }), {
 					status: 404,
 					headers: { 'Content-Type': 'application/json' },
 				});
 			}
 
+			const offers = await offerRepository.getByResourceId(resource.id);
+			const allocator = getAllocator();
 			const fromDate = new Date(from);
 			const toDate = new Date(to);
 			const slots: Array<{ start: number; end: number }> = [];
@@ -102,10 +106,20 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 			) {
 				const day = date.toISOString().split('T')[0];
 				if (!day) continue;
-				const state = allocator.getState(tenantId, resource.id);
+
+				const horizonCheck = validateHorizon(day, resource);
+				if (!horizonCheck.valid) {
+					continue;
+				}
+
+				const state = allocator.getState(
+					tenant.id as TenantId,
+					resource.id as ResourceId,
+				);
 				const availabilityParams: Parameters<typeof getAvailability>[0] = {
 					state,
 					day,
+					offers,
 				};
 				if (durationMinutes) {
 					availabilityParams.durationMinutes = parseInt(durationMinutes, 10);
@@ -164,16 +178,19 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				);
 			}
 
-			const tenantId = await tenantResolver.resolveBySlug(tenantSlug);
-			if (!tenantId) {
+			const tenant = await tenantRepository.getBySlug(tenantSlug);
+			if (!tenant) {
 				return new Response(JSON.stringify({ error: 'Tenant not found' }), {
 					status: 404,
 					headers: { 'Content-Type': 'application/json' },
 				});
 			}
 
-			const resource = resources.get(`${tenantSlug}:${resourceSlug}`);
-			if (!resource || resource.tenantId !== tenantId) {
+			const resource = await resourceRepository.getBySlug(
+				tenantSlug,
+				resourceSlug,
+			);
+			if (!resource || resource.tenantId !== tenant.id) {
 				return new Response(JSON.stringify({ error: 'Resource not found' }), {
 					status: 404,
 					headers: { 'Content-Type': 'application/json' },
@@ -189,13 +206,23 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 					headers: { 'Content-Type': 'application/json' },
 				});
 			}
+
+			const horizonCheck = validateHorizon(dayStr, resource);
+			if (!horizonCheck.valid) {
+				return new Response(JSON.stringify({ error: horizonCheck.error }), {
+					status: 400,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+
 			const day = dayStr;
 			const startMinute = startDate.getHours() * 60 + startDate.getMinutes();
 			const endMinute = endDate.getHours() * 60 + endDate.getMinutes();
 
+			const allocator = getAllocator();
 			const holdResult = await allocator.placeHold({
-				tenantId,
-				resourceId: resource.id,
+				tenantId: tenant.id as TenantId,
+				resourceId: resource.id as ResourceId,
 				day,
 				startMinute,
 				endMinute,
@@ -209,12 +236,13 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				});
 			}
 
+			const eventStore = getEventStore();
 			await eventStore.append(holdResult.event);
 
 			const bookingId = ulid() as BookingId;
 			const confirmParams: Parameters<typeof allocator.confirmBooking>[0] = {
-				tenantId,
-				resourceId: resource.id,
+				tenantId: tenant.id as TenantId,
+				resourceId: resource.id as ResourceId,
 				holdId: holdResult.holdId,
 				bookingId,
 				start: startDate.getTime(),
@@ -259,18 +287,4 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 	}
 
 	return new Response('Not Found', { status: 404 });
-};
-
-export const registerTenant = (slug: string, id: TenantId) => {
-	tenants.set(slug, id);
-	tenantResolver.register(slug, id);
-};
-
-export const registerResource = (
-	tenantSlug: string,
-	resourceSlug: string,
-	id: ResourceId,
-	tenantId: TenantId,
-) => {
-	resources.set(`${tenantSlug}:${resourceSlug}`, { id, tenantId });
 };

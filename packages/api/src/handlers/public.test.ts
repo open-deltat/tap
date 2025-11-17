@@ -1,11 +1,23 @@
-import { expect, test } from 'bun:test';
-import type { ResourceId, TenantId } from '@tap/core';
-import { ulid } from 'ulid';
+import { afterAll, beforeAll, expect, test } from 'bun:test';
+import { handlePublicRequest } from './public';
 import {
-	handlePublicRequest,
-	registerResource,
-	registerTenant,
-} from './public';
+	createTestOffer,
+	createTestResource,
+	createTestTenant,
+} from './test-setup';
+
+let testTenant: Awaited<ReturnType<typeof createTestTenant>>;
+let testResource: Awaited<ReturnType<typeof createTestResource>>;
+
+beforeAll(async () => {
+	testTenant = await createTestTenant();
+	testResource = await createTestResource(testTenant);
+	await createTestOffer(testTenant, testResource);
+});
+
+afterAll(async () => {
+	// Cleanup handled by test isolation
+});
 
 test('handlePublicRequest returns 404 for unknown route', async () => {
 	const req = new Request('http://localhost/v1/public/unknown/route', {
@@ -17,14 +29,8 @@ test('handlePublicRequest returns 404 for unknown route', async () => {
 });
 
 test('GET /v1/public/:tenantSlug/:resourceSlug/availability returns 400 when from/to missing', async () => {
-	const tenantId = ulid() as TenantId;
-	const resourceId = ulid() as ResourceId;
-
-	registerTenant('test-tenant', tenantId);
-	registerResource('test-tenant', 'test-resource', resourceId, tenantId);
-
 	const req = new Request(
-		'http://localhost/v1/public/test-tenant/test-resource/availability',
+		`http://localhost/v1/public/${testTenant.slug}/${testResource.slug}/availability`,
 		{
 			method: 'GET',
 		},
@@ -53,12 +59,8 @@ test('GET /v1/public/:tenantSlug/:resourceSlug/availability returns 404 for unkn
 });
 
 test('GET /v1/public/:tenantSlug/:resourceSlug/availability returns 404 for unknown resource', async () => {
-	const tenantId = ulid() as TenantId;
-
-	registerTenant('test-tenant', tenantId);
-
 	const req = new Request(
-		'http://localhost/v1/public/test-tenant/unknown/availability?from=2025-12-01T10:00:00Z&to=2025-12-01T18:00:00Z',
+		`http://localhost/v1/public/${testTenant.slug}/unknown/availability?from=2025-12-01T10:00:00Z&to=2025-12-01T18:00:00Z`,
 		{
 			method: 'GET',
 		},
@@ -72,14 +74,8 @@ test('GET /v1/public/:tenantSlug/:resourceSlug/availability returns 404 for unkn
 });
 
 test('GET /v1/public/:tenantSlug/:resourceSlug/availability returns slots for available time', async () => {
-	const tenantId = ulid() as TenantId;
-	const resourceId = ulid() as ResourceId;
-
-	registerTenant('test-tenant', tenantId);
-	registerResource('test-tenant', 'test-resource', resourceId, tenantId);
-
 	const req = new Request(
-		'http://localhost/v1/public/test-tenant/test-resource/availability?from=2025-12-01T10:00:00Z&to=2025-12-01T18:00:00Z&durationMinutes=60',
+		`http://localhost/v1/public/${testTenant.slug}/${testResource.slug}/availability?from=2025-12-01T10:00:00Z&to=2025-12-01T18:00:00Z&durationMinutes=60`,
 		{
 			method: 'GET',
 		},
@@ -94,14 +90,8 @@ test('GET /v1/public/:tenantSlug/:resourceSlug/availability returns slots for av
 });
 
 test('POST /v1/public/:tenantSlug/:resourceSlug/book returns 400 when required fields missing', async () => {
-	const tenantId = ulid() as TenantId;
-	const resourceId = ulid() as ResourceId;
-
-	registerTenant('test-tenant', tenantId);
-	registerResource('test-tenant', 'test-resource', resourceId, tenantId);
-
 	const req = new Request(
-		'http://localhost/v1/public/test-tenant/test-resource/book',
+		`http://localhost/v1/public/${testTenant.slug}/${testResource.slug}/book`,
 		{
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -136,14 +126,8 @@ test('POST /v1/public/:tenantSlug/:resourceSlug/book returns 404 for unknown ten
 });
 
 test('POST /v1/public/:tenantSlug/:resourceSlug/book creates booking successfully', async () => {
-	const tenantId = ulid() as TenantId;
-	const resourceId = ulid() as ResourceId;
-
-	registerTenant('test-tenant', tenantId);
-	registerResource('test-tenant', 'test-resource', resourceId, tenantId);
-
 	const req = new Request(
-		'http://localhost/v1/public/test-tenant/test-resource/book',
+		`http://localhost/v1/public/${testTenant.slug}/${testResource.slug}/book`,
 		{
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -167,21 +151,15 @@ test('POST /v1/public/:tenantSlug/:resourceSlug/book creates booking successfull
 });
 
 test('POST /v1/public/:tenantSlug/:resourceSlug/book returns 409 when slot not available', async () => {
-	const tenantId = ulid() as TenantId;
-	const resourceId = ulid() as ResourceId;
-
-	registerTenant('test-tenant', tenantId);
-	registerResource('test-tenant', 'test-resource', resourceId, tenantId);
-
 	// Book the slot first
 	const firstReq = new Request(
-		'http://localhost/v1/public/test-tenant/test-resource/book',
+		`http://localhost/v1/public/${testTenant.slug}/${testResource.slug}/book`,
 		{
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				start: '2025-12-01T10:00:00Z',
-				end: '2025-12-01T11:00:00Z',
+				start: '2025-12-02T10:00:00Z',
+				end: '2025-12-02T11:00:00Z',
 				customerName: 'First User',
 				customerEmail: 'first@example.com',
 			}),
@@ -192,13 +170,13 @@ test('POST /v1/public/:tenantSlug/:resourceSlug/book returns 409 when slot not a
 
 	// Try to book the same slot again
 	const secondReq = new Request(
-		'http://localhost/v1/public/test-tenant/test-resource/book',
+		`http://localhost/v1/public/${testTenant.slug}/${testResource.slug}/book`,
 		{
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				start: '2025-12-01T10:00:00Z',
-				end: '2025-12-01T11:00:00Z',
+				start: '2025-12-02T10:00:00Z',
+				end: '2025-12-02T11:00:00Z',
 				customerName: 'Second User',
 				customerEmail: 'second@example.com',
 			}),
@@ -213,20 +191,14 @@ test('POST /v1/public/:tenantSlug/:resourceSlug/book returns 409 when slot not a
 });
 
 test('POST /v1/public/:tenantSlug/:resourceSlug/book includes optional customerPhone', async () => {
-	const tenantId = ulid() as TenantId;
-	const resourceId = ulid() as ResourceId;
-
-	registerTenant('test-tenant', tenantId);
-	registerResource('test-tenant', 'test-resource', resourceId, tenantId);
-
 	const req = new Request(
-		'http://localhost/v1/public/test-tenant/test-resource/book',
+		`http://localhost/v1/public/${testTenant.slug}/${testResource.slug}/book`,
 		{
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				start: '2025-12-01T10:00:00Z',
-				end: '2025-12-01T11:00:00Z',
+				start: '2025-12-03T10:00:00Z',
+				end: '2025-12-03T11:00:00Z',
 				customerName: 'Test User',
 				customerEmail: 'test@example.com',
 				customerPhone: '+1234567890',
@@ -241,16 +213,32 @@ test('POST /v1/public/:tenantSlug/:resourceSlug/book includes optional customerP
 	expect(body.bookingId).toBeDefined();
 });
 
+test('POST /v1/public/:tenantSlug/:resourceSlug/book returns 400 when booking exceeds horizon', async () => {
+	const req = new Request(
+		`http://localhost/v1/public/${testTenant.slug}/${testResource.slug}/book`,
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				start: '2026-06-01T10:00:00Z',
+				end: '2026-06-01T11:00:00Z',
+				customerName: 'Test User',
+				customerEmail: 'test@example.com',
+			}),
+		},
+	);
+
+	const response = await handlePublicRequest(req);
+	expect(response.status).toBe(400);
+
+	const body = await response.json();
+	expect(body.error).toContain('horizon');
+});
+
 test('handlePublicRequest handles errors gracefully', async () => {
-	const tenantId = ulid() as TenantId;
-	const resourceId = ulid() as ResourceId;
-
-	registerTenant('test-tenant', tenantId);
-	registerResource('test-tenant', 'test-resource', resourceId, tenantId);
-
 	// Invalid JSON
 	const req = new Request(
-		'http://localhost/v1/public/test-tenant/test-resource/book',
+		`http://localhost/v1/public/${testTenant.slug}/${testResource.slug}/book`,
 		{
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },

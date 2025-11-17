@@ -1,5 +1,5 @@
-import { beforeAll, expect, test } from 'bun:test';
-import type { BookingId, ResourceId, TenantId } from '@tap/core';
+import { expect, test } from 'bun:test';
+import type { BookingId, HoldId, ResourceId, TenantId } from '@tap/core';
 import { createAllocator, createInMemoryEventStore } from '@tap/core';
 import {
 	commonErrors,
@@ -9,18 +9,12 @@ import {
 	toAPIErrorResponse,
 } from '@tap/errors';
 import { ulid } from 'ulid';
-import { registerResource, registerTenant } from './public';
 
 const allocator = createAllocator();
 const eventStore = createInMemoryEventStore();
 
 const tenantId = ulid() as TenantId;
 const resourceId = ulid() as ResourceId;
-
-beforeAll(() => {
-	registerTenant('test-tenant', tenantId);
-	registerResource('test-tenant', 'test-resource', resourceId, tenantId);
-});
 
 test('TAP_INVALID_INPUT returned for missing required fields', async () => {
 	const correlationId = createCorrelationId();
@@ -146,7 +140,7 @@ test('TAP_HOLD_EXPIRED returned when hold has expired', async () => {
 });
 
 test('TAP_HOLD_NOT_FOUND returned when confirming non-existent hold', async () => {
-	const fakeHoldId = ulid() as any;
+	const fakeHoldId = ulid() as HoldId;
 	const bookingId = ulid() as BookingId;
 	const day = '2025-12-27';
 	const dayStart = new Date(day).setHours(0, 0, 0, 0);
@@ -223,7 +217,7 @@ test('TAP_BOOKING_NOT_FOUND returned for unknown booking', async () => {
 		correlationId,
 		tenantId,
 		resourceId,
-		bookingId: ulid() as any,
+		bookingId: ulid() as BookingId,
 	});
 
 	const response = toAPIErrorResponse(error);
