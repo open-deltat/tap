@@ -1,4 +1,4 @@
-import type { BookingId, ResourceId, TenantId } from '@tap/core';
+import type { BookingId, HoldId, ResourceId, TenantId } from '@tap/core';
 import { ulid } from 'ulid';
 import { getAvailability } from '../services/availability';
 import {
@@ -144,12 +144,12 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 
 	if (
 		req.method === 'POST' &&
-		pathname.match(/^\/v1\/public\/[^/]+\/[^/]+\/book$/)
+		pathname.match(/^\/v1\/public\/[^/]+\/[^/]+\/hold$/)
 	) {
 		try {
 			const match = matchRoute(
 				pathname,
-				'/v1/public/:tenantSlug/:resourceSlug/book',
+				'/v1/public/:tenantSlug/:resourceSlug/hold',
 			);
 			if (!match) {
 				return new Response('Not Found', { status: 404 });
@@ -161,19 +161,10 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				return new Response('Not Found', { status: 404 });
 			}
 
-			const body = (await req.json()) as PublicBookRequest;
-
-			if (
-				!body.start ||
-				!body.end ||
-				!body.customerName ||
-				!body.customerEmail
-			) {
+			const body = (await req.json()) as { start: number; end: number };
+			if (!body.start || !body.end) {
 				return new Response(
-					JSON.stringify({
-						error:
-							'Missing required fields: start, end, customerName, customerEmail',
-					}),
+					JSON.stringify({ error: 'Missing required fields: start, end' }),
 					{ status: 400, headers: { 'Content-Type': 'application/json' } },
 				);
 			}
@@ -207,14 +198,6 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				});
 			}
 
-			const horizonCheck = validateHorizon(dayStr, resource);
-			if (!horizonCheck.valid) {
-				return new Response(JSON.stringify({ error: horizonCheck.error }), {
-					status: 400,
-					headers: { 'Content-Type': 'application/json' },
-				});
-			}
-
 			const day = dayStr;
 			const startMinute = startDate.getHours() * 60 + startDate.getMinutes();
 			const endMinute = endDate.getHours() * 60 + endDate.getMinutes();
@@ -226,7 +209,7 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				day,
 				startMinute,
 				endMinute,
-				expiresAt: Date.now() + 60_000,
+				expiresAt: Date.now() + 300_000,
 			});
 
 			if (!holdResult.success) {
@@ -239,14 +222,167 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 			const eventStore = getEventStore();
 			await eventStore.append(holdResult.event);
 
+			return new Response(
+				JSON.stringify({
+					holdId: holdResult.holdId,
+					expiresAt: Date.now() + 300_000,
+				}),
+				{ status: 201, headers: { 'Content-Type': 'application/json' } },
+			);
+		} catch (error) {
+			return new Response(
+				JSON.stringify({
+					error: error instanceof Error ? error.message : 'Unknown error',
+				}),
+				{ status: 500, headers: { 'Content-Type': 'application/json' } },
+			);
+		}
+	}
+
+	if (
+		req.method === 'POST' &&
+		pathname.match(/^\/v1\/public\/[^/]+\/[^/]+\/book$/)
+	) {
+		try {
+			const match = matchRoute(
+				pathname,
+				'/v1/public/:tenantSlug/:resourceSlug/book',
+			);
+			if (!match) {
+				return new Response('Not Found', { status: 404 });
+			}
+
+			const tenantSlug = match.tenantSlug;
+			const resourceSlug = match.resourceSlug;
+			if (!tenantSlug || !resourceSlug) {
+				return new Response('Not Found', { status: 404 });
+			}
+
+			const body = (await req.json()) as PublicBookRequest;
+
+			if (!body.customerName || !body.customerEmail) {
+				return new Response(
+					JSON.stringify({
+						error: 'Missing required fields: customerName, customerEmail',
+					}),
+					{ status: 400, headers: { 'Content-Type': 'application/json' } },
+				);
+			}
+
+			const tenant = await tenantRepository.getBySlug(tenantSlug);
+			if (!tenant) {
+				return new Response(JSON.stringify({ error: 'Tenant not found' }), {
+					status: 404,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+
+			const resource = await resourceRepository.getBySlug(
+				tenantSlug,
+				resourceSlug,
+			);
+			if (!resource || resource.tenantId !== tenant.id) {
+				return new Response(JSON.stringify({ error: 'Resource not found' }), {
+					status: 404,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+
+			const allocator = getAllocator();
+			const eventStore = getEventStore();
+			let holdId: string;
+			let start: number;
+			let end: number;
+
+			if (body.holdId) {
+				const events = await eventStore.getByTenant(tenant.id);
+				const holdEvent = events.find(
+					(e) => e.type === 'HoldPlaced' && e.payload.holdId === body.holdId,
+				);
+
+				if (!holdEvent || holdEvent.type !== 'HoldPlaced') {
+					return new Response(JSON.stringify({ error: 'Hold not found' }), {
+						status: 404,
+						headers: { 'Content-Type': 'application/json' },
+					});
+				}
+
+				if (
+					holdEvent.tenantId !== tenant.id ||
+					holdEvent.resourceId !== resource.id
+				) {
+					return new Response(JSON.stringify({ error: 'Hold not found' }), {
+						status: 404,
+						headers: { 'Content-Type': 'application/json' },
+					});
+				}
+
+				const dayDate = new Date(holdEvent.payload.day);
+				dayDate.setHours(0, 0, 0, 0);
+				const dayStart = dayDate.getTime();
+				start = dayStart + holdEvent.payload.startMinute * 60 * 1000;
+				end = dayStart + holdEvent.payload.endMinute * 60 * 1000;
+				holdId = holdEvent.payload.holdId;
+			} else if (body.start && body.end) {
+				const startDate = new Date(body.start);
+				const endDate = new Date(body.end);
+				const dayStr = startDate.toISOString().split('T')[0];
+				if (!dayStr) {
+					return new Response(JSON.stringify({ error: 'Invalid start date' }), {
+						status: 400,
+						headers: { 'Content-Type': 'application/json' },
+					});
+				}
+
+				const horizonCheck = validateHorizon(dayStr, resource);
+				if (!horizonCheck.valid) {
+					return new Response(JSON.stringify({ error: horizonCheck.error }), {
+						status: 400,
+						headers: { 'Content-Type': 'application/json' },
+					});
+				}
+
+				const day = dayStr;
+				const startMinute = startDate.getHours() * 60 + startDate.getMinutes();
+				const endMinute = endDate.getHours() * 60 + endDate.getMinutes();
+
+				const holdResult = await allocator.placeHold({
+					tenantId: tenant.id as TenantId,
+					resourceId: resource.id as ResourceId,
+					day,
+					startMinute,
+					endMinute,
+					expiresAt: Date.now() + 60_000,
+				});
+
+				if (!holdResult.success) {
+					return new Response(JSON.stringify({ error: 'Slot not available' }), {
+						status: 409,
+						headers: { 'Content-Type': 'application/json' },
+					});
+				}
+
+				await eventStore.append(holdResult.event);
+				holdId = holdResult.holdId;
+				start = startDate.getTime();
+				end = endDate.getTime();
+			} else {
+				return new Response(
+					JSON.stringify({
+						error: 'Missing required fields: either holdId or (start and end)',
+					}),
+					{ status: 400, headers: { 'Content-Type': 'application/json' } },
+				);
+			}
+
 			const bookingId = ulid() as BookingId;
 			const confirmParams: Parameters<typeof allocator.confirmBooking>[0] = {
 				tenantId: tenant.id as TenantId,
 				resourceId: resource.id as ResourceId,
-				holdId: holdResult.holdId,
+				holdId: holdId as HoldId,
 				bookingId,
-				start: startDate.getTime(),
-				end: endDate.getTime(),
+				start,
+				end,
 				customerName: body.customerName,
 				customerEmail: body.customerEmail,
 				paymentStatus: 'NONE',
@@ -270,8 +406,8 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 			return new Response(
 				JSON.stringify({
 					bookingId,
-					start: startDate.toISOString(),
-					end: endDate.toISOString(),
+					start: new Date(start).toISOString(),
+					end: new Date(end).toISOString(),
 					status: 'CONFIRMED',
 				}),
 				{ status: 201, headers: { 'Content-Type': 'application/json' } },

@@ -20,10 +20,7 @@ export const getAvailability = (params: {
 	} = params;
 
 	const dayState = state.get(day);
-	const availableMinutesFromOffers =
-		offers.length > 0
-			? getAvailableMinutesFromOffers(day, offers)
-			: new Set<Minute>();
+	const availableMinutesFromOffers = getAvailableMinutesFromOffers(day, offers);
 
 	const slots: AvailabilitySlot[] = [];
 	const dayStart = new Date(day).setHours(0, 0, 0, 0);
@@ -34,15 +31,14 @@ export const getAvailability = (params: {
 		const currentEnd = currentStart + durationMinutes;
 
 		const isInOfferRange =
-			offers.length === 0 ||
-			(availableMinutesFromOffers.has(currentStart) &&
-				availableMinutesFromOffers.has(currentEnd - 1));
+			availableMinutesFromOffers.has(currentStart) &&
+			availableMinutesFromOffers.has(currentEnd - 1);
 
-		if (
-			isInOfferRange &&
-			dayState &&
-			isRangeFree(dayState.booked, dayState.held, currentStart, currentEnd)
-		) {
+		const isFree =
+			!dayState ||
+			isRangeFree(dayState.booked, dayState.held, currentStart, currentEnd);
+
+		if (isInOfferRange && isFree) {
 			slots.push({
 				start: dayStart + currentStart * 60 * 1000,
 				end: dayStart + currentEnd * 60 * 1000,

@@ -103,6 +103,7 @@ export const createStreamListener = (
 
 			eventSource.onopen = () => {
 				reconnectAttempts = 0;
+				options.onConnect?.();
 			};
 		} catch (error) {
 			options.onError?.(

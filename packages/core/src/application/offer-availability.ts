@@ -1,6 +1,16 @@
 import type { DayKey, Minute } from '../domain/ids';
 import type { Offer } from '../domain/schemas';
 
+const DEFAULT_OFFER: Offer = {
+	id: 'default',
+	tenantId: 'default',
+	resourceId: 'default',
+	daysOfWeek: [1, 2, 3, 4, 5],
+	startTime: '09:00',
+	endTime: '17:00',
+	currency: 'USD',
+};
+
 export const getAvailableMinutesFromOffers = (
 	day: DayKey,
 	offers: Offer[],
@@ -9,8 +19,9 @@ export const getAvailableMinutesFromOffers = (
 	const dayOfWeek = dayDate.getDay();
 
 	const availableMinutes = new Set<Minute>();
+	const effectiveOffers = offers.length > 0 ? offers : [DEFAULT_OFFER];
 
-	for (const offer of offers) {
+	for (const offer of effectiveOffers) {
 		if (!offer.daysOfWeek.includes(dayOfWeek)) {
 			continue;
 		}

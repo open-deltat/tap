@@ -1,10 +1,18 @@
 {
 	"$schema": "https://biomejs.dev/schemas/latest/schema.json",
-	"linter": { "enabled": true },
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"correctness": {
+				"noNestedComponentDefinitions": "warn"
+			}
+		}
+	},
 	"formatter": { "enabled": true },
 	"files": {
 		"includes": [
 			"packages/*/src/**/*.ts",
+			"packages/*/src/**/*.tsx",
 			"packages/*/*.ts",
 			"packages/*/package.json"
 		]

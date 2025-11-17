@@ -29,7 +29,9 @@
   "license": "MIT",
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
+    "dev": "bun run scripts/dev.ts",
+    "dev:api": "cd packages/api && bun run dev",
+    "dev:app": "cd packages/app && bun run dev --turbopack",
     "clean": "turbo run clean",
     "typecheck": "turbo run typecheck",
     "test": "scripts/ensure-db.sh && turbo run test",
@@ -37,6 +39,7 @@
     "test:coverage": "turbo run test:coverage",
     "db:generate": "cd packages/db && bun run migrate:generate",
     "db:migrate": "cd packages/db && bun run migrate",
+    "seed": "cd packages/api && bun run seed",
     "lint": "turbo run lint",
     "format": "turbo run format",
     "lint:fix": "turbo run lint:fix",

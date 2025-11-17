@@ -2,11 +2,24 @@ import { expect, test } from 'bun:test';
 import type { Offer } from '../domain/schemas';
 import { getAvailableMinutesFromOffers } from './offer-availability';
 
-test('getAvailableMinutesFromOffers returns empty set when no offers', () => {
+test('getAvailableMinutesFromOffers returns default 9-5 weekday when no offers', () => {
 	const offers: Offer[] = [];
 	const day = '2025-12-01';
+	const dayDate = new Date(day);
+	const dayOfWeek = dayDate.getDay();
+	const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+
 	const result = getAvailableMinutesFromOffers(day, offers);
-	expect(result.size).toBe(0);
+
+	if (isWeekday) {
+		expect(result.size).toBeGreaterThan(0);
+		expect(result.has(9 * 60)).toBe(true);
+		expect(result.has(16 * 60 + 59)).toBe(true);
+		expect(result.has(8 * 60)).toBe(false);
+		expect(result.has(17 * 60)).toBe(false);
+	} else {
+		expect(result.size).toBe(0);
+	}
 });
 
 test('getAvailableMinutesFromOffers returns minutes for matching day of week', () => {

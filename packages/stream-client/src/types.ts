@@ -23,6 +23,7 @@ export type StreamListenerOptions = {
 	onEvent?: (event: BookingEvent) => void;
 	onError?: (error: Error) => void;
 	onReconnect?: (attempt: number) => void;
+	onConnect?: () => void;
 	onClose?: () => void;
 };
 

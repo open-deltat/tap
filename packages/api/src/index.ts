@@ -14,14 +14,39 @@ const _server = Bun.serve({
 	async fetch(req) {
 		const url = new URL(req.url);
 
+		if (req.method === 'OPTIONS') {
+			return new Response(null, {
+				headers: {
+					'Access-Control-Allow-Origin': '*',
+					'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+					'Access-Control-Allow-Headers': 'Content-Type',
+				},
+			});
+		}
+
+		const corsHeaders = {
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+			'Access-Control-Allow-Headers': 'Content-Type',
+		};
+
 		if (url.pathname === '/health') {
 			return new Response(JSON.stringify({ status: 'ok', version: '0.1.0' }), {
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', ...corsHeaders },
 			});
 		}
 
 		if (url.pathname.startsWith('/v1/public/')) {
-			return handlePublicRequest(req);
+			const response = await handlePublicRequest(req);
+			const headers = new Headers(response.headers);
+			Object.entries(corsHeaders).forEach(([key, value]) => {
+				headers.set(key, value);
+			});
+			return new Response(response.body, {
+				status: response.status,
+				statusText: response.statusText,
+				headers,
+			});
 		}
 
 		if (url.pathname.startsWith('/v1/')) {

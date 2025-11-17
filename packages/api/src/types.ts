@@ -38,8 +38,9 @@ export type ConfirmBookingRequest = {
 };
 
 export type PublicBookRequest = {
-	start: string;
-	end: string;
+	holdId?: string;
+	start?: string | number;
+	end?: string | number;
 	customerName: string;
 	customerEmail: string;
 	customerPhone?: string;

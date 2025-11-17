@@ -23,14 +23,37 @@ const createTestState = (
 	return state;
 };
 
-test('getAvailability returns empty array when day state does not exist', () => {
+test('getAvailability returns default 9-5 weekday slots when day state does not exist', () => {
 	const state = new Map();
+	const day = '2025-12-01';
 	const slots = getAvailability({
 		state,
-		day: '2025-12-01',
+		day,
 	});
 
-	expect(slots).toEqual([]);
+	const dayDate = new Date(day);
+	const dayOfWeek = dayDate.getDay();
+	const isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+
+	if (isWeekday) {
+		expect(slots.length).toBeGreaterThan(0);
+		const firstSlot = slots[0];
+		if (firstSlot) {
+			const slotStartMinute = Math.floor(
+				(firstSlot.start - new Date(day).setHours(0, 0, 0, 0)) / (60 * 1000),
+			);
+			expect(slotStartMinute).toBeGreaterThanOrEqual(9 * 60);
+		}
+		const lastSlot = slots[slots.length - 1];
+		if (lastSlot) {
+			const slotEndMinute = Math.floor(
+				(lastSlot.end - new Date(day).setHours(0, 0, 0, 0)) / (60 * 1000),
+			);
+			expect(slotEndMinute).toBeLessThanOrEqual(17 * 60);
+		}
+	} else {
+		expect(slots).toEqual([]);
+	}
 });
 
 test('getAvailability returns slots for free time ranges', () => {
