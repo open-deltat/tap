@@ -48,7 +48,7 @@ test('rejects invalid event type', () => {
 		eventId: ulid(),
 		tenantId: ulid(),
 		resourceId: ulid(),
-		type: 'InvalidType' as any,
+		type: 'InvalidType',
 		version: 1,
 		createdAt: Date.now(),
 		payload: {},

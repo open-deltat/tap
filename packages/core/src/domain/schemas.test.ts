@@ -47,7 +47,7 @@ test('rejects Resource with invalid slotMinutes', () => {
 		name: 'Test Resource',
 		slug: 'test-resource',
 		timezone: 'UTC',
-		slotMinutes: '45' as any,
+		slotMinutes: '45',
 	};
 
 	const result = ResourceSchema.safeParse(resource);

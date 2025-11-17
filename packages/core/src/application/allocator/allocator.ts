@@ -43,7 +43,7 @@ export type Allocator = {
 };
 
 export const createAllocator = (): Allocator => {
-	const { state, manager } = createStateManager();
+	const { manager } = createStateManager();
 	const holds = new Map<HoldId, HoldMetadata>();
 	const withLock = createMutex();
 

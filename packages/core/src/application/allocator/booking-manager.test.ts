@@ -69,7 +69,7 @@ test('confirmBooking returns null when hold does not exist', async () => {
 	const result = await bookingManager.confirmBooking({
 		tenantId,
 		resourceId,
-		holdId: ulid() as any,
+		holdId: ulid() as HoldId,
 		bookingId: ulid() as BookingId,
 	});
 
