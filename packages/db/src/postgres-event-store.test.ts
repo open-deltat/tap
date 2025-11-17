@@ -46,10 +46,10 @@ beforeAll(async () => {
 	}
 });
 
-test.skipIf(shouldSkip || !eventStore)(
-	'append and getAll work correctly',
-	async () => {
-		if (!eventStore) return;
+test.skipIf(shouldSkip)('append and getAll work correctly', async () => {
+	if (!eventStore) {
+		throw new Error('eventStore not initialized');
+	}
 		const tenantId = ulid() as TenantId;
 		const resourceId = ulid() as ResourceId;
 
@@ -83,10 +83,10 @@ test.skipIf(shouldSkip || !eventStore)(
 	},
 );
 
-test.skipIf(shouldSkip || !eventStore)(
-	'getByResource filters correctly',
-	async () => {
-		if (!eventStore) return;
+test.skipIf(shouldSkip)('getByResource filters correctly', async () => {
+	if (!eventStore) {
+		throw new Error('eventStore not initialized');
+	}
 		const tenantId = ulid() as TenantId;
 		const resourceId1 = ulid() as ResourceId;
 		const resourceId2 = ulid() as ResourceId;
@@ -146,10 +146,10 @@ test.skipIf(shouldSkip || !eventStore)(
 	},
 );
 
-test.skipIf(shouldSkip || !eventStore)(
-	'getByTenant filters correctly',
-	async () => {
-		if (!eventStore) return;
+test.skipIf(shouldSkip)('getByTenant filters correctly', async () => {
+	if (!eventStore) {
+		throw new Error('eventStore not initialized');
+	}
 		const tenantId1 = ulid() as TenantId;
 		const tenantId2 = ulid() as TenantId;
 		const resourceId = ulid() as ResourceId;

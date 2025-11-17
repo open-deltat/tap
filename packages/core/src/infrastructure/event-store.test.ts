@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
-import type { LedgerEvent } from '../../domain/events';
-import type { HoldId, ResourceId, TenantId } from '../../domain/ids';
+import type { LedgerEvent } from '../domain/events';
+import type { HoldId, ResourceId, TenantId } from '../domain/ids';
 import { createInMemoryEventStore } from './event-store';
 
 test('append and getAll work correctly', async () => {
