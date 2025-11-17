@@ -131,3 +131,118 @@ test('getByTenant filters correctly', async () => {
 	expect(tenant2Events.length).toBe(1);
 	expect(tenant2Events[0]).toEqual(event2);
 });
+
+test('getAfterCursor returns events after cursor', async () => {
+	const store = createInMemoryEventStore();
+	const tenantId = ulid() as TenantId;
+	const resourceId = ulid() as ResourceId;
+
+	const event1: LedgerEvent = {
+		eventId: ulid(),
+		tenantId,
+		resourceId,
+		type: 'HoldPlaced',
+		version: 1,
+		createdAt: Date.now(),
+		payload: {
+			holdId: ulid() as HoldId,
+			day: '2025-12-01',
+			startMinute: 600,
+			endMinute: 660,
+			expiresAt: Date.now() + 60_000,
+		},
+	};
+
+	const event2: LedgerEvent = {
+		eventId: ulid(),
+		tenantId,
+		resourceId,
+		type: 'BookingConfirmed',
+		version: 1,
+		createdAt: Date.now() + 1000,
+		payload: {
+			bookingId: ulid(),
+			holdId: ulid() as HoldId,
+			start: Date.now(),
+			end: Date.now() + 60 * 60 * 1000,
+		},
+	};
+
+	await store.append(event1);
+	await store.append(event2);
+
+	const afterCursor = await store.getAfterCursor(event1.eventId);
+	expect(afterCursor.length).toBe(1);
+	expect(afterCursor[0]).toEqual(event2);
+});
+
+test('getAfterCursor with tenantId filters correctly', async () => {
+	const store = createInMemoryEventStore();
+	const tenantId1 = ulid() as TenantId;
+	const tenantId2 = ulid() as TenantId;
+	const resourceId = ulid() as ResourceId;
+
+	const event1: LedgerEvent = {
+		eventId: ulid(),
+		tenantId: tenantId1,
+		resourceId,
+		type: 'HoldPlaced',
+		version: 1,
+		createdAt: Date.now(),
+		payload: {
+			holdId: ulid() as HoldId,
+			day: '2025-12-01',
+			startMinute: 600,
+			endMinute: 660,
+			expiresAt: Date.now() + 60_000,
+		},
+	};
+
+	const event2: LedgerEvent = {
+		eventId: ulid(),
+		tenantId: tenantId2,
+		resourceId,
+		type: 'HoldPlaced',
+		version: 1,
+		createdAt: Date.now() + 1000,
+		payload: {
+			holdId: ulid() as HoldId,
+			day: '2025-12-01',
+			startMinute: 600,
+			endMinute: 660,
+			expiresAt: Date.now() + 60_000,
+		},
+	};
+
+	const event3: LedgerEvent = {
+		eventId: ulid(),
+		tenantId: tenantId1,
+		resourceId,
+		type: 'BookingConfirmed',
+		version: 1,
+		createdAt: Date.now() + 2000,
+		payload: {
+			bookingId: ulid(),
+			holdId: ulid() as HoldId,
+			start: Date.now(),
+			end: Date.now() + 60 * 60 * 1000,
+		},
+	};
+
+	await store.append(event1);
+	await store.append(event2);
+	await store.append(event3);
+
+	const afterCursor = await store.getAfterCursor(event1.eventId, tenantId1);
+	expect(afterCursor.length).toBe(1);
+	expect(afterCursor[0]).toEqual(event3);
+	expect(afterCursor[0].tenantId).toBe(tenantId1);
+});
+
+test('getAfterCursor returns empty array if cursor not found', async () => {
+	const store = createInMemoryEventStore();
+	const fakeCursor = ulid();
+
+	const afterCursor = await store.getAfterCursor(fakeCursor);
+	expect(afterCursor.length).toBe(0);
+});

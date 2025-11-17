@@ -8,6 +8,7 @@ export type EventStore = {
 		resourceId: string,
 	) => Promise<LedgerEvent[]>;
 	getByTenant: (tenantId: string) => Promise<LedgerEvent[]>;
+	getAfterCursor: (cursor: string, tenantId?: string) => Promise<LedgerEvent[]>;
 };
 
 export const createInMemoryEventStore = (): EventStore => {
@@ -30,6 +31,18 @@ export const createInMemoryEventStore = (): EventStore => {
 
 		getByTenant: async (tenantId: string) => {
 			return events.filter((e) => e.tenantId === tenantId);
+		},
+
+		getAfterCursor: async (cursor: string, tenantId?: string) => {
+			let filtered = events;
+			if (tenantId) {
+				filtered = events.filter((e) => e.tenantId === tenantId);
+			}
+			const cursorIndex = filtered.findIndex((e) => e.eventId === cursor);
+			if (cursorIndex < 0) {
+				return [];
+			}
+			return filtered.slice(cursorIndex + 1);
 		},
 	};
 };

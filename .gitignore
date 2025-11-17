@@ -8,6 +8,11 @@ node_modules/
 dist/
 build/
 
+# Compiled JavaScript files in source directories
+**/src/**/*.js
+**/src/**/*.js.map
+**/src/**/*.d.ts.map
+
 # Turborepo
 .turbo/
 

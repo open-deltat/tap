@@ -187,3 +187,139 @@ test.skipIf(shouldSkip)('getByTenant filters correctly', async () => {
 	expect(tenant2Events.some((e) => e.eventId === event2.eventId)).toBe(true);
 	expect(tenant2Events.every((e) => e.tenantId === tenantId2)).toBe(true);
 });
+
+test.skipIf(shouldSkip)(
+	'getAfterCursor returns events after cursor',
+	async () => {
+		if (!eventStore) {
+			throw new Error('eventStore not initialized');
+		}
+		const tenantId = ulid() as TenantId;
+		const resourceId = ulid() as ResourceId;
+
+		const event1: LedgerEvent = {
+			eventId: ulid(),
+			tenantId,
+			resourceId,
+			type: 'HoldPlaced',
+			version: 1,
+			createdAt: Date.now(),
+			payload: {
+				holdId: ulid() as HoldId,
+				day: '2025-12-01',
+				startMinute: 600,
+				endMinute: 660,
+				expiresAt: Date.now() + 60_000,
+			},
+		};
+
+		const event2: LedgerEvent = {
+			eventId: ulid(),
+			tenantId,
+			resourceId,
+			type: 'BookingConfirmed',
+			version: 1,
+			createdAt: Date.now() + 1000,
+			payload: {
+				bookingId: ulid(),
+				holdId: ulid() as HoldId,
+				start: Date.now(),
+				end: Date.now() + 60 * 60 * 1000,
+			},
+		};
+
+		await eventStore.append(event1);
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		await eventStore.append(event2);
+
+		const afterCursor = await eventStore.getAfterCursor(event1.eventId);
+		expect(afterCursor.length).toBeGreaterThanOrEqual(1);
+		expect(afterCursor.some((e) => e.eventId === event2.eventId)).toBe(true);
+	},
+);
+
+test.skipIf(shouldSkip)(
+	'getAfterCursor with tenantId filters correctly',
+	async () => {
+		if (!eventStore) {
+			throw new Error('eventStore not initialized');
+		}
+		const tenantId1 = ulid() as TenantId;
+		const tenantId2 = ulid() as TenantId;
+		const resourceId = ulid() as ResourceId;
+
+		const event1: LedgerEvent = {
+			eventId: ulid(),
+			tenantId: tenantId1,
+			resourceId,
+			type: 'HoldPlaced',
+			version: 1,
+			createdAt: Date.now(),
+			payload: {
+				holdId: ulid() as HoldId,
+				day: '2025-12-01',
+				startMinute: 600,
+				endMinute: 660,
+				expiresAt: Date.now() + 60_000,
+			},
+		};
+
+		const event2: LedgerEvent = {
+			eventId: ulid(),
+			tenantId: tenantId2,
+			resourceId,
+			type: 'HoldPlaced',
+			version: 1,
+			createdAt: Date.now() + 1000,
+			payload: {
+				holdId: ulid() as HoldId,
+				day: '2025-12-01',
+				startMinute: 600,
+				endMinute: 660,
+				expiresAt: Date.now() + 60_000,
+			},
+		};
+
+		const event3: LedgerEvent = {
+			eventId: ulid(),
+			tenantId: tenantId1,
+			resourceId,
+			type: 'BookingConfirmed',
+			version: 1,
+			createdAt: Date.now() + 2000,
+			payload: {
+				bookingId: ulid(),
+				holdId: ulid() as HoldId,
+				start: Date.now(),
+				end: Date.now() + 60 * 60 * 1000,
+			},
+		};
+
+		await eventStore.append(event1);
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		await eventStore.append(event2);
+		await new Promise((resolve) => setTimeout(resolve, 100));
+		await eventStore.append(event3);
+
+		const afterCursor = await eventStore.getAfterCursor(
+			event1.eventId,
+			tenantId1,
+		);
+		expect(afterCursor.length).toBeGreaterThanOrEqual(1);
+		expect(afterCursor.some((e) => e.eventId === event3.eventId)).toBe(true);
+		expect(afterCursor.every((e) => e.tenantId === tenantId1)).toBe(true);
+	},
+);
+
+test.skipIf(shouldSkip)(
+	'getAfterCursor returns empty array if cursor not found',
+	async () => {
+		if (!eventStore) {
+			throw new Error('eventStore not initialized');
+		}
+		const fakeCursor = ulid();
+
+		const afterCursor = await eventStore.getAfterCursor(fakeCursor);
+		expect(afterCursor.length).toBe(0);
+	},
+);

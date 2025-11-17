@@ -1,5 +1,5 @@
 import type { EventStore, LedgerEvent } from '@tap/core';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, gt, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { ledgerEvents } from './schema';
@@ -73,6 +73,45 @@ export const createPostgresEventStore = (
 				.select()
 				.from(ledgerEvents)
 				.where(eq(ledgerEvents.tenantId, tenantId))
+				.orderBy(asc(ledgerEvents.createdAt));
+			return rows.map(rowToEvent);
+		},
+
+		getAfterCursor: async (
+			cursor: string,
+			tenantId?: string,
+		): Promise<LedgerEvent[]> => {
+			const cursorRow = await db
+				.select()
+				.from(ledgerEvents)
+				.where(eq(ledgerEvents.eventId, cursor))
+				.limit(1);
+
+			const cursorEvent = cursorRow[0];
+			if (!cursorEvent) {
+				return [];
+			}
+
+			const cursorCreatedAt = cursorEvent.createdAt;
+
+			const conditions = [
+				or(
+					gt(ledgerEvents.createdAt, cursorCreatedAt),
+					and(
+						eq(ledgerEvents.createdAt, cursorCreatedAt),
+						gt(ledgerEvents.eventId, cursor),
+					),
+				),
+			];
+
+			if (tenantId) {
+				conditions.push(eq(ledgerEvents.tenantId, tenantId));
+			}
+
+			const rows = await db
+				.select()
+				.from(ledgerEvents)
+				.where(and(...conditions))
 				.orderBy(asc(ledgerEvents.createdAt));
 			return rows.map(rowToEvent);
 		},

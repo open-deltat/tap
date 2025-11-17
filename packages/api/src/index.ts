@@ -62,3 +62,6 @@ console.log(
 	`  POST /v1/bookings/:id/cancel                   - Cancel booking`,
 );
 console.log(`  GET  /v1/events                                - Get events`);
+console.log(
+	`  GET  /v1/events/stream                          - Stream events (SSE)`,
+);

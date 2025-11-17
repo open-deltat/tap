@@ -341,6 +341,20 @@ export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 		}
 	}
 
+	if (req.method === 'GET' && pathname === '/v1/events/stream') {
+		try {
+			const { handleEventStream } = await import('./stream');
+			return await handleEventStream(req);
+		} catch (error) {
+			return new Response(
+				JSON.stringify({
+					error: error instanceof Error ? error.message : 'Unknown error',
+				}),
+				{ status: 500, headers: { 'Content-Type': 'application/json' } },
+			);
+		}
+	}
+
 	if (req.method === 'GET' && pathname === '/v1/events') {
 		try {
 			const url = new URL(req.url);
