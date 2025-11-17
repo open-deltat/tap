@@ -35,7 +35,12 @@ export type Allocator = {
 		resourceId: ResourceId;
 		holdId: HoldId;
 		bookingId: BookingId;
+		start: number;
+		end: number;
+		customerName?: string;
 		customerEmail?: string;
+		customerPhone?: string;
+		paymentStatus?: 'NONE' | 'PENDING' | 'PAID';
 		priceCents?: number;
 	}) => Promise<BookingConfirmedEvent | null>;
 	expireHolds: (now: number) => HoldId[];

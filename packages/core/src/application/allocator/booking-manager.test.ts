@@ -39,11 +39,17 @@ test('confirmBooking succeeds when hold exists', async () => {
 		throw new Error('Hold placement failed');
 	}
 
+	const dayStart = new Date('2025-12-25').setHours(0, 0, 0, 0);
+	const start = dayStart + 600 * 60 * 1000;
+	const end = dayStart + 660 * 60 * 1000;
+
 	const bookingResult = await bookingManager.confirmBooking({
 		tenantId,
 		resourceId,
 		holdId: holdResult.holdId,
 		bookingId: ulid() as BookingId,
+		start,
+		end,
 	});
 
 	expect(bookingResult).not.toBeNull();
@@ -66,11 +72,17 @@ test('confirmBooking returns null when hold does not exist', async () => {
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 
+	const dayStart = new Date('2025-12-25').setHours(0, 0, 0, 0);
+	const start = dayStart + 600 * 60 * 1000;
+	const end = dayStart + 660 * 60 * 1000;
+
 	const result = await bookingManager.confirmBooking({
 		tenantId,
 		resourceId,
 		holdId: ulid() as HoldId,
 		bookingId: ulid() as BookingId,
+		start,
+		end,
 	});
 
 	expect(result).toBeNull();

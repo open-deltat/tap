@@ -51,11 +51,17 @@ test('hold → confirm is atomic', async () => {
 		throw new Error('Hold placement failed');
 	}
 
+	const dayStart = new Date(day).setHours(0, 0, 0, 0);
+	const start = dayStart + 600 * 60 * 1000;
+	const end = dayStart + 660 * 60 * 1000;
+
 	const confirmEvent = await allocator.confirmBooking({
 		tenantId,
 		resourceId,
 		holdId: holdResult.holdId,
 		bookingId: ulid() as BookingId,
+		start,
+		end,
 	});
 
 	expect(confirmEvent).not.toBeNull();

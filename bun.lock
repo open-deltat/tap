@@ -8,6 +8,16 @@
         "turbo": "latest",
       },
     },
+    "packages/api": {
+      "name": "@tap/api",
+      "version": "0.1.0",
+      "dependencies": {
+        "@tap/core": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+    },
     "packages/core": {
       "name": "@tap/core",
       "version": "0.1.0",
@@ -38,6 +48,8 @@
     "@biomejs/cli-win32-arm64": ["@biomejs/cli-win32-arm64@2.2.2", "", { "os": "win32", "cpu": "arm64" }, "sha512-wBe2wItayw1zvtXysmHJQoQqXlTzHSpQRyPpJKiNIR21HzH/CrZRDFic1C1jDdp+zAPtqhNExa0owKMbNwW9cQ=="],
 
     "@biomejs/cli-win32-x64": ["@biomejs/cli-win32-x64@2.2.2", "", { "os": "win32", "cpu": "x64" }, "sha512-DAuHhHekGfiGb6lCcsT4UyxQmVwQiBCBUMwVra/dcOSs9q8OhfaZgey51MlekT3p8UwRqtXQfFuEJBhJNdLZwg=="],
+
+    "@tap/api": ["@tap/api@workspace:packages/api"],
 
     "@tap/core": ["@tap/core@workspace:packages/core"],
 

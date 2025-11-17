@@ -27,14 +27,20 @@ test('e2e: place hold, confirm booking, check events', async () => {
 
   await eventStore.append(holdResult.event);
 
-  const confirmEvent = await allocator.confirmBooking({
-    tenantId,
-    resourceId,
-    holdId: holdResult.holdId,
-    bookingId: ulid() as BookingId,
-    customerEmail: 'test@example.com',
-    priceCents: 5000,
-  });
+	const dayStart = new Date(day).setHours(0, 0, 0, 0);
+	const start = dayStart + 600 * 60 * 1000;
+	const end = dayStart + 660 * 60 * 1000;
+
+	const confirmEvent = await allocator.confirmBooking({
+		tenantId,
+		resourceId,
+		holdId: holdResult.holdId,
+		bookingId: ulid() as BookingId,
+		start,
+		end,
+		customerEmail: 'test@example.com',
+		priceCents: 5000,
+	});
 
   expect(confirmEvent).not.toBeNull();
   if (!confirmEvent) {

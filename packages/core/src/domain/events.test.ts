@@ -34,6 +34,8 @@ test('validates BookingConfirmed event', () => {
 		payload: {
 			bookingId: ulid(),
 			holdId: ulid(),
+			start: Date.now(),
+			end: Date.now() + 3600000,
 			customerEmail: 'test@example.com',
 			priceCents: 5000,
 		},

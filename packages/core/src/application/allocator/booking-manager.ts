@@ -10,62 +10,80 @@ export type BookingManager = {
 		resourceId: ResourceId;
 		holdId: HoldId;
 		bookingId: BookingId;
+		start: number;
+		end: number;
+		customerName?: string;
 		customerEmail?: string;
+		customerPhone?: string;
+		paymentStatus?: 'NONE' | 'PENDING' | 'PAID';
 		priceCents?: number;
 	}) => Promise<BookingConfirmedEvent | null>;
 };
 
-export const createBookingManager = (params: {
+export const createBookingManager = (deps: {
 	getState: (tenantId: TenantId, resourceId: ResourceId) => AllocatorState;
 	holds: Map<HoldId, HoldMetadata>;
 	withLock: (key: string) => Promise<() => void>;
 }): BookingManager => {
 	return {
-		confirmBooking: async ({
-			tenantId,
-			resourceId,
-			holdId,
-			bookingId,
-			customerEmail,
-			priceCents,
-		}) => {
-			const hold = params.holds.get(holdId);
+		confirmBooking: async (params) => {
+			const { tenantId, resourceId, holdId, bookingId } = params;
+			const hold = deps.holds.get(holdId);
 			if (!hold) {
 				return null;
 			}
 
 			const lockKey = `${tenantId}:${resourceId}:${hold.day}`;
-			const release = await params.withLock(lockKey);
+			const release = await deps.withLock(lockKey);
 			try {
-				const dayMap = params.getState(tenantId, resourceId);
+				const dayMap = deps.getState(tenantId, resourceId);
 				const dayState = dayMap.get(hold.day);
 				if (!dayState) {
-					params.holds.delete(holdId);
+					deps.holds.delete(holdId);
 					return null;
 				}
 
 				for (let m = hold.start; m < hold.end; m++) {
 					if (getBit(dayState.booked, m)) {
-						params.holds.delete(holdId);
+						deps.holds.delete(holdId);
 						return null;
 					}
 					if (!getBit(dayState.held, m)) {
-						params.holds.delete(holdId);
+						deps.holds.delete(holdId);
 						return null;
 					}
 				}
 
 				setBitRange(dayState.held, hold.start, hold.end, false);
 				setBitRange(dayState.booked, hold.start, hold.end, true);
-				params.holds.delete(holdId);
+				deps.holds.delete(holdId);
+
+				const dayStart = new Date(hold.day).setHours(0, 0, 0, 0);
+				const start = dayStart + hold.start * 60 * 1000;
+				const end = dayStart + hold.end * 60 * 1000;
 
 				const event = createBookingConfirmedEvent({
 					tenantId,
 					resourceId,
 					bookingId,
 					holdId,
-					customerEmail,
-					priceCents,
+					start,
+					end,
+					...(params.customerName !== undefined && {
+						customerName: params.customerName,
+					}),
+					...(params.customerEmail !== undefined && {
+						customerEmail: params.customerEmail,
+					}),
+					...(params.customerPhone !== undefined && {
+						customerPhone: params.customerPhone,
+					}),
+					...(params.paymentStatus !== undefined && {
+						paymentStatus: params.paymentStatus,
+					}),
+					...(params.priceCents !== undefined && {
+						priceCents: params.priceCents,
+					}),
 				});
 
 				return event;

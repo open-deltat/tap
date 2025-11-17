@@ -45,7 +45,12 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 		payload: z.object({
 			bookingId: ULIDSchema,
 			holdId: ULIDSchema,
+			start: z.number(),
+			end: z.number(),
+			customerName: z.string().optional(),
 			customerEmail: z.string().email().optional(),
+			customerPhone: z.string().optional(),
+			paymentStatus: z.enum(['NONE', 'PENDING', 'PAID']).optional(),
 			priceCents: z.number().int().optional(),
 		}),
 	}),
