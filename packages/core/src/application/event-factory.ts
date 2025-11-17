@@ -1,5 +1,9 @@
 import { ulid } from 'ulid';
-import type { BookingConfirmedEvent, HoldPlacedEvent } from '../domain/events';
+import type {
+	BookingCancelledEvent,
+	BookingConfirmedEvent,
+	HoldPlacedEvent,
+} from '../domain/events';
 import type {
 	BookingId,
 	DayKey,
@@ -65,5 +69,21 @@ export const createBookingConfirmedEvent = (params: {
 		customerPhone: params.customerPhone,
 		paymentStatus: params.paymentStatus,
 		priceCents: params.priceCents,
+	},
+});
+
+export const createBookingCancelledEvent = (params: {
+	tenantId: TenantId;
+	resourceId: ResourceId;
+	bookingId: BookingId;
+}): BookingCancelledEvent => ({
+	eventId: ulid() as EventId,
+	tenantId: params.tenantId,
+	resourceId: params.resourceId,
+	type: 'BookingCancelled',
+	version: 1,
+	createdAt: Date.now(),
+	payload: {
+		bookingId: params.bookingId,
 	},
 });

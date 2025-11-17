@@ -1,0 +1,24 @@
+{
+	"name": "@tap/db",
+	"version": "0.1.0",
+	"description": "TAP Postgres persistence layer",
+	"type": "module",
+	"main": "./src/index.ts",
+	"scripts": {
+		"migrate": "bun run src/migrate.ts",
+		"migrate:generate": "drizzle-kit generate",
+		"migrate:push": "drizzle-kit push",
+		"test": "bash ../../scripts/ensure-db.sh && bun test",
+		"test:watch": "bash ../../scripts/ensure-db.sh && bun test --watch",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@tap/core": "workspace:*",
+		"drizzle-orm": "^0.36.0",
+		"postgres": "^3.4.3"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"drizzle-kit": "^0.28.0"
+	}
+}

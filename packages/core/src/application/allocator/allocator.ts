@@ -1,4 +1,5 @@
 import type {
+	BookingCancelledEvent,
 	BookingConfirmedEvent,
 	HoldPlacedEvent,
 } from '../../domain/events';
@@ -43,6 +44,14 @@ export type Allocator = {
 		paymentStatus?: 'NONE' | 'PENDING' | 'PAID';
 		priceCents?: number;
 	}) => Promise<BookingConfirmedEvent | null>;
+	cancelBooking: (params: {
+		tenantId: TenantId;
+		resourceId: ResourceId;
+		bookingId: BookingId;
+		day: DayKey;
+		startMinute: Minute;
+		endMinute: Minute;
+	}) => Promise<BookingCancelledEvent | null>;
 	expireHolds: (now: number) => HoldId[];
 	getState: (tenantId: TenantId, resourceId: ResourceId) => AllocatorState;
 };
@@ -73,6 +82,7 @@ export const createAllocator = (): Allocator => {
 		getState: manager.getState,
 		placeHold: holdManager.placeHold,
 		confirmBooking: bookingManager.confirmBooking,
+		cancelBooking: bookingManager.cancelBooking,
 		expireHolds: expiryManager.expireHolds,
 	};
 };

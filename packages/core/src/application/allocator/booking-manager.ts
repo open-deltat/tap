@@ -1,7 +1,13 @@
-import type { BookingConfirmedEvent } from '../../domain/events';
+import type {
+	BookingCancelledEvent,
+	BookingConfirmedEvent,
+} from '../../domain/events';
 import type { BookingId, HoldId, ResourceId, TenantId } from '../../domain/ids';
 import { getBit, setBitRange } from '../../infrastructure/bitmap';
-import { createBookingConfirmedEvent } from '../event-factory';
+import {
+	createBookingCancelledEvent,
+	createBookingConfirmedEvent,
+} from '../event-factory';
 import type { AllocatorState, HoldMetadata } from './types';
 
 export type BookingManager = {
@@ -18,6 +24,14 @@ export type BookingManager = {
 		paymentStatus?: 'NONE' | 'PENDING' | 'PAID';
 		priceCents?: number;
 	}) => Promise<BookingConfirmedEvent | null>;
+	cancelBooking: (params: {
+		tenantId: TenantId;
+		resourceId: ResourceId;
+		bookingId: BookingId;
+		day: string;
+		startMinute: number;
+		endMinute: number;
+	}) => Promise<BookingCancelledEvent | null>;
 };
 
 export const createBookingManager = (deps: {
@@ -84,6 +98,56 @@ export const createBookingManager = (deps: {
 					...(params.priceCents !== undefined && {
 						priceCents: params.priceCents,
 					}),
+				});
+
+				return event;
+			} finally {
+				release();
+			}
+		},
+
+		cancelBooking: async (params: {
+			tenantId: TenantId;
+			resourceId: ResourceId;
+			bookingId: BookingId;
+			day: string;
+			startMinute: number;
+			endMinute: number;
+		}): Promise<BookingCancelledEvent | null> => {
+			const { tenantId, resourceId, bookingId, day, startMinute, endMinute } =
+				params;
+
+			const lockKey = `${tenantId}:${resourceId}:${day}`;
+			const release = await deps.withLock(lockKey);
+			try {
+				const dayMap = deps.getState(tenantId, resourceId);
+				const dayState = dayMap.get(day);
+				if (!dayState) {
+					return null;
+				}
+
+				// Check if booking exists (bits are set)
+				let hasBooking = false;
+				for (let m = startMinute; m < endMinute; m++) {
+					if (getBit(dayState.booked, m)) {
+						hasBooking = true;
+					} else {
+						hasBooking = false;
+						break;
+					}
+				}
+
+				if (!hasBooking) {
+					return null;
+				}
+
+				// Clear booked bits
+				setBitRange(dayState.booked, startMinute, endMinute, false);
+
+				const event = createBookingCancelledEvent({
+					tenantId,
+					resourceId,
+					bookingId,
 				});
 
 				return event;
