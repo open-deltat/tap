@@ -1,5 +1,9 @@
 import type { AllocatorState, DayKey, Minute, Offer } from '@tap/core';
-import { getAvailableMinutesFromOffers, isRangeFree } from '@tap/core';
+import {
+	getAvailableMinutesFromOffers,
+	isRangeFree,
+	parseDayToUnixStartOfDayUTC,
+} from '@tap/core';
 import type { AvailabilitySlot } from '../types';
 
 export const getAvailability = (params: {
@@ -23,7 +27,7 @@ export const getAvailability = (params: {
 	const availableMinutesFromOffers = getAvailableMinutesFromOffers(day, offers);
 
 	const slots: AvailabilitySlot[] = [];
-	const dayStart = new Date(day).setHours(0, 0, 0, 0);
+	const dayStart = parseDayToUnixStartOfDayUTC(day);
 
 	let currentStart = fromMinute;
 

@@ -1,4 +1,5 @@
 import type { BookingId, HoldId, ResourceId, TenantId } from '@tap/core';
+import { parseDayToUnixStartOfDayUTC } from '@tap/core';
 import { ulid } from 'ulid';
 import { getAvailability } from '../services/availability';
 import {
@@ -317,15 +318,26 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 					});
 				}
 
-				const dayDate = new Date(holdEvent.payload.day);
-				dayDate.setHours(0, 0, 0, 0);
-				const dayStart = dayDate.getTime();
+				const dayStart = parseDayToUnixStartOfDayUTC(holdEvent.payload.day);
 				start = dayStart + holdEvent.payload.startMinute * 60 * 1000;
 				end = dayStart + holdEvent.payload.endMinute * 60 * 1000;
 				holdId = holdEvent.payload.holdId;
 			} else if (body.start && body.end) {
-				const startDate = new Date(body.start);
-				const endDate = new Date(body.end);
+				const startUnix =
+					typeof body.start === 'number'
+						? body.start
+						: new Date(body.start).getTime();
+				const endUnix =
+					typeof body.end === 'number' ? body.end : new Date(body.end).getTime();
+
+				if (Number.isNaN(startUnix) || Number.isNaN(endUnix)) {
+					return new Response(JSON.stringify({ error: 'Invalid start or end date' }), {
+						status: 400,
+						headers: { 'Content-Type': 'application/json' },
+					});
+				}
+
+				const startDate = new Date(startUnix);
 				const dayStr = startDate.toISOString().split('T')[0];
 				if (!dayStr) {
 					return new Response(JSON.stringify({ error: 'Invalid start date' }), {
@@ -343,8 +355,9 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				}
 
 				const day = dayStr;
-				const startMinute = startDate.getHours() * 60 + startDate.getMinutes();
-				const endMinute = endDate.getHours() * 60 + endDate.getMinutes();
+				const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
+				const startMinute = Math.floor((startUnix - dayStartUnix) / (60 * 1000));
+				const endMinute = Math.floor((endUnix - dayStartUnix) / (60 * 1000));
 
 				const holdResult = await allocator.placeHold({
 					tenantId: tenant.id as TenantId,
@@ -364,8 +377,8 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 
 				await eventStore.append(holdResult.event);
 				holdId = holdResult.holdId;
-				start = startDate.getTime();
-				end = endDate.getTime();
+				start = startUnix;
+				end = endUnix;
 			} else {
 				return new Response(
 					JSON.stringify({
