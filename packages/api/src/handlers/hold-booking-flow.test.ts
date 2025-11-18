@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import type { BookingId, HoldId, ResourceId, TenantId } from '@tap/core';
+import type { ResourceId, TenantId } from '@tap/core';
 import { parseDayToUnixStartOfDayUTC } from '@tap/core';
-import { ulid } from 'ulid';
 import { getAllocator, getEventStore } from '../services/context';
 import { handlePrivateRequest } from './private';
 import {
@@ -19,14 +18,12 @@ beforeAll(async () => {
 	await createTestOffer(testTenant, testResource);
 });
 
-afterAll(async () => {
-});
+afterAll(async () => {});
 
 test('Hold + Booking flow: place hold with unix timestamps', async () => {
 	const tenantId = testTenant.id as TenantId;
 	const resourceId = testResource.id as ResourceId;
 	const day = '2025-01-10';
-	const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
 	const expiresAtUnix = Date.now() + 60_000;
 
 	const req = new Request('http://localhost/v1/holds', {
@@ -274,7 +271,8 @@ test('Hold + Booking flow: booking uses UTC for day parsing', async () => {
 	const eventStore = getEventStore();
 	const events = await eventStore.getByResource(tenantId, resourceId);
 	const bookingEvent = events.find(
-		(e) => e.type === 'BookingConfirmed' && e.payload.holdId === holdBody.holdId,
+		(e) =>
+			e.type === 'BookingConfirmed' && e.payload.holdId === holdBody.holdId,
 	);
 
 	expect(bookingEvent).toBeDefined();
@@ -420,4 +418,3 @@ test('Hold + Booking flow: all timestamps are unix milliseconds', async () => {
 		expect(bookingEvent.payload.end).toBe(endUnix);
 	}
 });
-

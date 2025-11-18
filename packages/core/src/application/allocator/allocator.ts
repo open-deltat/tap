@@ -1,6 +1,7 @@
 import type {
 	BookingCancelledEvent,
 	BookingConfirmedEvent,
+	HoldExpiredEvent,
 	HoldPlacedEvent,
 } from '../../domain/events';
 import type {
@@ -15,6 +16,7 @@ import { createMutex } from '../../infrastructure/mutex';
 import { createBookingManager } from './booking-manager';
 import { createExpiryManager } from './expiry-manager';
 import { createHoldManager } from './hold-manager';
+import { createReleaseManager } from './release-manager';
 import { createStateManager } from './state-manager';
 import type { AllocatorState, HoldMetadata } from './types';
 
@@ -53,6 +55,11 @@ export type Allocator = {
 		endMinute: Minute;
 	}) => Promise<BookingCancelledEvent | null>;
 	expireHolds: (now: number) => HoldId[];
+	releaseHold: (params: {
+		holdId: HoldId;
+		tenantId: TenantId;
+		resourceId: ResourceId;
+	}) => Promise<HoldExpiredEvent | null>;
 	getState: (tenantId: TenantId, resourceId: ResourceId) => AllocatorState;
 };
 
@@ -78,11 +85,17 @@ export const createAllocator = (): Allocator => {
 		holds,
 	});
 
+	const releaseManager = createReleaseManager({
+		getState: manager.getState,
+		holds,
+	});
+
 	return {
 		getState: manager.getState,
 		placeHold: holdManager.placeHold,
 		confirmBooking: bookingManager.confirmBooking,
 		cancelBooking: bookingManager.cancelBooking,
 		expireHolds: expiryManager.expireHolds,
+		releaseHold: releaseManager.releaseHold,
 	};
 };

@@ -5,9 +5,14 @@ import {
 	type AvailabilitySlot,
 	type AvailabilityState,
 	createAvailabilityState,
+	isSlotAvailable,
 	updateAvailabilityFromEvent,
 } from '@/lib/availability-state';
-import { getDayKey, toISODateString } from '@/lib/timezone';
+import {
+	getDayKey,
+	getMinutesFromMidnight,
+	toISODateString,
+} from '@/lib/timezone';
 import type { BookingEvent } from '../../../stream-client/src/types';
 
 export type UseAvailabilityOptions = {
@@ -27,6 +32,7 @@ export type UseAvailabilityResult = {
 	error: Error | null;
 	refresh: () => Promise<void>;
 	applyDelta: (event: BookingEvent) => void;
+	cursor: string | null;
 };
 
 export const useAvailability = (
@@ -46,8 +52,8 @@ export const useAvailability = (
 	const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
+	const [cursor, setCursor] = useState<string | null>(null);
 	const stateRef = useRef<AvailabilityState>(createAvailabilityState());
-	const cursorRef = useRef<string | null>(null);
 
 	const fetchAvailability = useCallback(
 		async (date: Date) => {
@@ -126,7 +132,7 @@ export const useAvailability = (
 							events: Array<{ eventId: string }>;
 						};
 						if (eventsData.events.length > 0 && eventsData.events[0]) {
-							cursorRef.current = eventsData.events[0].eventId;
+							setCursor(eventsData.events[0].eventId);
 						}
 					}
 				} catch {}
@@ -147,34 +153,93 @@ export const useAvailability = (
 		],
 	);
 
-	const refresh = async () => {
+	const refresh = useCallback(async () => {
 		if (selectedDate) {
 			await fetchAvailability(selectedDate);
 		}
-	};
+	}, [selectedDate, fetchAvailability]);
 
-	const applyDelta = (event: BookingEvent) => {
-		updateAvailabilityFromEvent(stateRef.current, event);
+	const recalculateSlots = useCallback(
+		(date: Date) => {
+			const dayKey = getDayKey(date);
+			const fromMinute = fromHour * 60;
+			const toMinute = toHour * 60;
 
-		if (selectedDate) {
-			const dayKey = getDayKey(selectedDate);
-			let shouldRefresh = false;
+			const state = stateRef.current;
+			const dayState = state.get(dayKey);
 
-			if (event.type === 'HoldPlaced') {
-				shouldRefresh = event.payload.day === dayKey;
-			} else if (event.type === 'HoldExpired') {
-				shouldRefresh = stateRef.current.has(dayKey);
-			} else if (event.type === 'BookingConfirmed') {
-				shouldRefresh = getDayKey(new Date(event.payload.start)) === dayKey;
-			} else if (event.type === 'BookingCancelled') {
-				shouldRefresh = stateRef.current.has(dayKey);
+			if (dayState) {
+				const localSlots = getAvailableSlots(
+					state,
+					dayKey,
+					fromMinute,
+					toMinute,
+					durationMinutes,
+					slotResolutionMinutes,
+				);
+
+				setSlots((currentSlots) => {
+					const currentSlotSet = new Set(
+						currentSlots.map((s) => `${s.start}-${s.end}`),
+					);
+					const filteredLocalSlots = localSlots.filter(
+						(s) => !currentSlotSet.has(`${s.start}-${s.end}`),
+					);
+
+					const updatedSlots = currentSlots
+						.filter((slot) => {
+							const slotStart = new Date(slot.start);
+							const slotDayKey = getDayKey(slotStart);
+							if (slotDayKey !== dayKey) return true;
+
+							const slotStartMinute = getMinutesFromMidnight(slotStart);
+							const slotEndMinute = getMinutesFromMidnight(new Date(slot.end));
+							const slotDuration = slotEndMinute - slotStartMinute;
+
+							if (slotDuration !== durationMinutes) return true;
+
+							return isSlotAvailable(
+								state,
+								dayKey,
+								slotStartMinute,
+								slotEndMinute,
+							);
+						})
+						.concat(filteredLocalSlots);
+
+					return updatedSlots;
+				});
 			}
+		},
+		[durationMinutes, fromHour, toHour, slotResolutionMinutes],
+	);
 
-			if (shouldRefresh) {
-				refresh();
+	const applyDelta = useCallback(
+		(event: BookingEvent) => {
+			updateAvailabilityFromEvent(stateRef.current, event);
+
+			if (selectedDate) {
+				const dayKey = getDayKey(selectedDate);
+				let shouldUpdate = false;
+
+				if (event.type === 'HoldPlaced') {
+					shouldUpdate = event.payload.day === dayKey;
+				} else if (event.type === 'HoldExpired') {
+					shouldUpdate = stateRef.current.has(dayKey);
+				} else if (event.type === 'BookingConfirmed') {
+					shouldUpdate = getDayKey(new Date(event.payload.start)) === dayKey;
+				} else if (event.type === 'BookingCancelled') {
+					shouldUpdate = stateRef.current.has(dayKey);
+				}
+
+				if (shouldUpdate) {
+					recalculateSlots(selectedDate);
+					refresh();
+				}
 			}
-		}
-	};
+		},
+		[selectedDate, recalculateSlots, refresh],
+	);
 
 	useEffect(() => {
 		if (selectedDate) {
@@ -188,6 +253,7 @@ export const useAvailability = (
 		error,
 		refresh,
 		applyDelta,
+		cursor,
 	};
 };
 

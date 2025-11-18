@@ -39,6 +39,7 @@
     "test:coverage": "turbo run test:coverage",
     "db:generate": "cd packages/db && bun run migrate:generate",
     "db:migrate": "cd packages/db && bun run migrate",
+    "db:reset": "cd packages/db && bun run reset",
     "seed": "cd packages/api && bun run seed",
     "lint": "turbo run lint",
     "format": "turbo run format",

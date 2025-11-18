@@ -40,19 +40,19 @@ export const BookingCalendar = React.memo<BookingCalendarProps>(
 		const [selectedSlot, setSelectedSlot] =
 			React.useState<AvailabilitySlot | null>(null);
 		const [holdId, setHoldId] = React.useState<string | null>(null);
-		const [streamCursor, setStreamCursor] = React.useState<string | null>(null);
 		const [showBookingForm, setShowBookingForm] = React.useState(false);
 
-		const { slots, isLoading, error, refresh, applyDelta } = useAvailability({
-			apiBaseUrl,
-			tenantSlug,
-			resourceSlug,
-			selectedDate,
-			slotResolutionMinutes,
-			durationMinutes,
-			fromHour,
-			toHour,
-		});
+		const { slots, isLoading, error, refresh, applyDelta, cursor } =
+			useAvailability({
+				apiBaseUrl,
+				tenantSlug,
+				resourceSlug,
+				selectedDate,
+				slotResolutionMinutes,
+				durationMinutes,
+				fromHour,
+				toHour,
+			});
 
 		const {
 			placeHold,
@@ -76,28 +76,10 @@ export const BookingCalendar = React.memo<BookingCalendarProps>(
 			},
 		});
 
-		React.useEffect(() => {
-			const fetchInitialCursor = async () => {
-				try {
-					const response = await fetch(`${apiBaseUrl}/v1/events?limit=1`);
-					if (response.ok) {
-						const data = (await response.json()) as {
-							events: Array<{ eventId: string }>;
-						};
-						if (data.events.length > 0) {
-							setStreamCursor(data.events[0].eventId);
-						}
-					}
-				} catch {}
-			};
-
-			fetchInitialCursor();
-		}, [apiBaseUrl]);
-
 		useStreamListener({
 			apiBaseUrl,
-			cursor: streamCursor,
-			enabled: streamCursor !== null,
+			cursor,
+			enabled: cursor !== null,
 			onEvent: (event) => {
 				applyDelta(event);
 			},
@@ -105,6 +87,34 @@ export const BookingCalendar = React.memo<BookingCalendarProps>(
 				console.error('Stream error:', error);
 			},
 		});
+
+		React.useEffect(() => {
+			const handleBeforeUnload = () => {
+				if (holdId) {
+					fetch(
+						`${apiBaseUrl}/v1/public/${tenantSlug}/${resourceSlug}/hold/${holdId}`,
+						{
+							method: 'DELETE',
+							keepalive: true,
+						},
+					).catch(() => {});
+				}
+			};
+
+			window.addEventListener('beforeunload', handleBeforeUnload);
+			return () => {
+				window.removeEventListener('beforeunload', handleBeforeUnload);
+				if (holdId) {
+					fetch(
+						`${apiBaseUrl}/v1/public/${tenantSlug}/${resourceSlug}/hold/${holdId}`,
+						{
+							method: 'DELETE',
+							keepalive: true,
+						},
+					).catch(() => {});
+				}
+			};
+		}, [holdId, apiBaseUrl, tenantSlug, resourceSlug]);
 
 		const handleSlotSelect = async (slot: AvailabilitySlot) => {
 			setSelectedSlot(slot);

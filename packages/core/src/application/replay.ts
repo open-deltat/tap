@@ -23,7 +23,10 @@ export const replayEvents = async (
 		}
 
 		if (event.type === 'HoldPlaced') {
-			const { day, startMinute, endMinute } = event.payload;
+			const { day, startMinute, endMinute, expiresAt } = event.payload;
+			if (expiresAt <= Date.now()) {
+				continue;
+			}
 			let dayState = state.get(day);
 			if (!dayState) {
 				dayState = createBitmapDay(15);

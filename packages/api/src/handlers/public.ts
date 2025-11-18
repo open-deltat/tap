@@ -162,7 +162,11 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				return new Response('Not Found', { status: 404 });
 			}
 
-			const body = (await req.json()) as { start: number; end: number };
+			const body = (await req.json()) as {
+				start: string | number;
+				end: string | number;
+				clientRef?: string;
+			};
 			if (!body.start || !body.end) {
 				return new Response(
 					JSON.stringify({ error: 'Missing required fields: start, end' }),
@@ -189,8 +193,24 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				});
 			}
 
-			const startDate = new Date(body.start);
-			const endDate = new Date(body.end);
+			const startUnix =
+				typeof body.start === 'number'
+					? body.start
+					: new Date(body.start).getTime();
+			const endUnix =
+				typeof body.end === 'number' ? body.end : new Date(body.end).getTime();
+
+			if (Number.isNaN(startUnix) || Number.isNaN(endUnix)) {
+				return new Response(
+					JSON.stringify({ error: 'Invalid start or end date' }),
+					{
+						status: 400,
+						headers: { 'Content-Type': 'application/json' },
+					},
+				);
+			}
+
+			const startDate = new Date(startUnix);
 			const dayStr = startDate.toISOString().split('T')[0];
 			if (!dayStr) {
 				return new Response(JSON.stringify({ error: 'Invalid start date' }), {
@@ -199,9 +219,18 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				});
 			}
 
+			const horizonCheck = validateHorizon(dayStr, resource);
+			if (!horizonCheck.valid) {
+				return new Response(JSON.stringify({ error: horizonCheck.error }), {
+					status: 400,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+
 			const day = dayStr;
-			const startMinute = startDate.getHours() * 60 + startDate.getMinutes();
-			const endMinute = endDate.getHours() * 60 + endDate.getMinutes();
+			const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
+			const startMinute = Math.floor((startUnix - dayStartUnix) / (60 * 1000));
+			const endMinute = Math.floor((endUnix - dayStartUnix) / (60 * 1000));
 
 			const allocator = getAllocator();
 			const holdResult = await allocator.placeHold({
@@ -210,7 +239,8 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				day,
 				startMinute,
 				endMinute,
-				expiresAt: Date.now() + 300_000,
+				expiresAt: Date.now() + 30_000,
+				...(body.clientRef ? { clientRef: body.clientRef } : {}),
 			});
 
 			if (!holdResult.success) {
@@ -226,10 +256,81 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 			return new Response(
 				JSON.stringify({
 					holdId: holdResult.holdId,
-					expiresAt: Date.now() + 300_000,
+					expiresAt: Date.now() + 30_000,
 				}),
 				{ status: 201, headers: { 'Content-Type': 'application/json' } },
 			);
+		} catch (error) {
+			return new Response(
+				JSON.stringify({
+					error: error instanceof Error ? error.message : 'Unknown error',
+				}),
+				{ status: 500, headers: { 'Content-Type': 'application/json' } },
+			);
+		}
+	}
+
+	if (
+		req.method === 'DELETE' &&
+		pathname.match(/^\/v1\/public\/[^/]+\/[^/]+\/hold\/[^/]+$/)
+	) {
+		try {
+			const match = matchRoute(
+				pathname,
+				'/v1/public/:tenantSlug/:resourceSlug/hold/:holdId',
+			);
+			if (!match) {
+				return new Response('Not Found', { status: 404 });
+			}
+
+			const tenantSlug = match.tenantSlug;
+			const resourceSlug = match.resourceSlug;
+			const holdId = match.holdId;
+			if (!tenantSlug || !resourceSlug || !holdId) {
+				return new Response('Not Found', { status: 404 });
+			}
+
+			const tenant = await tenantRepository.getBySlug(tenantSlug);
+			if (!tenant) {
+				return new Response(JSON.stringify({ error: 'Tenant not found' }), {
+					status: 404,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+
+			const resource = await resourceRepository.getBySlug(
+				tenantSlug,
+				resourceSlug,
+			);
+			if (!resource || resource.tenantId !== tenant.id) {
+				return new Response(JSON.stringify({ error: 'Resource not found' }), {
+					status: 404,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+
+			const allocator = getAllocator();
+			const eventStore = getEventStore();
+
+			const event = await allocator.releaseHold({
+				holdId: holdId as HoldId,
+				tenantId: tenant.id as TenantId,
+				resourceId: resource.id as ResourceId,
+			});
+
+			if (!event) {
+				return new Response(JSON.stringify({ error: 'Hold not found' }), {
+					status: 404,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
+
+			await eventStore.append(event);
+
+			return new Response(JSON.stringify({ released: true }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' },
+			});
 		} catch (error) {
 			return new Response(
 				JSON.stringify({
@@ -328,13 +429,18 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 						? body.start
 						: new Date(body.start).getTime();
 				const endUnix =
-					typeof body.end === 'number' ? body.end : new Date(body.end).getTime();
+					typeof body.end === 'number'
+						? body.end
+						: new Date(body.end).getTime();
 
 				if (Number.isNaN(startUnix) || Number.isNaN(endUnix)) {
-					return new Response(JSON.stringify({ error: 'Invalid start or end date' }), {
-						status: 400,
-						headers: { 'Content-Type': 'application/json' },
-					});
+					return new Response(
+						JSON.stringify({ error: 'Invalid start or end date' }),
+						{
+							status: 400,
+							headers: { 'Content-Type': 'application/json' },
+						},
+					);
 				}
 
 				const startDate = new Date(startUnix);
@@ -356,7 +462,9 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 
 				const day = dayStr;
 				const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
-				const startMinute = Math.floor((startUnix - dayStartUnix) / (60 * 1000));
+				const startMinute = Math.floor(
+					(startUnix - dayStartUnix) / (60 * 1000),
+				);
 				const endMinute = Math.floor((endUnix - dayStartUnix) / (60 * 1000));
 
 				const holdResult = await allocator.placeHold({
@@ -365,7 +473,7 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 					day,
 					startMinute,
 					endMinute,
-					expiresAt: Date.now() + 60_000,
+					expiresAt: Date.now() + 30_000,
 				});
 
 				if (!holdResult.success) {

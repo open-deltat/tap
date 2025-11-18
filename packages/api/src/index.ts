@@ -18,7 +18,7 @@ const _server = Bun.serve({
 			return new Response(null, {
 				headers: {
 					'Access-Control-Allow-Origin': '*',
-					'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+					'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
 					'Access-Control-Allow-Headers': 'Content-Type',
 				},
 			});
@@ -26,7 +26,7 @@ const _server = Bun.serve({
 
 		const corsHeaders = {
 			'Access-Control-Allow-Origin': '*',
-			'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+			'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
 			'Access-Control-Allow-Headers': 'Content-Type',
 		};
 
@@ -73,8 +73,12 @@ console.log(`  GET  /health                                    - Health check`);
 console.log(
 	`  GET  /v1/public/:tenantSlug/:resourceSlug/availability - Public availability`,
 );
+console.log(`  POST /v1/public/:tenantSlug/:resourceSlug/hold - Place hold`);
 console.log(
-	`  POST /v1/public/:tenantSlug/:resourceSlug/book  - Public booking`,
+	`  DELETE /v1/public/:tenantSlug/:resourceSlug/hold/:holdId - Release hold`,
+);
+console.log(
+	`  POST /v1/public/:tenantSlug/:resourceSlug/book - Public booking`,
 );
 console.log(
 	`  GET  /v1/availability                          - Private availability`,

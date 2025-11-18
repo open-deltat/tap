@@ -3,8 +3,8 @@ import type { BookingId, ResourceId, TenantId } from '@tap/core';
 import { parseDayToUnixStartOfDayUTC } from '@tap/core';
 import { ulid } from 'ulid';
 import { getAllocator, getEventStore } from '../services/context';
-import { handleEventStream } from './stream';
 import { handlePublicRequest } from './public';
+import { handleEventStream } from './stream';
 import {
 	createTestOffer,
 	createTestResource,
@@ -20,8 +20,7 @@ beforeAll(async () => {
 	await createTestOffer(testTenant, testResource);
 });
 
-afterAll(async () => {
-});
+afterAll(async () => {});
 
 test('TAP flow: availability snapshot returns slots with unix timestamps', async () => {
 	const req = new Request(
@@ -164,18 +163,22 @@ test('TAP flow: stream sends delta events with unix timestamps', async () => {
 		const decoder = new TextDecoder();
 		let receivedData = '';
 
-		await new Promise((resolve) => setTimeout(resolve, 1200));
+		await new Promise((resolve) => setTimeout(resolve, 1500));
 
 		const startTime = Date.now();
-		while (Date.now() - startTime < 2000) {
+		while (Date.now() - startTime < 3000) {
 			const { value, done } = await reader.read();
 			if (done) break;
 			if (value) {
 				receivedData += decoder.decode(value, { stream: true });
-				if (receivedData.includes('BookingConfirmed')) {
+				if (
+					receivedData.includes('BookingConfirmed') &&
+					receivedData.includes(confirmEvent.eventId)
+				) {
 					break;
 				}
 			}
+			await new Promise((resolve) => setTimeout(resolve, 50));
 		}
 
 		reader.cancel();
@@ -195,8 +198,7 @@ test('TAP flow: stream sends delta events with unix timestamps', async () => {
 						expect(eventData.payload.end).toBe(end);
 						break;
 					}
-				} catch {
-				}
+				} catch {}
 			}
 		}
 	}
@@ -239,7 +241,8 @@ test('TAP flow: public booking creates event with unix timestamps', async () => 
 		testResource.id as ResourceId,
 	);
 	const bookingEvent = events.find(
-		(e) => e.type === 'BookingConfirmed' && e.payload.bookingId === body.bookingId,
+		(e) =>
+			e.type === 'BookingConfirmed' && e.payload.bookingId === body.bookingId,
 	);
 
 	expect(bookingEvent).toBeDefined();
@@ -338,7 +341,7 @@ test('TAP flow: stream reflects booking changes immediately', async () => {
 
 	if (reader) {
 		const decoder = new TextDecoder();
-		let receivedEvents: string[] = [];
+		const receivedEvents: string[] = [];
 
 		const bookingId = ulid() as BookingId;
 		const dayStartUnix = parseDayToUnixStartOfDayUTC('2025-12-28');
@@ -538,7 +541,8 @@ test('TAP flow: all timestamps are unix milliseconds', async () => {
 		testResource.id as ResourceId,
 	);
 	const bookingEvent = events.find(
-		(e) => e.type === 'BookingConfirmed' && e.payload.bookingId === body.bookingId,
+		(e) =>
+			e.type === 'BookingConfirmed' && e.payload.bookingId === body.bookingId,
 	);
 
 	expect(bookingEvent).toBeDefined();
@@ -550,4 +554,3 @@ test('TAP flow: all timestamps are unix milliseconds', async () => {
 		expect(Number.isInteger(bookingEvent.createdAt)).toBe(true);
 	}
 });
-

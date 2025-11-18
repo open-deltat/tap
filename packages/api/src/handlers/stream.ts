@@ -68,8 +68,13 @@ export const handleEventStream = async (req: Request): Promise<Response> => {
 				}
 			};
 
+			await pollForNewEvents();
+
 			const pollInterval = setInterval(async () => {
-				if (controller.desiredSize === null || controller.desiredSize > 0) {
+				if (
+					!isClosed &&
+					(controller.desiredSize === null || controller.desiredSize > 0)
+				) {
 					await pollForNewEvents();
 				}
 			}, POLL_INTERVAL_MS);

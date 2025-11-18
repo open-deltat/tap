@@ -8,6 +8,7 @@
 		"migrate": "bun run src/migrate.ts",
 		"migrate:generate": "drizzle-kit generate",
 		"migrate:push": "drizzle-kit push",
+		"reset": "bun run src/reset.ts",
 		"test": "bash ../../scripts/ensure-db.sh && bun test",
 		"test:watch": "bash ../../scripts/ensure-db.sh && bun test --watch",
 		"typecheck": "tsc --noEmit"
