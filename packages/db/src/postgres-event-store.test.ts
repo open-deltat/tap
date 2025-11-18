@@ -323,3 +323,115 @@ test.skipIf(shouldSkip)(
 		expect(afterCursor.length).toBe(0);
 	},
 );
+
+test.skipIf(shouldSkip)(
+	'event store preserves unix timestamps (timezone-agnostic)',
+	async () => {
+		if (!eventStore) {
+			throw new Error('eventStore not initialized');
+		}
+		const tenantId = ulid() as TenantId;
+		const resourceId = ulid() as ResourceId;
+
+		const unixCreatedAt = 1735084800000;
+		const unixExpiresAt = unixCreatedAt + 60_000;
+		const unixStart = unixCreatedAt + 600 * 60 * 1000;
+		const unixEnd = unixCreatedAt + 660 * 60 * 1000;
+
+		const holdEvent: LedgerEvent = {
+			eventId: ulid(),
+			tenantId,
+			resourceId,
+			type: 'HoldPlaced',
+			version: 1,
+			createdAt: unixCreatedAt,
+			payload: {
+				holdId: ulid() as HoldId,
+				day: '2025-12-25',
+				startMinute: 600,
+				endMinute: 660,
+				expiresAt: unixExpiresAt,
+			},
+		};
+
+		const bookingEvent: LedgerEvent = {
+			eventId: ulid(),
+			tenantId,
+			resourceId,
+			type: 'BookingConfirmed',
+			version: 1,
+			createdAt: unixCreatedAt + 1000,
+			payload: {
+				bookingId: ulid(),
+				holdId: ulid() as HoldId,
+				start: unixStart,
+				end: unixEnd,
+			},
+		};
+
+		await eventStore.append(holdEvent);
+		await eventStore.append(bookingEvent);
+
+		const all = await eventStore.getAll();
+		const foundHold = all.find((e) => e.eventId === holdEvent.eventId);
+		const foundBooking = all.find((e) => e.eventId === bookingEvent.eventId);
+
+		expect(foundHold).toBeDefined();
+		if (foundHold && foundHold.type === 'HoldPlaced') {
+			expect(foundHold.createdAt).toBe(unixCreatedAt);
+			expect(foundHold.payload.expiresAt).toBe(unixExpiresAt);
+			expect(typeof foundHold.createdAt).toBe('number');
+			expect(typeof foundHold.payload.expiresAt).toBe('number');
+		}
+
+		expect(foundBooking).toBeDefined();
+		if (foundBooking && foundBooking.type === 'BookingConfirmed') {
+			expect(foundBooking.createdAt).toBe(unixCreatedAt + 1000);
+			expect(foundBooking.payload.start).toBe(unixStart);
+			expect(foundBooking.payload.end).toBe(unixEnd);
+			expect(typeof foundBooking.createdAt).toBe('number');
+			expect(typeof foundBooking.payload.start).toBe('number');
+			expect(typeof foundBooking.payload.end).toBe('number');
+		}
+	},
+);
+
+test.skipIf(shouldSkip)(
+	'event store converts Date to unix on read (timezone-agnostic)',
+	async () => {
+		if (!eventStore) {
+			throw new Error('eventStore not initialized');
+		}
+		const tenantId = ulid() as TenantId;
+		const resourceId = ulid() as ResourceId;
+
+		const unixTimestamp = 1735084800000;
+
+		const event: LedgerEvent = {
+			eventId: ulid(),
+			tenantId,
+			resourceId,
+			type: 'HoldPlaced',
+			version: 1,
+			createdAt: unixTimestamp,
+			payload: {
+				holdId: ulid() as HoldId,
+				day: '2025-12-25',
+				startMinute: 600,
+				endMinute: 660,
+				expiresAt: unixTimestamp + 60_000,
+			},
+		};
+
+		await eventStore.append(event);
+		const retrieved = await eventStore.getByResource(tenantId, resourceId);
+		const found = retrieved.find((e) => e.eventId === event.eventId);
+
+		expect(found).toBeDefined();
+		if (found) {
+			expect(found.createdAt).toBe(unixTimestamp);
+			expect(found.createdAt).not.toBeInstanceOf(Date);
+			expect(typeof found.createdAt).toBe('number');
+		}
+	},
+);

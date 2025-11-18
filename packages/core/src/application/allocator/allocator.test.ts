@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
 import type { BookingId, ResourceId, TenantId } from '../../domain/ids';
+import { parseDayToUnixStartOfDayUTC } from '../../infrastructure/day-utils';
 import { createAllocator } from './allocator';
 
 test('concurrent hold requests → only one wins', async () => {
@@ -51,7 +52,7 @@ test('hold → confirm is atomic', async () => {
 		throw new Error('Hold placement failed');
 	}
 
-	const dayStart = new Date(day).setHours(0, 0, 0, 0);
+	const dayStart = parseDayToUnixStartOfDayUTC(day);
 	const start = dayStart + 600 * 60 * 1000;
 	const end = dayStart + 660 * 60 * 1000;
 
@@ -197,7 +198,7 @@ test('cancelBooking clears booked bits', async () => {
 		throw new Error('Hold placement failed');
 	}
 
-	const dayStart = new Date(day).setHours(0, 0, 0, 0);
+	const dayStart = parseDayToUnixStartOfDayUTC(day);
 	const start = dayStart + 600 * 60 * 1000;
 	const end = dayStart + 660 * 60 * 1000;
 
@@ -268,4 +269,151 @@ test('cancelBooking returns null when booking does not exist', async () => {
 	});
 
 	expect(result).toBeNull();
+});
+
+test('placeHold uses unix timestamps for expiresAt', async () => {
+	const allocator = createAllocator();
+	const tenantId = ulid() as TenantId;
+	const resourceId = ulid() as ResourceId;
+	const day = '2025-12-25';
+
+	const unixTimestamp = 1735084800000;
+	const expiresAt = unixTimestamp + 60_000;
+
+	const result = await allocator.placeHold({
+		tenantId,
+		resourceId,
+		day,
+		startMinute: 600,
+		endMinute: 660,
+		expiresAt,
+	});
+
+	expect(result.success).toBeTrue();
+	if (result.success) {
+		expect(result.event.payload.expiresAt).toBe(expiresAt);
+		expect(typeof result.event.payload.expiresAt).toBe('number');
+		expect(result.event.createdAt).toBeGreaterThan(0);
+		expect(typeof result.event.createdAt).toBe('number');
+	}
+});
+
+test('confirmBooking uses unix timestamps for start and end', async () => {
+	const allocator = createAllocator();
+	const tenantId = ulid() as TenantId;
+	const resourceId = ulid() as ResourceId;
+	const day = '2025-12-25';
+
+	const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
+	const holdResult = await allocator.placeHold({
+		tenantId,
+		resourceId,
+		day,
+		startMinute: 600,
+		endMinute: 660,
+		expiresAt: dayStartUnix + 60_000,
+	});
+
+	if (!holdResult.success) {
+		throw new Error('Hold placement failed');
+	}
+
+	const unixStart = dayStartUnix + 600 * 60 * 1000;
+	const unixEnd = dayStartUnix + 660 * 60 * 1000;
+
+	const confirmEvent = await allocator.confirmBooking({
+		tenantId,
+		resourceId,
+		holdId: holdResult.holdId,
+		bookingId: ulid() as BookingId,
+		start: unixStart,
+		end: unixEnd,
+	});
+
+	expect(confirmEvent).not.toBeNull();
+	if (confirmEvent) {
+		expect(confirmEvent.type).toBe('BookingConfirmed');
+		expect(confirmEvent.payload.start).toBe(unixStart);
+		expect(confirmEvent.payload.end).toBe(unixEnd);
+		expect(typeof confirmEvent.payload.start).toBe('number');
+		expect(typeof confirmEvent.payload.end).toBe('number');
+		expect(confirmEvent.createdAt).toBeGreaterThan(0);
+		expect(typeof confirmEvent.createdAt).toBe('number');
+	}
+});
+
+test('expireHolds uses unix timestamps', async () => {
+	const allocator = createAllocator();
+	const tenantId = ulid() as TenantId;
+	const resourceId = ulid() as ResourceId;
+	const day = '2025-12-01';
+
+	const pastUnixTimestamp = 1735084800000 - 1000;
+	const futureUnixTimestamp = 1735084800000 + 1000;
+
+	await allocator.placeHold({
+		tenantId,
+		resourceId,
+		day,
+		startMinute: 600,
+		endMinute: 660,
+		expiresAt: pastUnixTimestamp,
+	});
+
+	await allocator.placeHold({
+		tenantId,
+		resourceId,
+		day,
+		startMinute: 660,
+		endMinute: 720,
+		expiresAt: futureUnixTimestamp,
+	});
+
+	const expired = allocator.expireHolds(1735084800000);
+	expect(expired.length).toBe(1);
+});
+
+test('all timestamps are unix milliseconds (timezone-agnostic)', async () => {
+	const allocator = createAllocator();
+	const tenantId = ulid() as TenantId;
+	const resourceId = ulid() as ResourceId;
+	const day = '2025-12-25';
+
+	const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
+	const unixExpiresAt = dayStartUnix + 60_000;
+
+	const holdResult = await allocator.placeHold({
+		tenantId,
+		resourceId,
+		day,
+		startMinute: 600,
+		endMinute: 660,
+		expiresAt: unixExpiresAt,
+	});
+
+	expect(holdResult.success).toBeTrue();
+	if (holdResult.success) {
+		const event = holdResult.event;
+		expect(event.createdAt).toBeGreaterThan(0);
+		expect(event.payload.expiresAt).toBe(unixExpiresAt);
+
+		const unixStart = dayStartUnix + 600 * 60 * 1000;
+		const unixEnd = dayStartUnix + 660 * 60 * 1000;
+
+		const confirmEvent = await allocator.confirmBooking({
+			tenantId,
+			resourceId,
+			holdId: holdResult.holdId,
+			bookingId: ulid() as BookingId,
+			start: unixStart,
+			end: unixEnd,
+		});
+
+		expect(confirmEvent).not.toBeNull();
+		if (confirmEvent) {
+			expect(confirmEvent.payload.start).toBe(unixStart);
+			expect(confirmEvent.payload.end).toBe(unixEnd);
+			expect(confirmEvent.createdAt).toBeGreaterThan(0);
+		}
+	}
 });

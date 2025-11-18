@@ -4,6 +4,7 @@ import type {
 } from '../../domain/events';
 import type { BookingId, HoldId, ResourceId, TenantId } from '../../domain/ids';
 import { getBit, setBitRange } from '../../infrastructure/bitmap';
+import { parseDayToUnixStartOfDayUTC } from '../../infrastructure/day-utils';
 import {
 	createBookingCancelledEvent,
 	createBookingConfirmedEvent,
@@ -72,9 +73,9 @@ export const createBookingManager = (deps: {
 				setBitRange(dayState.booked, hold.start, hold.end, true);
 				deps.holds.delete(holdId);
 
-				const dayStart = new Date(hold.day).setHours(0, 0, 0, 0);
-				const start = dayStart + hold.start * 60 * 1000;
-				const end = dayStart + hold.end * 60 * 1000;
+				const dayStartUnix = parseDayToUnixStartOfDayUTC(hold.day);
+				const start = dayStartUnix + hold.start * 60 * 1000;
+				const end = dayStartUnix + hold.end * 60 * 1000;
 
 				const event = createBookingConfirmedEvent({
 					tenantId,

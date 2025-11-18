@@ -1,16 +1,18 @@
 import type { DayKey } from '../domain/ids';
+import {
+	getUnixStartOfDayUTC,
+	parseDayToUnixStartOfDayUTC,
+} from '../infrastructure/day-utils';
 
 export const isWithinHorizon = (
 	day: DayKey,
 	horizonDays: number,
 	now: number = Date.now(),
 ): boolean => {
-	const dayDate = new Date(day);
-	const today = new Date(now);
-	today.setHours(0, 0, 0, 0);
-	dayDate.setHours(0, 0, 0, 0);
+	const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
+	const todayStartUnix = getUnixStartOfDayUTC(now);
 
-	const diffTime = dayDate.getTime() - today.getTime();
+	const diffTime = dayStartUnix - todayStartUnix;
 	const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
 	return diffDays >= 0 && diffDays <= horizonDays;

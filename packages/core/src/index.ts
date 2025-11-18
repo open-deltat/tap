@@ -6,5 +6,6 @@ export * from './application/replay';
 export * from './domain/events';
 export * from './domain/types';
 export * from './infrastructure/bitmap';
+export * from './infrastructure/day-utils';
 export * from './infrastructure/event-store';
 export * from './infrastructure/mutex';

@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
 import type { BookingId, HoldId, ResourceId, TenantId } from '../../domain/ids';
+import { parseDayToUnixStartOfDayUTC } from '../../infrastructure/day-utils';
 import { createMutex } from '../../infrastructure/mutex';
 import { createBookingManager } from './booking-manager';
 import { createHoldManager } from './hold-manager';
@@ -39,7 +40,7 @@ test('confirmBooking succeeds when hold exists', async () => {
 		throw new Error('Hold placement failed');
 	}
 
-	const dayStart = new Date('2025-12-25').setHours(0, 0, 0, 0);
+	const dayStart = parseDayToUnixStartOfDayUTC('2025-12-25');
 	const start = dayStart + 600 * 60 * 1000;
 	const end = dayStart + 660 * 60 * 1000;
 
@@ -72,7 +73,7 @@ test('confirmBooking returns null when hold does not exist', async () => {
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 
-	const dayStart = new Date('2025-12-25').setHours(0, 0, 0, 0);
+	const dayStart = parseDayToUnixStartOfDayUTC('2025-12-25');
 	const start = dayStart + 600 * 60 * 1000;
 	const end = dayStart + 660 * 60 * 1000;
 
@@ -122,7 +123,7 @@ test('cancelBooking succeeds when booking exists', async () => {
 		throw new Error('Hold placement failed');
 	}
 
-	const dayStart = new Date(day).setHours(0, 0, 0, 0);
+	const dayStart = parseDayToUnixStartOfDayUTC(day);
 	const start = dayStart + 600 * 60 * 1000;
 	const end = dayStart + 660 * 60 * 1000;
 
@@ -275,7 +276,7 @@ test('cancelBooking returns null when booking partially exists', async () => {
 		throw new Error('Hold placement failed');
 	}
 
-	const dayStart = new Date(day).setHours(0, 0, 0, 0);
+	const dayStart = parseDayToUnixStartOfDayUTC(day);
 	const start = dayStart + 600 * 60 * 1000;
 	const end = dayStart + 660 * 60 * 1000;
 

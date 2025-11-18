@@ -1,5 +1,6 @@
 import type { DayKey, Minute } from '../domain/ids';
 import type { Offer } from '../domain/schemas';
+import { getDayOfWeekUTC } from '../infrastructure/day-utils';
 
 const DEFAULT_OFFER: Offer = {
 	id: 'default',
@@ -15,8 +16,7 @@ export const getAvailableMinutesFromOffers = (
 	day: DayKey,
 	offers: Offer[],
 ): Set<Minute> => {
-	const dayDate = new Date(day);
-	const dayOfWeek = dayDate.getDay();
+	const dayOfWeek = getDayOfWeekUTC(day);
 
 	const availableMinutes = new Set<Minute>();
 	const effectiveOffers = offers.length > 0 ? offers : [DEFAULT_OFFER];
