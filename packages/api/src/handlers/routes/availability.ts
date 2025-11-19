@@ -62,6 +62,19 @@ export const handleGetAvailability = async (
 	const allocator = getAllocator();
 	const fromDate = new Date(from);
 	const toDate = new Date(to);
+
+	const MAX_RANGE_DAYS = 35;
+	const diffTime = Math.abs(toDate.getTime() - fromDate.getTime());
+	const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+	if (diffDays > MAX_RANGE_DAYS) {
+		return {
+			success: false,
+			error: `Date range too large (max ${MAX_RANGE_DAYS} days)`,
+			status: 400,
+		};
+	}
+
 	const slots: Array<{ start: number; end: number }> = [];
 
 	const state = allocator.getState(tenant.id as TenantId, resource.id as ResourceId);

@@ -57,7 +57,7 @@ export type Allocator = {
 		startMinute: Minute;
 		endMinute: Minute;
 	}) => Promise<BookingCancelledEvent | null>;
-	expireHolds: (now: number) => HoldId[];
+	expireHolds: (now: number) => HoldExpiredEvent[];
 	releaseHold: (params: {
 		holdId: HoldId;
 		sessionId: SessionId;

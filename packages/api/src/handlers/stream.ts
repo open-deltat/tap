@@ -4,6 +4,7 @@ import { getEventStore } from '../services/context';
 const BOOKING_EVENT_TYPES: LedgerEvent['type'][] = [
 	'HoldPlaced',
 	'HoldExpired',
+	'HoldReleased',
 	'BookingConfirmed',
 	'BookingCancelled',
 ];

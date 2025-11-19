@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { createAllocator, createInMemoryEventStore } from '../src';
 import { ulid } from 'ulid';
-import type { TenantId, ResourceId, BookingId } from '../src/domain/ids';
+import type { TenantId, ResourceId, BookingId, SessionId } from '../src/domain/ids';
 
 test('e2e: place hold, confirm booking, check events', async () => {
   const allocator = createAllocator();
@@ -9,11 +9,13 @@ test('e2e: place hold, confirm booking, check events', async () => {
 
   const tenantId = ulid() as TenantId;
   const resourceId = ulid() as ResourceId;
+  const sessionId = 'sess_e2e' as SessionId;
   const day = '2025-12-25';
 
   const holdResult = await allocator.placeHold({
     tenantId,
     resourceId,
+    sessionId,
     day,
     startMinute: 600,
     endMinute: 660,
@@ -35,6 +37,7 @@ test('e2e: place hold, confirm booking, check events', async () => {
 		tenantId,
 		resourceId,
 		holdId: holdResult.holdId,
+		sessionId,
 		bookingId: ulid() as BookingId,
 		start,
 		end,
@@ -59,12 +62,14 @@ test('e2e: concurrent holds, only one succeeds', async () => {
   const allocator = createAllocator();
   const tenantId = ulid() as TenantId;
   const resourceId = ulid() as ResourceId;
+  const sessionId = 'sess_e2e' as SessionId;
   const day = '2025-12-25';
 
   const results = await Promise.all([
     allocator.placeHold({
       tenantId,
       resourceId,
+      sessionId,
       day,
       startMinute: 600,
       endMinute: 660,
@@ -73,6 +78,7 @@ test('e2e: concurrent holds, only one succeeds', async () => {
     allocator.placeHold({
       tenantId,
       resourceId,
+      sessionId,
       day,
       startMinute: 600,
       endMinute: 660,
@@ -81,6 +87,7 @@ test('e2e: concurrent holds, only one succeeds', async () => {
     allocator.placeHold({
       tenantId,
       resourceId,
+      sessionId,
       day,
       startMinute: 600,
       endMinute: 660,
@@ -98,11 +105,13 @@ test('e2e: hold expiry workflow', async () => {
 
   const tenantId = ulid() as TenantId;
   const resourceId = ulid() as ResourceId;
+  const sessionId = 'sess_e2e' as SessionId;
   const day = '2025-12-25';
 
   const holdResult = await allocator.placeHold({
     tenantId,
     resourceId,
+    sessionId,
     day,
     startMinute: 600,
     endMinute: 660,
@@ -111,9 +120,9 @@ test('e2e: hold expiry workflow', async () => {
 
   expect(holdResult.success).toBeTrue();
 
-  const expired = allocator.expireHolds(Date.now());
-  expect(expired.length).toBeGreaterThan(0);
-  expect(expired).toContain(holdResult.success ? holdResult.holdId : '');
+  const expiredEvents = allocator.expireHolds(Date.now());
+  expect(expiredEvents.length).toBeGreaterThan(0);
+  expect(expiredEvents[0].payload.holdId).toBe(holdResult.success ? holdResult.holdId : '');
 
   const state = allocator.getState(tenantId, resourceId);
   const dayState = state.get(day);
@@ -137,11 +146,13 @@ test('e2e: multiple non-overlapping holds', async () => {
   const allocator = createAllocator();
   const tenantId = ulid() as TenantId;
   const resourceId = ulid() as ResourceId;
+  const sessionId = 'sess_e2e' as SessionId;
   const day = '2025-12-25';
 
   const hold1 = await allocator.placeHold({
     tenantId,
     resourceId,
+    sessionId,
     day,
     startMinute: 600,
     endMinute: 630,
@@ -151,6 +162,7 @@ test('e2e: multiple non-overlapping holds', async () => {
   const hold2 = await allocator.placeHold({
     tenantId,
     resourceId,
+    sessionId,
     day,
     startMinute: 630,
     endMinute: 660,
@@ -160,6 +172,7 @@ test('e2e: multiple non-overlapping holds', async () => {
   const hold3 = await allocator.placeHold({
     tenantId,
     resourceId,
+    sessionId,
     day,
     startMinute: 660,
     endMinute: 690,
@@ -179,11 +192,13 @@ test('e2e: event store filtering', async () => {
   const tenantId2 = ulid() as TenantId;
   const resourceId1 = ulid() as ResourceId;
   const resourceId2 = ulid() as ResourceId;
+  const sessionId = 'sess_e2e' as SessionId;
   const day = '2025-12-25';
 
   const hold1 = await allocator.placeHold({
     tenantId: tenantId1,
     resourceId: resourceId1,
+    sessionId,
     day,
     startMinute: 600,
     endMinute: 660,
@@ -193,6 +208,7 @@ test('e2e: event store filtering', async () => {
   const hold2 = await allocator.placeHold({
     tenantId: tenantId1,
     resourceId: resourceId2,
+    sessionId,
     day,
     startMinute: 600,
     endMinute: 660,
@@ -202,6 +218,7 @@ test('e2e: event store filtering', async () => {
   const hold3 = await allocator.placeHold({
     tenantId: tenantId2,
     resourceId: resourceId1,
+    sessionId,
     day,
     startMinute: 600,
     endMinute: 660,

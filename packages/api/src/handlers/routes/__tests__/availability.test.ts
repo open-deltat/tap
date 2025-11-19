@@ -127,5 +127,17 @@ test('handleGetAvailability handles invalid date format gracefully', async () =>
 	}
 });
 
+test('handleGetAvailability returns error when range exceeds 35 days', async () => {
+	const result = await handleGetAvailability({
+		tenantSlug: testTenant.slug,
+		resourceSlug: testResource.slug,
+		from: '2025-12-01T00:00:00Z',
+		to: '2026-02-01T00:00:00Z',
+	});
 
-
+	expect(result.success).toBe(false);
+	if (!result.success) {
+		expect(result.status).toBe(400);
+		expect(result.error).toContain('Date range too large');
+	}
+});

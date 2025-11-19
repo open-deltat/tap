@@ -1,9 +1,11 @@
+import type { HoldExpiredEvent } from '../../domain/events';
 import type { HoldId, ResourceId, TenantId } from '../../domain/ids';
 import { setBitRange } from '../../infrastructure/bitmap';
+import { createHoldExpiredEvent } from '../event-factory';
 import type { AllocatorState, HoldMetadata } from './types';
 
 export type ExpiryManager = {
-	expireHolds: (now: number) => HoldId[];
+	expireHolds: (now: number) => HoldExpiredEvent[];
 };
 
 export const createExpiryManager = (params: {
@@ -12,10 +14,9 @@ export const createExpiryManager = (params: {
 }): ExpiryManager => {
 	return {
 		expireHolds: (now: number) => {
-			const expired: HoldId[] = [];
+			const expiredEvents: HoldExpiredEvent[] = [];
 			for (const [holdId, metadata] of params.holds) {
 				if (metadata.expiresAt <= now) {
-					expired.push(holdId);
 					const dayMap = params.getState(
 						metadata.tenantId as TenantId,
 						metadata.resourceId as ResourceId,
@@ -25,9 +26,20 @@ export const createExpiryManager = (params: {
 						setBitRange(dayState.held, metadata.start, metadata.end, false);
 					}
 					params.holds.delete(holdId);
+
+					expiredEvents.push(
+						createHoldExpiredEvent({
+							tenantId: metadata.tenantId,
+							resourceId: metadata.resourceId,
+							holdId,
+							day: metadata.day,
+							startMinute: metadata.start,
+							endMinute: metadata.end,
+						}),
+					);
 				}
 			}
-			return expired;
+			return expiredEvents;
 		},
 	};
 };

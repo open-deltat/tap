@@ -81,6 +81,20 @@ export const createPostgresEventStore = (
 			cursor: string,
 			tenantId?: string,
 		): Promise<LedgerEvent[]> => {
+			if (cursor === '0') {
+				const query = db
+					.select()
+					.from(ledgerEvents)
+					.orderBy(asc(ledgerEvents.createdAt));
+
+				if (tenantId) {
+					query.where(eq(ledgerEvents.tenantId, tenantId));
+				}
+
+				const rows = await query;
+				return rows.map(rowToEvent);
+			}
+
 			const cursorRow = await db
 				.select()
 				.from(ledgerEvents)

@@ -137,6 +137,9 @@ export const createHoldManager = (params: {
 					tenantId: hold.tenantId,
 					resourceId: hold.resourceId,
 					holdId,
+					day: hold.day,
+					startMinute: hold.start,
+					endMinute: hold.end,
 				});
 
 				return { success: true, event };
@@ -177,6 +180,9 @@ export const createHoldManager = (params: {
 							tenantId: hold.tenantId,
 							resourceId: hold.resourceId,
 							holdId,
+							day: hold.day,
+							startMinute: hold.start,
+							endMinute: hold.end,
 						}),
 					);
 				} finally {

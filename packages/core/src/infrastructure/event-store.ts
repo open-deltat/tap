@@ -38,6 +38,9 @@ export const createInMemoryEventStore = (): EventStore => {
 			if (tenantId) {
 				filtered = events.filter((e) => e.tenantId === tenantId);
 			}
+			if (cursor === '0') {
+				return filtered;
+			}
 			const cursorIndex = filtered.findIndex((e) => e.eventId === cursor);
 			if (cursorIndex < 0) {
 				return [];

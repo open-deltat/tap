@@ -155,10 +155,16 @@ export const createBookingManager = (deps: {
 				// Clear booked bits
 				setBitRange(dayState.booked, startMinute, endMinute, false);
 
+				const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
+				const start = dayStartUnix + startMinute * 60 * 1000;
+				const end = dayStartUnix + endMinute * 60 * 1000;
+
 				const event = createBookingCancelledEvent({
 					tenantId,
 					resourceId,
 					bookingId,
+					start,
+					end,
 				});
 
 				return event;

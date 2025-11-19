@@ -1,4 +1,4 @@
-import type { BookingId, ResourceId, TenantId } from '@tap/core';
+import type { BookingId, ResourceId, SessionId, TenantId } from '@tap/core';
 import { ulid } from 'ulid';
 import {
 	bookingRepository,
@@ -101,6 +101,7 @@ export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 			const holdParams: Parameters<typeof allocator.placeHold>[0] = {
 				tenantId: body.tenantId,
 				resourceId: body.resourceId,
+				sessionId: 'sess_private_default' as SessionId,
 				day: body.day,
 				startMinute: body.startMinute,
 				endMinute: body.endMinute,
@@ -178,6 +179,7 @@ export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 					tenantId: body.tenantId,
 					resourceId: body.resourceId,
 					holdId: body.holdId,
+					sessionId: 'sess_private_default' as SessionId,
 					bookingId,
 					start,
 					end,
@@ -222,6 +224,7 @@ export const handlePrivateRequest = async (req: Request): Promise<Response> => {
 				tenantId: body.tenantId,
 				resourceId: body.resourceId,
 				holdId: body.holdId,
+				sessionId: 'sess_private_default' as SessionId,
 				bookingId,
 				start,
 				end,

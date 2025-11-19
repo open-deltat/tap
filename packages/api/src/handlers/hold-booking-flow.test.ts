@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import type { ResourceId, TenantId } from '@tap/core';
+import type { ResourceId, TenantId, SessionId } from '@tap/core';
 import { parseDayToUnixStartOfDayUTC } from '@tap/core';
 import { getAllocator, getEventStore } from '../services/context';
 import { handlePrivateRequest } from './private';
@@ -140,6 +140,7 @@ test('Hold + Booking flow: cannot confirm booking from expired hold', async () =
 	const holdResult = await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId: 'sess_http_default' as SessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,

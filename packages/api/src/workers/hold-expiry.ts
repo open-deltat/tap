@@ -12,28 +12,16 @@ export const startHoldExpiryWorker = (
 		try {
 			const now = Date.now();
 			const allocator = getAllocator();
-			const expiredHoldIds = allocator.expireHolds(now);
+			const expiredEvents = allocator.expireHolds(now);
 
-			if (expiredHoldIds.length === 0) {
+			if (expiredEvents.length === 0) {
 				setTimeout(tick, intervalMs);
 				return;
 			}
 
 			const eventStore = getEventStore();
-			for (const holdId of expiredHoldIds) {
-				const events = await eventStore.getAll();
-				const holdEvent = events.find(
-					(e) => e.type === 'HoldPlaced' && e.payload.holdId === holdId,
-				);
-				if (holdEvent && holdEvent.type === 'HoldPlaced') {
-					const { createHoldExpiredEvent } = await import('@tap/core');
-					const expiredEvent = createHoldExpiredEvent({
-						tenantId: holdEvent.tenantId as TenantId,
-						resourceId: holdEvent.resourceId as ResourceId,
-						holdId,
-					});
-					await eventStore.append(expiredEvent);
-				}
+			for (const event of expiredEvents) {
+				await eventStore.append(event);
 			}
 		} catch (error) {
 			console.error('Hold expiry worker error:', error);

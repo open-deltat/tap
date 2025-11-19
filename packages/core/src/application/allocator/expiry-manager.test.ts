@@ -40,10 +40,10 @@ test('expireHolds removes expired holds', async () => {
 		throw new Error('Hold placement failed');
 	}
 
-	const expired = expiryManager.expireHolds(Date.now());
+	const expiredEvents = expiryManager.expireHolds(Date.now());
 
-	expect(expired.length).toBeGreaterThan(0);
-	expect(expired).toContain(holdResult.holdId);
+	expect(expiredEvents.length).toBeGreaterThan(0);
+	expect(expiredEvents.some((e) => e.payload.holdId === holdResult.holdId)).toBeTrue();
 	expect(holds.has(holdResult.holdId)).toBeFalse();
 });
 
@@ -80,8 +80,8 @@ test('expireHolds does not remove non-expired holds', async () => {
 		throw new Error('Hold placement failed');
 	}
 
-	const expired = expiryManager.expireHolds(Date.now());
+	const expiredEvents = expiryManager.expireHolds(Date.now());
 
-	expect(expired.length).toBe(0);
+	expect(expiredEvents.length).toBe(0);
 	expect(holds.has(holdResult.holdId)).toBeTrue();
 });

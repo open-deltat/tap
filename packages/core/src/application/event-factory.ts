@@ -78,6 +78,8 @@ export const createBookingCancelledEvent = (params: {
 	tenantId: TenantId;
 	resourceId: ResourceId;
 	bookingId: BookingId;
+	start: number;
+	end: number;
 }): BookingCancelledEvent => ({
 	eventId: ulid() as EventId,
 	tenantId: params.tenantId,
@@ -87,6 +89,8 @@ export const createBookingCancelledEvent = (params: {
 	createdAt: Date.now(),
 	payload: {
 		bookingId: params.bookingId,
+		start: params.start,
+		end: params.end,
 	},
 });
 
@@ -94,6 +98,9 @@ export const createHoldExpiredEvent = (params: {
 	tenantId: TenantId;
 	resourceId: ResourceId;
 	holdId: HoldId;
+	day: DayKey;
+	startMinute: Minute;
+	endMinute: Minute;
 }): HoldExpiredEvent => ({
 	eventId: ulid() as EventId,
 	tenantId: params.tenantId,
@@ -103,6 +110,9 @@ export const createHoldExpiredEvent = (params: {
 	createdAt: Date.now(),
 	payload: {
 		holdId: params.holdId,
+		day: params.day,
+		startMinute: params.startMinute,
+		endMinute: params.endMinute,
 	},
 });
 
@@ -110,6 +120,9 @@ export const createHoldReleasedEvent = (params: {
 	tenantId: TenantId;
 	resourceId: ResourceId;
 	holdId: HoldId;
+	day: DayKey;
+	startMinute: Minute;
+	endMinute: Minute;
 }): HoldReleasedEvent => ({
 	eventId: ulid() as EventId,
 	tenantId: params.tenantId,
@@ -119,5 +132,8 @@ export const createHoldReleasedEvent = (params: {
 	createdAt: Date.now(),
 	payload: {
 		holdId: params.holdId,
+		day: params.day,
+		startMinute: params.startMinute,
+		endMinute: params.endMinute,
 	},
 });
