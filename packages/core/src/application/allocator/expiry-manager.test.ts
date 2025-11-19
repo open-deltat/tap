@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
-import type { HoldId, ResourceId, TenantId } from '../../domain/ids';
+import type { HoldId, ResourceId, SessionId, TenantId } from '../../domain/ids';
 import { createMutex } from '../../infrastructure/mutex';
 import { createExpiryManager } from './expiry-manager';
 import { createHoldManager } from './hold-manager';
@@ -23,10 +23,12 @@ test('expireHolds removes expired holds', async () => {
 
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 
 	const holdResult = await holdManager.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day: '2025-12-25',
 		startMinute: 600,
 		endMinute: 660,
@@ -61,10 +63,12 @@ test('expireHolds does not remove non-expired holds', async () => {
 
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 
 	const holdResult = await holdManager.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day: '2025-12-25',
 		startMinute: 600,
 		endMinute: 660,

@@ -41,6 +41,12 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 		}),
 	}),
 	EventBase.extend({
+		type: z.literal('HoldReleased'),
+		payload: z.object({
+			holdId: ULIDSchema,
+		}),
+	}),
+	EventBase.extend({
 		type: z.literal('BookingConfirmed'),
 		payload: z.object({
 			bookingId: ULIDSchema,
@@ -67,5 +73,6 @@ export type LedgerEvent = z.infer<typeof LedgerEventSchema>;
 export type ResourceCreatedEvent = LedgerEvent & { type: 'ResourceCreated' };
 export type HoldPlacedEvent = LedgerEvent & { type: 'HoldPlaced' };
 export type HoldExpiredEvent = LedgerEvent & { type: 'HoldExpired' };
+export type HoldReleasedEvent = LedgerEvent & { type: 'HoldReleased' };
 export type BookingConfirmedEvent = LedgerEvent & { type: 'BookingConfirmed' };
 export type BookingCancelledEvent = LedgerEvent & { type: 'BookingCancelled' };

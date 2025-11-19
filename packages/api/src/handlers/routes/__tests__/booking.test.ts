@@ -6,7 +6,7 @@ import {
 	createTestTenant,
 } from '../../test-setup';
 import { getAllocator, getEventStore } from '../../../services/context';
-import type { TenantId, ResourceId } from '@tap/core';
+import type { TenantId, ResourceId, SessionId } from '@tap/core';
 import { ulid } from 'ulid';
 
 let testTenant: Awaited<ReturnType<typeof createTestTenant>>;
@@ -81,6 +81,7 @@ test('handleBook creates booking from holdId', async () => {
 	const holdResult = await allocator.placeHold({
 		tenantId: testTenant.id as TenantId,
 		resourceId: testResource.id as ResourceId,
+		sessionId: 'sess_http_default' as SessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,
@@ -203,6 +204,7 @@ test('handleBook includes customerPhone when provided', async () => {
 	const holdResult = await allocator.placeHold({
 		tenantId: testTenant.id as TenantId,
 		resourceId: testResource.id as ResourceId,
+		sessionId: 'sess_http_default' as SessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,

@@ -1,4 +1,4 @@
-import type { BookingId, HoldId, ResourceId, TenantId } from '@tap/core';
+import type { BookingId, HoldId, ResourceId, SessionId, TenantId } from '@tap/core';
 import { parseDayToUnixStartOfDayUTC } from '@tap/core';
 import { ulid } from 'ulid';
 import {
@@ -14,6 +14,7 @@ export type BookParams = {
 	tenantSlug: string;
 	resourceSlug: string;
 	body: PublicBookRequest;
+	sessionId?: string;
 };
 
 export type BookResult =
@@ -32,6 +33,7 @@ export type BookResult =
 
 export const handleBook = async (params: BookParams): Promise<BookResult> => {
 	const { tenantSlug, resourceSlug, body } = params;
+	const sessionId = (params.sessionId || 'sess_http_default') as SessionId;
 
 	if (!body.customerName || !body.customerEmail) {
 		return {
@@ -135,6 +137,7 @@ export const handleBook = async (params: BookParams): Promise<BookResult> => {
 		const holdResult = await allocator.placeHold({
 			tenantId: tenant.id as TenantId,
 			resourceId: resource.id as ResourceId,
+			sessionId,
 			day,
 			startMinute,
 			endMinute,
@@ -166,6 +169,7 @@ export const handleBook = async (params: BookParams): Promise<BookResult> => {
 		tenantId: tenant.id as TenantId,
 		resourceId: resource.id as ResourceId,
 		holdId: holdId as HoldId,
+		sessionId,
 		bookingId,
 		start,
 		end,

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
-import type { BookingId, HoldId, ResourceId, TenantId } from '../../domain/ids';
+import type { BookingId, HoldId, ResourceId, SessionId, TenantId } from '../../domain/ids';
 import { parseDayToUnixStartOfDayUTC } from '../../infrastructure/day-utils';
 import { createMutex } from '../../infrastructure/mutex';
 import { createBookingManager } from './booking-manager';
@@ -25,10 +25,12 @@ test('confirmBooking succeeds when hold exists', async () => {
 
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 
 	const holdResult = await holdManager.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day: '2025-12-25',
 		startMinute: 600,
 		endMinute: 660,
@@ -48,6 +50,7 @@ test('confirmBooking succeeds when hold exists', async () => {
 		tenantId,
 		resourceId,
 		holdId: holdResult.holdId,
+		sessionId,
 		bookingId: ulid() as BookingId,
 		start,
 		end,
@@ -72,6 +75,7 @@ test('confirmBooking returns null when hold does not exist', async () => {
 
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 
 	const dayStart = parseDayToUnixStartOfDayUTC('2025-12-25');
 	const start = dayStart + 600 * 60 * 1000;
@@ -81,6 +85,7 @@ test('confirmBooking returns null when hold does not exist', async () => {
 		tenantId,
 		resourceId,
 		holdId: ulid() as HoldId,
+		sessionId,
 		bookingId: ulid() as BookingId,
 		start,
 		end,
@@ -106,12 +111,14 @@ test('cancelBooking succeeds when booking exists', async () => {
 
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-25';
 
 	// Place and confirm a booking
 	const holdResult = await holdManager.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,
@@ -132,6 +139,7 @@ test('cancelBooking succeeds when booking exists', async () => {
 		tenantId,
 		resourceId,
 		holdId: holdResult.holdId,
+		sessionId,
 		bookingId,
 		start,
 		end,
@@ -259,12 +267,14 @@ test('cancelBooking returns null when booking partially exists', async () => {
 
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-25';
 
 	// Place and confirm a booking for 600-660
 	const holdResult = await holdManager.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,
@@ -285,6 +295,7 @@ test('cancelBooking returns null when booking partially exists', async () => {
 		tenantId,
 		resourceId,
 		holdId: holdResult.holdId,
+		sessionId,
 		bookingId,
 		start,
 		end,
@@ -303,4 +314,57 @@ test('cancelBooking returns null when booking partially exists', async () => {
 	});
 
 	expect(cancelResult).toBeNull();
+});
+
+test('confirmBooking returns null when hold belongs to different session', async () => {
+	const { manager } = createStateManager();
+	const holds = new Map<HoldId, HoldMetadata>();
+	const withLock = createMutex();
+	const holdManager = createHoldManager({
+		getState: manager.getState,
+		holds,
+		withLock,
+	});
+	const bookingManager = createBookingManager({
+		getState: manager.getState,
+		holds,
+		withLock,
+	});
+
+	const tenantId = ulid() as TenantId;
+	const resourceId = ulid() as ResourceId;
+	const sessionA = 'sess_A' as SessionId;
+	const sessionB = 'sess_B' as SessionId;
+	const day = '2025-12-25';
+
+	const holdResult = await holdManager.placeHold({
+		tenantId,
+		resourceId,
+		sessionId: sessionA,
+		day,
+		startMinute: 600,
+		endMinute: 660,
+		expiresAt: Date.now() + 60_000,
+	});
+
+	if (!holdResult.success) {
+		throw new Error('Hold placement failed');
+	}
+
+	const dayStart = parseDayToUnixStartOfDayUTC(day);
+	const start = dayStart + 600 * 60 * 1000;
+	const end = dayStart + 660 * 60 * 1000;
+
+	const result = await bookingManager.confirmBooking({
+		tenantId,
+		resourceId,
+		holdId: holdResult.holdId,
+		sessionId: sessionB,
+		bookingId: ulid() as BookingId,
+		start,
+		end,
+	});
+
+	expect(result).toBeNull();
+	expect(holds.has(holdResult.holdId)).toBeTrue();
 });

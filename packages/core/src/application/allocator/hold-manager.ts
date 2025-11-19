@@ -1,10 +1,11 @@
 import { ulid } from 'ulid';
-import type { HoldPlacedEvent } from '../../domain/events';
+import type { HoldExpiredEvent, HoldPlacedEvent, HoldReleasedEvent } from '../../domain/events';
 import type {
 	DayKey,
 	HoldId,
 	Minute,
 	ResourceId,
+	SessionId,
 	TenantId,
 } from '../../domain/ids';
 import {
@@ -12,13 +13,18 @@ import {
 	isRangeFree,
 	setBitRange,
 } from '../../infrastructure/bitmap';
-import { createHoldPlacedEvent } from '../event-factory';
+import {
+	createHoldExpiredEvent,
+	createHoldPlacedEvent,
+	createHoldReleasedEvent,
+} from '../event-factory';
 import type { AllocatorState, HoldMetadata } from './types';
 
 export type HoldManager = {
 	placeHold: (params: {
 		tenantId: TenantId;
 		resourceId: ResourceId;
+		sessionId: SessionId;
 		day: DayKey;
 		startMinute: Minute;
 		endMinute: Minute;
@@ -28,6 +34,13 @@ export type HoldManager = {
 		| { success: true; holdId: HoldId; event: HoldPlacedEvent }
 		| { success: false }
 	>;
+	releaseHold: (params: {
+		holdId: HoldId;
+		sessionId: SessionId;
+	}) => Promise<
+		{ success: true; event: HoldReleasedEvent } | { success: false }
+	>;
+	releaseHoldsForSession: (sessionId: SessionId) => Promise<HoldExpiredEvent[]>;
 };
 
 export const createHoldManager = (params: {
@@ -39,6 +52,7 @@ export const createHoldManager = (params: {
 		placeHold: async ({
 			tenantId,
 			resourceId,
+			sessionId,
 			day,
 			startMinute,
 			endMinute,
@@ -67,6 +81,7 @@ export const createHoldManager = (params: {
 				params.holds.set(holdId, {
 					tenantId,
 					resourceId,
+					sessionId,
 					day,
 					start: startMinute,
 					end: endMinute,
@@ -93,6 +108,82 @@ export const createHoldManager = (params: {
 			} finally {
 				release();
 			}
+		},
+		releaseHold: async ({ holdId, sessionId }) => {
+			const hold = params.holds.get(holdId);
+			if (!hold || hold.sessionId !== sessionId) {
+				return { success: false };
+			}
+
+			const lockKey = `${hold.tenantId}:${hold.resourceId}:${hold.day}`;
+			const release = await params.withLock(lockKey);
+			try {
+				// Re-check in case it changed while waiting for lock
+				const currentHold = params.holds.get(holdId);
+				if (!currentHold || currentHold.sessionId !== sessionId) {
+					return { success: false };
+				}
+
+				const dayMap = params.getState(hold.tenantId, hold.resourceId);
+				const dayState = dayMap.get(hold.day);
+
+				if (dayState) {
+					setBitRange(dayState.held, hold.start, hold.end, false);
+				}
+
+				params.holds.delete(holdId);
+
+				const event = createHoldReleasedEvent({
+					tenantId: hold.tenantId,
+					resourceId: hold.resourceId,
+					holdId,
+				});
+
+				return { success: true, event };
+			} finally {
+				release();
+			}
+		},
+		releaseHoldsForSession: async (sessionId) => {
+			const sessionHolds: HoldId[] = [];
+			for (const [id, meta] of params.holds.entries()) {
+				if (meta.sessionId === sessionId) {
+					sessionHolds.push(id);
+				}
+			}
+
+			const events: HoldExpiredEvent[] = [];
+
+			// Optimization: group by lockKey to avoid acquiring/releasing lock multiple times
+			// but for simplicity and correctness with existing locking, we iterate.
+			for (const holdId of sessionHolds) {
+				const hold = params.holds.get(holdId);
+				if (!hold) continue;
+
+				const lockKey = `${hold.tenantId}:${hold.resourceId}:${hold.day}`;
+				const release = await params.withLock(lockKey);
+				try {
+					if (!params.holds.has(holdId)) continue;
+
+					const dayMap = params.getState(hold.tenantId, hold.resourceId);
+					const dayState = dayMap.get(hold.day);
+					if (dayState) {
+						setBitRange(dayState.held, hold.start, hold.end, false);
+					}
+					params.holds.delete(holdId);
+
+					events.push(
+						createHoldExpiredEvent({
+							tenantId: hold.tenantId,
+							resourceId: hold.resourceId,
+							holdId,
+						}),
+					);
+				} finally {
+					release();
+				}
+			}
+			return events;
 		},
 	};
 };

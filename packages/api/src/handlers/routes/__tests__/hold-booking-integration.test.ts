@@ -165,7 +165,7 @@ test('Hold events are emitted to event store', async () => {
 	expect(holdPlacedEvent?.payload.holdId).toBe(holdResult.holdId);
 });
 
-test('Release hold emits HoldExpired event', async () => {
+test('Release hold emits HoldReleased event', async () => {
 	const day = '2025-12-13';
 	const start = `${day}T10:00:00Z`;
 	const end = `${day}T11:00:00Z`;
@@ -198,13 +198,13 @@ test('Release hold emits HoldExpired event', async () => {
 		testResource.id as any,
 	);
 
-	const holdExpiredEvent = events.find(
-		(e) => e.type === 'HoldExpired' && e.payload.holdId === holdResult.holdId,
+	const holdReleasedEvent = events.find(
+		(e) => e.type === 'HoldReleased' && e.payload.holdId === holdResult.holdId,
 	);
 
-	expect(holdExpiredEvent).toBeDefined();
-	expect(holdExpiredEvent?.type).toBe('HoldExpired');
-	expect(holdExpiredEvent?.payload.holdId).toBe(holdResult.holdId);
+	expect(holdReleasedEvent).toBeDefined();
+	expect(holdReleasedEvent?.type).toBe('HoldReleased');
+	expect(holdReleasedEvent?.payload.holdId).toBe(holdResult.holdId);
 });
 
 test('Concurrent holds on same slot: only one succeeds', async () => {

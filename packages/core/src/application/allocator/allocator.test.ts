@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
-import type { BookingId, ResourceId, TenantId } from '../../domain/ids';
+import type { BookingId, ResourceId, SessionId, TenantId } from '../../domain/ids';
 import { parseDayToUnixStartOfDayUTC } from '../../infrastructure/day-utils';
 import { createAllocator } from './allocator';
 
@@ -8,12 +8,14 @@ test('concurrent hold requests → only one wins', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-25';
 
 	const [a, b] = await Promise.all([
 		allocator.placeHold({
 			tenantId,
 			resourceId,
+			sessionId,
 			day,
 			startMinute: 600,
 			endMinute: 660,
@@ -37,11 +39,13 @@ test('hold → confirm is atomic', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-25';
 
 	const holdResult = await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,
@@ -60,6 +64,7 @@ test('hold → confirm is atomic', async () => {
 		tenantId,
 		resourceId,
 		holdId: holdResult.holdId,
+		sessionId,
 		bookingId: ulid() as BookingId,
 		start,
 		end,
@@ -75,12 +80,14 @@ test('cannot double-book same slot', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-01';
 
 	const [result1, result2] = await Promise.all([
 		allocator.placeHold({
 			tenantId,
 			resourceId,
+			sessionId,
 			day,
 			startMinute: 600,
 			endMinute: 660,
@@ -104,6 +111,7 @@ test('overlapping holds are rejected', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-01';
 
 	const first = await allocator.placeHold({
@@ -120,6 +128,7 @@ test('overlapping holds are rejected', async () => {
 	const overlapping = await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 630,
 		endMinute: 690,
@@ -133,6 +142,7 @@ test('non-overlapping holds are allowed', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-01';
 
 	const first = await allocator.placeHold({
@@ -149,6 +159,7 @@ test('non-overlapping holds are allowed', async () => {
 	const second = await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 660,
 		endMinute: 720,
@@ -162,11 +173,13 @@ test('expired holds are cleaned up', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-01';
 
 	await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,
@@ -181,12 +194,14 @@ test('cancelBooking clears booked bits', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-01';
 
 	// Place and confirm a booking
 	const holdResult = await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,
@@ -207,6 +222,7 @@ test('cancelBooking clears booked bits', async () => {
 		tenantId,
 		resourceId,
 		holdId: holdResult.holdId,
+		sessionId,
 		bookingId,
 		start,
 		end,
@@ -275,6 +291,7 @@ test('placeHold uses unix timestamps for expiresAt', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-25';
 
 	const unixTimestamp = 1735084800000;
@@ -283,6 +300,7 @@ test('placeHold uses unix timestamps for expiresAt', async () => {
 	const result = await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,
@@ -302,12 +320,14 @@ test('confirmBooking uses unix timestamps for start and end', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-25';
 
 	const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
 	const holdResult = await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,
@@ -325,6 +345,7 @@ test('confirmBooking uses unix timestamps for start and end', async () => {
 		tenantId,
 		resourceId,
 		holdId: holdResult.holdId,
+		sessionId,
 		bookingId: ulid() as BookingId,
 		start: unixStart,
 		end: unixEnd,
@@ -346,6 +367,7 @@ test('expireHolds uses unix timestamps', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-01';
 
 	const pastUnixTimestamp = 1735084800000 - 1000;
@@ -354,6 +376,7 @@ test('expireHolds uses unix timestamps', async () => {
 	await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,
@@ -363,6 +386,7 @@ test('expireHolds uses unix timestamps', async () => {
 	await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 660,
 		endMinute: 720,
@@ -377,6 +401,7 @@ test('all timestamps are unix milliseconds (timezone-agnostic)', async () => {
 	const allocator = createAllocator();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
+	const sessionId = 'sess_01' as SessionId;
 	const day = '2025-12-25';
 
 	const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
@@ -385,6 +410,7 @@ test('all timestamps are unix milliseconds (timezone-agnostic)', async () => {
 	const holdResult = await allocator.placeHold({
 		tenantId,
 		resourceId,
+		sessionId,
 		day,
 		startMinute: 600,
 		endMinute: 660,
@@ -404,6 +430,7 @@ test('all timestamps are unix milliseconds (timezone-agnostic)', async () => {
 			tenantId,
 			resourceId,
 			holdId: holdResult.holdId,
+			sessionId,
 			bookingId: ulid() as BookingId,
 			start: unixStart,
 			end: unixEnd,

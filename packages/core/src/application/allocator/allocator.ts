@@ -3,6 +3,7 @@ import type {
 	BookingConfirmedEvent,
 	HoldExpiredEvent,
 	HoldPlacedEvent,
+	HoldReleasedEvent,
 } from '../../domain/events';
 import type {
 	BookingId,
@@ -10,13 +11,13 @@ import type {
 	HoldId,
 	Minute,
 	ResourceId,
+	SessionId,
 	TenantId,
 } from '../../domain/ids';
 import { createMutex } from '../../infrastructure/mutex';
 import { createBookingManager } from './booking-manager';
 import { createExpiryManager } from './expiry-manager';
 import { createHoldManager } from './hold-manager';
-import { createReleaseManager } from './release-manager';
 import { createStateManager } from './state-manager';
 import type { AllocatorState, HoldMetadata } from './types';
 
@@ -24,6 +25,7 @@ export type Allocator = {
 	placeHold: (params: {
 		tenantId: TenantId;
 		resourceId: ResourceId;
+		sessionId: SessionId;
 		day: DayKey;
 		startMinute: Minute;
 		endMinute: Minute;
@@ -37,6 +39,7 @@ export type Allocator = {
 		tenantId: TenantId;
 		resourceId: ResourceId;
 		holdId: HoldId;
+		sessionId: SessionId;
 		bookingId: BookingId;
 		start: number;
 		end: number;
@@ -57,9 +60,9 @@ export type Allocator = {
 	expireHolds: (now: number) => HoldId[];
 	releaseHold: (params: {
 		holdId: HoldId;
-		tenantId: TenantId;
-		resourceId: ResourceId;
-	}) => Promise<HoldExpiredEvent | null>;
+		sessionId: SessionId;
+	}) => Promise<{ success: true; event: HoldReleasedEvent } | { success: false }>;
+	releaseHoldsForSession: (sessionId: SessionId) => Promise<HoldExpiredEvent[]>;
 	getState: (tenantId: TenantId, resourceId: ResourceId) => AllocatorState;
 };
 
@@ -85,17 +88,13 @@ export const createAllocator = (): Allocator => {
 		holds,
 	});
 
-	const releaseManager = createReleaseManager({
-		getState: manager.getState,
-		holds,
-	});
-
 	return {
 		getState: manager.getState,
 		placeHold: holdManager.placeHold,
 		confirmBooking: bookingManager.confirmBooking,
 		cancelBooking: bookingManager.cancelBooking,
 		expireHolds: expiryManager.expireHolds,
-		releaseHold: releaseManager.releaseHold,
+		releaseHold: holdManager.releaseHold,
+		releaseHoldsForSession: holdManager.releaseHoldsForSession,
 	};
 };

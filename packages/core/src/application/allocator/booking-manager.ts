@@ -2,7 +2,13 @@ import type {
 	BookingCancelledEvent,
 	BookingConfirmedEvent,
 } from '../../domain/events';
-import type { BookingId, HoldId, ResourceId, TenantId } from '../../domain/ids';
+import type {
+	BookingId,
+	HoldId,
+	ResourceId,
+	SessionId,
+	TenantId,
+} from '../../domain/ids';
 import { getBit, setBitRange } from '../../infrastructure/bitmap';
 import { parseDayToUnixStartOfDayUTC } from '../../infrastructure/day-utils';
 import {
@@ -16,6 +22,7 @@ export type BookingManager = {
 		tenantId: TenantId;
 		resourceId: ResourceId;
 		holdId: HoldId;
+		sessionId: SessionId;
 		bookingId: BookingId;
 		start: number;
 		end: number;
@@ -42,9 +49,12 @@ export const createBookingManager = (deps: {
 }): BookingManager => {
 	return {
 		confirmBooking: async (params) => {
-			const { tenantId, resourceId, holdId, bookingId } = params;
+			const { tenantId, resourceId, holdId, sessionId, bookingId } = params;
 			const hold = deps.holds.get(holdId);
 			if (!hold) {
+				return null;
+			}
+			if (hold.sessionId !== sessionId) {
 				return null;
 			}
 

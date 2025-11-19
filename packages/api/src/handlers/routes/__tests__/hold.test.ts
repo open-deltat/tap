@@ -189,7 +189,7 @@ test('handleReleaseHold returns error for non-existent hold', async () => {
 		expect(result.success).toBe(false);
 		if (!result.success) {
 			expect(result.status).toBe(404);
-			expect(result.error).toBe('Hold not found');
+			expect(result.error).toBe('Hold not found or access denied');
 		}
 	});
 

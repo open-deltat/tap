@@ -1,4 +1,4 @@
-import type { HoldId, ResourceId, TenantId } from '@tap/core';
+import type { HoldId, ResourceId, SessionId, TenantId } from '@tap/core';
 import { parseDayToUnixStartOfDayUTC } from '@tap/core';
 import { validateHorizon } from '../../services/context';
 import {
@@ -14,6 +14,7 @@ export type PlaceHoldParams = {
 	start: string | number;
 	end: string | number;
 	clientRef?: string;
+	sessionId?: string;
 };
 
 export type PlaceHoldResult =
@@ -32,6 +33,7 @@ export const handlePlaceHold = async (
 	params: PlaceHoldParams,
 ): Promise<PlaceHoldResult> => {
 	const { tenantSlug, resourceSlug, start, end, clientRef } = params;
+	const sessionId = (params.sessionId || 'sess_http_default') as SessionId;
 
 	const tenant = await tenantRepository.getBySlug(tenantSlug);
 	if (!tenant) {
@@ -91,6 +93,7 @@ export const handlePlaceHold = async (
 	const holdResult = await allocator.placeHold({
 		tenantId: tenant.id as TenantId,
 		resourceId: resource.id as ResourceId,
+		sessionId,
 		day,
 		startMinute,
 		endMinute,
@@ -120,6 +123,7 @@ export type ReleaseHoldParams = {
 	tenantSlug: string;
 	resourceSlug: string;
 	holdId: string;
+	sessionId?: string;
 };
 
 export type ReleaseHoldResult =
@@ -137,6 +141,7 @@ export const handleReleaseHold = async (
 	params: ReleaseHoldParams,
 ): Promise<ReleaseHoldResult> => {
 	const { tenantSlug, resourceSlug, holdId } = params;
+	const sessionId = (params.sessionId || 'sess_http_default') as SessionId;
 
 	const tenant = await tenantRepository.getBySlug(tenantSlug);
 	if (!tenant) {
@@ -159,21 +164,20 @@ export const handleReleaseHold = async (
 	const allocator = getAllocator();
 	const eventStore = getEventStore();
 
-	const event = await allocator.releaseHold({
+	const result = await allocator.releaseHold({
 		holdId: holdId as HoldId,
-		tenantId: tenant.id as TenantId,
-		resourceId: resource.id as ResourceId,
+		sessionId,
 	});
 
-	if (!event) {
+	if (!result.success) {
 		return {
 			success: false,
-			error: 'Hold not found',
+			error: 'Hold not found or access denied',
 			status: 404,
 		};
 	}
 
-	await eventStore.append(event);
+	await eventStore.append(result.event);
 
 	return {
 		success: true,
