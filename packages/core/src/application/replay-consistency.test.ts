@@ -106,6 +106,16 @@ test('replay handles events across year boundary', async () => {
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 
+	// Use future dates to ensure holds are not expired
+	const futureYear = new Date().getFullYear() + 1;
+	const lastDayOfYear = new Date(futureYear - 1, 11, 31);
+	const firstDayOfNextYear = new Date(futureYear, 0, 1);
+	
+	const day1 = lastDayOfYear.toISOString().split('T')[0]!;
+	const day2 = firstDayOfNextYear.toISOString().split('T')[0]!;
+	const now = Date.now();
+	const futureExpiresAt = now + 60_000;
+
 	const events: LedgerEvent[] = [
 		{
 			eventId: ulid(),
@@ -113,13 +123,13 @@ test('replay handles events across year boundary', async () => {
 			resourceId,
 			type: 'HoldPlaced',
 			version: 1,
-			createdAt: Date.UTC(2024, 11, 31, 23, 59, 59, 999),
+			createdAt: now - 1000,
 			payload: {
 				holdId: ulid(),
-				day: '2024-12-31',
+				day: day1,
 				startMinute: 600,
 				endMinute: 660,
-				expiresAt: Date.UTC(2025, 0, 1, 0, 0, 0, 0),
+				expiresAt: futureExpiresAt,
 			},
 		},
 		{
@@ -128,13 +138,13 @@ test('replay handles events across year boundary', async () => {
 			resourceId,
 			type: 'HoldPlaced',
 			version: 1,
-			createdAt: Date.UTC(2025, 0, 1, 0, 0, 0, 0),
+			createdAt: now,
 			payload: {
 				holdId: ulid(),
-				day: '2025-01-01',
+				day: day2,
 				startMinute: 600,
 				endMinute: 660,
-				expiresAt: Date.UTC(2025, 0, 1, 0, 0, 0, 0) + 60_000,
+				expiresAt: futureExpiresAt,
 			},
 		},
 	];
@@ -142,8 +152,8 @@ test('replay handles events across year boundary', async () => {
 	await replayEvents(allocator, events);
 
 	const state = allocator.getState(tenantId, resourceId);
-	expect(state.has('2024-12-31')).toBeTrue();
-	expect(state.has('2025-01-01')).toBeTrue();
+	expect(state.has(day1)).toBeTrue();
+	expect(state.has(day2)).toBeTrue();
 });
 
 test('replay maintains idempotency', async () => {

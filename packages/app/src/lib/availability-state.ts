@@ -9,6 +9,7 @@ export type AvailabilitySlot = {
 export type DayAvailabilityState = {
 	booked: Set<number>;
 	held: Set<number>;
+	holdMetadata: Map<string, { startMinute: number; endMinute: number }>;
 };
 
 export type AvailabilityState = Map<string, DayAvailabilityState>;
@@ -26,25 +27,29 @@ export const applyBookingEvent = (
 		const dayState = state.get(dayKey) || {
 			booked: new Set(),
 			held: new Set(),
+			holdMetadata: new Map(),
 		};
 		const startMinute = event.payload.startMinute;
 		const endMinute = event.payload.endMinute;
+		const holdId = event.payload.holdId;
 
 		for (let m = startMinute; m < endMinute; m++) {
 			dayState.held.add(m);
 		}
+		dayState.holdMetadata.set(holdId, { startMinute, endMinute });
 		state.set(dayKey, dayState);
 	} else if (event.type === 'HoldExpired') {
+		const holdId = event.payload.holdId;
 		for (const [key, day] of state.entries()) {
-			const heldToRemove: number[] = [];
-			for (const heldMinute of day.held) {
-				heldToRemove.push(heldMinute);
-			}
-			for (const minute of heldToRemove) {
-				day.held.delete(minute);
-			}
-			if (day.held.size === 0 && day.booked.size === 0) {
-				state.delete(key);
+			const holdInfo = day.holdMetadata.get(holdId);
+			if (holdInfo) {
+				for (let m = holdInfo.startMinute; m < holdInfo.endMinute; m++) {
+					day.held.delete(m);
+				}
+				day.holdMetadata.delete(holdId);
+				if (day.held.size === 0 && day.booked.size === 0) {
+					state.delete(key);
+				}
 			}
 		}
 	} else if (event.type === 'BookingConfirmed') {
@@ -54,14 +59,19 @@ export const applyBookingEvent = (
 		const eventDayState = state.get(eventDayKey) || {
 			booked: new Set(),
 			held: new Set(),
+			holdMetadata: new Map(),
 		};
 
 		const startMinute = getMinutesFromMidnight(startDate);
 		const endMinute = getMinutesFromMidnight(endDate);
 
+		const holdId = event.payload.holdId;
 		for (let m = startMinute; m < endMinute; m++) {
 			eventDayState.held.delete(m);
 			eventDayState.booked.add(m);
+		}
+		if (holdId) {
+			eventDayState.holdMetadata.delete(holdId);
 		}
 
 		state.set(eventDayKey, eventDayState);
