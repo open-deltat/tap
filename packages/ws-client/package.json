@@ -1,14 +1,14 @@
 {
-	"name": "@tap/stream-client",
+	"name": "@tap/ws-client",
 	"version": "0.1.0",
-	"description": "TAP v0.1 Stream Client - Client library for consuming TAP event streams",
+	"description": "TAP v0.1 WebSocket Client - Framework-agnostic client for TAP availability and bookings",
 	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
+	"main": "./dist/packages/ws-client/src/index.js",
+	"types": "./dist/packages/ws-client/src/index.d.ts",
 	"exports": {
 		".": {
-			"types": "./dist/index.d.ts",
-			"default": "./dist/index.js"
+			"types": "./dist/packages/ws-client/src/index.d.ts",
+			"default": "./dist/packages/ws-client/src/index.js"
 		}
 	},
 	"scripts": {

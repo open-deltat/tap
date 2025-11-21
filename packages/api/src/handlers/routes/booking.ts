@@ -187,8 +187,8 @@ export const handleBook = async (params: BookParams): Promise<BookResult> => {
 	if (!confirmEvent) {
 		return {
 			success: false,
-			error: 'Failed to confirm booking',
-			status: 500,
+			error: 'Hold not found or access denied',
+			status: 404,
 		};
 	}
 

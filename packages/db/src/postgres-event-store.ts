@@ -38,7 +38,7 @@ export const createPostgresEventStore = (
 				resourceId: event.resourceId,
 				type: event.type,
 				version: event.version,
-				payload: event.payload,
+				payload: JSON.parse(JSON.stringify(event.payload)),
 				createdAt: new Date(event.createdAt),
 			});
 		},
@@ -47,7 +47,7 @@ export const createPostgresEventStore = (
 			const rows = await db
 				.select()
 				.from(ledgerEvents)
-				.orderBy(asc(ledgerEvents.createdAt));
+				.orderBy(asc(ledgerEvents.createdAt), asc(ledgerEvents.eventId));
 			return rows.map(rowToEvent);
 		},
 
@@ -64,7 +64,7 @@ export const createPostgresEventStore = (
 						eq(ledgerEvents.resourceId, resourceId),
 					),
 				)
-				.orderBy(asc(ledgerEvents.createdAt));
+				.orderBy(asc(ledgerEvents.createdAt), asc(ledgerEvents.eventId));
 			return rows.map(rowToEvent);
 		},
 
@@ -73,7 +73,7 @@ export const createPostgresEventStore = (
 				.select()
 				.from(ledgerEvents)
 				.where(eq(ledgerEvents.tenantId, tenantId))
-				.orderBy(asc(ledgerEvents.createdAt));
+				.orderBy(asc(ledgerEvents.createdAt), asc(ledgerEvents.eventId));
 			return rows.map(rowToEvent);
 		},
 
@@ -85,7 +85,7 @@ export const createPostgresEventStore = (
 				const query = db
 					.select()
 					.from(ledgerEvents)
-					.orderBy(asc(ledgerEvents.createdAt));
+					.orderBy(asc(ledgerEvents.createdAt), asc(ledgerEvents.eventId));
 
 				if (tenantId) {
 					query.where(eq(ledgerEvents.tenantId, tenantId));
@@ -126,7 +126,7 @@ export const createPostgresEventStore = (
 				.select()
 				.from(ledgerEvents)
 				.where(and(...conditions))
-				.orderBy(asc(ledgerEvents.createdAt));
+				.orderBy(asc(ledgerEvents.createdAt), asc(ledgerEvents.eventId));
 			return rows.map(rowToEvent);
 		},
 	};

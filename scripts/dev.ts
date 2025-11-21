@@ -62,6 +62,7 @@ const appProcess = spawn({
 	env: {
 		...process.env,
 		PORT: String(APP_PORT),
+		NEXT_PUBLIC_API_BASE_URL: `http://localhost:${API_PORT}`,
 	},
 	stdout: 'inherit',
 	stderr: 'inherit',

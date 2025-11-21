@@ -1,4 +1,4 @@
-import type { BookingEvent } from '../../../stream-client/src/types';
+import type { BookingEvent } from '@tap/ws-client';
 import { getDayKey, getMinutesFromMidnight } from './timezone';
 
 export type AvailabilitySlot = {

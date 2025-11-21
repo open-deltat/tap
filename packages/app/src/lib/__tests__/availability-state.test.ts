@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import type { BookingEvent } from '../../../../stream-client/src/types';
+import type { BookingEvent } from '@tap/ws-client';
 import {
 	applyBookingEvent,
 	createAvailabilityState,

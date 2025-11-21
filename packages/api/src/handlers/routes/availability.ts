@@ -20,6 +20,7 @@ export type GetAvailabilityResult =
 			success: true;
 			slots: Array<{ start: number; end: number }>;
 			asOfEventId: string | null;
+			resourceId: string;
 	  }
 	| {
 			success: false;
@@ -113,6 +114,7 @@ export const handleGetAvailability = async (
 		success: true,
 		slots,
 		asOfEventId,
+		resourceId: resource.id,
 	};
 };
 

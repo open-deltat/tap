@@ -102,10 +102,12 @@ test('mergeAvailability integration test', () => {
     // Final: Free 09:00-13:00, 14:00-17:00
 
     expect(result.length).toBe(2);
-    expect(result[0].start).toBe(9 * 60 * 60000);
-    expect(result[0].end).toBe(13 * 60 * 60000);
-    expect(result[1].start).toBe(14 * 60 * 60000);
-    expect(result[1].end).toBe(17 * 60 * 60000);
+    if (result.length >= 2 && result[0] && result[1]) {
+        expect(result[0].start).toBe(9 * 60 * 60000);
+        expect(result[0].end).toBe(13 * 60 * 60000);
+        expect(result[1].start).toBe(14 * 60 * 60000);
+        expect(result[1].end).toBe(17 * 60 * 60000);
+    }
 });
 
 test('mergeAvailability ignores old events', () => {

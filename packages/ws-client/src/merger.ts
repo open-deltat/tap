@@ -37,6 +37,13 @@ const getEventTimeRange = (event: LedgerEvent): TimeSlot | null => {
 		event.type === 'HoldExpired' ||
 		event.type === 'HoldReleased'
 	) {
+		if (
+			!event.payload.day ||
+			event.payload.startMinute === undefined ||
+			event.payload.endMinute === undefined
+		) {
+			return null;
+		}
 		const dayStart = parseDayToUnixStartOfDayUTC(event.payload.day);
 		return {
 			start: dayStart + event.payload.startMinute * 60000,
@@ -44,6 +51,12 @@ const getEventTimeRange = (event: LedgerEvent): TimeSlot | null => {
 		};
 	}
 	if (event.type === 'BookingConfirmed' || event.type === 'BookingCancelled') {
+		if (
+			event.payload.start === undefined ||
+			event.payload.end === undefined
+		) {
+			return null;
+		}
 		return {
 			start: event.payload.start,
 			end: event.payload.end,
@@ -96,9 +109,14 @@ const addRange = (
 	const result: TimeSlot[] = [];
 	if (newSlots.length === 0) return result;
 
-	let current = newSlots[0];
+	const first = newSlots[0];
+	if (!first) return result;
+
+	let current = first;
 	for (let i = 1; i < newSlots.length; i++) {
 		const next = newSlots[i];
+		if (!next) continue;
+
 		if (next.start <= current.end) {
 			// Merge
 			current.end = Math.max(current.end, next.end);

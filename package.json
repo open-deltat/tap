@@ -49,5 +49,8 @@
   "devDependencies": {
     "@biomejs/biome": "latest",
     "turbo": "latest"
+  },
+  "dependencies": {
+    "ulid": "^3.0.1"
   }
 }

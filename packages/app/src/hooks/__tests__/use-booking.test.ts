@@ -14,11 +14,11 @@ describe('useBooking API calls', () => {
 	const resourceSlug = 'test-resource';
 
 	beforeEach(() => {
-		(global.fetch as ReturnType<typeof mock>).mockClear();
+		(global.fetch as unknown as ReturnType<typeof mock>).mockClear();
 	});
 
 	test('placeHold makes correct API call', async () => {
-		(global.fetch as ReturnType<typeof mock>).mockResolvedValueOnce({
+		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: true,
 			json: async () => ({ holdId: 'hold_123' }),
 			status: 201,
@@ -48,7 +48,7 @@ describe('useBooking API calls', () => {
 	});
 
 	test('placeHold handles API errors', async () => {
-		(global.fetch as ReturnType<typeof mock>).mockResolvedValueOnce({
+		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: false,
 			status: 409,
 			statusText: 'Conflict',
@@ -72,7 +72,7 @@ describe('useBooking API calls', () => {
 	});
 
 	test('releaseHold makes correct API call', async () => {
-		(global.fetch as ReturnType<typeof mock>).mockResolvedValueOnce({
+		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: true,
 			json: async () => ({ released: true }),
 			status: 200,
@@ -100,7 +100,7 @@ describe('useBooking API calls', () => {
 	});
 
 	test('releaseHold handles API errors', async () => {
-		(global.fetch as ReturnType<typeof mock>).mockResolvedValueOnce({
+		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: false,
 			status: 404,
 			statusText: 'Not Found',
@@ -122,7 +122,7 @@ describe('useBooking API calls', () => {
 	});
 
 	test('confirmBooking makes correct API call', async () => {
-		(global.fetch as ReturnType<typeof mock>).mockResolvedValueOnce({
+		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: true,
 			json: async () => ({ bookingId: 'booking_123' }),
 			status: 201,
@@ -157,7 +157,7 @@ describe('useBooking API calls', () => {
 	});
 
 	test('confirmBooking includes optional customerPhone', async () => {
-		(global.fetch as ReturnType<typeof mock>).mockResolvedValueOnce({
+		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: true,
 			json: async () => ({ bookingId: 'booking_123' }),
 			status: 201,
@@ -193,7 +193,7 @@ describe('useBooking API calls', () => {
 	});
 
 	test('confirmBooking handles API errors', async () => {
-		(global.fetch as ReturnType<typeof mock>).mockResolvedValueOnce({
+		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: false,
 			status: 404,
 			statusText: 'Not Found',
@@ -220,7 +220,7 @@ describe('useBooking API calls', () => {
 	});
 
 	test('handles network errors gracefully', async () => {
-		(global.fetch as ReturnType<typeof mock>).mockRejectedValueOnce(
+		(global.fetch as unknown as ReturnType<typeof mock>).mockRejectedValueOnce(
 			new Error('Network error'),
 		);
 

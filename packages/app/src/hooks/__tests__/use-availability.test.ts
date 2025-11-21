@@ -13,7 +13,7 @@ global.fetch = mock(() =>
 
 describe('useAvailability', () => {
 	beforeEach(() => {
-		(global.fetch as ReturnType<typeof mock>).mockClear();
+		(global.fetch as unknown as ReturnType<typeof mock>).mockClear();
 	});
 
 	test('fetchAvailability makes correct API call', async () => {
@@ -22,7 +22,7 @@ describe('useAvailability', () => {
 		const resourceSlug = 'test-resource';
 		const selectedDate = new Date('2025-01-15T10:00:00Z');
 
-		(global.fetch as ReturnType<typeof mock>).mockResolvedValueOnce({
+		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: true,
 			json: async () => ({
 				slots: [{ start: Date.now(), end: Date.now() + 3600000 }],
@@ -31,7 +31,7 @@ describe('useAvailability', () => {
 			status: 200,
 		} as Response);
 
-		(global.fetch as ReturnType<typeof mock>).mockResolvedValueOnce({
+		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: true,
 			json: async () => ({
 				events: [{ eventId: 'event_123' }],
@@ -50,7 +50,7 @@ describe('useAvailability', () => {
 	});
 
 	test('handles API errors correctly', async () => {
-		(global.fetch as ReturnType<typeof mock>).mockResolvedValueOnce({
+		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: false,
 			status: 404,
 			statusText: 'Not Found',

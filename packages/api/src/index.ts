@@ -1,7 +1,11 @@
 import { handlePrivateRequest } from './handlers/private';
 import { handlePublicRequest } from './handlers/public';
+import { tenantRepository, resourceRepository } from './services/context';
+import { websocketHandler } from './handlers/ws/index';
 import { initializeContext } from './services/context';
 import { startHoldExpiryWorker } from './workers/hold-expiry';
+import { ulid } from 'ulid';
+import type { SessionId } from '@tap/core';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
@@ -11,8 +15,53 @@ const stopHoldExpiryWorker = startHoldExpiryWorker(5000);
 
 const _server = Bun.serve({
 	port: PORT,
-	async fetch(req) {
+	async fetch(req, server) {
 		const url = new URL(req.url);
+
+		if (url.pathname === '/v1/hold-stream') {
+			let tenantId = url.searchParams.get('tenantId');
+			let resourceId = url.searchParams.get('resourceId');
+			const tenantSlug = url.searchParams.get('tenantSlug');
+			const resourceSlug = url.searchParams.get('resourceSlug');
+			const cursor = url.searchParams.get('cursor') || undefined;
+
+			if ((!tenantId || !resourceId) && tenantSlug && resourceSlug) {
+				const tenant = await tenantRepository.getBySlug(tenantSlug);
+				if (tenant) {
+					tenantId = tenant.id;
+					const resource = await resourceRepository.getBySlug(
+						tenantSlug,
+						resourceSlug,
+					);
+					if (resource && resource.tenantId === tenant.id) {
+						resourceId = resource.id;
+					}
+				}
+			}
+
+			if (!tenantId || !resourceId) {
+				return new Response(
+					'Missing or invalid tenantId/resourceId or tenantSlug/resourceSlug',
+					{ status: 400 },
+				);
+			}
+
+			const sessionId = ('sess_' + ulid()) as SessionId;
+
+			const success = server.upgrade(req, {
+				data: {
+					sessionId,
+					tenantId,
+					resourceId,
+					cursor,
+				},
+			});
+
+			if (success) {
+				return undefined;
+			}
+			return new Response('Upgrade failed', { status: 500 });
+		}
 
 		if (req.method === 'OPTIONS') {
 			return new Response(null, {
@@ -50,11 +99,21 @@ const _server = Bun.serve({
 		}
 
 		if (url.pathname.startsWith('/v1/')) {
-			return handlePrivateRequest(req);
+			const response = await handlePrivateRequest(req);
+			const headers = new Headers(response.headers);
+			Object.entries(corsHeaders).forEach(([key, value]) => {
+				headers.set(key, value);
+			});
+			return new Response(response.body, {
+				status: response.status,
+				statusText: response.statusText,
+				headers,
+			});
 		}
 
 		return new Response('Not Found', { status: 404 });
 	},
+	websocket: websocketHandler,
 });
 
 process.on('SIGINT', () => {
@@ -67,7 +126,7 @@ process.on('SIGTERM', () => {
 	process.exit(0);
 });
 
-console.log(`🚀 TAP API running at http://localhost:${PORT}`);
+console.log(`🚀 TAP API running at http://localhost:${_server.port}`);
 console.log(`\n📋 Endpoints:`);
 console.log(`  GET  /health                                    - Health check`);
 console.log(

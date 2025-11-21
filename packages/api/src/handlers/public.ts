@@ -51,6 +51,7 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 				JSON.stringify({
 					slots: result.slots,
 					asOfEventId: result.asOfEventId,
+					resourceId: result.resourceId,
 				}),
 				{ status: 200, headers: { 'Content-Type': 'application/json' } },
 			);
@@ -194,11 +195,13 @@ export const handlePublicRequest = async (req: Request): Promise<Response> => {
 			}
 
 			const body = (await req.json()) as PublicBookRequest;
+			const sessionId = req.headers.get('x-tap-session-id') || undefined;
 
 			const result = await handleBook({
 				tenantSlug,
 				resourceSlug,
 				body,
+				sessionId,
 			});
 
 			if (!result.success) {

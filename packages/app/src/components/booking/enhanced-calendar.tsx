@@ -4,15 +4,15 @@ import { Calendar, Clock, Loader2, AlertCircle, CheckCircle2 } from 'lucide-reac
 import * as React from 'react';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
-import { useAvailability } from '@/hooks/use-availability';
+import { useAvailability, type AvailabilitySlot } from '@/hooks/use-availability';
 import { useBooking } from '@/hooks/use-booking';
-import { useStreamListener } from '@/hooks/use-stream-listener';
-import type { AvailabilitySlot } from '@/lib/availability-state';
+import { useHoldStream } from '@/hooks/use-hold-stream';
 import {
 	getClientTimezone,
 	format,
 	fromUnixTimestamp,
 	getDayKey,
+    getMinutesFromMidnight
 } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 
@@ -24,18 +24,8 @@ export type EnhancedCalendarProps = {
 	durationMinutes?: number;
 	fromHour?: number;
 	toHour?: number;
-	viewMode?: 'single' | 'week';
-	onSlotSelected?: (slot: AvailabilitySlot) => void;
 	onBookingConfirmed?: (bookingId: string) => void;
 	className?: string;
-};
-
-type SlotStatus = 'available' | 'held-by-me' | 'held-by-other' | 'booked';
-
-type SlotWithStatus = AvailabilitySlot & {
-	status: SlotStatus;
-	holdId?: string;
-	expiresAt?: number;
 };
 
 export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
@@ -43,54 +33,67 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 		apiBaseUrl,
 		tenantSlug,
 		resourceSlug,
-		slotResolutionMinutes = 15,
 		durationMinutes = 60,
 		fromHour = 0,
 		toHour = 24,
-		viewMode = 'single',
-		onSlotSelected,
 		onBookingConfirmed,
 		className,
 	}) => {
 		const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
 			new Date(),
 		);
-		const [selectedSlot, setSelectedSlot] =
-			React.useState<SlotWithStatus | null>(null);
 		const [activeHold, setActiveHold] = React.useState<{
 			holdId: string;
 			expiresAt: number;
 			slot: AvailabilitySlot;
 		} | null>(null);
+
 		const [showBookingForm, setShowBookingForm] = React.useState(false);
 		const [customerName, setCustomerName] = React.useState('');
 		const [customerEmail, setCustomerEmail] = React.useState('');
 		const [customerPhone, setCustomerPhone] = React.useState('');
 		const [holdExpirationCountdown, setHoldExpirationCountdown] =
 			React.useState<number | null>(null);
-		const [streamConnected, setStreamConnected] = React.useState(false);
-		const [heldSlots, setHeldSlots] = React.useState<
-			Map<string, { holdId: string; expiresAt: number; isMine: boolean }>
-		>(new Map());
-		const [bookedSlots, setBookedSlots] = React.useState<Set<string>>(new Set());
 
+        // Availability
 		const { slots, isLoading, error, refresh, applyDelta, cursor } =
 			useAvailability({
 				apiBaseUrl,
 				tenantSlug,
 				resourceSlug,
 				selectedDate,
-				slotResolutionMinutes,
 				durationMinutes,
 				fromHour,
 				toHour,
 			});
 
+		console.log('[EnhancedCalendar] Slots:', slots.length, 'Cursor:', cursor);
+
+		// WS Hold Stream + Deltas
+        const { sessionId, isConnected: streamConnected, placeHold: placeHoldWS, releaseHold: releaseHoldWS } = useHoldStream({
+            apiBaseUrl,
+            tenantSlug,
+            resourceSlug,
+            enabled: true,
+            cursor,
+			onEvent: (event) => {
+				console.log('[EnhancedCalendar] WS Event received:', event);
+				applyDelta(event);
+				// If our hold expired/released remotely, clear activeHold
+                if (activeHold && event.type === 'HoldExpired' && event.payload.holdId === activeHold.holdId) {
+                    setActiveHold(null);
+                    setShowBookingForm(false);
+                }
+                if (activeHold && event.type === 'HoldReleased' && event.payload.holdId === activeHold.holdId) {
+                    setActiveHold(null);
+                    setShowBookingForm(false);
+                }
+            }
+        });
+
+        // Booking
 		const {
-			placeHold,
-			releaseHold: releaseHoldFn,
 			confirmBooking,
-			isPlacingHold,
 			isConfirming,
 			error: bookingError,
 		} = useBooking({
@@ -98,7 +101,6 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 			tenantSlug,
 			resourceSlug,
 			onSuccess: (bookingId) => {
-				setSelectedSlot(null);
 				setActiveHold(null);
 				setShowBookingForm(false);
 				setCustomerName('');
@@ -112,76 +114,16 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 			},
 		});
 
-		const { isConnected } = useStreamListener({
-			apiBaseUrl,
-			cursor,
-			enabled: cursor !== null,
-			onEvent: (event) => {
-				if (event.type === 'HoldPlaced') {
-					const dayStart = new Date(event.payload.day + 'T00:00:00Z').getTime();
-					const start = dayStart + event.payload.startMinute * 60 * 1000;
-					const end = dayStart + event.payload.endMinute * 60 * 1000;
-
-					setHeldSlots((prev) => {
-						const next = new Map(prev);
-						next.set(`${start}-${end}`, {
-							holdId: event.payload.holdId,
-							expiresAt: event.payload.expiresAt,
-							isMine: activeHold?.holdId === event.payload.holdId,
-						});
-						return next;
-					});
-				} else if (event.type === 'HoldExpired') {
-					setHeldSlots((prev) => {
-						const next = new Map(prev);
-						for (const [key, value] of next.entries()) {
-							if (value.holdId === event.payload.holdId) {
-								next.delete(key);
-							}
-						}
-						if (activeHold?.holdId === event.payload.holdId) {
-							setActiveHold(null);
-							setShowBookingForm(false);
-						}
-						return next;
-					});
-				} else if (event.type === 'BookingConfirmed') {
-					const start = new Date(event.payload.start).getTime();
-					const end = new Date(event.payload.end).getTime();
-					setBookedSlots((prev) => {
-						const next = new Set(prev);
-						next.add(`${start}-${end}`);
-						return next;
-					});
-					setHeldSlots((prev) => {
-						const next = new Map(prev);
-						for (const [key, value] of next.entries()) {
-							if (value.holdId === event.payload.holdId) {
-								next.delete(key);
-							}
-						}
-						return next;
-					});
-				} else if (event.type === 'BookingCancelled') {
-					const start = new Date(event.payload.start).getTime();
-					const end = new Date(event.payload.end).getTime();
-					setBookedSlots((prev) => {
-						const next = new Set(prev);
-						next.delete(`${start}-${end}`);
-						return next;
-					});
-				}
-				applyDelta(event);
-			},
-			onError: (error) => {
-				console.error('Stream error:', error);
-			},
-		});
-
+        // Cleanup hold on unmount/change
 		React.useEffect(() => {
-			setStreamConnected(isConnected);
-		}, [isConnected]);
+			return () => {
+				if (activeHold) {
+					releaseHoldWS(activeHold.holdId);
+				}
+			};
+		}, [activeHold, releaseHoldWS]);
 
+        // Countdown
 		React.useEffect(() => {
 			if (activeHold) {
 				const updateCountdown = () => {
@@ -192,7 +134,6 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 						setShowBookingForm(false);
 					}
 				};
-
 				updateCountdown();
 				const interval = setInterval(updateCountdown, 1000);
 				return () => clearInterval(interval);
@@ -201,111 +142,47 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 			}
 		}, [activeHold]);
 
-		React.useEffect(() => {
-			const handleBeforeUnload = () => {
-				if (activeHold) {
-					fetch(
-						`${apiBaseUrl}/v1/public/${tenantSlug}/${resourceSlug}/hold/${activeHold.holdId}`,
-						{
-							method: 'DELETE',
-							keepalive: true,
-						},
-					).catch(() => {});
-				}
-			};
+		const handleSlotClick = async (slot: AvailabilitySlot) => {
+			if (!streamConnected) return;
 
-			window.addEventListener('beforeunload', handleBeforeUnload);
-			return () => {
-				window.removeEventListener('beforeunload', handleBeforeUnload);
-				if (activeHold) {
-					fetch(
-						`${apiBaseUrl}/v1/public/${tenantSlug}/${resourceSlug}/hold/${activeHold.holdId}`,
-						{
-							method: 'DELETE',
-							keepalive: true,
-						},
-					).catch(() => {});
-				}
-			};
-		}, [activeHold, apiBaseUrl, tenantSlug, resourceSlug]);
+            try {
+                const startDate = fromUnixTimestamp(slot.start);
+                const endDate = fromUnixTimestamp(slot.end);
 
-		const slotsWithStatus = React.useMemo((): SlotWithStatus[] => {
-			return slots.map((slot) => {
-				const slotKey = `${slot.start}-${slot.end}`;
-				const heldInfo = heldSlots.get(slotKey);
-				const isBooked = bookedSlots.has(slotKey);
-				const isHeldByMe = heldInfo?.isMine ?? false;
-				const isHeldByOther = heldInfo && !isHeldByMe;
+                const req = {
+                    day: getDayKey(startDate),
+                    startMinute: getMinutesFromMidnight(startDate),
+                    endMinute: getMinutesFromMidnight(endDate)
+                };
 
-				let status: SlotStatus = 'available';
-				if (isBooked) {
-					status = 'booked';
-				} else if (isHeldByMe) {
-					status = 'held-by-me';
-				} else if (isHeldByOther) {
-					status = 'held-by-other';
-				}
-
-				return {
-					...slot,
-					status,
-					holdId: heldInfo?.holdId,
-					expiresAt: heldInfo?.expiresAt,
-				};
-			});
-		}, [slots, heldSlots, bookedSlots]);
-
-		const handleSlotClick = async (slot: SlotWithStatus) => {
-			if (slot.status === 'booked' || slot.status === 'held-by-other') {
-				return;
-			}
-
-			if (slot.status === 'held-by-me' && slot.holdId) {
-				setSelectedSlot(slot);
-				setShowBookingForm(true);
-				return;
-			}
-
-			setSelectedSlot(slot);
-			const holdId = await placeHold(slot);
-			if (holdId) {
-				const expiresAt = Date.now() + 30_000;
-				setActiveHold({ holdId, expiresAt, slot });
-				setHeldSlots((prev) => {
-					const next = new Map(prev);
-					next.set(`${slot.start}-${slot.end}`, {
-						holdId,
-						expiresAt,
-						isMine: true,
-					});
-					return next;
-				});
-				setShowBookingForm(true);
-				onSlotSelected?.(slot);
-			}
+                const holdId = await placeHoldWS(req);
+                setActiveHold({
+                    holdId,
+                    slot,
+                    expiresAt: Date.now() + 60000 // Default 60s
+                });
+                setShowBookingForm(true);
+            } catch (e) {
+                console.error('Failed to place hold', e);
+            }
 		};
 
-		const handleReleaseHold = async () => {
+		const handleReleaseHold = () => {
 			if (activeHold) {
-				await releaseHoldFn(activeHold.holdId);
+				releaseHoldWS(activeHold.holdId);
 				setActiveHold(null);
-				setSelectedSlot(null);
 				setShowBookingForm(false);
-				setHeldSlots((prev) => {
-					const next = new Map(prev);
-					next.delete(`${activeHold.slot.start}-${activeHold.slot.end}`);
-					return next;
-				});
 			}
 		};
 
 		const handleBookingSubmit = async (e: React.FormEvent) => {
 			e.preventDefault();
-			if (!activeHold || !customerName.trim() || !customerEmail.trim()) {
+			if (!activeHold || !customerName.trim() || !customerEmail.trim() || !sessionId) {
 				return;
 			}
 			await confirmBooking({
 				holdId: activeHold.holdId,
+                sessionId,
 				customerName: customerName.trim(),
 				customerEmail: customerEmail.trim(),
 				customerPhone: customerPhone.trim() || undefined,
@@ -322,37 +199,15 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 			return `${seconds}s`;
 		};
 
-		const getSlotStatusColor = (status: SlotStatus): string => {
-			switch (status) {
-				case 'available':
-					return 'bg-green-50 hover:bg-green-100 border-green-200 text-green-900';
-				case 'held-by-me':
-					return 'bg-blue-50 hover:bg-blue-100 border-blue-300 text-blue-900';
-				case 'held-by-other':
-					return 'bg-yellow-50 border-yellow-200 text-yellow-700 cursor-not-allowed opacity-60';
-				case 'booked':
-					return 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed';
-				default:
-					return '';
-			}
-		};
-
-		const getWeekDates = (): Date[] => {
-			if (!selectedDate) return [];
-			const dates: Date[] = [];
-			const startOfWeek = new Date(selectedDate);
-			const day = startOfWeek.getDay();
-			const diff = startOfWeek.getDate() - day;
-			startOfWeek.setDate(diff);
-			startOfWeek.setHours(0, 0, 0, 0);
-
-			for (let i = 0; i < 7; i++) {
-				const date = new Date(startOfWeek);
-				date.setDate(startOfWeek.getDate() + i);
-				dates.push(date);
-			}
-			return dates;
-		};
+        const displayedSlots = React.useMemo(() => {
+            const list = [...slots];
+            if (activeHold) {
+                if (!list.find(s => s.start === activeHold.slot.start)) {
+                    list.push(activeHold.slot);
+                }
+            }
+            return list.sort((a, b) => a.start - b.start);
+        }, [slots, activeHold]);
 
 		return (
 			<div className={cn('flex flex-col gap-6', className)}>
@@ -378,7 +233,10 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 						<CalendarComponent
 							mode="single"
 							selected={selectedDate}
-							onSelect={setSelectedDate}
+							onSelect={(date) => {
+                                setSelectedDate(date);
+                                if (activeHold) handleReleaseHold();
+                            }}
 							className="rounded-lg border"
 							disabled={(date) => date < new Date()}
 						/>
@@ -516,35 +374,30 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 									</div>
 								) : (
 									<div className="space-y-2">
-										{isLoading || isPlacingHold ? (
+										{isLoading ? (
 											<div className="flex flex-col items-center justify-center p-8 text-muted-foreground">
 												<Loader2 className="h-8 w-8 animate-spin mb-2" />
 												<p>Loading available times...</p>
 											</div>
-										) : slotsWithStatus.length === 0 ? (
+										) : displayedSlots.length === 0 ? (
 											<div className="flex flex-col items-center justify-center p-8 text-muted-foreground">
 												<Clock className="h-8 w-8 mb-2" />
 												<p>No available times for this date</p>
 											</div>
 										) : (
 											<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[500px] overflow-y-auto p-2">
-												{slotsWithStatus.map((slot, index) => (
+												{displayedSlots.map((slot, index) => {
+                                                    const isHeldByMe = activeHold?.slot.start === slot.start;
+                                                    return (
 													<Button
 														key={`${slot.start}-${slot.end}-${index}`}
-														variant="outline"
+														variant={isHeldByMe ? "default" : "outline"}
 														className={cn(
 															'w-full justify-start text-left h-auto py-3 px-4',
-															getSlotStatusColor(slot.status),
-															(slot.status === 'booked' ||
-																slot.status === 'held-by-other') &&
-																'cursor-not-allowed',
+                                                            isHeldByMe ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''
 														)}
-														onClick={() => handleSlotClick(slot)}
-														disabled={
-															slot.status === 'booked' ||
-															slot.status === 'held-by-other' ||
-															isPlacingHold
-														}
+														onClick={() => isHeldByMe ? setShowBookingForm(true) : handleSlotClick(slot)}
+                                                        disabled={!isHeldByMe && activeHold !== null}
 													>
 														<div className="flex items-center gap-2 w-full">
 															<Clock className="h-4 w-4 flex-shrink-0" />
@@ -553,25 +406,11 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 																	{formatTime(slot.start)} -{' '}
 																	{formatTime(slot.end)}
 																</div>
-																{slot.status === 'held-by-me' && (
-																	<div className="text-xs opacity-75">
-																		Your hold
-																	</div>
-																)}
-																{slot.status === 'held-by-other' && (
-																	<div className="text-xs opacity-75">
-																		Temporarily held
-																	</div>
-																)}
-																{slot.status === 'booked' && (
-																	<div className="text-xs opacity-75">
-																		Booked
-																	</div>
-																)}
+                                                                {isHeldByMe && <div className="text-xs opacity-90">Your Hold</div>}
 															</div>
 														</div>
 													</Button>
-												))}
+												)})}
 											</div>
 										)}
 									</div>
@@ -590,4 +429,3 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 );
 
 EnhancedCalendar.displayName = 'EnhancedCalendar';
-

@@ -38,18 +38,18 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 		type: z.literal('HoldExpired'),
 		payload: z.object({
 			holdId: ULIDSchema,
-			day: z.string(),
-			startMinute: z.number().int().min(0).max(1439),
-			endMinute: z.number().int().min(1).max(1440),
+			day: z.string().optional(),
+			startMinute: z.number().int().min(0).max(1439).optional(),
+			endMinute: z.number().int().min(1).max(1440).optional(),
 		}),
 	}),
 	EventBase.extend({
 		type: z.literal('HoldReleased'),
 		payload: z.object({
 			holdId: ULIDSchema,
-			day: z.string(),
-			startMinute: z.number().int().min(0).max(1439),
-			endMinute: z.number().int().min(1).max(1440),
+			day: z.string().optional(),
+			startMinute: z.number().int().min(0).max(1439).optional(),
+			endMinute: z.number().int().min(1).max(1440).optional(),
 		}),
 	}),
 	EventBase.extend({
@@ -70,8 +70,8 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 		type: z.literal('BookingCancelled'),
 		payload: z.object({
 			bookingId: ULIDSchema,
-			start: z.number(),
-			end: z.number(),
+			start: z.number().optional(),
+			end: z.number().optional(),
 		}),
 	}),
 ]);
