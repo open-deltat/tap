@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import type { ResourceId, TenantId, SessionId } from '@tap/core';
+import type { ResourceId, SessionId, TenantId } from '@tap/core';
 import { parseDayToUnixStartOfDayUTC } from '@tap/core';
 import { getAllocator, getEventStore } from '../services/context';
 import { handlePrivateRequest } from './private';

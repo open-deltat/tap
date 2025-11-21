@@ -1,5 +1,5 @@
-import { parseDayToUnixStartOfDayUTC } from '@tap/core';
 import type { LedgerEvent } from '@tap/core';
+import { parseDayToUnixStartOfDayUTC } from '@tap/core';
 
 export type TimeSlot = { start: number; end: number };
 
@@ -51,10 +51,7 @@ const getEventTimeRange = (event: LedgerEvent): TimeSlot | null => {
 		};
 	}
 	if (event.type === 'BookingConfirmed' || event.type === 'BookingCancelled') {
-		if (
-			event.payload.start === undefined ||
-			event.payload.end === undefined
-		) {
+		if (event.payload.start === undefined || event.payload.end === undefined) {
 			return null;
 		}
 		return {
@@ -128,4 +125,3 @@ const addRange = (
 	result.push(current);
 	return result;
 };
-

@@ -78,7 +78,10 @@ export const handleGetAvailability = async (
 
 	const slots: Array<{ start: number; end: number }> = [];
 
-	const state = allocator.getState(tenant.id as TenantId, resource.id as ResourceId);
+	const state = allocator.getState(
+		tenant.id as TenantId,
+		resource.id as ResourceId,
+	);
 
 	for (
 		let date = new Date(fromDate);
@@ -101,8 +104,8 @@ export const handleGetAvailability = async (
 		slots.push(...daySlots);
 	}
 
-	const eventStore = await import('../../services/context').then(
-		(m) => m.getEventStore(),
+	const eventStore = await import('../../services/context').then((m) =>
+		m.getEventStore(),
 	);
 	const events = await eventStore.getByResource(
 		tenant.id as TenantId,
@@ -117,4 +120,3 @@ export const handleGetAvailability = async (
 		resourceId: resource.id,
 	};
 };
-

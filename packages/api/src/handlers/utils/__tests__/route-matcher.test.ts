@@ -63,7 +63,3 @@ test('matchRoute handles multiple consecutive parameters', () => {
 	const result = matchRoute('/a/b/c', '/:x/:y/:z');
 	expect(result).toEqual({ x: 'a', y: 'b', z: 'c' });
 });
-
-
-
-

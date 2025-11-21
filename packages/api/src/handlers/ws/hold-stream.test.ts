@@ -1,10 +1,10 @@
-import { expect, test, beforeAll } from 'bun:test';
-import { websocketHandler, WebSocketData } from './index';
-import { createTestTenant, createTestResource } from '../test-setup';
+import { beforeAll, expect, test } from 'bun:test';
+import type { ResourceId, SessionId, TenantId } from '@tap/core';
 import type { ServerWebSocket } from 'bun';
-import { getAllocator, getEventStore } from '../../services/context';
-import type { SessionId, TenantId, ResourceId } from '@tap/core';
 import { ulid } from 'ulid';
+import { getAllocator, getEventStore } from '../../services/context';
+import { createTestResource, createTestTenant } from '../test-setup';
+import { type WebSocketData, websocketHandler } from './index';
 
 let testTenant: Awaited<ReturnType<typeof createTestTenant>>;
 let testResource: Awaited<ReturnType<typeof createTestResource>>;
@@ -163,7 +163,7 @@ test('WS Hold Stream: releases all holds on disconnect', async () => {
 		testResource.id as ResourceId,
 	);
 
-	const expired = events.filter(e => e.type === 'HoldExpired');
+	const expired = events.filter((e) => e.type === 'HoldExpired');
 	// We expect 2 expired events
 	// Note: Allocator.releaseHoldsForSession logic is used.
 	// Filter by sessionId? releaseHoldsForSession is session-aware.
@@ -176,5 +176,3 @@ test('WS Hold Stream: releases all holds on disconnect', async () => {
 
 	expect(expired.length).toBe(2);
 });
-
-

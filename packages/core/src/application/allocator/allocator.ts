@@ -61,7 +61,9 @@ export type Allocator = {
 	releaseHold: (params: {
 		holdId: HoldId;
 		sessionId: SessionId;
-	}) => Promise<{ success: true; event: HoldReleasedEvent } | { success: false }>;
+	}) => Promise<
+		{ success: true; event: HoldReleasedEvent } | { success: false }
+	>;
 	releaseHoldsForSession: (sessionId: SessionId) => Promise<HoldExpiredEvent[]>;
 	getState: (tenantId: TenantId, resourceId: ResourceId) => AllocatorState;
 };

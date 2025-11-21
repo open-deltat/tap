@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import { handleGetAvailability } from '../availability';
 import {
 	createTestOffer,
 	createTestResource,
 	createTestTenant,
 } from '../../test-setup';
+import { handleGetAvailability } from '../availability';
 
 let testTenant: Awaited<ReturnType<typeof createTestTenant>>;
 let testResource: Awaited<ReturnType<typeof createTestResource>>;

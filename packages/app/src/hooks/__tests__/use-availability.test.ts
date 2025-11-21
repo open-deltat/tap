@@ -1,4 +1,5 @@
-import { describe, expect, test, beforeEach, mock } from 'bun:test';
+import { beforeEach, describe, expect, mock, test } from 'bun:test';
+import { applyBookingEvent } from '../../lib/availability-state';
 
 global.fetch = mock(() =>
 	Promise.resolve({
@@ -20,7 +21,6 @@ describe('useAvailability', () => {
 		const apiBaseUrl = 'http://localhost:3001';
 		const tenantSlug = 'test-tenant';
 		const resourceSlug = 'test-resource';
-		const selectedDate = new Date('2025-01-15T10:00:00Z');
 
 		(global.fetch as unknown as ReturnType<typeof mock>).mockResolvedValueOnce({
 			ok: true,
@@ -69,7 +69,6 @@ describe('useAvailability', () => {
 	});
 
 	test('applies delta events correctly', () => {
-		const { applyBookingEvent } = require('../../lib/availability-state');
 		const state = new Map();
 
 		const holdPlacedEvent = {
@@ -93,4 +92,3 @@ describe('useAvailability', () => {
 		expect(dayState?.holdMetadata.get('hold_123')).toBeDefined();
 	});
 });
-

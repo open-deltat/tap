@@ -110,9 +110,9 @@ test('replay handles events across year boundary', async () => {
 	const futureYear = new Date().getFullYear() + 1;
 	const lastDayOfYear = new Date(futureYear - 1, 11, 31);
 	const firstDayOfNextYear = new Date(futureYear, 0, 1);
-	
-	const day1 = lastDayOfYear.toISOString().split('T')[0]!;
-	const day2 = firstDayOfNextYear.toISOString().split('T')[0]!;
+
+	const day1 = lastDayOfYear.toISOString().split('T')[0] ?? '';
+	const day2 = firstDayOfNextYear.toISOString().split('T')[0] ?? '';
 	const now = Date.now();
 	const futureExpiresAt = now + 60_000;
 

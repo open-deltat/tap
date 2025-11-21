@@ -8,7 +8,7 @@ export default function Home() {
 
 	const handleBookingConfirmed = (bookingId: string) => {
 		console.log('Booking confirmed:', bookingId);
-        // Show success message or redirect?
+		// Show success message or redirect?
 	};
 
 	return (

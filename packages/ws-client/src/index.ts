@@ -1,3 +1,3 @@
-export * from './ws-client';
-export * from './types';
 export * from './merger';
+export * from './types';
+export * from './ws-client';

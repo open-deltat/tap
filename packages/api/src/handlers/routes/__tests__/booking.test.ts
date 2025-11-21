@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import { handleBook } from '../booking';
+import type { ResourceId, SessionId, TenantId } from '@tap/core';
+import { ulid } from 'ulid';
+import { getAllocator, getEventStore } from '../../../services/context';
 import {
 	createTestOffer,
 	createTestResource,
 	createTestTenant,
 } from '../../test-setup';
-import { getAllocator, getEventStore } from '../../../services/context';
-import type { TenantId, ResourceId, SessionId } from '@tap/core';
-import { ulid } from 'ulid';
+import { handleBook } from '../booking';
 
 let testTenant: Awaited<ReturnType<typeof createTestTenant>>;
 let testResource: Awaited<ReturnType<typeof createTestResource>>;
@@ -266,6 +266,3 @@ test('handleBook returns error for invalid date format', async () => {
 		expect(result.status).toBe(400);
 	}
 });
-
-
-

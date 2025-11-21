@@ -1,4 +1,10 @@
-import type { BookingId, HoldId, ResourceId, SessionId, TenantId } from '@tap/core';
+import type {
+	BookingId,
+	HoldId,
+	ResourceId,
+	SessionId,
+	TenantId,
+} from '@tap/core';
 import { parseDayToUnixStartOfDayUTC } from '@tap/core';
 import { ulid } from 'ulid';
 import {
@@ -98,7 +104,9 @@ export const handleBook = async (params: BookParams): Promise<BookResult> => {
 		holdId = holdEvent.payload.holdId;
 	} else if (body.start && body.end) {
 		const startUnix =
-			typeof body.start === 'number' ? body.start : new Date(body.start).getTime();
+			typeof body.start === 'number'
+				? body.start
+				: new Date(body.start).getTime();
 		const endUnix =
 			typeof body.end === 'number' ? end : new Date(body.end).getTime();
 
@@ -202,4 +210,3 @@ export const handleBook = async (params: BookParams): Promise<BookResult> => {
 		status: 'CONFIRMED' as const,
 	};
 };
-

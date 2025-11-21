@@ -1,5 +1,5 @@
-import { ulid } from 'ulid';
 import type { LedgerEvent } from '@tap/core';
+import { ulid } from 'ulid';
 
 export type TapClientOptions = {
 	baseUrl: string;
@@ -34,10 +34,10 @@ export const createTapClient = (options: TapClientOptions): TapClient => {
 	let isExplicitlyDisconnected = false;
 	const pendingRequests = new Map<
 		string,
-		{ resolve: (val: any) => void; reject: (err: any) => void }
+		{ resolve: (val: unknown) => void; reject: (err: unknown) => void }
 	>();
 
-	const log = (...args: any[]) => {
+	const log = (...args: unknown[]) => {
 		if (options.debug) console.log('[TapClient]', ...args);
 	};
 
@@ -127,7 +127,9 @@ export const createTapClient = (options: TapClientOptions): TapClient => {
 								pendingRequests.delete(data.requestId);
 							}
 						} else {
-							options.onError?.(new Error(data.message || 'Unknown server error'));
+							options.onError?.(
+								new Error(data.message || 'Unknown server error'),
+							);
 						}
 						break;
 					}
@@ -145,6 +147,7 @@ export const createTapClient = (options: TapClientOptions): TapClient => {
 		ws = null;
 	};
 
+	// biome-ignore lint/suspicious/noExplicitAny: Payload spread requires any or strictly typed object
 	const send = (type: string, payload: any): Promise<any> => {
 		return new Promise((resolve, reject) => {
 			if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -181,5 +184,3 @@ export const createTapClient = (options: TapClientOptions): TapClient => {
 		isConnected: () => ws?.readyState === WebSocket.OPEN,
 	};
 };
-
-

@@ -1,18 +1,26 @@
 'use client';
 
-import { Calendar, Clock, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import {
+	AlertCircle,
+	CheckCircle2,
+	Clock,
+	Loader2,
+} from 'lucide-react';
 import * as React from 'react';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
-import { useAvailability, type AvailabilitySlot } from '@/hooks/use-availability';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import {
+	type AvailabilitySlot,
+	useAvailability,
+} from '@/hooks/use-availability';
 import { useBooking } from '@/hooks/use-booking';
 import { useHoldStream } from '@/hooks/use-hold-stream';
 import {
-	getClientTimezone,
 	format,
 	fromUnixTimestamp,
+	getClientTimezone,
 	getDayKey,
-    getMinutesFromMidnight
+	getMinutesFromMidnight,
 } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 
@@ -40,7 +48,7 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 		className,
 	}) => {
 		const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
-			new Date(),
+			() => new Date(),
 		);
 		const [activeHold, setActiveHold] = React.useState<{
 			holdId: string;
@@ -55,7 +63,7 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 		const [holdExpirationCountdown, setHoldExpirationCountdown] =
 			React.useState<number | null>(null);
 
-        // Availability
+		// Availability
 		const { slots, isLoading, error, refresh, applyDelta, cursor } =
 			useAvailability({
 				apiBaseUrl,
@@ -70,28 +78,41 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 		console.log('[EnhancedCalendar] Slots:', slots.length, 'Cursor:', cursor);
 
 		// WS Hold Stream + Deltas
-        const { sessionId, isConnected: streamConnected, placeHold: placeHoldWS, releaseHold: releaseHoldWS } = useHoldStream({
-            apiBaseUrl,
-            tenantSlug,
-            resourceSlug,
-            enabled: true,
-            cursor,
+		const {
+			sessionId,
+			isConnected: streamConnected,
+			placeHold: placeHoldWS,
+			releaseHold: releaseHoldWS,
+		} = useHoldStream({
+			apiBaseUrl,
+			tenantSlug,
+			resourceSlug,
+			enabled: true,
+			cursor,
 			onEvent: (event) => {
 				console.log('[EnhancedCalendar] WS Event received:', event);
 				applyDelta(event);
 				// If our hold expired/released remotely, clear activeHold
-                if (activeHold && event.type === 'HoldExpired' && event.payload.holdId === activeHold.holdId) {
-                    setActiveHold(null);
-                    setShowBookingForm(false);
-                }
-                if (activeHold && event.type === 'HoldReleased' && event.payload.holdId === activeHold.holdId) {
-                    setActiveHold(null);
-                    setShowBookingForm(false);
-                }
-            }
-        });
+				if (
+					activeHold &&
+					event.type === 'HoldExpired' &&
+					event.payload.holdId === activeHold.holdId
+				) {
+					setActiveHold(null);
+					setShowBookingForm(false);
+				}
+				if (
+					activeHold &&
+					event.type === 'HoldReleased' &&
+					event.payload.holdId === activeHold.holdId
+				) {
+					setActiveHold(null);
+					setShowBookingForm(false);
+				}
+			},
+		});
 
-        // Booking
+		// Booking
 		const {
 			confirmBooking,
 			isConfirming,
@@ -114,7 +135,7 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 			},
 		});
 
-        // Cleanup hold on unmount/change
+		// Cleanup hold on unmount/change
 		React.useEffect(() => {
 			return () => {
 				if (activeHold) {
@@ -123,7 +144,7 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 			};
 		}, [activeHold, releaseHoldWS]);
 
-        // Countdown
+		// Countdown
 		React.useEffect(() => {
 			if (activeHold) {
 				const updateCountdown = () => {
@@ -142,52 +163,57 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 			}
 		}, [activeHold]);
 
-		const handleSlotClick = async (slot: AvailabilitySlot) => {
+		const handleSlotClick = React.useCallback(async (slot: AvailabilitySlot) => {
 			if (!streamConnected) return;
 
-            try {
-                const startDate = fromUnixTimestamp(slot.start);
-                const endDate = fromUnixTimestamp(slot.end);
+			try {
+				const startDate = fromUnixTimestamp(slot.start);
+				const endDate = fromUnixTimestamp(slot.end);
 
-                const req = {
-                    day: getDayKey(startDate),
-                    startMinute: getMinutesFromMidnight(startDate),
-                    endMinute: getMinutesFromMidnight(endDate)
-                };
+				const req = {
+					day: getDayKey(startDate),
+					startMinute: getMinutesFromMidnight(startDate),
+					endMinute: getMinutesFromMidnight(endDate),
+				};
 
-                const holdId = await placeHoldWS(req);
-                setActiveHold({
-                    holdId,
-                    slot,
-                    expiresAt: Date.now() + 60000 // Default 60s
-                });
-                setShowBookingForm(true);
-            } catch (e) {
-                console.error('Failed to place hold', e);
-            }
-		};
+				const holdId = await placeHoldWS(req);
+				setActiveHold({
+					holdId,
+					slot,
+					expiresAt: Date.now() + 60000, // Default 60s
+				});
+				setShowBookingForm(true);
+			} catch (e) {
+				console.error('Failed to place hold', e);
+			}
+		}, [streamConnected, placeHoldWS]);
 
-		const handleReleaseHold = () => {
+		const handleReleaseHold = React.useCallback(() => {
 			if (activeHold) {
 				releaseHoldWS(activeHold.holdId);
 				setActiveHold(null);
 				setShowBookingForm(false);
 			}
-		};
+		}, [activeHold, releaseHoldWS]);
 
-		const handleBookingSubmit = async (e: React.FormEvent) => {
+		const handleBookingSubmit = React.useCallback(async (e: React.FormEvent) => {
 			e.preventDefault();
-			if (!activeHold || !customerName.trim() || !customerEmail.trim() || !sessionId) {
+			if (
+				!activeHold ||
+				!customerName.trim() ||
+				!customerEmail.trim() ||
+				!sessionId
+			) {
 				return;
 			}
 			await confirmBooking({
 				holdId: activeHold.holdId,
-                sessionId,
+				sessionId,
 				customerName: customerName.trim(),
 				customerEmail: customerEmail.trim(),
 				customerPhone: customerPhone.trim() || undefined,
 			});
-		};
+		}, [activeHold, customerName, customerEmail, sessionId, confirmBooking, customerPhone]);
 
 		const formatTime = (timestamp: number): string => {
 			const date = fromUnixTimestamp(timestamp);
@@ -199,15 +225,15 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 			return `${seconds}s`;
 		};
 
-        const displayedSlots = React.useMemo(() => {
-            const list = [...slots];
-            if (activeHold) {
-                if (!list.find(s => s.start === activeHold.slot.start)) {
-                    list.push(activeHold.slot);
-                }
-            }
-            return list.sort((a, b) => a.start - b.start);
-        }, [slots, activeHold]);
+		const displayedSlots = React.useMemo(() => {
+			const list = [...slots];
+			if (activeHold) {
+				if (!list.find((s) => s.start === activeHold.slot.start)) {
+					list.push(activeHold.slot);
+				}
+			}
+			return list.sort((a, b) => a.start - b.start);
+		}, [slots, activeHold]);
 
 		return (
 			<div className={cn('flex flex-col gap-6', className)}>
@@ -234,18 +260,16 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 							mode="single"
 							selected={selectedDate}
 							onSelect={(date) => {
-                                setSelectedDate(date);
-                                if (activeHold) handleReleaseHold();
-                            }}
+								setSelectedDate(date);
+								if (activeHold) handleReleaseHold();
+							}}
 							className="rounded-lg border"
 							disabled={(date) => date < new Date()}
 						/>
 						{selectedDate && (
 							<div className="mt-4 text-sm text-muted-foreground space-y-1">
 								<p>Timezone: {getClientTimezone()}</p>
-								<p>
-									{format(selectedDate, 'EEEE, MMMM d, yyyy')}
-								</p>
+								<p>{format(selectedDate, 'EEEE, MMMM d, yyyy')}</p>
 							</div>
 						)}
 					</div>
@@ -259,7 +283,8 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 										<div className="flex items-center gap-2 text-sm text-orange-600">
 											<Clock className="h-4 w-4" />
 											<span>
-												Hold expires in {formatCountdown(holdExpirationCountdown)}
+												Hold expires in{' '}
+												{formatCountdown(holdExpirationCountdown)}
 											</span>
 										</div>
 									)}
@@ -387,30 +412,42 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 										) : (
 											<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[500px] overflow-y-auto p-2">
 												{displayedSlots.map((slot, index) => {
-                                                    const isHeldByMe = activeHold?.slot.start === slot.start;
-                                                    return (
-													<Button
-														key={`${slot.start}-${slot.end}-${index}`}
-														variant={isHeldByMe ? "default" : "outline"}
-														className={cn(
-															'w-full justify-start text-left h-auto py-3 px-4',
-                                                            isHeldByMe ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''
-														)}
-														onClick={() => isHeldByMe ? setShowBookingForm(true) : handleSlotClick(slot)}
-                                                        disabled={!isHeldByMe && activeHold !== null}
-													>
-														<div className="flex items-center gap-2 w-full">
-															<Clock className="h-4 w-4 flex-shrink-0" />
-															<div className="flex-1 text-left">
-																<div className="font-medium">
-																	{formatTime(slot.start)} -{' '}
-																	{formatTime(slot.end)}
+													const isHeldByMe =
+														activeHold?.slot.start === slot.start;
+													return (
+														<Button
+															key={`${slot.start}-${slot.end}-${index}`}
+															variant={isHeldByMe ? 'default' : 'outline'}
+															className={cn(
+																'w-full justify-start text-left h-auto py-3 px-4',
+																isHeldByMe
+																	? 'bg-blue-600 hover:bg-blue-700 text-white'
+																	: '',
+															)}
+															onClick={() =>
+																isHeldByMe
+																	? setShowBookingForm(true)
+																	: handleSlotClick(slot)
+															}
+															disabled={!isHeldByMe && activeHold !== null}
+														>
+															<div className="flex items-center gap-2 w-full">
+																<Clock className="h-4 w-4 flex-shrink-0" />
+																<div className="flex-1 text-left">
+																	<div className="font-medium">
+																		{formatTime(slot.start)} -{' '}
+																		{formatTime(slot.end)}
+																	</div>
+																	{isHeldByMe && (
+																		<div className="text-xs opacity-90">
+																			Your Hold
+																		</div>
+																	)}
 																</div>
-                                                                {isHeldByMe && <div className="text-xs opacity-90">Your Hold</div>}
 															</div>
-														</div>
-													</Button>
-												)})}
+														</Button>
+													);
+												})}
 											</div>
 										)}
 									</div>
@@ -427,5 +464,6 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 		);
 	},
 );
+
 
 EnhancedCalendar.displayName = 'EnhancedCalendar';

@@ -1,11 +1,11 @@
 import type { HoldId, ResourceId, SessionId, TenantId } from '@tap/core';
 import { parseDayToUnixStartOfDayUTC } from '@tap/core';
-import { validateHorizon } from '../../services/context';
 import {
 	getAllocator,
 	getEventStore,
 	resourceRepository,
 	tenantRepository,
+	validateHorizon,
 } from '../../services/context';
 
 export type PlaceHoldParams = {
@@ -184,4 +184,3 @@ export const handleReleaseHold = async (
 		released: true,
 	};
 };
-

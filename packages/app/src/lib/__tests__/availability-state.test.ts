@@ -5,7 +5,6 @@ import {
 	createAvailabilityState,
 	getAvailableSlots,
 	isSlotAvailable,
-	type AvailabilityState,
 } from '../availability-state';
 
 test('createAvailabilityState creates an empty availability state', () => {

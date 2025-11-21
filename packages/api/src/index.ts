@@ -1,11 +1,14 @@
+import type { SessionId } from '@tap/core';
+import { ulid } from 'ulid';
 import { handlePrivateRequest } from './handlers/private';
 import { handlePublicRequest } from './handlers/public';
-import { tenantRepository, resourceRepository } from './services/context';
 import { websocketHandler } from './handlers/ws/index';
-import { initializeContext } from './services/context';
+import {
+	initializeContext,
+	resourceRepository,
+	tenantRepository,
+} from './services/context';
 import { startHoldExpiryWorker } from './workers/hold-expiry';
-import { ulid } from 'ulid';
-import type { SessionId } from '@tap/core';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 

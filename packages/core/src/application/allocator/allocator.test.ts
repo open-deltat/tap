@@ -1,6 +1,11 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
-import type { BookingId, ResourceId, SessionId, TenantId } from '../../domain/ids';
+import type {
+	BookingId,
+	ResourceId,
+	SessionId,
+	TenantId,
+} from '../../domain/ids';
 import { parseDayToUnixStartOfDayUTC } from '../../infrastructure/day-utils';
 import { createAllocator } from './allocator';
 

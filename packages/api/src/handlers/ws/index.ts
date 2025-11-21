@@ -1,5 +1,3 @@
-import type { ServerWebSocket } from 'bun';
-import { ulid } from 'ulid';
 import type {
 	HoldId,
 	LedgerEvent,
@@ -7,6 +5,8 @@ import type {
 	SessionId,
 	TenantId,
 } from '@tap/core';
+import type { ServerWebSocket } from 'bun';
+import { ulid } from 'ulid';
 import { getAllocator, getEventStore } from '../../services/context';
 
 export type WebSocketData = {

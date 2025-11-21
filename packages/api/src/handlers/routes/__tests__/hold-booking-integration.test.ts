@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
-import { handlePlaceHold, handleReleaseHold } from '../hold';
-import { handleGetAvailability } from '../availability';
 import { getEventStore } from '../../../services/context';
 import {
 	createTestOffer,
 	createTestResource,
 	createTestTenant,
 } from '../../test-setup';
+import { handleGetAvailability } from '../availability';
+import { handlePlaceHold, handleReleaseHold } from '../hold';
 
 let testTenant: Awaited<ReturnType<typeof createTestTenant>>;
 let testResource: Awaited<ReturnType<typeof createTestResource>>;
@@ -235,6 +235,3 @@ test('Concurrent holds on same slot: only one succeeds', async () => {
 	expect(successCount).toBe(1);
 	expect(conflictCount).toBe(1);
 });
-
-
-

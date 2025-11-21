@@ -1,5 +1,9 @@
 import { ulid } from 'ulid';
-import type { HoldExpiredEvent, HoldPlacedEvent, HoldReleasedEvent } from '../../domain/events';
+import type {
+	HoldExpiredEvent,
+	HoldPlacedEvent,
+	HoldReleasedEvent,
+} from '../../domain/events';
 import type {
 	DayKey,
 	HoldId,

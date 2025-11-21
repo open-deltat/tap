@@ -164,7 +164,7 @@ test('releaseHoldsForSession releases all holds for session', async () => {
 	const released = await holdManager.releaseHoldsForSession(sessionA);
 
 	expect(released.length).toBe(2);
-	expect(released.every(e => e.type === 'HoldExpired')).toBeTrue();
+	expect(released.every((e) => e.type === 'HoldExpired')).toBeTrue();
 
 	expect(holds.size).toBe(1);
 	if (holdB.success) {

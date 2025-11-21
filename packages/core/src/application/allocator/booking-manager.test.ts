@@ -1,6 +1,12 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
-import type { BookingId, HoldId, ResourceId, SessionId, TenantId } from '../../domain/ids';
+import type {
+	BookingId,
+	HoldId,
+	ResourceId,
+	SessionId,
+	TenantId,
+} from '../../domain/ids';
 import { parseDayToUnixStartOfDayUTC } from '../../infrastructure/day-utils';
 import { createMutex } from '../../infrastructure/mutex';
 import { createBookingManager } from './booking-manager';

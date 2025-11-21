@@ -43,7 +43,9 @@ test('expireHolds removes expired holds', async () => {
 	const expiredEvents = expiryManager.expireHolds(Date.now());
 
 	expect(expiredEvents.length).toBeGreaterThan(0);
-	expect(expiredEvents.some((e) => e.payload.holdId === holdResult.holdId)).toBeTrue();
+	expect(
+		expiredEvents.some((e) => e.payload.holdId === holdResult.holdId),
+	).toBeTrue();
 	expect(holds.has(holdResult.holdId)).toBeFalse();
 });
 
