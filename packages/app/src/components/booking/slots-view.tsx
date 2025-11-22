@@ -1,6 +1,5 @@
 'use client';
 
-import { format as formatTz } from 'date-fns-tz'; // Use timezone aware format
 import { Calendar as CalendarIcon, Clock, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { AvailabilitySlot } from '@/hooks/use-availability';
@@ -11,7 +10,8 @@ export type SlotsViewProps = {
 	error: Error | null;
 	displayedSlots: { start: number; end: number; available: boolean }[];
 	onSlotClick: (slot: AvailabilitySlot) => void;
-	timezone: string; // Added timezone prop
+	timezone: string;
+	formatDate: (date: Date | number, fmt: string) => string;
 };
 
 export const SlotsView = ({
@@ -21,14 +21,15 @@ export const SlotsView = ({
 	displayedSlots,
 	onSlotClick,
 	timezone,
+	formatDate,
 }: SlotsViewProps) => {
-	// Format helper using the selected timezone
+	// Format helper using the passed formatter
 	const formatTime = (timestamp: number) => {
-		return formatTz(new Date(timestamp), 'h:mm a', { timeZone: timezone });
+		return formatDate(timestamp, 'h:mm a');
 	};
 
 	const formatDateTitle = (date: Date) => {
-		return formatTz(date, 'EEEE, MMMM d', { timeZone: timezone });
+		return formatDate(date, 'EEEE, MMMM d');
 	};
 
 	return (
@@ -77,7 +78,7 @@ export const SlotsView = ({
 				) : displayedSlots.length === 0 ? (
 					<div className="h-full flex flex-col items-center justify-center text-muted-foreground">
 						<Clock className="h-10 w-10 mb-3 opacity-10" />
-						<p className="text-sm">No slots configured for this date</p>
+						<p className="text-sm">No slots available in {timezone}</p>
 					</div>
 				) : (
 					<div className="grid grid-cols-2 lg:grid-cols-3 gap-2">

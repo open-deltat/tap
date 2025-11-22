@@ -26,7 +26,7 @@
 	},
 	"dependencies": {
 		"@tap/protocol": "workspace:*",
-		"date-fns": "^4.1.0",
+		"date-fns": "^3.6.0",
 		"date-fns-tz": "^3.2.0",
 		"ulid": "^2.3.0",
 		"zod": "^3.23.8"

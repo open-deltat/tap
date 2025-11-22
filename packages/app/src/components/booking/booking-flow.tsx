@@ -9,13 +9,13 @@ import {
 } from '@/hooks/use-availability';
 import { useAvailabilityStream } from '@/hooks/use-availability-stream';
 import { useBooking } from '@/hooks/use-booking';
+import { useClientTimezone } from '@/hooks/use-client-timezone';
 import { useHoldStream } from '@/hooks/use-hold-stream';
 import {
 	format,
 	fromDayKey,
 	fromUnixTimestamp,
 	fromZonedTime,
-	getClientTimezone,
 } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { BookingForm } from './booking-form';
@@ -49,7 +49,9 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 		const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
 			undefined,
 		);
-		const [timezone, setTimezone] = React.useState<string>(getClientTimezone());
+
+		// Use the new hook for timezone management
+		const { timezone, setTimezone, format: formatTz } = useClientTimezone();
 
 		const [activeHold, setActiveHold] = React.useState<{
 			holdId: string;
@@ -72,7 +74,6 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			applyDelta,
 			availableDays,
 			refreshMonth,
-			debugLogs,
 		} = useAvailability({
 			apiBaseUrl,
 			tenantSlug,
@@ -253,7 +254,7 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 
 		const formatTime = (timestamp: number): string => {
 			const date = fromUnixTimestamp(timestamp);
-			return format(date, 'h:mm a');
+			return formatTz(date, 'h:mm a');
 		};
 
 		const formatCountdown = (ms: number): string => {
@@ -272,36 +273,24 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			// We extract the date string "2025-11-24"
 			const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
-			// Create start timestamp: YYYY-MM-DD at fromHour:00 in target timezone
-			const startStr = `${dateStr}T${fromHour.toString().padStart(2, '0')}:00:00`;
+			// Create start timestamp: YYYY-MM-DD at 00:00:00 in target timezone (Always start at midnight)
+			const startStr = `${dateStr}T00:00:00`;
 
 			let startTime: number;
 			let endTime: number;
 
 			try {
+				// startStr is e.g. 2025-11-24T00:00:00
+				// fromZonedTime interprets this as 00:00 in NY (UTC-5) -> 05:00 UTC
 				startTime = fromZonedTime(startStr, timezone).getTime();
 
-				if (toHour === 24) {
-					// Handle 24:00 safely by moving to next day 00:00
-					const nextDay = new Date(selectedDate);
-					nextDay.setDate(nextDay.getDate() + 1);
-					const nextDayStr = format(nextDay, 'yyyy-MM-dd');
-					endTime = fromZonedTime(`${nextDayStr}T00:00:00`, timezone).getTime();
-				} else {
-					const endStr = `${dateStr}T${toHour.toString().padStart(2, '0')}:00:00`;
-					endTime = fromZonedTime(endStr, timezone).getTime();
-				}
-
-				console.log('[BookingFlow] Generating slots', {
-					dateStr,
-					timezone,
-					startStr,
-					startTime,
-					endTime,
-					slotsCount: slots.length,
-				});
+				// Always generate 24 hours from start
+				const nextDay = new Date(selectedDate);
+				nextDay.setDate(nextDay.getDate() + 1);
+				const nextDayStr = format(nextDay, 'yyyy-MM-dd');
+				endTime = fromZonedTime(`${nextDayStr}T00:00:00`, timezone).getTime();
 			} catch (e) {
-				console.error('[BookingFlow] Timezone conversion error', e);
+				console.error('Timezone conversion error', e);
 				return [];
 			}
 
@@ -328,20 +317,8 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 				current += resolutionMs;
 			}
 
-			if (activeHold) {
-				// Handle active hold logic if needed
-			}
-
 			return list;
-		}, [
-			slots,
-			activeHold,
-			durationMs,
-			selectedDate,
-			fromHour,
-			toHour,
-			timezone,
-		]);
+		}, [slots, durationMs, selectedDate, timezone]);
 
 		return (
 			<div
@@ -382,18 +359,10 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 							displayedSlots={displayedSlots}
 							onSlotClick={handleSlotClick}
 							timezone={timezone}
+							formatDate={formatTz}
 						/>
 					)}
 				</div>
-
-				{/* Debug Panel (Optional Toggle) */}
-				{debugLogs.length > 0 && (
-					<div className="hidden">
-						{debugLogs.map((log, i) => (
-							<div key={`${i}-${log.length}`}>{log}</div>
-						))}
-					</div>
-				)}
 			</div>
 		);
 	},

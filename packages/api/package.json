@@ -15,7 +15,7 @@
 	"dependencies": {
 		"@tap/core": "workspace:*",
 		"@tap/protocol": "workspace:*",
-		"date-fns": "^4.1.0",
+		"date-fns": "^3.6.0",
 		"zod": "^3.23.8"
 	},
 	"devDependencies": {

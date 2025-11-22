@@ -3,9 +3,8 @@
 import type { LedgerEvent } from '@tap/core';
 import type { AvailabilityPostResponse } from '@tap/protocol';
 import { AvailabilityStore } from '@tap/ws-client';
-import { format } from 'date-fns';
-import { format as formatTz, fromZonedTime } from 'date-fns-tz'; // Use date-fns-tz for timezone aware formatting and conversion
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { format, formatTz, fromZonedTime } from '@/lib/timezone';
 
 export type AvailabilitySlot = {
 	start: number;
@@ -32,7 +31,6 @@ export type UseAvailabilityResult = {
 	cursor: string | null;
 	availableDays: Set<string>; // 'YYYY-MM-DD'
 	refreshMonth: (date: Date) => Promise<void>;
-	debugLogs: string[];
 };
 
 export const useAvailability = (
@@ -55,7 +53,6 @@ export const useAvailability = (
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
 	const [availableDays, setAvailableDays] = useState<Set<string>>(new Set());
-	const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
 	// Fetch slots for the specific selected day
 	const fetchAvailability = useCallback(
@@ -88,12 +85,7 @@ export const useAvailability = (
 						toDate = fromZonedTime(endStr, timezone);
 					}
 
-					console.log('[useAvailability] Fetching range (TZ)', {
-						timezone,
-						dateStr,
-						from: fromDate.toISOString(),
-						to: toDate.toISOString(),
-					});
+					// console.log('Fetching range', { timezone, from: fromDate.toISOString(), to: toDate.toISOString() });
 				} else {
 					// Legacy local fallback
 					fromDate = new Date(date);
@@ -132,7 +124,6 @@ export const useAvailability = (
 				const snapshot = store.getSnapshot();
 				setSlots(snapshot.slots);
 				setCursor(snapshot.cursor);
-				setDebugLogs(store.getLogs());
 			} catch (err) {
 				setError(err instanceof Error ? err : new Error('Unknown error'));
 			} finally {
@@ -164,10 +155,6 @@ export const useAvailability = (
 			endOfGrid.setDate(endOfGrid.getDate() + 7); // +7 days buffer
 			endOfGrid.setHours(23, 59, 59, 999);
 
-			// NOTE: For refreshMonth we are using local date range approximation.
-			// Since we fetch +/- 7 days buffer, it should cover timezone shifts comfortably.
-			// We don't strictly convert the query range to timezone here because we just want "all slots around this month".
-
 			try {
 				const body = {
 					tenantId: tenantSlug,
@@ -189,11 +176,17 @@ export const useAvailability = (
 					for (const slot of data.freeSlots) {
 						// Use timezone aware formatting to determine which "Day" this slot belongs to
 						// If timezone is provided, we use it. Otherwise fallback to local.
-						const dateKey = timezone
-							? formatTz(new Date(slot.start), 'yyyy-MM-dd', {
-									timeZone: timezone,
-								})
-							: formatTz(new Date(slot.start), 'yyyy-MM-dd'); // Local fallback
+						let dateKey: string;
+						if (timezone) {
+							// Important: date-fns-tz format(date, fmt, { timeZone }) uses the timestamp
+							// and formats it as it appears in that timezone.
+							// slot.start is UTC.
+							dateKey = formatTz(new Date(slot.start), 'yyyy-MM-dd', {
+								timeZone: timezone,
+							});
+						} else {
+							dateKey = formatTz(new Date(slot.start), 'yyyy-MM-dd'); // Local fallback
+						}
 
 						if (dateKey) days.add(dateKey);
 					}
@@ -221,7 +214,7 @@ export const useAvailability = (
 	// Initial month fetch
 	useEffect(() => {
 		refreshMonth(selectedDate || new Date());
-	}, [refreshMonth, selectedDate]); // Added selectedDate dependency
+	}, [refreshMonth, selectedDate]);
 
 	const applyDelta = useCallback(
 		(event: LedgerEvent) => {
@@ -229,8 +222,6 @@ export const useAvailability = (
 			const snapshot = store.getSnapshot();
 			setSlots(snapshot.slots);
 			setCursor(snapshot.cursor);
-			setDebugLogs(store.getLogs());
-			// Ideally we should update availableDays here too if a day becomes fully booked or free
 		},
 		[store],
 	);
@@ -244,6 +235,5 @@ export const useAvailability = (
 		cursor,
 		availableDays,
 		refreshMonth,
-		debugLogs,
 	};
 };
