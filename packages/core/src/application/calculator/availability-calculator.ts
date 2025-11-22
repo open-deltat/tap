@@ -6,13 +6,7 @@ import {
 	type ResourceId,
 	type TenantId,
 } from '@tap/protocol';
-import {
-	addDays,
-	addMinutes,
-	differenceInMinutes,
-	format,
-	startOfDay,
-} from 'date-fns';
+import { addDays, addMinutes, differenceInMinutes, startOfDay } from 'date-fns';
 import type { Offer } from '../../domain/models';
 import { getBit } from '../../infrastructure/bitmap';
 import type { AllocatorState } from '../inventory/types';
@@ -138,7 +132,7 @@ export function calculateAvailability(params: {
 }
 
 function checkBitmapAvailability(
-	stateMap: InventoryState,
+	stateMap: AllocatorState,
 	dayKey: DayKey,
 	slotStart: Date,
 	duration: number,
