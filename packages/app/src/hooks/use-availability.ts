@@ -1,8 +1,8 @@
 'use client';
 
 import type { LedgerEvent } from '@tap/core';
-import { mergeAvailability } from '@tap/ws-client';
-import { useCallback, useEffect, useState } from 'react';
+import { AvailabilityStore } from '@tap/ws-client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toISODateString } from '@/lib/timezone';
 
 export type AvailabilitySlot = {
@@ -16,8 +16,8 @@ export type UseAvailabilityOptions = {
 	resourceSlug: string;
 	selectedDate: Date | undefined;
 	durationMinutes?: number;
-	slotResolutionMinutes?: number; // Kept for compatibility but unused for logic
-	fromHour?: number; // Backend handles? No, backend takes from/to date.
+	slotResolutionMinutes?: number;
+	fromHour?: number;
 	toHour?: number;
 };
 
@@ -43,9 +43,9 @@ export const useAvailability = (
 		toHour = 24,
 	} = options;
 
-	const [baseSlots, setBaseSlots] = useState<AvailabilitySlot[]>([]);
-	const [currentSlots, setCurrentSlots] = useState<AvailabilitySlot[]>([]);
-	const [events, setEvents] = useState<LedgerEvent[]>([]);
+	// Use the store to manage state
+	const store = useMemo(() => new AvailabilityStore(), []);
+	const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
 	const [cursor, setCursor] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
@@ -87,20 +87,25 @@ export const useAvailability = (
 					asOfEventId: string;
 				};
 
-				setBaseSlots(data.slots);
-				setCursor(data.asOfEventId);
-				// Keep events that are newer than the snapshot to avoid race conditions
-				setEvents((prev) => {
-					if (!data.asOfEventId) return prev;
-					return prev.filter((e) => e.eventId > data.asOfEventId);
-				});
+				store.setSnapshot(data.slots, data.asOfEventId);
+				const snapshot = store.getSnapshot();
+				setSlots(snapshot.slots);
+				setCursor(snapshot.cursor);
 			} catch (err) {
 				setError(err instanceof Error ? err : new Error('Unknown error'));
 			} finally {
 				setIsLoading(false);
 			}
 		},
-		[apiBaseUrl, tenantSlug, resourceSlug, durationMinutes, fromHour, toHour],
+		[
+			apiBaseUrl,
+			tenantSlug,
+			resourceSlug,
+			durationMinutes,
+			fromHour,
+			toHour,
+			store,
+		],
 	);
 
 	const refresh = useCallback(async () => {
@@ -115,28 +120,19 @@ export const useAvailability = (
 		}
 	}, [selectedDate, fetchAvailability]);
 
-	const applyDelta = useCallback((event: LedgerEvent) => {
-		console.log('[useAvailability] Applying Delta:', event);
-		setEvents((prev) => {
-			if (prev.find((e) => e.eventId === event.eventId)) return prev;
-			return [...prev, event];
-		});
-	}, []);
-
-	useEffect(() => {
-		if (baseSlots.length === 0 && events.length === 0) {
-			setCurrentSlots([]);
-			return;
-		}
-
-		// Use mergeAvailability from stream-client
-		// It expects slots with start/end.
-		const merged = mergeAvailability(baseSlots, events, cursor);
-		setCurrentSlots(merged);
-	}, [baseSlots, events, cursor]);
+	const applyDelta = useCallback(
+		(event: LedgerEvent) => {
+			console.log('[useAvailability] Applying Delta:', event);
+			store.applyEvent(event);
+			const snapshot = store.getSnapshot();
+			setSlots(snapshot.slots);
+			setCursor(snapshot.cursor);
+		},
+		[store],
+	);
 
 	return {
-		slots: currentSlots,
+		slots,
 		isLoading,
 		error,
 		refresh,

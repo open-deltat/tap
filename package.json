@@ -44,7 +44,7 @@
     "lint": "turbo run lint",
     "format": "turbo run format",
     "lint:fix": "turbo run lint:fix",
-    "check": "turbo run lint"
+    "check": "bun biome check --fix"
   },
   "devDependencies": {
     "@biomejs/biome": "latest",

@@ -14,6 +14,7 @@ import {
 	type TenantId,
 } from '@tap/protocol';
 import type { Server } from 'bun';
+import { ulid } from 'ulid';
 import { core } from '../core';
 
 async function confirmBookingWithHold(
@@ -31,7 +32,7 @@ async function confirmBookingWithHold(
 		resourceId,
 		holdId,
 		sessionId,
-		bookingId: crypto.randomUUID() as BookingId,
+		bookingId: ulid() as BookingId,
 		start: start.getTime(),
 		end: end.getTime(),
 		customerName: customer.name,
@@ -82,7 +83,7 @@ export async function handleBook(
 
 		// If no hold provided, try to place one instantly
 		if (!holdId || !sessionId) {
-			const tempSessionId = `temp_session_${crypto.randomUUID()}` as SessionId;
+			const tempSessionId = `session_${ulid()}` as SessionId;
 
 			const dayKey = start.toISOString().split('T')[0] as DayKey; // core DayKey (UTC)
 			const startMinute = start.getUTCHours() * 60 + start.getUTCMinutes();

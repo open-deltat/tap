@@ -4,6 +4,7 @@ import {
 	type AvailabilityPostResponse,
 } from '@tap/protocol';
 import { parseISO } from 'date-fns';
+import { ulid } from 'ulid';
 import { core } from '../core';
 
 export async function handleAvailability(req: Request): Promise<Response> {
@@ -42,7 +43,7 @@ export async function handleAvailability(req: Request): Promise<Response> {
 			tenantId: body.tenantId,
 			resourceId: body.resourceId,
 			resolutionMinutes: body.slotDurationMinutes || 15,
-			asOfEventId: crypto.randomUUID(),
+			asOfEventId: ulid(),
 			freeSlots: slots.map((s) => ({
 				slotId: s.slotId,
 				resourceId: s.resourceId,

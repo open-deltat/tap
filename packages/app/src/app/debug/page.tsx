@@ -1,14 +1,16 @@
 'use client';
 
-import type {
-	AvailabilityPostResponse,
-	AvailabilityWsServerMessage,
-	BookPostResponse,
-	HoldWsServerMessage,
-	ResourceId,
-	TenantId,
+import type { LedgerEvent } from '@tap/core';
+import {
+	type AvailabilityPostResponse,
+	type BookPostResponse,
+	createSlotId,
+	type HoldWsServerMessage,
+	type ResourceId,
+	type TenantId,
 } from '@tap/protocol';
-import { useEffect, useRef, useState } from 'react';
+import { AvailabilityStore } from '@tap/ws-client';
+import { useRef, useState } from 'react';
 
 const API_BASE =
 	process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
@@ -29,6 +31,7 @@ export default function DebugPage() {
 
 	const availWsRef = useRef<WebSocket | null>(null);
 	const holdWsRef = useRef<WebSocket | null>(null);
+	const storeRef = useRef(new AvailabilityStore());
 
 	const addLog = (msg: string) => {
 		setLogs((prev) => [`[${new Date().toISOString()}] ${msg}`, ...prev]);
@@ -48,8 +51,16 @@ export default function DebugPage() {
 					slotDurationMinutes: 60,
 				}),
 			});
-			const data = await res.json();
+			const data = (await res.json()) as AvailabilityPostResponse;
 			setAvailability(data);
+
+			// Initialize store with these slots
+			const slots = data.freeSlots.map((s) => ({
+				start: new Date(s.start).getTime(),
+				end: new Date(s.end).getTime(),
+			}));
+			storeRef.current.setSnapshot(slots, data.asOfEventId);
+
 			addLog(`Availability received: ${data.freeSlots.length} slots found.`);
 		} catch (e) {
 			addLog(`Error checking availability: ${e}`);
@@ -79,6 +90,84 @@ export default function DebugPage() {
 		ws.onmessage = (event) => {
 			const msg = JSON.parse(event.data);
 			addLog(`[AvailStream] Received: ${JSON.stringify(msg)}`);
+
+			if (msg.type === 'stream.delta') {
+				const delta = msg.payload;
+
+				// Construct partial event then cast
+				const coreEventBase = {
+					eventId: msg.eventId,
+					type: delta.kind,
+					tenantId: delta.tenantId,
+					resourceId: delta.resourceId,
+					createdAt: Date.now(),
+					version: 1,
+					payload: {},
+				};
+
+				let coreEvent: LedgerEvent;
+
+				if (
+					delta.kind === 'HoldPlaced' ||
+					delta.kind === 'HoldReleased' ||
+					delta.kind === 'HoldExpired'
+				) {
+					const start = new Date(delta.start);
+					const end = new Date(delta.end);
+					const day = start.toISOString().split('T')[0];
+					const startMinute = start.getUTCHours() * 60 + start.getUTCMinutes();
+					const endMinute = end.getUTCHours() * 60 + end.getUTCMinutes();
+
+					coreEvent = {
+						...coreEventBase,
+						type: delta.kind,
+						payload: {
+							holdId: delta.holdId,
+							day,
+							startMinute,
+							endMinute,
+							expiresAt: 0, // Not needed for merge
+						},
+					} as unknown as LedgerEvent;
+				} else if (
+					delta.kind === 'BookingConfirmed' ||
+					delta.kind === 'BookingCancelled'
+				) {
+					coreEvent = {
+						...coreEventBase,
+						type: delta.kind,
+						payload: {
+							bookingId: delta.bookingId,
+							start: new Date(delta.start).getTime(),
+							end: new Date(delta.end).getTime(),
+							holdId: delta.holdId,
+						},
+					} as unknown as LedgerEvent;
+				} else {
+					return;
+				}
+
+				storeRef.current.applyEvent(coreEvent);
+
+				const snapshot = storeRef.current.getSnapshot();
+
+				setAvailability((prev) => {
+					if (!prev) return null;
+					const newFreeSlots = snapshot.slots.map((s) => ({
+						slotId: createSlotId(new Date(s.start), new Date(s.end)),
+						resourceId: prev.resourceId,
+						tenantId: prev.tenantId,
+						start: new Date(s.start).toISOString(),
+						end: new Date(s.end).toISOString(),
+					}));
+
+					return {
+						...prev,
+						asOfEventId: snapshot.cursor ?? prev.asOfEventId,
+						freeSlots: newFreeSlots,
+					};
+				});
+			}
 		};
 
 		ws.onclose = () => {
@@ -113,28 +202,18 @@ export default function DebugPage() {
 			addLog(`[HoldWS] Received: ${JSON.stringify(msg)}`);
 
 			if (msg.type === 'hold.session.hello') {
-				// Store session ID if we need it, but usually confirmed has holdId
-			}
-			if (msg.type === 'hold.confirmed') {
-				// Wait, hold.confirmed schema says it has holdId
-				// msg is discriminated union
-				if ('holdId' in msg) {
-					// We need to capture session ID from hello message to book properly?
-					// The hello message comes first.
-					// Ideally we state needs to track both.
-				}
-			}
-
-			// We need to capture sessionId from hello and holdId from confirmed to enable booking
-			if (msg.type === 'hold.session.hello') {
 				setHoldInfo((prev) => ({
-					...prev!,
+					holdId: prev?.holdId ?? '',
 					sessionId: msg.sessionId,
 					slotId: slot.slotId,
 				}));
 			}
 			if (msg.type === 'hold.confirmed') {
-				setHoldInfo((prev) => ({ ...prev!, holdId: msg.holdId }));
+				setHoldInfo((prev) => ({
+					holdId: msg.holdId,
+					sessionId: prev?.sessionId ?? '',
+					slotId: prev?.slotId ?? '',
+				}));
 			}
 			if (msg.type === 'hold.error') {
 				addLog(`Hold Error: ${msg.errorValue} - ${msg.message}`);
@@ -196,7 +275,6 @@ export default function DebugPage() {
 				addLog(
 					`Booking Confirmed! ID: ${(data as BookPostResponse).bookingId}`,
 				);
-				// Close hold connection as it's now booked (server might close it automatically or we should)
 				if (holdWsRef.current) {
 					holdWsRef.current.close();
 				}
@@ -214,18 +292,21 @@ export default function DebugPage() {
 
 			<div className="flex gap-4 mb-8 flex-wrap">
 				<button
+					type="button"
 					onClick={checkAvailability}
 					className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
 				>
 					1. Check Availability
 				</button>
 				<button
+					type="button"
 					onClick={connectAvailStream}
 					className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded"
 				>
 					2. Connect Stream
 				</button>
 				<button
+					type="button"
 					onClick={placeHold}
 					disabled={!availability}
 					className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded disabled:opacity-50"
@@ -233,6 +314,7 @@ export default function DebugPage() {
 					3. Place Hold (First Slot)
 				</button>
 				<button
+					type="button"
 					onClick={bookSlot}
 					disabled={!holdInfo}
 					className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
@@ -240,6 +322,7 @@ export default function DebugPage() {
 					4. Book Held Slot
 				</button>
 				<button
+					type="button"
 					onClick={releaseHold}
 					disabled={!holdInfo}
 					className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded disabled:opacity-50"
@@ -251,8 +334,8 @@ export default function DebugPage() {
 			<div className="grid grid-cols-2 gap-8">
 				<div className="border p-4 rounded bg-gray-50 h-[500px] overflow-y-auto font-mono text-sm">
 					<h2 className="font-bold mb-2 sticky top-0 bg-gray-50">Logs</h2>
-					{logs.map((log, i) => (
-						<div key={i} className="mb-1 border-b border-gray-200 pb-1">
+					{logs.map((log) => (
+						<div key={log} className="mb-1 border-b border-gray-200 pb-1">
 							{log}
 						</div>
 					))}
