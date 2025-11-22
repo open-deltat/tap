@@ -1,4 +1,4 @@
-import { format as formatTz, fromZonedTime, toZonedTime } from 'date-fns-tz';
+import { format as formatTz } from 'date-fns-tz';
 
 export const getClientTimezone = (): string => {
 	return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -24,7 +24,7 @@ export const getDayKey = (date: Date, timezone?: string): string => {
 	if (timezone) {
 		return formatTz(date, 'yyyy-MM-dd', { timeZone: timezone });
 	}
-	return format(date, 'yyyy-MM-dd');
+	return formatTz(date, 'yyyy-MM-dd');
 };
 
 export const fromDayKey = (dayKey: string): Date => {
