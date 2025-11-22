@@ -1,0 +1,31 @@
+# Use the official Bun image
+FROM oven/bun:1 AS base
+WORKDIR /usr/src/app
+
+# Copy root configuration files
+COPY package.json bun.lock ./
+COPY turbo.json tsconfig.json ./
+
+# Copy package.json files for all relevant workspaces to install dependencies
+# We only need api, core, and protocol for the API service
+COPY packages/api/package.json ./packages/api/
+COPY packages/core/package.json ./packages/core/
+COPY packages/protocol/package.json ./packages/protocol/
+
+# Install dependencies including dev dependencies (needed for build/typescript)
+RUN bun install
+
+# Copy source code for relevant packages
+COPY packages/api ./packages/api
+COPY packages/core ./packages/core
+COPY packages/protocol ./packages/protocol
+
+# Set working directory to the API package
+WORKDIR /usr/src/app/packages/api
+
+# Expose the port the API runs on
+EXPOSE 3000
+
+# Start the API using the script defined in packages/api/package.json
+CMD ["bun", "run", "start"]
+

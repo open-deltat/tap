@@ -1,0 +1,10 @@
+node_modules
+.turbo
+dist
+.git
+.env
+packages/app/.next
+packages/app/out
+packages/app/build
+.DS_Store
+
