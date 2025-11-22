@@ -48,7 +48,7 @@ export default function Home() {
 								Connected
 							</span>
 						</div>
-						<div className="bg-white rounded-xl shadow-sm border p-1">
+						<div className="bg-white rounded-3xl shadow-sm border p-1">
 							<BookingFlow
 								apiBaseUrl={apiBaseUrl}
 								tenantSlug={TENANT_ID}
@@ -74,7 +74,7 @@ export default function Home() {
 								Connected
 							</span>
 						</div>
-						<div className="bg-white rounded-xl shadow-sm border p-1">
+						<div className="bg-white rounded-3xl shadow-sm border p-1">
 							<BookingFlow
 								apiBaseUrl={apiBaseUrl}
 								tenantSlug={TENANT_ID}

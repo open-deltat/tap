@@ -32,6 +32,7 @@
         "@tap/core": "workspace:*",
         "@tap/protocol": "workspace:*",
         "@tap/ws-client": "workspace:*",
+        "@toolwind/corner-shape": "^0.0.8-3",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "date-fns": "^3.6.0",
@@ -382,6 +383,8 @@
     "@tap/protocol": ["@tap/protocol@workspace:packages/protocol"],
 
     "@tap/ws-client": ["@tap/ws-client@workspace:packages/ws-client"],
+
+    "@toolwind/corner-shape": ["@toolwind/corner-shape@0.0.8-3", "", { "dependencies": { "@types/node": "^20.4.1" } }, "sha512-MPIF81F2bhtXbzEeXF0vnL+PKpnopCHOzBspOkK8osMzWQvPUujZn2XZOMdsu4DF6wsVbbRYQtdsJr486HmIPQ=="],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg=="],
 
