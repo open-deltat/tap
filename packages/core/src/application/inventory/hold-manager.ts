@@ -1,9 +1,3 @@
-import { ulid } from 'ulid';
-import type {
-	HoldExpiredEvent,
-	HoldPlacedEvent,
-	HoldReleasedEvent,
-} from '../../domain/events';
 import type {
 	DayKey,
 	HoldId,
@@ -11,7 +5,13 @@ import type {
 	ResourceId,
 	SessionId,
 	TenantId,
-} from '../../domain/ids';
+} from '@tap/protocol';
+import { ulid } from 'ulid';
+import type {
+	HoldExpiredEvent,
+	HoldPlacedEvent,
+	HoldReleasedEvent,
+} from '../../domain/events';
 import {
 	createBitmapDay,
 	isRangeFree,
@@ -22,7 +22,7 @@ import {
 	createHoldPlacedEvent,
 	createHoldReleasedEvent,
 } from '../event-factory';
-import type { AllocatorState, HoldMetadata } from './types';
+import type { HoldMetadata, InventoryState } from './types';
 
 export type HoldManager = {
 	placeHold: (params: {
@@ -48,7 +48,7 @@ export type HoldManager = {
 };
 
 export const createHoldManager = (params: {
-	getState: (tenantId: TenantId, resourceId: ResourceId) => AllocatorState;
+	getState: (tenantId: TenantId, resourceId: ResourceId) => InventoryState;
 	holds: Map<HoldId, HoldMetadata>;
 	withLock: (key: string) => Promise<() => void>;
 }): HoldManager => {

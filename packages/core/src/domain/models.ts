@@ -16,7 +16,7 @@ export const ResourceSchema = z.object({
 	slotMinutes: z.enum(['5', '10', '15', '30', '60']),
 	horizonDays: z.number().int().default(90),
 	requiresPayment: z.boolean().default(false),
-	metadata: z.record(z.unknown()).optional(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const OfferSchema = z.object({

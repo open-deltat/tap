@@ -15,6 +15,7 @@ import {
 } from '@tap/protocol';
 import type { ServerWebSocket } from 'bun';
 import { core } from '../core';
+import { serverContext } from '../server-context';
 
 export type WSData = {
 	type: 'availability' | 'hold';
@@ -29,6 +30,7 @@ export type WSData = {
 
 export const websocketHandler = {
 	async open(ws: ServerWebSocket<WSData>) {
+		console.log(`[WS] Open connection type=${ws.data.type}`);
 		if (ws.data.type === 'availability') {
 			// Wait for subscribe
 			const hello: AvailabilityWsServerMessage = {
@@ -40,6 +42,9 @@ export const websocketHandler = {
 			ws.send(JSON.stringify(hello));
 		} else if (ws.data.type === 'hold') {
 			const { tenantId, resourceId, slotId } = ws.data;
+			console.log(
+				`[WS] Hold connection req: ${tenantId} ${resourceId} ${slotId}`,
+			);
 			if (!tenantId || !resourceId || !slotId) {
 				ws.close(1008, 'Missing params');
 				return;
@@ -65,6 +70,7 @@ export const websocketHandler = {
 				});
 
 				if (result.success) {
+					console.log('[WS] Hold placed successfully');
 					const successResult = result as {
 						holdId: HoldId;
 						event: { eventId: string };
@@ -107,8 +113,17 @@ export const websocketHandler = {
 							holdId,
 						} as AvailabilityDeltaPayload,
 					};
-					ws.publish(topic, JSON.stringify(message));
+
+					// Use server.publish to ensure broadcast to all subscribers
+					const bytes = serverContext.server?.publish(
+						topic,
+						JSON.stringify(message),
+					);
+					console.log(
+						`[WS] Published HoldPlaced to topic ${topic}. Bytes sent: ${bytes}`,
+					);
 				} else {
+					console.log('[WS] Failed to place hold');
 					const error: HoldWsServerMessage = {
 						type: 'hold.error',
 						errorValue: 'TAP_SLOT_UNAVAILABLE',
@@ -117,7 +132,8 @@ export const websocketHandler = {
 					ws.send(JSON.stringify(error));
 					ws.close();
 				}
-			} catch (_e) {
+			} catch (e) {
+				console.error('[WS] Error placing hold:', e);
 				ws.close(1011, 'Internal Error');
 			}
 		}
@@ -125,6 +141,7 @@ export const websocketHandler = {
 
 	message(ws: ServerWebSocket<WSData>, message: string | Buffer) {
 		const str = typeof message === 'string' ? message : message.toString();
+		// console.log(`[WS] Message received: ${str.slice(0, 50)}...`);
 		let json: unknown;
 		try {
 			json = JSON.parse(str);
@@ -139,6 +156,7 @@ export const websocketHandler = {
 				if (msg.type === 'stream.subscribe') {
 					const topic = createAvailabilityTopic(msg.tenantId, msg.resourceId);
 					ws.subscribe(topic);
+					console.log(`[WS] Client subscribed to ${topic}`);
 				}
 			}
 		} else if (ws.data.type === 'hold') {
@@ -182,7 +200,8 @@ export const websocketHandler = {
 										end: ws.data.end,
 									},
 								};
-								ws.publish(topic, JSON.stringify(message));
+								// ws.publish(topic, JSON.stringify(message));
+								serverContext.server?.publish(topic, JSON.stringify(message));
 							}
 							ws.close();
 						});
@@ -229,7 +248,8 @@ export const websocketHandler = {
 									end: ws.data.end,
 								},
 							};
-							ws.publish(topic, JSON.stringify(message));
+							// ws.publish(topic, JSON.stringify(message));
+							serverContext.server?.publish(topic, JSON.stringify(message));
 						}
 					});
 			}

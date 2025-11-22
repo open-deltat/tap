@@ -1,4 +1,4 @@
-import type { Minute } from '../../domain/ids';
+import type { Minute } from '@tap/protocol';
 import type { BitmapDay } from './types';
 
 export const createEmptyBitmap = (): Uint8Array => new Uint8Array(180);

@@ -3,6 +3,7 @@ import type { Server } from 'bun';
 import { handleAvailability } from './routes/availability';
 import { handleBook } from './routes/book';
 import { type WSData, websocketHandler } from './routes/websockets';
+import { setServer } from './server-context';
 
 // CORS headers
 const CORS_HEADERS = {
@@ -78,18 +79,24 @@ function handleHttp(
 			const resourceId = url.searchParams.get('resourceId');
 			const slotId = url.searchParams.get('slotId');
 
+			console.log(
+				`[WS-Upgrade] hold-ws request params: tenant=${tenantId}, resource=${resourceId}, slot=${slotId}`,
+			);
+
 			if (!tenantId || !resourceId || !slotId) {
+				console.log('[WS-Upgrade] Missing params');
 				return new Response('Missing query params', { status: 400 });
 			}
 
 			const success = server.upgrade(req, {
 				data: {
-					type: 'hold' as const,
+					type: 'hold',
 					tenantId: tenantId as TenantId,
 					resourceId: resourceId as ResourceId,
 					slotId: slotId as SlotId,
 				},
 			});
+			console.log(`[WS-Upgrade] Upgrade success: ${success}`);
 			if (success) return undefined;
 			return new Response('WebSocket upgrade failed', { status: 400 });
 		}
@@ -107,6 +114,9 @@ const server = Bun.serve({
 	fetch: handleHttp,
 	websocket: websocketHandler,
 });
+
+// Share server instance globally
+setServer(server);
 
 if (import.meta.main) {
 	console.log(`Listening on localhost:${server.port}`);

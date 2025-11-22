@@ -1,9 +1,9 @@
 'use client';
 
 import type { LedgerEvent } from '@tap/core';
+import type { AvailabilityPostResponse } from '@tap/protocol';
 import { AvailabilityStore } from '@tap/ws-client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toISODateString } from '@/lib/timezone';
 
 export type AvailabilitySlot = {
 	start: number;
@@ -15,8 +15,7 @@ export type UseAvailabilityOptions = {
 	tenantSlug: string;
 	resourceSlug: string;
 	selectedDate: Date | undefined;
-	durationMinutes?: number;
-	slotResolutionMinutes?: number;
+	durationMs?: number;
 	fromHour?: number;
 	toHour?: number;
 };
@@ -28,6 +27,9 @@ export type UseAvailabilityResult = {
 	refresh: () => Promise<void>;
 	applyDelta: (event: LedgerEvent) => void;
 	cursor: string | null;
+	availableDays: Set<string>; // 'YYYY-MM-DD'
+	refreshMonth: (date: Date) => Promise<void>;
+	debugLogs: string[];
 };
 
 export const useAvailability = (
@@ -38,18 +40,20 @@ export const useAvailability = (
 		tenantSlug,
 		resourceSlug,
 		selectedDate,
-		durationMinutes = 60,
+		durationMs = 60 * 60000,
 		fromHour = 0,
 		toHour = 24,
 	} = options;
 
-	// Use the store to manage state
 	const store = useMemo(() => new AvailabilityStore(), []);
 	const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
 	const [cursor, setCursor] = useState<string | null>(null);
 	const [isLoading, setIsLoading] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
+	const [availableDays, setAvailableDays] = useState<Set<string>>(new Set());
+	const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
+	// Fetch slots for the specific selected day
 	const fetchAvailability = useCallback(
 		async (date: Date) => {
 			setIsLoading(true);
@@ -61,51 +65,82 @@ export const useAvailability = (
 				const toDate = new Date(date);
 				toDate.setHours(toHour, 0, 0, 0);
 
-				const fromISO = toISODateString(fromDate);
-				const toISO = toISODateString(toDate);
+				const body = {
+					tenantId: tenantSlug,
+					resourceId: resourceSlug,
+					from: fromDate.toISOString(),
+					to: toDate.toISOString(),
+					slotDurationMs: durationMs,
+				};
 
-				const url = `${apiBaseUrl}/v1/public/${tenantSlug}/${resourceSlug}/availability?from=${fromISO}&to=${toISO}&durationMinutes=${durationMinutes}`;
-
-				const response = await fetch(url, {
-					method: 'GET',
-					headers: {
-						'Content-Type': 'application/json',
-					},
+				const response = await fetch(`${apiBaseUrl}/availability`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(body),
 				});
 
 				if (!response.ok) {
-					let errorMessage = `Failed to fetch availability: ${response.status} ${response.statusText}`;
-					try {
-						const errorData = await response.json();
-						errorMessage = errorData.error || errorMessage;
-					} catch {}
-					throw new Error(errorMessage);
+					throw new Error(`Failed to fetch: ${response.status}`);
 				}
 
-				const data = (await response.json()) as {
-					slots: Array<{ start: number; end: number }>;
-					asOfEventId: string;
-				};
+				const data = (await response.json()) as AvailabilityPostResponse;
 
-				store.setSnapshot(data.slots, data.asOfEventId);
+				// Convert protocol slots to store slots
+				const initialSlots = data.freeSlots.map((s) => ({
+					start: new Date(s.start).getTime(),
+					end: new Date(s.end).getTime(),
+				}));
+
+				store.setSnapshot(initialSlots, data.asOfEventId);
 				const snapshot = store.getSnapshot();
 				setSlots(snapshot.slots);
 				setCursor(snapshot.cursor);
+				setDebugLogs(store.getLogs());
 			} catch (err) {
 				setError(err instanceof Error ? err : new Error('Unknown error'));
 			} finally {
 				setIsLoading(false);
 			}
 		},
-		[
-			apiBaseUrl,
-			tenantSlug,
-			resourceSlug,
-			durationMinutes,
-			fromHour,
-			toHour,
-			store,
-		],
+		[apiBaseUrl, tenantSlug, resourceSlug, durationMs, fromHour, toHour, store],
+	);
+
+	// Fetch availability for the whole month to populate the calendar
+	const refreshMonth = useCallback(
+		async (date: Date) => {
+			const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+			const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+			endOfMonth.setHours(23, 59, 59, 999);
+
+			try {
+				const body = {
+					tenantId: tenantSlug,
+					resourceId: resourceSlug,
+					from: startOfMonth.toISOString(),
+					to: endOfMonth.toISOString(),
+					slotDurationMs: durationMs,
+				};
+
+				const response = await fetch(`${apiBaseUrl}/availability`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(body),
+				});
+
+				if (response.ok) {
+					const data = (await response.json()) as AvailabilityPostResponse;
+					const days = new Set<string>();
+					for (const slot of data.freeSlots) {
+						const dateKey = slot.start.split('T')[0];
+						if (dateKey) days.add(dateKey);
+					}
+					setAvailableDays(days);
+				}
+			} catch (e) {
+				console.error('Failed to fetch month availability', e);
+			}
+		},
+		[apiBaseUrl, tenantSlug, resourceSlug, durationMs],
 	);
 
 	const refresh = useCallback(async () => {
@@ -120,13 +155,19 @@ export const useAvailability = (
 		}
 	}, [selectedDate, fetchAvailability]);
 
+	// Initial month fetch
+	useEffect(() => {
+		refreshMonth(selectedDate || new Date());
+	}, [refreshMonth, selectedDate]);
+
 	const applyDelta = useCallback(
 		(event: LedgerEvent) => {
-			console.log('[useAvailability] Applying Delta:', event);
 			store.applyEvent(event);
 			const snapshot = store.getSnapshot();
 			setSlots(snapshot.slots);
 			setCursor(snapshot.cursor);
+			setDebugLogs(store.getLogs());
+			// Ideally we should update availableDays here too if a day becomes fully booked or free
 		},
 		[store],
 	);
@@ -138,5 +179,8 @@ export const useAvailability = (
 		refresh,
 		applyDelta,
 		cursor,
+		availableDays,
+		refreshMonth,
+		debugLogs,
 	};
 };

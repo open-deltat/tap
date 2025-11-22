@@ -34,7 +34,7 @@ const CalendarChevron = ({
 	orientation,
 	...props
 }: React.ComponentProps<'svg'> & {
-	orientation?: 'left' | 'right' | 'down';
+	orientation?: 'left' | 'right' | 'down' | 'up';
 }) => {
 	if (orientation === 'left') {
 		return <ChevronLeftIcon className={cn('size-4', className)} {...props} />;
@@ -42,6 +42,15 @@ const CalendarChevron = ({
 
 	if (orientation === 'right') {
 		return <ChevronRightIcon className={cn('size-4', className)} {...props} />;
+	}
+
+	if (orientation === 'up') {
+		return (
+			<ChevronDownIcon
+				className={cn('size-4 rotate-180', className)}
+				{...props}
+			/>
+		);
 	}
 
 	return <ChevronDownIcon className={cn('size-4', className)} {...props} />;

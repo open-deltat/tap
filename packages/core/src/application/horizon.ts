@@ -1,4 +1,4 @@
-import type { DayKey } from '../domain/ids';
+import type { DayKey } from '@tap/protocol';
 import {
 	getUnixStartOfDayUTC,
 	parseDayToUnixStartOfDayUTC,

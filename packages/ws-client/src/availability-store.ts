@@ -6,6 +6,7 @@ export type TimeSlot = { start: number; end: number };
 export class AvailabilityStore {
 	private slots: TimeSlot[] = [];
 	private cursor: string | null = null;
+	private logs: string[] = [];
 
 	constructor(
 		initialSlots: TimeSlot[] = [],
@@ -13,6 +14,7 @@ export class AvailabilityStore {
 	) {
 		this.slots = initialSlots;
 		this.cursor = initialCursor;
+		this.addLog('Store initialized');
 	}
 
 	public getSnapshot() {
@@ -22,29 +24,56 @@ export class AvailabilityStore {
 		};
 	}
 
+	public getLogs() {
+		return [...this.logs];
+	}
+
+	private addLog(msg: string) {
+		this.logs.unshift(`[${new Date().toISOString()}] ${msg}`);
+		if (this.logs.length > 100) this.logs.pop();
+	}
+
 	public setSnapshot(slots: TimeSlot[], cursor: string | null) {
 		this.slots = slots;
 		this.cursor = cursor;
+		this.addLog(`Snapshot set: ${slots.length} slots, cursor: ${cursor}`);
 	}
 
 	public applyEvent(event: LedgerEvent): void {
+		this.addLog(`Received event ${event.type} (${event.eventId})`);
+
 		// Ignore events older than our snapshot
-		if (this.cursor && event.eventId <= this.cursor) {
+		if (this.cursor && (event.eventId as string) <= this.cursor) {
+			this.addLog(
+				`Ignored old event ${event.eventId} (cursor: ${this.cursor})`,
+			);
 			return;
 		}
 
 		// Ideally we should track the latest cursor seen
-		if (!this.cursor || event.eventId > this.cursor) {
-			this.cursor = event.eventId;
+		if (!this.cursor || (event.eventId as string) > this.cursor) {
+			this.cursor = event.eventId as string;
 		}
 
 		const range = this.getEventTimeRange(event);
-		if (!range) return;
+		if (!range) {
+			this.addLog(`Could not determine range for event ${event.type}`);
+			return;
+		}
 
+		const prevCount = this.slots.length;
 		if (this.isBlocking(event)) {
 			this.slots = this.subtractRange(this.slots, range.start, range.end);
+			this.addLog(
+				`Blocked range ${new Date(range.start).toISOString()} - ${new Date(range.end).toISOString()}. Slots: ${prevCount} -> ${this.slots.length}`,
+			);
 		} else if (this.isReleasing(event)) {
 			this.slots = this.addRange(this.slots, range.start, range.end);
+			this.addLog(
+				`Released range ${new Date(range.start).toISOString()} - ${new Date(range.end).toISOString()}. Slots: ${prevCount} -> ${this.slots.length}`,
+			);
+		} else {
+			this.addLog(`Event ${event.type} produced no action.`);
 		}
 	}
 
@@ -133,17 +162,21 @@ export class AvailabilityStore {
 		const first = newSlots[0];
 		if (!first) return result;
 
-		let current = first;
+		let current = { ...first }; // Copy to avoid mutation issues
 		for (let i = 1; i < newSlots.length; i++) {
 			const next = newSlots[i];
 			if (!next) continue;
 
+			// If next starts within or immediately after current (mergable)
+			// Be careful with adjacency.
+			// If current is [10:00, 11:00] and next is [11:00, 12:00], they should merge.
 			if (next.start <= current.end) {
 				// Merge
 				current.end = Math.max(current.end, next.end);
 			} else {
+				// Gap found, push current and start new
 				result.push(current);
-				current = next;
+				current = { ...next };
 			}
 		}
 		result.push(current);

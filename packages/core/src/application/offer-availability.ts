@@ -1,11 +1,11 @@
-import type { DayKey, Minute, ResourceId, TenantId } from '../domain/ids';
+import type { DayKey, Minute, ResourceId, TenantId } from '@tap/protocol';
 import type { Offer } from '../domain/models';
 import { getDayOfWeekUTC } from '../infrastructure/day-utils';
 
 const DEFAULT_OFFER: Offer = {
 	id: 'default',
-	tenantId: 'default' as unknown as TenantId,
-	resourceId: 'default' as unknown as ResourceId,
+	tenantId: 'default' as TenantId,
+	resourceId: 'default' as ResourceId,
 	daysOfWeek: [1, 2, 3, 4, 5],
 	startTime: '09:00',
 	endTime: '17:00',

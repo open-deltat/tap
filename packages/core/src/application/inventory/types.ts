@@ -4,10 +4,10 @@ import type {
 	ResourceId,
 	SessionId,
 	TenantId,
-} from '../../domain/ids';
+} from '@tap/protocol';
 import type { BitmapDay } from '../../infrastructure/bitmap';
 
-export type AllocatorState = Map<DayKey, BitmapDay>;
+export type InventoryState = Map<DayKey, BitmapDay>;
 
 export type HoldMetadata = {
 	tenantId: TenantId;

@@ -1,0 +1,140 @@
+'use client';
+
+import type { LedgerEvent } from '@tap/core';
+import type {
+	AvailabilityDeltaPayload,
+	AvailabilityWsServerMessage,
+} from '@tap/protocol';
+import { useEffect, useRef, useState } from 'react';
+
+type UseAvailabilityStreamOptions = {
+	apiBaseUrl: string;
+	tenantSlug: string;
+	resourceSlug: string;
+	enabled: boolean;
+	onDelta?: (event: LedgerEvent) => void;
+};
+
+export const useAvailabilityStream = ({
+	apiBaseUrl,
+	tenantSlug,
+	resourceSlug,
+	enabled,
+	onDelta,
+}: UseAvailabilityStreamOptions) => {
+	const [isConnected, setIsConnected] = useState(false);
+	const wsRef = useRef<WebSocket | null>(null);
+	const onDeltaRef = useRef(onDelta);
+
+	useEffect(() => {
+		onDeltaRef.current = onDelta;
+	}, [onDelta]);
+
+	useEffect(() => {
+		if (!enabled) {
+			if (wsRef.current) {
+				wsRef.current.close();
+				wsRef.current = null;
+				setIsConnected(false);
+			}
+			return;
+		}
+
+		const wsUrl = `${apiBaseUrl.replace(/^http/, 'ws')}/availability-ws`;
+		const ws = new WebSocket(wsUrl);
+		wsRef.current = ws;
+
+		ws.onopen = () => {
+			console.log('[AvailStream] Connected');
+			setIsConnected(true);
+			// Subscribe
+			ws.send(
+				JSON.stringify({
+					type: 'stream.subscribe',
+					tenantId: tenantSlug,
+					resourceId: resourceSlug,
+				}),
+			);
+		};
+
+		ws.onmessage = (event) => {
+			console.log('[AvailStream] Message:', event.data);
+			try {
+				const msg = JSON.parse(event.data) as AvailabilityWsServerMessage;
+				if (msg.type === 'stream.delta') {
+					const delta = msg.payload;
+					// Map Protocol Delta to Core LedgerEvent (simplified for Client Store)
+					const coreEvent = mapDeltaToLedgerEvent(msg.eventId, delta);
+					if (coreEvent) {
+						onDeltaRef.current?.(coreEvent as LedgerEvent);
+					}
+				}
+			} catch (err) {
+				console.error('[AvailStream] Error parsing message:', err);
+			}
+		};
+
+		ws.onclose = () => {
+			console.log('[AvailStream] Disconnected');
+			setIsConnected(false);
+			wsRef.current = null;
+		};
+
+		return () => {
+			ws.close();
+		};
+	}, [apiBaseUrl, tenantSlug, resourceSlug, enabled]);
+
+	return { isConnected };
+};
+
+// Helper to map protocol delta to the shape expected by AvailabilityStore (LedgerEvent)
+function mapDeltaToLedgerEvent(
+	eventId: string,
+	delta: AvailabilityDeltaPayload,
+) {
+	const base = {
+		eventId,
+		tenantId: delta.tenantId,
+		resourceId: delta.resourceId,
+		createdAt: Date.now(),
+		version: 1,
+	};
+
+	if (
+		delta.kind === 'HoldPlaced' ||
+		delta.kind === 'HoldReleased' ||
+		delta.kind === 'HoldExpired'
+	) {
+		const start = new Date(delta.start);
+		const end = new Date(delta.end);
+		const dayStart = new Date(start);
+		dayStart.setUTCHours(0, 0, 0, 0);
+
+		return {
+			...base,
+			type: delta.kind,
+			payload: {
+				holdId: delta.holdId,
+				day: start.toISOString().split('T')[0],
+				startMinute: Math.round((start.getTime() - dayStart.getTime()) / 60000),
+				endMinute: Math.round((end.getTime() - dayStart.getTime()) / 60000),
+			},
+		};
+	}
+
+	if (delta.kind === 'BookingConfirmed' || delta.kind === 'BookingCancelled') {
+		return {
+			...base,
+			type: delta.kind,
+			payload: {
+				bookingId: delta.bookingId,
+				start: new Date(delta.start).getTime(),
+				end: new Date(delta.end).getTime(),
+				holdId: delta.holdId,
+			},
+		};
+	}
+
+	return null;
+}

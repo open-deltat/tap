@@ -48,7 +48,7 @@ export default function DebugPage() {
 					resourceId: RESOURCE_ID,
 					from: '2025-01-01T00:00:00.000Z',
 					to: '2025-01-02T00:00:00.000Z',
-					slotDurationMinutes: 60,
+					slotDurationMs: 60 * 60000,
 				}),
 			});
 			const data = (await res.json()) as AvailabilityPostResponse;

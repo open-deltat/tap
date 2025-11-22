@@ -1,15 +1,15 @@
+import type { HoldId, ResourceId, TenantId } from '@tap/protocol';
 import type { HoldExpiredEvent } from '../../domain/events';
-import type { HoldId, ResourceId, TenantId } from '../../domain/ids';
 import { setBitRange } from '../../infrastructure/bitmap';
 import { createHoldExpiredEvent } from '../event-factory';
-import type { AllocatorState, HoldMetadata } from './types';
+import type { HoldMetadata, InventoryState } from './types';
 
 export type ExpiryManager = {
 	expireHolds: (now: number) => HoldExpiredEvent[];
 };
 
 export const createExpiryManager = (params: {
-	getState: (tenantId: TenantId, resourceId: ResourceId) => AllocatorState;
+	getState: (tenantId: TenantId, resourceId: ResourceId) => InventoryState;
 	holds: Map<HoldId, HoldMetadata>;
 }): ExpiryManager => {
 	return {

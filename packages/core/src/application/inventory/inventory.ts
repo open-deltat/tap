@@ -1,11 +1,4 @@
 import type {
-	BookingCancelledEvent,
-	BookingConfirmedEvent,
-	HoldExpiredEvent,
-	HoldPlacedEvent,
-	HoldReleasedEvent,
-} from '../../domain/events';
-import type {
 	BookingId,
 	DayKey,
 	HoldId,
@@ -13,13 +6,20 @@ import type {
 	ResourceId,
 	SessionId,
 	TenantId,
-} from '../../domain/ids';
+} from '@tap/protocol';
+import type {
+	BookingCancelledEvent,
+	BookingConfirmedEvent,
+	HoldExpiredEvent,
+	HoldPlacedEvent,
+	HoldReleasedEvent,
+} from '../../domain/events';
 import { createMutex } from '../../infrastructure/mutex';
 import { createBookingManager } from './booking-manager';
 import { createExpiryManager } from './expiry-manager';
 import { createHoldManager } from './hold-manager';
 import { createStateManager } from './state-manager';
-import type { AllocatorState, HoldMetadata } from './types';
+import type { HoldMetadata, InventoryState } from './types';
 
 export type Inventory = {
 	placeHold: (params: {
@@ -65,7 +65,7 @@ export type Inventory = {
 		{ success: true; event: HoldReleasedEvent } | { success: false }
 	>;
 	releaseHoldsForSession: (sessionId: SessionId) => Promise<HoldExpiredEvent[]>;
-	getState: (tenantId: TenantId, resourceId: ResourceId) => AllocatorState;
+	getState: (tenantId: TenantId, resourceId: ResourceId) => InventoryState;
 };
 
 export const createInventory = (): Inventory => {

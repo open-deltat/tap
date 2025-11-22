@@ -1,18 +1,18 @@
+import type { DayKey, HoldId, ResourceId, TenantId } from '@tap/protocol';
 import type {
 	BookingConfirmedEvent,
 	HoldPlacedEvent,
 	LedgerEvent,
 } from '../domain/events';
-import type { DayKey, HoldId, ResourceId, TenantId } from '../domain/ids';
 import { createBitmapDay, setBitRange } from '../infrastructure/bitmap';
 import type { Inventory } from './inventory/inventory';
-import type { AllocatorState } from './inventory/types';
+import type { InventoryState } from './inventory/types';
 
 export const replayEvents = async (
 	inventory: Inventory,
 	events: LedgerEvent[],
 ): Promise<void> => {
-	const stateMap = new Map<string, AllocatorState>();
+	const stateMap = new Map<string, InventoryState>();
 
 	for (const event of events) {
 		const stateKey = `${event.tenantId}:${event.resourceId}`;

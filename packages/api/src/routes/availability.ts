@@ -34,16 +34,15 @@ export async function handleAvailability(req: Request): Promise<Response> {
 			resourceId: body.resourceId,
 			from: fromDate,
 			to: toDate,
-			...(body.slotDurationMinutes
-				? { slotDurationMinutes: body.slotDurationMinutes }
-				: {}),
+			...(body.slotDurationMs ? { slotDurationMs: body.slotDurationMs } : {}),
 		});
 
 		const response: AvailabilityPostResponse = {
 			tenantId: body.tenantId,
 			resourceId: body.resourceId,
-			resolutionMinutes: body.slotDurationMinutes || 15,
-			asOfEventId: ulid(),
+			resolutionMs: body.slotDurationMs || 15 * 60000,
+			// TODO: Use the actual latest event ID from the core ledger
+			asOfEventId: ulid(), // <--- This generates a NEW ID every time, which is "newer" than any past event
 			freeSlots: slots.map((s) => ({
 				slotId: s.slotId,
 				resourceId: s.resourceId,

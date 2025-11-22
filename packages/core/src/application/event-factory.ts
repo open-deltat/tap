@@ -1,11 +1,3 @@
-import { ulid } from 'ulid';
-import type {
-	BookingCancelledEvent,
-	BookingConfirmedEvent,
-	HoldExpiredEvent,
-	HoldPlacedEvent,
-	HoldReleasedEvent,
-} from '../domain/events';
 import type {
 	BookingId,
 	DayKey,
@@ -14,7 +6,15 @@ import type {
 	Minute,
 	ResourceId,
 	TenantId,
-} from '../domain/ids';
+} from '@tap/protocol';
+import { ulid } from 'ulid';
+import type {
+	BookingCancelledEvent,
+	BookingConfirmedEvent,
+	HoldExpiredEvent,
+	HoldPlacedEvent,
+	HoldReleasedEvent,
+} from '../domain/events';
 
 export const createHoldPlacedEvent = (params: {
 	tenantId: TenantId;

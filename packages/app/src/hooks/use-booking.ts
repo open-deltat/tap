@@ -1,5 +1,14 @@
 'use client';
 
+import type {
+	BookPostRequestBody,
+	BookPostResponse,
+	HoldId,
+	ResourceId,
+	SessionId,
+	SlotId,
+	TenantId,
+} from '@tap/protocol';
 import { useState } from 'react';
 
 export type UseBookingOptions = {
@@ -12,6 +21,7 @@ export type UseBookingOptions = {
 
 export type UseBookingResult = {
 	confirmBooking: (params: {
+		slotId: string;
 		holdId: string;
 		sessionId: string;
 		customerName: string;
@@ -28,6 +38,7 @@ export const useBooking = (options: UseBookingOptions): UseBookingResult => {
 	const [error, setError] = useState<Error | null>(null);
 
 	const confirmBooking = async (params: {
+		slotId: string;
 		holdId: string;
 		sessionId: string;
 		customerName: string;
@@ -38,33 +49,37 @@ export const useBooking = (options: UseBookingOptions): UseBookingResult => {
 		setError(null);
 
 		try {
-			const response = await fetch(
-				`${apiBaseUrl}/v1/public/${tenantSlug}/${resourceSlug}/book`,
-				{
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'X-Tap-Session-Id': params.sessionId,
-					},
-					body: JSON.stringify({
-						holdId: params.holdId,
-						customerName: params.customerName,
-						customerEmail: params.customerEmail,
-						customerPhone: params.customerPhone,
-					}),
+			const body: BookPostRequestBody = {
+				tenantId: tenantSlug as TenantId,
+				resourceId: resourceSlug as ResourceId,
+				slotId: params.slotId as SlotId,
+				holdId: params.holdId as HoldId,
+				holdSessionId: params.sessionId as SessionId,
+				customer: {
+					name: params.customerName,
+					email: params.customerEmail,
+					phone: params.customerPhone,
 				},
-			);
+			};
+
+			const response = await fetch(`${apiBaseUrl}/book`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify(body),
+			});
 
 			if (!response.ok) {
 				const errorData = await response.json().catch(() => ({
 					error: response.statusText,
 				}));
 				throw new Error(
-					errorData.error || `Failed to book: ${response.status}`,
+					errorData.error?.message || `Failed to book: ${response.status}`,
 				);
 			}
 
-			const data = (await response.json()) as { bookingId: string };
+			const data = (await response.json()) as BookPostResponse;
 			onSuccess?.(data.bookingId);
 			return data.bookingId;
 		} catch (err) {

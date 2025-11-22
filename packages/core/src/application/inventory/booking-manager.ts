@@ -1,21 +1,21 @@
 import type {
-	BookingCancelledEvent,
-	BookingConfirmedEvent,
-} from '../../domain/events';
-import type {
 	BookingId,
 	HoldId,
 	ResourceId,
 	SessionId,
 	TenantId,
-} from '../../domain/ids';
+} from '@tap/protocol';
+import type {
+	BookingCancelledEvent,
+	BookingConfirmedEvent,
+} from '../../domain/events';
 import { getBit, setBitRange } from '../../infrastructure/bitmap';
 import { parseDayToUnixStartOfDayUTC } from '../../infrastructure/day-utils';
 import {
 	createBookingCancelledEvent,
 	createBookingConfirmedEvent,
 } from '../event-factory';
-import type { AllocatorState, HoldMetadata } from './types';
+import type { HoldMetadata, InventoryState } from './types';
 
 export type BookingManager = {
 	confirmBooking: (params: {
@@ -43,7 +43,7 @@ export type BookingManager = {
 };
 
 export const createBookingManager = (deps: {
-	getState: (tenantId: TenantId, resourceId: ResourceId) => AllocatorState;
+	getState: (tenantId: TenantId, resourceId: ResourceId) => InventoryState;
 	holds: Map<HoldId, HoldMetadata>;
 	withLock: (key: string) => Promise<() => void>;
 }): BookingManager => {

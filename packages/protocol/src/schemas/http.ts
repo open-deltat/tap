@@ -21,7 +21,7 @@ export const AvailabilityPostRequestBodySchema = z.object({
 	resourceId: ResourceIdSchema,
 	from: IsoDateTimeSchema,
 	to: IsoDateTimeSchema,
-	slotDurationMinutes: z.number().int().positive().optional(),
+	slotDurationMs: z.number().int().positive().optional(),
 });
 export type AvailabilityPostRequestBody = z.infer<
 	typeof AvailabilityPostRequestBodySchema
@@ -30,7 +30,7 @@ export type AvailabilityPostRequestBody = z.infer<
 export const AvailabilityPostResponseSchema = z.object({
 	tenantId: TenantIdSchema,
 	resourceId: ResourceIdSchema,
-	resolutionMinutes: z.number().int().positive(),
+	resolutionMs: z.number().int().positive(),
 	asOfEventId: CursorSchema,
 	freeSlots: z.array(AvailabilitySlotSchema),
 	pricing: z.array(SlotPricingSchema).optional(),

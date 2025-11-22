@@ -6,16 +6,15 @@ import {
 	type ResourceId,
 	type TenantId,
 } from '@tap/protocol';
-import { addDays, addMinutes, differenceInMinutes, startOfDay } from 'date-fns';
 import type { Offer } from '../../domain/models';
 import { getBit } from '../../infrastructure/bitmap';
-import type { AllocatorState } from '../inventory/types';
+import type { InventoryState } from '../inventory/types';
 
 // Default offer: Mon-Fri, 09:00-17:00
 const DEFAULT_OFFER: Offer = {
 	id: 'default',
-	tenantId: 'default' as unknown as TenantId,
-	resourceId: 'default' as unknown as ResourceId,
+	tenantId: 'default' as TenantId,
+	resourceId: 'default' as ResourceId,
 	daysOfWeek: [1, 2, 3, 4, 5],
 	startTime: '09:00',
 	endTime: '17:00',
@@ -40,12 +39,12 @@ export function calculateAvailability(params: {
 	inventoryState: (
 		tenantId: TenantId,
 		resourceId: ResourceId,
-	) => AllocatorState;
+	) => InventoryState;
 	tenantId: TenantId;
 	resourceId: ResourceId;
 	from: Date;
 	to: Date;
-	slotDurationMinutes?: number;
+	slotDurationMs?: number;
 }): AvailabilitySlot[] {
 	const {
 		inventoryState,
@@ -53,24 +52,32 @@ export function calculateAvailability(params: {
 		resourceId,
 		from,
 		to,
-		slotDurationMinutes = 15,
+		slotDurationMs = 15 * 60000,
 	} = params;
 
 	const slots: AvailabilitySlot[] = [];
 	const stateMap = inventoryState(tenantId, resourceId);
 	const offers = getOffersForResource(tenantId, resourceId);
 
-	// Iterate day by day
-	let currentDay = startOfDay(from);
-	const endDay = startOfDay(to);
+	// Strict UTC iteration
+	// 1. Start at UTC midnight of the 'from' date
+	//    Or specifically, just iterate over the days covered by [from, to] in UTC
+	const startUtc = Date.UTC(
+		from.getUTCFullYear(),
+		from.getUTCMonth(),
+		from.getUTCDate(),
+	);
+	const endUtc = Date.UTC(
+		to.getUTCFullYear(),
+		to.getUTCMonth(),
+		to.getUTCDate(),
+	);
 
-	// We iterate until the start of the day is past the end date
-	// but we must process the day containing 'to' if 'to' has time components
-	while (currentDay <= endDay) {
-		// Use simple string splitting for UTC DayKey to align with PlaceHold logic
-		// This avoids timezone shifts that happen with format(..., 'yyyy-MM-dd') if system is not UTC
+	// Iterate day by day (UTC)
+	for (let dayTs = startUtc; dayTs <= endUtc; dayTs += 86400000) {
+		const currentDay = new Date(dayTs);
 		const dayKey = currentDay.toISOString().split('T')[0] as DayKey;
-		const dayOfWeek = currentDay.getDay(); // 0=Sun, 1=Mon...
+		const dayOfWeek = currentDay.getUTCDay(); // 0=Sun, 1=Mon...
 
 		// Find applicable offers
 		const activeOffers = offers.filter((o) => o.daysOfWeek.includes(dayOfWeek));
@@ -79,35 +86,38 @@ export function calculateAvailability(params: {
 			const [startHour, startMin] = offer.startTime.split(':').map(Number);
 			const [endHour, endMin] = offer.endTime.split(':').map(Number);
 
-			const offerStart = new Date(currentDay);
+			// Construct offer start/end in strict UTC
+			const offerStart = new Date(dayTs);
 			offerStart.setUTCHours(startHour ?? 0, startMin ?? 0, 0, 0);
 
-			const offerEnd = new Date(currentDay);
+			const offerEnd = new Date(dayTs);
 			offerEnd.setUTCHours(endHour ?? 0, endMin ?? 0, 0, 0);
 
 			// Clamp to query range
-			// If offer ends before 'from', skip
-			if (offerEnd < from) continue;
-			// If offer starts after 'to', skip
-			if (offerStart > to) continue;
+			if (offerEnd.getTime() < from.getTime()) continue;
+			if (offerStart.getTime() > to.getTime()) continue;
 
 			// Calculate grid
-			// We want aligned slots from offerStart
-			// e.g. 9:00, 9:15, 9:30
+			let slotStart = new Date(offerStart);
 
-			let slotStart = offerStart;
-
-			while (differenceInMinutes(offerEnd, slotStart) >= slotDurationMinutes) {
-				const slotEnd = addMinutes(slotStart, slotDurationMinutes);
+			while (offerEnd.getTime() - slotStart.getTime() >= slotDurationMs) {
+				// Manual addMinutes to avoid local timezone jumps if using date-fns incorrectly,
+				// but date-fns addMinutes is generally safe for UTC if inputs are correct.
+				// Let's stick to UTC timestamps for safety.
+				const slotEnd = new Date(slotStart.getTime() + slotDurationMs);
 
 				// Check if slot is within query range
 				if (slotStart >= from && slotEnd <= to) {
 					// Check availability in bitmap
+					// Convert ms to minutes for bitmap check (ceil to be safe or floor?)
+					// If we request 15 mins (900000ms), we check 15 mins.
+					const durationMinutes = Math.ceil(slotDurationMs / 60000);
+
 					const isFree = checkBitmapAvailability(
 						stateMap,
 						dayKey,
 						slotStart,
-						slotDurationMinutes,
+						durationMinutes,
 					);
 
 					if (isFree) {
@@ -121,18 +131,16 @@ export function calculateAvailability(params: {
 					}
 				}
 
-				slotStart = addMinutes(slotStart, slotDurationMinutes);
+				slotStart = slotEnd;
 			}
 		}
-
-		currentDay = addDays(currentDay, 1);
 	}
 
 	return slots;
 }
 
 function checkBitmapAvailability(
-	stateMap: AllocatorState,
+	stateMap: InventoryState,
 	dayKey: DayKey,
 	slotStart: Date,
 	duration: number,
