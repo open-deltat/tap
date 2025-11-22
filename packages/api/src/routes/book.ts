@@ -1,22 +1,24 @@
 import {
-	type AvailabilityDeltaPayload,
-	type AvailabilityWsServerMessage,
 	type BookingConfirmedEvent,
-	type BookingId,
-	type BookPostRequestBody,
-	type BookPostResponse,
-	bookPostRequestBodySchema,
 	createAvailabilityTopic,
 	type DayKey,
-	type HoldId,
 	parseSlotId,
+	TapError,
+} from '@tap/core';
+import {
+	type AvailabilityDeltaPayload,
+	type AvailabilityWsServerMessage,
+	type BookingId,
+	type BookPostRequestBody,
+	BookPostRequestBodySchema,
+	type BookPostResponse,
+	type HoldId,
 	type ResourceId,
 	type SessionId,
 	type TenantId,
-} from '@tap/core';
-import { TapError } from '@tap/errors';
+} from '@tap/protocol';
 import type { Server } from 'bun';
-import { core } from '../allocator';
+import { core } from '../core';
 
 async function confirmBookingWithHold(
 	tenantId: TenantId,
@@ -51,7 +53,7 @@ export async function handleBook(
 ): Promise<Response> {
 	try {
 		const json = await req.json();
-		const result = bookPostRequestBodySchema.safeParse(json);
+		const result = BookPostRequestBodySchema.safeParse(json);
 
 		if (!result.success) {
 			const error = new TapError(

@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
+import { ULIDSchema } from '@tap/protocol';
 import { ulid } from 'ulid';
-import { ULIDSchema } from './ids';
 
 test('validates valid ULID', () => {
 	const validUlid = ulid();

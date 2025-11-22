@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll, beforeEach } from "bun:test";
 import server from "../src/index";
-import { resetCore } from "../src/allocator";
+import { resetCore } from "../src/core";
 import type { AvailabilityPostResponse, BookPostResponse, AvailabilityWsServerMessage, HoldWsServerMessage } from "@tap/core";
 
 const BASE_URL = `http://localhost:${server.port}`;
@@ -24,12 +24,13 @@ function waitForMessage(ws: WebSocket, predicate: (msg: any) => boolean, existin
 
       if (predicate(msg)) {
         ws.removeEventListener("message", handler);
+        clearTimeout(timer); // Clear timeout
         resolve(msg);
       }
     };
     ws.addEventListener("message", handler);
     // Timeout
-    setTimeout(() => {
+    const timer = setTimeout(() => {
         ws.removeEventListener("message", handler);
         console.log("Wait for message timed out for predicate:", predicate.toString());
         resolve(undefined);

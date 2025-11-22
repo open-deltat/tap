@@ -1,6 +1,4 @@
-import type { ErrorValue } from './error-values';
-
-export type { ErrorValue };
+import type { ErrorValue } from '@tap/protocol';
 
 export type ErrorCategory =
 	| 'CLIENT_VALIDATION'
@@ -10,30 +8,6 @@ export type ErrorCategory =
 	| 'INTEGRATION'
 	| 'SERVER'
 	| 'INTERNAL_INVARIANT';
-
-export type TAPError = {
-	errorValue: ErrorValue;
-	category: ErrorCategory;
-	httpStatus: number;
-	message: string;
-	details?: Record<string, unknown>;
-	correlationId: string;
-	tenantId?: string;
-	resourceId?: string;
-	bookingId?: string;
-	holdId?: string;
-	cause?: unknown;
-};
-
-export type APIErrorResponse = {
-	error: {
-		value: ErrorValue;
-		httpStatus: number;
-		message: string;
-		correlationId: string;
-		details?: Record<string, unknown>;
-	};
-};
 
 export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 

@@ -1,20 +1,25 @@
+import { createAvailabilityTopic, parseSlotId } from '@tap/core';
 import {
 	type AvailabilityDeltaPayload,
+	AvailabilityWsClientMessageSchema,
 	type AvailabilityWsServerMessage,
-	availabilityWsClientMessageSchema,
-	createAvailabilityTopic,
 	type DayKey,
 	type HoldId,
-	type HoldSessionId,
+	type SessionId as HoldSessionId,
+	HoldWsClientMessageSchema,
 	type HoldWsServerMessage,
-	holdWsClientMessageSchema,
-	parseSlotId,
 	type ResourceId,
 	type SlotId,
 	type TenantId,
-} from '@tap/core';
-import type { ServerWebSocket } from 'bun';
-import { core } from '../allocator';
+} from '@tap/protocol';
+import type { Server, ServerWebSocket } from 'bun';
+import { core } from '../core';
+
+let serverInstance: Server | undefined;
+
+export const setServer = (server: Server) => {
+	serverInstance = server;
+};
 
 export type WSData = {
 	type: 'availability' | 'hold';
@@ -110,7 +115,11 @@ export const websocketHandler = {
 							holdId,
 						} as AvailabilityDeltaPayload,
 					};
-					ws.publish(topic, JSON.stringify(message));
+					if (serverInstance) {
+						serverInstance.publish(topic, JSON.stringify(message));
+					} else {
+						ws.publish(topic, JSON.stringify(message));
+					}
 				} else {
 					const error: HoldWsServerMessage = {
 						type: 'hold.error',
@@ -130,7 +139,7 @@ export const websocketHandler = {
 		const str = typeof message === 'string' ? message : message.toString();
 
 		if (ws.data.type === 'availability') {
-			const result = availabilityWsClientMessageSchema.safeParse(
+			const result = AvailabilityWsClientMessageSchema.safeParse(
 				JSON.parse(str),
 			);
 			if (result.success) {
@@ -141,7 +150,7 @@ export const websocketHandler = {
 				}
 			}
 		} else if (ws.data.type === 'hold') {
-			const result = holdWsClientMessageSchema.safeParse(JSON.parse(str));
+			const result = HoldWsClientMessageSchema.safeParse(JSON.parse(str));
 			if (result.success) {
 				const msg = result.data;
 				if (msg.type === 'hold.release' && ws.data.holdId === msg.holdId) {
@@ -182,7 +191,11 @@ export const websocketHandler = {
 										end: ws.data.end,
 									},
 								};
-								ws.publish(topic, JSON.stringify(message));
+								if (serverInstance) {
+									serverInstance.publish(topic, JSON.stringify(message));
+								} else {
+									ws.publish(topic, JSON.stringify(message));
+								}
 							}
 							ws.close();
 						});
@@ -229,7 +242,11 @@ export const websocketHandler = {
 									end: ws.data.end,
 								},
 							};
-							ws.publish(topic, JSON.stringify(message));
+							if (serverInstance) {
+								serverInstance.publish(topic, JSON.stringify(message));
+							} else {
+								ws.publish(topic, JSON.stringify(message));
+							}
 						}
 					});
 			}

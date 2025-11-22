@@ -2,12 +2,15 @@ import type { ResourceId, SlotId, TenantId } from '@tap/core';
 import type { Server } from 'bun';
 import { handleAvailability } from './routes/availability';
 import { handleBook } from './routes/book';
-import { type WSData, websocketHandler } from './routes/websockets';
+import { setServer, type WSData, websocketHandler } from './routes/websockets';
 
 function handleHttp(
 	req: Request,
 	server: Server<WSData>,
 ): Promise<Response> | Response | undefined {
+	// Initialize server for websockets
+	setServer(server);
+
 	const url = new URL(req.url);
 	const method = req.method;
 	const pathname = url.pathname;

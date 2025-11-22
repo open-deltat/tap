@@ -21,7 +21,7 @@ import { createHoldManager } from './hold-manager';
 import { createStateManager } from './state-manager';
 import type { AllocatorState, HoldMetadata } from './types';
 
-export type Allocator = {
+export type Inventory = {
 	placeHold: (params: {
 		tenantId: TenantId;
 		resourceId: ResourceId;
@@ -68,7 +68,7 @@ export type Allocator = {
 	getState: (tenantId: TenantId, resourceId: ResourceId) => AllocatorState;
 };
 
-export const createAllocator = (): Allocator => {
+export const createInventory = (): Inventory => {
 	const { manager } = createStateManager();
 	const holds = new Map<HoldId, HoldMetadata>();
 	const withLock = createMutex();

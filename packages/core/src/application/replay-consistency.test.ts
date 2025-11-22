@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
 import type { LedgerEvent, ResourceId, TenantId } from '../domain/events';
-import { createAllocator } from './allocator/allocator';
+import { createInventory } from './inventory/inventory';
 import { replayEvents } from './replay';
 
 test('replay maintains consistency with events at identical timestamps', async () => {
-	const allocator = createAllocator();
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day = '2025-12-25';
@@ -44,16 +44,16 @@ test('replay maintains consistency with events at identical timestamps', async (
 		},
 	];
 
-	await replayEvents(allocator, events);
+	await replayEvents(inventory, events);
 
-	const state = allocator.getState(tenantId, resourceId);
+	const state = inventory.getState(tenantId, resourceId);
 	const dayState = state.get(day);
 
 	expect(dayState).toBeDefined();
 });
 
 test('replay handles out-of-order events correctly', async () => {
-	const allocator = createAllocator();
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day = '2025-12-25';
@@ -93,16 +93,16 @@ test('replay handles out-of-order events correctly', async () => {
 		},
 	];
 
-	await replayEvents(allocator, events);
+	await replayEvents(inventory, events);
 
-	const state = allocator.getState(tenantId, resourceId);
+	const state = inventory.getState(tenantId, resourceId);
 	const dayState = state.get(day);
 
 	expect(dayState).toBeDefined();
 });
 
 test('replay handles events across year boundary', async () => {
-	const allocator = createAllocator();
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 
@@ -149,16 +149,16 @@ test('replay handles events across year boundary', async () => {
 		},
 	];
 
-	await replayEvents(allocator, events);
+	await replayEvents(inventory, events);
 
-	const state = allocator.getState(tenantId, resourceId);
+	const state = inventory.getState(tenantId, resourceId);
 	expect(state.has(day1)).toBeTrue();
 	expect(state.has(day2)).toBeTrue();
 });
 
 test('replay maintains idempotency', async () => {
-	const allocator1 = createAllocator();
-	const allocator2 = createAllocator();
+	const inventory1 = createInventory();
+	const inventory2 = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day = '2025-12-25';
@@ -181,11 +181,11 @@ test('replay maintains idempotency', async () => {
 		},
 	];
 
-	await replayEvents(allocator1, events);
-	await replayEvents(allocator2, events);
+	await replayEvents(inventory1, events);
+	await replayEvents(inventory2, events);
 
-	const state1 = allocator1.getState(tenantId, resourceId);
-	const state2 = allocator2.getState(tenantId, resourceId);
+	const state1 = inventory1.getState(tenantId, resourceId);
+	const state2 = inventory2.getState(tenantId, resourceId);
 
 	const dayState1 = state1.get(day);
 	const dayState2 = state2.get(day);
@@ -200,7 +200,7 @@ test('replay maintains idempotency', async () => {
 });
 
 test('replay handles hold expiration correctly', async () => {
-	const allocator = createAllocator();
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day = '2025-12-25';
@@ -235,9 +235,9 @@ test('replay handles hold expiration correctly', async () => {
 		},
 	];
 
-	await replayEvents(allocator, events);
+	await replayEvents(inventory, events);
 
-	const state = allocator.getState(tenantId, resourceId);
+	const state = inventory.getState(tenantId, resourceId);
 	const dayState = state.get(day);
 
 	expect(dayState).toBeDefined();
@@ -254,7 +254,7 @@ test('replay handles hold expiration correctly', async () => {
 });
 
 test('replay handles booking cancellation correctly', async () => {
-	const allocator = createAllocator();
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day = '2025-12-25';
@@ -304,9 +304,9 @@ test('replay handles booking cancellation correctly', async () => {
 		},
 	];
 
-	await replayEvents(allocator, events);
+	await replayEvents(inventory, events);
 
-	const state = allocator.getState(tenantId, resourceId);
+	const state = inventory.getState(tenantId, resourceId);
 	const dayState = state.get(day);
 
 	expect(dayState).toBeDefined();

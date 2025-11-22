@@ -1,16 +1,15 @@
-import type { AvailabilityPostResponse } from '@tap/core';
+import { calculateAvailability, TapError } from '@tap/core';
 import {
-	availabilityPostRequestBodySchema,
-	calculateAvailability,
-} from '@tap/core';
-import { TapError } from '@tap/errors';
+	AvailabilityPostRequestBodySchema,
+	type AvailabilityPostResponse,
+} from '@tap/protocol';
 import { parseISO } from 'date-fns';
-import { core } from '../allocator';
+import { core } from '../core';
 
 export async function handleAvailability(req: Request): Promise<Response> {
 	try {
 		const json = await req.json();
-		const result = availabilityPostRequestBodySchema.safeParse(json);
+		const result = AvailabilityPostRequestBodySchema.safeParse(json);
 
 		if (!result.success) {
 			const error = new TapError(

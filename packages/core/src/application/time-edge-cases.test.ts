@@ -2,11 +2,11 @@ import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
 import type { BookingId, ResourceId, TenantId } from '../domain/ids';
 import { parseDayToUnixStartOfDayUTC } from '../infrastructure/day-utils';
-import { createAllocator } from './allocator/allocator';
 import { isWithinHorizon } from './horizon';
+import { createInventory } from './inventory/inventory';
 
-test('allocator handles bookings at midnight boundary', async () => {
-	const allocator = createAllocator();
+test('inventory handles bookings at midnight boundary', async () => {
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day = '2025-12-31';
@@ -17,7 +17,7 @@ test('allocator handles bookings at midnight boundary', async () => {
 	const nextDay = '2026-01-01';
 	const nextDayStartUnix = parseDayToUnixStartOfDayUTC(nextDay);
 
-	const holdResult1 = await allocator.placeHold({
+	const holdResult1 = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day,
@@ -28,7 +28,7 @@ test('allocator handles bookings at midnight boundary', async () => {
 
 	expect(holdResult1.success).toBeTrue();
 
-	const holdResult2 = await allocator.placeHold({
+	const holdResult2 = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day: nextDay,
@@ -40,8 +40,8 @@ test('allocator handles bookings at midnight boundary', async () => {
 	expect(holdResult2.success).toBeTrue();
 });
 
-test('allocator handles concurrent bookings at exact same time', async () => {
-	const allocator = createAllocator();
+test('inventory handles concurrent bookings at exact same time', async () => {
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId1 = ulid() as ResourceId;
 	const resourceId2 = ulid() as ResourceId;
@@ -49,7 +49,7 @@ test('allocator handles concurrent bookings at exact same time', async () => {
 	const exactTime = Date.now() + 60_000;
 
 	const [result1, result2] = await Promise.all([
-		allocator.placeHold({
+		inventory.placeHold({
 			tenantId,
 			resourceId: resourceId1,
 			day,
@@ -57,7 +57,7 @@ test('allocator handles concurrent bookings at exact same time', async () => {
 			endMinute: 660,
 			expiresAt: exactTime,
 		}),
-		allocator.placeHold({
+		inventory.placeHold({
 			tenantId,
 			resourceId: resourceId2,
 			day,
@@ -71,13 +71,13 @@ test('allocator handles concurrent bookings at exact same time', async () => {
 	expect(result2.success).toBeTrue();
 });
 
-test('allocator prevents double booking at exact same minute range', async () => {
-	const allocator = createAllocator();
+test('inventory prevents double booking at exact same minute range', async () => {
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day = '2025-12-25';
 
-	const holdResult1 = await allocator.placeHold({
+	const holdResult1 = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day,
@@ -93,7 +93,7 @@ test('allocator prevents double booking at exact same minute range', async () =>
 		const start = dayStartUnix + 600 * 60 * 1000;
 		const end = dayStartUnix + 660 * 60 * 1000;
 
-		const confirmEvent = await allocator.confirmBooking({
+		const confirmEvent = await inventory.confirmBooking({
 			tenantId,
 			resourceId,
 			holdId: holdResult1.holdId,
@@ -104,7 +104,7 @@ test('allocator prevents double booking at exact same minute range', async () =>
 
 		expect(confirmEvent).not.toBeNull();
 
-		const holdResult2 = await allocator.placeHold({
+		const holdResult2 = await inventory.placeHold({
 			tenantId,
 			resourceId,
 			day,
@@ -117,15 +117,15 @@ test('allocator prevents double booking at exact same minute range', async () =>
 	}
 });
 
-test('allocator handles hold expiration at exact boundary', async () => {
-	const allocator = createAllocator();
+test('inventory handles hold expiration at exact boundary', async () => {
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day = '2025-12-25';
 
 	const exactExpiryTime = Date.now() + 5000;
 
-	await allocator.placeHold({
+	await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day,
@@ -134,13 +134,13 @@ test('allocator handles hold expiration at exact boundary', async () => {
 		expiresAt: exactExpiryTime,
 	});
 
-	const expiredBefore = allocator.expireHolds(exactExpiryTime - 1);
+	const expiredBefore = inventory.expireHolds(exactExpiryTime - 1);
 	expect(expiredBefore.length).toBe(0);
 
-	const expiredAt = allocator.expireHolds(exactExpiryTime);
+	const expiredAt = inventory.expireHolds(exactExpiryTime);
 	expect(expiredAt.length).toBe(1);
 
-	const expiredAfter = allocator.expireHolds(exactExpiryTime + 1);
+	const expiredAfter = inventory.expireHolds(exactExpiryTime + 1);
 	expect(expiredAfter.length).toBe(0);
 });
 
@@ -167,8 +167,8 @@ test('isWithinHorizon handles year boundary correctly', () => {
 	expect(result2).toBe(true);
 });
 
-test('allocator handles bookings spanning month boundaries', async () => {
-	const allocator = createAllocator();
+test('inventory handles bookings spanning month boundaries', async () => {
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 
@@ -178,7 +178,7 @@ test('allocator handles bookings spanning month boundaries', async () => {
 	const dayStart1 = parseDayToUnixStartOfDayUTC(lastDayOfMonth);
 	const dayStart2 = parseDayToUnixStartOfDayUTC(firstDayOfNextMonth);
 
-	const holdResult1 = await allocator.placeHold({
+	const holdResult1 = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day: lastDayOfMonth,
@@ -189,7 +189,7 @@ test('allocator handles bookings spanning month boundaries', async () => {
 
 	expect(holdResult1.success).toBeTrue();
 
-	const holdResult2 = await allocator.placeHold({
+	const holdResult2 = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day: firstDayOfNextMonth,
@@ -201,15 +201,15 @@ test('allocator handles bookings spanning month boundaries', async () => {
 	expect(holdResult2.success).toBeTrue();
 });
 
-test('allocator handles very long booking ranges', async () => {
-	const allocator = createAllocator();
+test('inventory handles very long booking ranges', async () => {
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day = '2025-12-25';
 
 	const dayStartUnix = parseDayToUnixStartOfDayUTC(day);
 
-	const holdResult = await allocator.placeHold({
+	const holdResult = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day,
@@ -224,7 +224,7 @@ test('allocator handles very long booking ranges', async () => {
 		const start = dayStartUnix;
 		const end = dayStartUnix + 1440 * 60 * 1000;
 
-		const confirmEvent = await allocator.confirmBooking({
+		const confirmEvent = await inventory.confirmBooking({
 			tenantId,
 			resourceId,
 			holdId: holdResult.holdId,
@@ -237,13 +237,13 @@ test('allocator handles very long booking ranges', async () => {
 	}
 });
 
-test('allocator handles overlapping holds at boundaries', async () => {
-	const allocator = createAllocator();
+test('inventory handles overlapping holds at boundaries', async () => {
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day = '2025-12-25';
 
-	const holdResult1 = await allocator.placeHold({
+	const holdResult1 = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day,
@@ -254,7 +254,7 @@ test('allocator handles overlapping holds at boundaries', async () => {
 
 	expect(holdResult1.success).toBeTrue();
 
-	const holdResult2 = await allocator.placeHold({
+	const holdResult2 = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day,
@@ -265,7 +265,7 @@ test('allocator handles overlapping holds at boundaries', async () => {
 
 	expect(holdResult2.success).toBeFalse();
 
-	const holdResult3 = await allocator.placeHold({
+	const holdResult3 = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day,
@@ -277,14 +277,14 @@ test('allocator handles overlapping holds at boundaries', async () => {
 	expect(holdResult3.success).toBeTrue();
 });
 
-test('allocator state is consistent across day boundaries', async () => {
-	const allocator = createAllocator();
+test('inventory state is consistent across day boundaries', async () => {
+	const inventory = createInventory();
 	const tenantId = ulid() as TenantId;
 	const resourceId = ulid() as ResourceId;
 	const day1 = '2025-12-31';
 	const day2 = '2026-01-01';
 
-	const holdResult1 = await allocator.placeHold({
+	const holdResult1 = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day: day1,
@@ -293,7 +293,7 @@ test('allocator state is consistent across day boundaries', async () => {
 		expiresAt: Date.now() + 60_000,
 	});
 
-	const holdResult2 = await allocator.placeHold({
+	const holdResult2 = await inventory.placeHold({
 		tenantId,
 		resourceId,
 		day: day2,
@@ -305,7 +305,7 @@ test('allocator state is consistent across day boundaries', async () => {
 	expect(holdResult1.success).toBeTrue();
 	expect(holdResult2.success).toBeTrue();
 
-	const state = allocator.getState(tenantId, resourceId);
+	const state = inventory.getState(tenantId, resourceId);
 	expect(state.has(day1)).toBeTrue();
 	expect(state.has(day2)).toBeTrue();
 });

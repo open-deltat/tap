@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { ulid } from 'ulid';
-import { ResourceSchema, TenantSchema } from './schemas';
+import { ResourceSchema, TenantSchema } from './models';
 
 test('validates Tenant schema', () => {
 	const tenant = {

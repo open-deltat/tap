@@ -1,11 +1,17 @@
+import {
+	BookingIdSchema,
+	HoldIdSchema,
+	ResourceIdSchema,
+	TenantIdSchema,
+	ULIDSchema,
+} from '@tap/protocol';
 import { z } from 'zod';
-import { ULIDSchema } from './ids';
-import { ResourceSchema } from './schemas';
+import { ResourceSchema } from './models';
 
 const EventBase = z.object({
 	eventId: ULIDSchema,
-	tenantId: ULIDSchema,
-	resourceId: ULIDSchema,
+	tenantId: TenantIdSchema,
+	resourceId: ResourceIdSchema,
 	version: z.literal(1),
 	createdAt: z.number(),
 });
@@ -26,7 +32,7 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 	EventBase.extend({
 		type: z.literal('HoldPlaced'),
 		payload: z.object({
-			holdId: ULIDSchema,
+			holdId: HoldIdSchema,
 			day: z.string(),
 			startMinute: z.number().int().min(0).max(1439),
 			endMinute: z.number().int().min(1).max(1440),
@@ -37,7 +43,7 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 	EventBase.extend({
 		type: z.literal('HoldExpired'),
 		payload: z.object({
-			holdId: ULIDSchema,
+			holdId: HoldIdSchema,
 			day: z.string().optional(),
 			startMinute: z.number().int().min(0).max(1439).optional(),
 			endMinute: z.number().int().min(1).max(1440).optional(),
@@ -46,7 +52,7 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 	EventBase.extend({
 		type: z.literal('HoldReleased'),
 		payload: z.object({
-			holdId: ULIDSchema,
+			holdId: HoldIdSchema,
 			day: z.string().optional(),
 			startMinute: z.number().int().min(0).max(1439).optional(),
 			endMinute: z.number().int().min(1).max(1440).optional(),
@@ -55,8 +61,8 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 	EventBase.extend({
 		type: z.literal('BookingConfirmed'),
 		payload: z.object({
-			bookingId: ULIDSchema,
-			holdId: ULIDSchema,
+			bookingId: BookingIdSchema,
+			holdId: HoldIdSchema,
 			start: z.number(),
 			end: z.number(),
 			customerName: z.string().optional(),
@@ -69,7 +75,7 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 	EventBase.extend({
 		type: z.literal('BookingCancelled'),
 		payload: z.object({
-			bookingId: ULIDSchema,
+			bookingId: BookingIdSchema,
 			start: z.number().optional(),
 			end: z.number().optional(),
 		}),
