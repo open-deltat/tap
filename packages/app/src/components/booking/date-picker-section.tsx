@@ -29,11 +29,15 @@ export const DatePickerSection = ({
 			<div className="p-4 flex-1 flex flex-col">
 				<div className="flex items-center justify-between mb-4 px-2">
 					<h2 className="text-sm font-semibold tracking-tight">Select Date</h2>
-					{isLoading && (
+					<div
+						className={`transition-opacity duration-300 ${isLoading ? 'opacity-100' : 'opacity-0'}`}
+					>
 						<Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-					)}
+					</div>
 				</div>
-				<div className="flex-1 flex justify-center">
+				<div
+					className={`flex-1 flex justify-center transition-opacity duration-300 ${isLoading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}
+				>
 					<Calendar
 						mode="single"
 						selected={selectedDate}

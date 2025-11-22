@@ -1,8 +1,11 @@
 'use client';
 
 import { Calendar as CalendarIcon, Clock, Info } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { AvailabilitySlot } from '@/hooks/use-availability';
+import { cn } from '@/lib/utils';
 
 export type SlotsViewProps = {
 	selectedDate: Date | undefined;
@@ -72,38 +75,73 @@ export const SlotsView = ({
 						<p className="text-sm">Select a date to view availability</p>
 					</div>
 				) : isLoading ? (
-					<div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-						{Array.from({ length: 9 }).map((_, i) => (
-							<div
+					<div className="grid grid-cols-2 lg:grid-cols-3 gap-2 animate-in fade-in duration-500">
+						{Array.from({ length: 12 }).map((_, i) => (
+							<Skeleton
 								// biome-ignore lint/suspicious/noArrayIndexKey: static skeleton items
 								key={`skeleton-${i}`}
-								className="h-12 rounded-md bg-muted animate-pulse"
+								className="h-[38px] w-full rounded-md"
 							/>
 						))}
 					</div>
 				) : displayedSlots.length === 0 ? (
-					<div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+					<div className="h-full flex flex-col items-center justify-center text-muted-foreground animate-in fade-in zoom-in-95 duration-300">
 						<Clock className="h-10 w-10 mb-3 opacity-10" />
 						<p className="text-sm">No slots available in {timezone}</p>
 					</div>
 				) : (
-					<div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+					<div className="grid grid-cols-2 lg:grid-cols-3 gap-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
 						{displayedSlots.map((slot) => (
-							<Button
+							<SlotButton
 								key={`${slot.start}-${slot.end}`}
-								variant="outline"
-								disabled={!slot.available}
-								className="h-auto py-2 px-3 justify-center flex-col gap-0.5 hover:border-primary hover:bg-primary/5 hover:text-primary transition-all group disabled:opacity-30 disabled:hover:border-input disabled:hover:bg-transparent"
-								onClick={() => onSlotClick(slot)}
-							>
-								<span className="font-medium text-sm">
-									{formatTime(slot.start)}
-								</span>
-							</Button>
+								slot={slot}
+								formatTime={formatTime}
+								onClick={onSlotClick}
+							/>
 						))}
 					</div>
 				)}
 			</div>
 		</div>
+	);
+};
+
+const SlotButton = ({
+	slot,
+	formatTime,
+	onClick,
+}: {
+	slot: { start: number; end: number; available: boolean };
+	formatTime: (ts: number) => string;
+	onClick: (slot: AvailabilitySlot) => void;
+}) => {
+	const [isFlashing, setIsFlashing] = useState(false);
+	const prevAvailable = useRef(slot.available);
+
+	useEffect(() => {
+		if (prevAvailable.current === true && slot.available === false) {
+			setIsFlashing(true);
+			const timer = setTimeout(() => setIsFlashing(false), 500);
+			return () => clearTimeout(timer);
+		}
+		prevAvailable.current = slot.available;
+	}, [slot.available]);
+
+	return (
+		<Button
+			variant="outline"
+			disabled={!slot.available}
+			className={cn(
+				'h-auto py-2 px-3 justify-center flex-col gap-0.5 transition-all duration-500 group',
+				isFlashing
+					? 'bg-destructive/10 border-destructive text-destructive disabled:opacity-100'
+					: !slot.available
+						? 'opacity-30 hover:bg-transparent hover:border-input'
+						: 'hover:border-primary hover:bg-primary/5 hover:text-primary',
+			)}
+			onClick={() => onClick(slot)}
+		>
+			<span className="font-medium text-sm">{formatTime(slot.start)}</span>
+		</Button>
 	);
 };
