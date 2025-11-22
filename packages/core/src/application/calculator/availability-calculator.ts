@@ -15,7 +15,7 @@ import {
 } from 'date-fns';
 import type { Offer } from '../../domain/models';
 import { getBit } from '../../infrastructure/bitmap';
-import type { InventoryState } from '../inventory/types';
+import type { AllocatorState } from '../inventory/types';
 
 // Default offer: Mon-Fri, 09:00-17:00
 const DEFAULT_OFFER: Offer = {
@@ -46,7 +46,7 @@ export function calculateAvailability(params: {
 	inventoryState: (
 		tenantId: TenantId,
 		resourceId: ResourceId,
-	) => InventoryState;
+	) => AllocatorState;
 	tenantId: TenantId;
 	resourceId: ResourceId;
 	from: Date;
