@@ -32,13 +32,6 @@ const reset = async (): Promise<void> => {
 		console.log('🔄 Running migrations...');
 		await migrate(connString);
 
-		console.log('🌱 Seeding database...');
-		const { $ } = await import('bun');
-		const seedResult = await $`bun run seed`.cwd('../api');
-		if (seedResult.exitCode !== 0) {
-			throw new Error(`Seed process failed with code ${seedResult.exitCode}`);
-		}
-
 		console.log('\n✨ Database reset completed!');
 	} catch (error) {
 		console.error('❌ Reset failed:', error);
