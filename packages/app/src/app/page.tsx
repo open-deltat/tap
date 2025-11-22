@@ -55,7 +55,7 @@ export default function Home() {
 								resourceSlug={RESOURCE_ID}
 								durationMs={60 * 60000}
 								onBookingConfirmed={handleBookingConfirmed}
-								className="h-[450px] border-none shadow-none"
+								className="h-auto md:h-[500px] border-none shadow-none"
 								initialTimezone="Europe/Berlin"
 							/>
 						</div>
@@ -81,7 +81,7 @@ export default function Home() {
 								resourceSlug={RESOURCE_ID}
 								durationMs={60 * 60000}
 								onBookingConfirmed={handleBookingConfirmed}
-								className="h-[450px] border-none shadow-none"
+								className="h-auto md:h-[500px] border-none shadow-none"
 								initialTimezone="America/New_York"
 							/>
 						</div>
@@ -89,7 +89,7 @@ export default function Home() {
 				</div>
 
 				{/* Info & Logs Section */}
-				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[400px]">
+				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-[400px]">
 					<div className="lg:col-span-2">
 						<EventLogger
 							apiBaseUrl={apiBaseUrl}

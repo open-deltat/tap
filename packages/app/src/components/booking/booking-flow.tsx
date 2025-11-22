@@ -328,9 +328,12 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 
 		return (
 			<div
-				className={cn('flex flex-col md:flex-row gap-4 h-[500px]', className)}
+				className={cn(
+					'flex flex-col md:flex-row gap-4 h-auto md:h-[500px]',
+					className,
+				)}
 			>
-				<div className="w-full md:w-[320px] bg-background border rounded-xl shadow-sm overflow-hidden">
+				<div className="w-full md:w-[320px] bg-background border rounded-xl shadow-sm overflow-hidden shrink-0">
 					<DatePickerSection
 						selectedDate={selectedDate}
 						onSelectDate={(date) => {
@@ -345,7 +348,7 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 					/>
 				</div>
 
-				<div className="flex-1 relative bg-background border rounded-xl shadow-sm overflow-hidden flex flex-col">
+				<div className="flex-1 relative bg-background border rounded-xl shadow-sm overflow-hidden flex flex-col min-h-[300px] md:min-h-0">
 					{view === 'booking' && activeHold ? (
 						<BookingForm
 							activeHold={activeHold}
