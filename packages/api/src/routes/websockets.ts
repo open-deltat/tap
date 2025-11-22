@@ -137,11 +137,16 @@ export const websocketHandler = {
 
 	message(ws: ServerWebSocket<WSData>, message: string | Buffer) {
 		const str = typeof message === 'string' ? message : message.toString();
+		let json: unknown;
+		try {
+			json = JSON.parse(str);
+		} catch (_e) {
+			// Ignore invalid JSON
+			return;
+		}
 
 		if (ws.data.type === 'availability') {
-			const result = AvailabilityWsClientMessageSchema.safeParse(
-				JSON.parse(str),
-			);
+			const result = AvailabilityWsClientMessageSchema.safeParse(json);
 			if (result.success) {
 				const msg = result.data;
 				if (msg.type === 'stream.subscribe') {
@@ -150,7 +155,7 @@ export const websocketHandler = {
 				}
 			}
 		} else if (ws.data.type === 'hold') {
-			const result = HoldWsClientMessageSchema.safeParse(JSON.parse(str));
+			const result = HoldWsClientMessageSchema.safeParse(json);
 			if (result.success) {
 				const msg = result.data;
 				if (msg.type === 'hold.release' && ws.data.holdId === msg.holdId) {

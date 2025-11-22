@@ -66,7 +66,16 @@ export async function handleBook(
 
 		const body = result.data;
 
-		const { start, end } = parseSlotId(body.slotId);
+		let start: Date;
+		let end: Date;
+		try {
+			const parsed = parseSlotId(body.slotId);
+			start = parsed.start;
+			end = parsed.end;
+		} catch (err) {
+			const error = new TapError('TAP_INVALID_INPUT', 'Invalid slot ID format', err as Record<string, unknown>);
+			return error.toResponse();
+		}
 
 		let holdId = body.holdId;
 		let sessionId = body.holdSessionId;
