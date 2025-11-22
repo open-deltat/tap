@@ -3,12 +3,12 @@
 	"version": "0.1.0",
 	"description": "TAP v0.1 Core - Time Allocation Protocol foundation",
 	"type": "module",
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
 	"exports": {
 		".": {
-			"types": "./dist/index.d.ts",
-			"default": "./dist/index.js"
+			"types": "./src/index.ts",
+			"default": "./src/index.ts"
 		}
 	},
 	"scripts": {
@@ -25,10 +25,12 @@
 		"example:server": "bun run examples/server.ts"
 	},
 	"dependencies": {
-		"zod": "^3.23.8",
-		"ulid": "^2.3.0"
+		"date-fns": "^4.1.0",
+		"ulid": "^2.3.0",
+		"zod": "^4.1.12"
 	},
 	"devDependencies": {
-		"@types/bun": "latest"
+		"@types/bun": "latest",
+		"typescript": "^5.0.0"
 	}
 }

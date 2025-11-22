@@ -1,11 +1,6 @@
 'use client';
 
-import {
-	AlertCircle,
-	CheckCircle2,
-	Clock,
-	Loader2,
-} from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -47,6 +42,9 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 		onBookingConfirmed,
 		className,
 	}) => {
+		const nameId = React.useId();
+		const emailId = React.useId();
+		const phoneId = React.useId();
 		const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
 			() => new Date(),
 		);
@@ -163,30 +161,33 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 			}
 		}, [activeHold]);
 
-		const handleSlotClick = React.useCallback(async (slot: AvailabilitySlot) => {
-			if (!streamConnected) return;
+		const handleSlotClick = React.useCallback(
+			async (slot: AvailabilitySlot) => {
+				if (!streamConnected) return;
 
-			try {
-				const startDate = fromUnixTimestamp(slot.start);
-				const endDate = fromUnixTimestamp(slot.end);
+				try {
+					const startDate = fromUnixTimestamp(slot.start);
+					const endDate = fromUnixTimestamp(slot.end);
 
-				const req = {
-					day: getDayKey(startDate),
-					startMinute: getMinutesFromMidnight(startDate),
-					endMinute: getMinutesFromMidnight(endDate),
-				};
+					const req = {
+						day: getDayKey(startDate),
+						startMinute: getMinutesFromMidnight(startDate),
+						endMinute: getMinutesFromMidnight(endDate),
+					};
 
-				const holdId = await placeHoldWS(req);
-				setActiveHold({
-					holdId,
-					slot,
-					expiresAt: Date.now() + 60000, // Default 60s
-				});
-				setShowBookingForm(true);
-			} catch (e) {
-				console.error('Failed to place hold', e);
-			}
-		}, [streamConnected, placeHoldWS]);
+					const holdId = await placeHoldWS(req);
+					setActiveHold({
+						holdId,
+						slot,
+						expiresAt: Date.now() + 60000, // Default 60s
+					});
+					setShowBookingForm(true);
+				} catch (e) {
+					console.error('Failed to place hold', e);
+				}
+			},
+			[streamConnected, placeHoldWS],
+		);
 
 		const handleReleaseHold = React.useCallback(() => {
 			if (activeHold) {
@@ -196,24 +197,34 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 			}
 		}, [activeHold, releaseHoldWS]);
 
-		const handleBookingSubmit = React.useCallback(async (e: React.FormEvent) => {
-			e.preventDefault();
-			if (
-				!activeHold ||
-				!customerName.trim() ||
-				!customerEmail.trim() ||
-				!sessionId
-			) {
-				return;
-			}
-			await confirmBooking({
-				holdId: activeHold.holdId,
+		const handleBookingSubmit = React.useCallback(
+			async (e: React.FormEvent) => {
+				e.preventDefault();
+				if (
+					!activeHold ||
+					!customerName.trim() ||
+					!customerEmail.trim() ||
+					!sessionId
+				) {
+					return;
+				}
+				await confirmBooking({
+					holdId: activeHold.holdId,
+					sessionId,
+					customerName: customerName.trim(),
+					customerEmail: customerEmail.trim(),
+					customerPhone: customerPhone.trim() || undefined,
+				});
+			},
+			[
+				activeHold,
+				customerName,
+				customerEmail,
 				sessionId,
-				customerName: customerName.trim(),
-				customerEmail: customerEmail.trim(),
-				customerPhone: customerPhone.trim() || undefined,
-			});
-		}, [activeHold, customerName, customerEmail, sessionId, confirmBooking, customerPhone]);
+				confirmBooking,
+				customerPhone,
+			],
+		);
 
 		const formatTime = (timestamp: number): string => {
 			const date = fromUnixTimestamp(timestamp);
@@ -326,10 +337,14 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 
 										<form onSubmit={handleBookingSubmit} className="space-y-4">
 											<div>
-												<label className="block text-sm font-medium mb-1">
+												<label
+													htmlFor={nameId}
+													className="block text-sm font-medium mb-1"
+												>
 													Name <span className="text-destructive">*</span>
 												</label>
 												<input
+													id={nameId}
 													type="text"
 													required
 													value={customerName}
@@ -341,10 +356,14 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 											</div>
 
 											<div>
-												<label className="block text-sm font-medium mb-1">
+												<label
+													htmlFor={emailId}
+													className="block text-sm font-medium mb-1"
+												>
 													Email <span className="text-destructive">*</span>
 												</label>
 												<input
+													id={emailId}
 													type="email"
 													required
 													value={customerEmail}
@@ -356,13 +375,17 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 											</div>
 
 											<div>
-												<label className="block text-sm font-medium mb-1">
+												<label
+													htmlFor={phoneId}
+													className="block text-sm font-medium mb-1"
+												>
 													Phone{' '}
 													<span className="text-muted-foreground">
 														(optional)
 													</span>
 												</label>
 												<input
+													id={phoneId}
 													type="tel"
 													value={customerPhone}
 													onChange={(e) => setCustomerPhone(e.target.value)}
@@ -464,6 +487,5 @@ export const EnhancedCalendar = React.memo<EnhancedCalendarProps>(
 		);
 	},
 );
-
 
 EnhancedCalendar.displayName = 'EnhancedCalendar';

@@ -1,4 +1,5 @@
 export * from './application/allocator';
+export * from './application/calculator/availability-calculator';
 export * from './application/event-factory';
 export * from './application/horizon';
 export * from './application/offer-availability';

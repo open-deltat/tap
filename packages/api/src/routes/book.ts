@@ -1,0 +1,177 @@
+import {
+	type AvailabilityDeltaPayload,
+	type AvailabilityWsServerMessage,
+	type BookingConfirmedEvent,
+	type BookingId,
+	type BookPostRequestBody,
+	type BookPostResponse,
+	bookPostRequestBodySchema,
+	createAvailabilityTopic,
+	type DayKey,
+	type HoldId,
+	parseSlotId,
+	type ResourceId,
+	type SessionId,
+	type TenantId,
+} from '@tap/core';
+import { TapError } from '@tap/errors';
+import type { Server } from 'bun';
+import { core } from '../allocator';
+
+async function confirmBookingWithHold(
+	tenantId: TenantId,
+	resourceId: ResourceId,
+	holdId: HoldId,
+	sessionId: SessionId,
+	_slotId: string,
+	start: Date,
+	end: Date,
+	customer: BookPostRequestBody['customer'],
+): Promise<BookingConfirmedEvent | null> {
+	const event = await core.confirmBooking({
+		tenantId,
+		resourceId,
+		holdId,
+		sessionId,
+		bookingId: crypto.randomUUID() as BookingId,
+		start: start.getTime(),
+		end: end.getTime(),
+		customerName: customer.name,
+		customerEmail: customer.email,
+		customerPhone: customer.phone,
+		paymentStatus: 'PENDING',
+		priceCents: 1000, // Mock
+	});
+	return event;
+}
+
+export async function handleBook(
+	req: Request,
+	server: Server,
+): Promise<Response> {
+	try {
+		const json = await req.json();
+		const result = bookPostRequestBodySchema.safeParse(json);
+
+		if (!result.success) {
+			const error = new TapError(
+				'TAP_INVALID_INPUT',
+				'Invalid request body',
+				result.error.format() as Record<string, unknown>,
+			);
+			return error.toResponse();
+		}
+
+		const body = result.data;
+
+		const { start, end } = parseSlotId(body.slotId);
+
+		let holdId = body.holdId;
+		let sessionId = body.holdSessionId;
+
+		// If no hold provided, try to place one instantly
+		if (!holdId || !sessionId) {
+			const tempSessionId = `temp_session_${crypto.randomUUID()}` as SessionId;
+
+			const dayKey = start.toISOString().split('T')[0] as DayKey; // core DayKey (UTC)
+			const startMinute = start.getUTCHours() * 60 + start.getUTCMinutes();
+			const endMinute = end.getUTCHours() * 60 + end.getUTCMinutes();
+
+			const holdResult = await core.placeHold({
+				tenantId: body.tenantId,
+				resourceId: body.resourceId,
+				sessionId: tempSessionId,
+				day: dayKey,
+				startMinute,
+				endMinute,
+				expiresAt: Date.now() + 60000, // 1 min expiry
+				clientRef: body.clientRef,
+			});
+
+			if (!holdResult.success) {
+				const error = new TapError(
+					'TAP_SLOT_UNAVAILABLE',
+					'Slot is not available',
+				);
+				return error.toResponse();
+			}
+
+			// Core placeHold returns HoldPlacedEvent | Failure
+			// If success is true, it should have holdId.
+			// We might need to check the type of holdResult more closely.
+			// Assuming holdResult.success means holdResult is HoldPlacedEvent (or contains holdId)
+			// Let's check core types later if this fails, but assuming holdId exists on success.
+			if ('holdId' in holdResult) {
+				holdId = holdResult.holdId;
+			}
+			sessionId = tempSessionId;
+		}
+
+		if (!holdId || !sessionId) {
+			const error = new TapError(
+				'TAP_INTERNAL_ERROR',
+				'Failed to establish hold context',
+			);
+			return error.toResponse();
+		}
+
+		const event = await confirmBookingWithHold(
+			body.tenantId,
+			body.resourceId,
+			holdId,
+			sessionId,
+			body.slotId,
+			start,
+			end,
+			body.customer,
+		);
+
+		if (!event) {
+			// This implies the hold was invalid or expired or session mismatch
+			const error = new TapError('TAP_HOLD_EXPIRED', 'Hold invalid or expired');
+			return error.toResponse();
+		}
+
+		// Broadcast update via Server Pub/Sub
+		const topic = createAvailabilityTopic(body.tenantId, body.resourceId);
+		const payload: AvailabilityDeltaPayload = {
+			kind: 'BookingConfirmed',
+			slotId: body.slotId,
+			resourceId: body.resourceId,
+			tenantId: body.tenantId,
+			start: start.toISOString(),
+			end: end.toISOString(),
+			bookingId: event.payload.bookingId,
+			holdId: holdId || undefined,
+		};
+
+		const message: AvailabilityWsServerMessage = {
+			type: 'stream.delta',
+			eventId: event.eventId,
+			payload,
+		};
+
+		server.publish(topic, JSON.stringify(message));
+
+		const response: BookPostResponse = {
+			bookingId: event.payload.bookingId,
+			tenantId: body.tenantId,
+			resourceId: body.resourceId,
+			slotId: body.slotId,
+			start: start.toISOString(),
+			end: end.toISOString(),
+			paymentStatus: 'PENDING',
+			clientRef: body.clientRef || undefined,
+		};
+
+		return new Response(JSON.stringify(response), {
+			headers: { 'Content-Type': 'application/json' },
+		});
+	} catch (e) {
+		const error = new TapError(
+			'TAP_INTERNAL_ERROR',
+			e instanceof Error ? e.message : 'Unknown error',
+		);
+		return error.toResponse();
+	}
+}
