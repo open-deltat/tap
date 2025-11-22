@@ -4,7 +4,7 @@ import { ERROR_META } from './error-meta';
 export class TapError extends Error {
 	public readonly code: ErrorValue;
 	public readonly httpStatus: number;
-	public readonly details?: Record<string, unknown>;
+	public readonly details: Record<string, unknown> | undefined;
 	public readonly correlationId: string;
 
 	constructor(

@@ -5,7 +5,7 @@ export * from './application/inventory';
 export * from './application/offer-availability';
 export * from './application/replay';
 export * from './domain/events';
-export * from './domain/types';
+export * from './domain/models';
 export * from './errors';
 export * from './infrastructure/bitmap';
 export * from './infrastructure/day-utils';

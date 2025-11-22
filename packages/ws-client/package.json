@@ -3,12 +3,12 @@
 	"version": "0.1.0",
 	"description": "TAP v0.1 WebSocket Client - Framework-agnostic client for TAP availability and bookings",
 	"type": "module",
-	"main": "./dist/packages/ws-client/src/index.js",
-	"types": "./dist/packages/ws-client/src/index.d.ts",
+	"main": "./src/index.ts",
+	"types": "./src/index.ts",
 	"exports": {
 		".": {
-			"types": "./dist/packages/ws-client/src/index.d.ts",
-			"default": "./dist/packages/ws-client/src/index.js"
+			"types": "./src/index.ts",
+			"default": "./src/index.ts"
 		}
 	},
 	"scripts": {

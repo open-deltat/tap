@@ -1,21 +1,15 @@
-import {
-	BookingIdSchema,
-	HoldIdSchema,
-	ResourceIdSchema,
-	TenantIdSchema,
-	ULIDSchema,
-} from '@tap/protocol';
+import { type ResourceId, type TenantId, ULIDSchema } from '@tap/protocol';
 import { z } from 'zod';
 
 export const TenantSchema = z.object({
-	id: TenantIdSchema,
+	id: ULIDSchema.transform((v) => v as TenantId),
 	name: z.string(),
 	slug: z.string().min(3),
 });
 
 export const ResourceSchema = z.object({
-	id: ResourceIdSchema,
-	tenantId: TenantIdSchema,
+	id: ULIDSchema.transform((v) => v as ResourceId),
+	tenantId: ULIDSchema.transform((v) => v as TenantId),
 	name: z.string(),
 	slug: z.string().min(3),
 	timezone: z.string(),
@@ -27,8 +21,8 @@ export const ResourceSchema = z.object({
 
 export const OfferSchema = z.object({
 	id: ULIDSchema,
-	tenantId: TenantIdSchema,
-	resourceId: ResourceIdSchema,
+	tenantId: ULIDSchema.transform((v) => v as TenantId),
+	resourceId: ULIDSchema.transform((v) => v as ResourceId),
 	daysOfWeek: z.array(z.number().int().min(0).max(6)),
 	startTime: z.string(),
 	endTime: z.string(),
@@ -37,10 +31,10 @@ export const OfferSchema = z.object({
 });
 
 export const BookingSchema = z.object({
-	id: BookingIdSchema,
-	tenantId: TenantIdSchema,
-	resourceId: ResourceIdSchema,
-	holdId: HoldIdSchema.optional(),
+	id: ULIDSchema,
+	tenantId: ULIDSchema.transform((v) => v as TenantId),
+	resourceId: ULIDSchema.transform((v) => v as ResourceId),
+	holdId: ULIDSchema.optional(),
 	start: z.number(),
 	end: z.number(),
 	status: z.enum(['CONFIRMED', 'CANCELLED']).default('CONFIRMED'),
@@ -55,9 +49,9 @@ export const BookingSchema = z.object({
 });
 
 export const HoldSchema = z.object({
-	id: HoldIdSchema,
-	tenantId: TenantIdSchema,
-	resourceId: ResourceIdSchema,
+	id: ULIDSchema,
+	tenantId: ULIDSchema.transform((v) => v as TenantId),
+	resourceId: ULIDSchema.transform((v) => v as ResourceId),
 	day: z.string(),
 	startMinute: z.number().int().min(0).max(1439),
 	endMinute: z.number().int().min(1).max(1440),

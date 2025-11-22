@@ -14,6 +14,11 @@ export default function Home() {
 	return (
 		<main className="container mx-auto p-8">
 			<h1 className="text-3xl font-bold mb-8">TAP Booking Demo</h1>
+			<div className="mb-4">
+				<a href="/debug" className="text-blue-500 hover:underline">
+					Go to API Debugger
+				</a>
+			</div>
 			<EnhancedCalendar
 				apiBaseUrl={apiBaseUrl}
 				tenantSlug="demo-tenant"

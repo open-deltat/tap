@@ -1,25 +1,20 @@
-import { createAvailabilityTopic, parseSlotId } from '@tap/core';
 import {
 	type AvailabilityDeltaPayload,
 	AvailabilityWsClientMessageSchema,
 	type AvailabilityWsServerMessage,
+	createAvailabilityTopic,
 	type DayKey,
 	type HoldId,
 	type SessionId as HoldSessionId,
 	HoldWsClientMessageSchema,
 	type HoldWsServerMessage,
+	parseSlotId,
 	type ResourceId,
 	type SlotId,
 	type TenantId,
 } from '@tap/protocol';
-import type { Server, ServerWebSocket } from 'bun';
+import type { ServerWebSocket } from 'bun';
 import { core } from '../core';
-
-let serverInstance: Server | undefined;
-
-export const setServer = (server: Server) => {
-	serverInstance = server;
-};
 
 export type WSData = {
 	type: 'availability' | 'hold';
@@ -38,8 +33,8 @@ export const websocketHandler = {
 			// Wait for subscribe
 			const hello: AvailabilityWsServerMessage = {
 				type: 'stream.hello',
-				resourceId: 'pending' as ResourceId, // Cast pending as ResourceId or change schema to allow pending. Schema allows literal 'pending'.
-				tenantId: 'pending' as TenantId,
+				resourceId: null,
+				tenantId: null,
 				cursor: crypto.randomUUID(),
 			};
 			ws.send(JSON.stringify(hello));
@@ -70,9 +65,6 @@ export const websocketHandler = {
 				});
 
 				if (result.success) {
-					// If result.success is true, we assume holdId is present in the result.
-					// We cast result to any to access holdId as the strict type might be a union where success=true implies holdId.
-					// In a stricter world, we would narrow the type properly.
 					const successResult = result as {
 						holdId: HoldId;
 						event: { eventId: string };
@@ -100,7 +92,7 @@ export const websocketHandler = {
 					};
 					ws.send(JSON.stringify(confirmed));
 
-					// Broadcast HoldPlaced
+					// Broadcast HoldPlaced via WS publish (broadcasts to all SUBSCRIBERS of topic, excluding self)
 					const topic = createAvailabilityTopic(tenantId, resourceId);
 					const message: AvailabilityWsServerMessage = {
 						type: 'stream.delta',
@@ -115,11 +107,7 @@ export const websocketHandler = {
 							holdId,
 						} as AvailabilityDeltaPayload,
 					};
-					if (serverInstance) {
-						serverInstance.publish(topic, JSON.stringify(message));
-					} else {
-						ws.publish(topic, JSON.stringify(message));
-					}
+					ws.publish(topic, JSON.stringify(message));
 				} else {
 					const error: HoldWsServerMessage = {
 						type: 'hold.error',
@@ -141,7 +129,6 @@ export const websocketHandler = {
 		try {
 			json = JSON.parse(str);
 		} catch (_e) {
-			// Ignore invalid JSON
 			return;
 		}
 
@@ -168,7 +155,6 @@ export const websocketHandler = {
 						})
 						.then((res) => {
 							if (res.success) {
-								// Broadcast HoldReleased
 								if (
 									!ws.data.tenantId ||
 									!ws.data.resourceId ||
@@ -196,11 +182,7 @@ export const websocketHandler = {
 										end: ws.data.end,
 									},
 								};
-								if (serverInstance) {
-									serverInstance.publish(topic, JSON.stringify(message));
-								} else {
-									ws.publish(topic, JSON.stringify(message));
-								}
+								ws.publish(topic, JSON.stringify(message));
 							}
 							ws.close();
 						});
@@ -247,11 +229,7 @@ export const websocketHandler = {
 									end: ws.data.end,
 								},
 							};
-							if (serverInstance) {
-								serverInstance.publish(topic, JSON.stringify(message));
-							} else {
-								ws.publish(topic, JSON.stringify(message));
-							}
+							ws.publish(topic, JSON.stringify(message));
 						}
 					});
 			}

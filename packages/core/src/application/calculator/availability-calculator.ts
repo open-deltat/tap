@@ -1,27 +1,27 @@
 import {
+	type AvailabilitySlot,
+	createSlotId,
+	type DayKey,
+	type Minute,
+	type ResourceId,
+	type TenantId,
+} from '@tap/protocol';
+import {
 	addDays,
 	addMinutes,
 	differenceInMinutes,
 	format,
 	startOfDay,
 } from 'date-fns';
-import {
-	createSlotId,
-	type DayKey,
-	type Minute,
-	type ResourceId,
-	type TenantId,
-} from '../../domain/ids';
-import type { AvailabilitySlot } from '../../domain/protocol';
-import type { Offer } from '../../domain/schemas';
+import type { Offer } from '../../domain/models';
 import { getBit } from '../../infrastructure/bitmap';
-import type { AllocatorState } from '../allocator/types';
+import type { InventoryState } from '../inventory/types';
 
 // Default offer: Mon-Fri, 09:00-17:00
 const DEFAULT_OFFER: Offer = {
 	id: 'default',
-	tenantId: 'default',
-	resourceId: 'default',
+	tenantId: 'default' as unknown as TenantId,
+	resourceId: 'default' as unknown as ResourceId,
 	daysOfWeek: [1, 2, 3, 4, 5],
 	startTime: '09:00',
 	endTime: '17:00',
@@ -43,10 +43,10 @@ function getOffersForResource(
 }
 
 export function calculateAvailability(params: {
-	allocatorState: (
+	inventoryState: (
 		tenantId: TenantId,
 		resourceId: ResourceId,
-	) => AllocatorState;
+	) => InventoryState;
 	tenantId: TenantId;
 	resourceId: ResourceId;
 	from: Date;
@@ -54,7 +54,7 @@ export function calculateAvailability(params: {
 	slotDurationMinutes?: number;
 }): AvailabilitySlot[] {
 	const {
-		allocatorState,
+		inventoryState,
 		tenantId,
 		resourceId,
 		from,
@@ -63,7 +63,7 @@ export function calculateAvailability(params: {
 	} = params;
 
 	const slots: AvailabilitySlot[] = [];
-	const stateMap = allocatorState(tenantId, resourceId);
+	const stateMap = inventoryState(tenantId, resourceId);
 	const offers = getOffersForResource(tenantId, resourceId);
 
 	// Iterate day by day
@@ -73,7 +73,9 @@ export function calculateAvailability(params: {
 	// We iterate until the start of the day is past the end date
 	// but we must process the day containing 'to' if 'to' has time components
 	while (currentDay <= endDay) {
-		const dayKey = format(currentDay, 'yyyy-MM-dd') as DayKey;
+		// Use simple string splitting for UTC DayKey to align with PlaceHold logic
+		// This avoids timezone shifts that happen with format(..., 'yyyy-MM-dd') if system is not UTC
+		const dayKey = currentDay.toISOString().split('T')[0] as DayKey;
 		const dayOfWeek = currentDay.getDay(); // 0=Sun, 1=Mon...
 
 		// Find applicable offers
@@ -84,10 +86,10 @@ export function calculateAvailability(params: {
 			const [endHour, endMin] = offer.endTime.split(':').map(Number);
 
 			const offerStart = new Date(currentDay);
-			offerStart.setUTCHours(startHour, startMin, 0, 0);
+			offerStart.setUTCHours(startHour ?? 0, startMin ?? 0, 0, 0);
 
 			const offerEnd = new Date(currentDay);
-			offerEnd.setUTCHours(endHour, endMin, 0, 0);
+			offerEnd.setUTCHours(endHour ?? 0, endMin ?? 0, 0, 0);
 
 			// Clamp to query range
 			// If offer ends before 'from', skip
@@ -136,7 +138,7 @@ export function calculateAvailability(params: {
 }
 
 function checkBitmapAvailability(
-	stateMap: AllocatorState,
+	stateMap: InventoryState,
 	dayKey: DayKey,
 	slotStart: Date,
 	duration: number,

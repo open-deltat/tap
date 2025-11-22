@@ -9,9 +9,11 @@ import { core } from '../core';
 export async function handleAvailability(req: Request): Promise<Response> {
 	try {
 		const json = await req.json();
+		console.log('Availability Request:', JSON.stringify(json, null, 2));
 		const result = AvailabilityPostRequestBodySchema.safeParse(json);
 
 		if (!result.success) {
+			console.error('Validation Error:', result.error);
 			const error = new TapError(
 				'TAP_INVALID_INPUT',
 				'Invalid request body',
@@ -26,7 +28,7 @@ export async function handleAvailability(req: Request): Promise<Response> {
 		const toDate = parseISO(body.to);
 
 		const slots = calculateAvailability({
-			allocatorState: core.getState,
+			inventoryState: core.getState,
 			tenantId: body.tenantId,
 			resourceId: body.resourceId,
 			from: fromDate,
@@ -58,6 +60,7 @@ export async function handleAvailability(req: Request): Promise<Response> {
 			headers: { 'Content-Type': 'application/json' },
 		});
 	} catch (e) {
+		console.error('Internal Error in handleAvailability:', e);
 		const error = new TapError(
 			'TAP_INTERNAL_ERROR',
 			e instanceof Error ? e.message : 'Unknown error',

@@ -3,7 +3,7 @@
 	"version": "0.1.0",
 	"private": true,
 	"scripts": {
-		"dev": "next dev",
+		"dev": "next dev -p 3001",
 		"build": "next build",
 		"start": "next start",
 		"lint": "eslint",
@@ -24,6 +24,7 @@
 		"react-dom": "19.2.0",
 		"tailwind-merge": "^3.4.0",
 		"@tap/core": "workspace:*",
+		"@tap/protocol": "workspace:*",
 		"@tap/ws-client": "workspace:*"
 	},
 	"devDependencies": {

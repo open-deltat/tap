@@ -1,10 +1,4 @@
-import {
-	type BookingConfirmedEvent,
-	createAvailabilityTopic,
-	type DayKey,
-	parseSlotId,
-	TapError,
-} from '@tap/core';
+import { type BookingConfirmedEvent, type DayKey, TapError } from '@tap/core';
 import {
 	type AvailabilityDeltaPayload,
 	type AvailabilityWsServerMessage,
@@ -12,7 +6,9 @@ import {
 	type BookPostRequestBody,
 	BookPostRequestBodySchema,
 	type BookPostResponse,
+	createAvailabilityTopic,
 	type HoldId,
+	parseSlotId,
 	type ResourceId,
 	type SessionId,
 	type TenantId,
@@ -73,7 +69,11 @@ export async function handleBook(
 			start = parsed.start;
 			end = parsed.end;
 		} catch (err) {
-			const error = new TapError('TAP_INVALID_INPUT', 'Invalid slot ID format', err as Record<string, unknown>);
+			const error = new TapError(
+				'TAP_INVALID_INPUT',
+				'Invalid slot ID format',
+				err as Record<string, unknown>,
+			);
 			return error.toResponse();
 		}
 

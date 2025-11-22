@@ -5,11 +5,11 @@ import type {
 } from '../domain/events';
 import type { DayKey, HoldId, ResourceId, TenantId } from '../domain/ids';
 import { createBitmapDay, setBitRange } from '../infrastructure/bitmap';
-import type { Allocator } from './allocator/allocator';
-import type { AllocatorState } from './allocator/types';
+import type { Inventory } from './inventory/inventory';
+import type { AllocatorState } from './inventory/types';
 
 export const replayEvents = async (
-	allocator: Allocator,
+	inventory: Inventory,
 	events: LedgerEvent[],
 ): Promise<void> => {
 	const stateMap = new Map<string, AllocatorState>();
@@ -109,7 +109,7 @@ export const replayEvents = async (
 
 	for (const [stateKey, state] of stateMap) {
 		const [tenantId, resourceId] = stateKey.split(':');
-		const currentState = allocator.getState(
+		const currentState = inventory.getState(
 			tenantId as TenantId,
 			resourceId as ResourceId,
 		);
