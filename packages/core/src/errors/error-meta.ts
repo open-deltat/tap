@@ -1,5 +1,4 @@
 import type { ErrorValue } from '@tap/protocol';
-import { ERROR_VALUES } from '@tap/protocol'; // Assuming ERROR_VALUES object/map is available or we construct it
 import type { ErrorCategory } from './types';
 
 // If ERROR_VALUES from protocol is an array, we might need to map it.
