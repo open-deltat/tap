@@ -1,9 +1,9 @@
 'use client';
 
+import { format as formatTz } from 'date-fns-tz'; // Use timezone aware format
 import { Calendar as CalendarIcon, Clock, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { AvailabilitySlot } from '@/hooks/use-availability';
-import { format } from '@/lib/timezone';
 
 export type SlotsViewProps = {
 	selectedDate: Date | undefined;
@@ -11,7 +11,7 @@ export type SlotsViewProps = {
 	error: Error | null;
 	displayedSlots: { start: number; end: number; available: boolean }[];
 	onSlotClick: (slot: AvailabilitySlot) => void;
-	formatTime: (timestamp: number) => string;
+	timezone: string; // Added timezone prop
 };
 
 export const SlotsView = ({
@@ -20,8 +20,17 @@ export const SlotsView = ({
 	error,
 	displayedSlots,
 	onSlotClick,
-	formatTime,
+	timezone,
 }: SlotsViewProps) => {
+	// Format helper using the selected timezone
+	const formatTime = (timestamp: number) => {
+		return formatTz(new Date(timestamp), 'h:mm a', { timeZone: timezone });
+	};
+
+	const formatDateTitle = (date: Date) => {
+		return formatTz(date, 'EEEE, MMMM d', { timeZone: timezone });
+	};
+
 	return (
 		<div className="flex-1 flex flex-col h-full bg-background">
 			<div className="p-4 border-b bg-background sticky top-0 z-10">
@@ -29,14 +38,16 @@ export const SlotsView = ({
 					{selectedDate ? (
 						<>
 							<CalendarIcon className="h-4 w-4 text-muted-foreground" />
-							{format(selectedDate, 'EEEE, MMMM d')}
+							{formatDateTitle(selectedDate)}
 						</>
 					) : (
 						'Availability'
 					)}
 				</h3>
 				<p className="text-xs text-muted-foreground mt-0.5">
-					{selectedDate ? 'Select a time' : 'Select a date from the calendar.'}
+					{selectedDate
+						? `Select a time (${timezone})`
+						: 'Select a date from the calendar.'}
 				</p>
 			</div>
 

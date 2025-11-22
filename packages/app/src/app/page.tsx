@@ -35,8 +35,9 @@ export default function Home() {
 					tenantSlug={TENANT_ID}
 					resourceSlug={RESOURCE_ID}
 					durationMs={60 * 60000}
-					fromHour={9}
-					toHour={17}
+					// Removed fromHour/toHour to default to full day (0-24)
+					// This allows the timezone shifting to work without cutting off slots
+					// The resource's availability will define what is actually bookable.
 					onBookingConfirmed={handleBookingConfirmed}
 				/>
 			</div>

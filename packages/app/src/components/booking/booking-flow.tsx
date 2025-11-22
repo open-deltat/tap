@@ -10,7 +10,13 @@ import {
 import { useAvailabilityStream } from '@/hooks/use-availability-stream';
 import { useBooking } from '@/hooks/use-booking';
 import { useHoldStream } from '@/hooks/use-hold-stream';
-import { format, fromUnixTimestamp } from '@/lib/timezone';
+import {
+	format,
+	fromDayKey,
+	fromUnixTimestamp,
+	fromZonedTime,
+	getClientTimezone,
+} from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { BookingForm } from './booking-form';
 import { DatePickerSection } from './date-picker-section';
@@ -39,9 +45,12 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 		onBookingConfirmed,
 		className,
 	}) => {
+		// Start with no selected date to allow auto-selection of first available day
 		const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
-			() => new Date(),
+			undefined,
 		);
+		const [timezone, setTimezone] = React.useState<string>(getClientTimezone());
+
 		const [activeHold, setActiveHold] = React.useState<{
 			holdId: string;
 			sessionId: string;
@@ -72,7 +81,30 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			durationMs,
 			fromHour,
 			toHour,
+			timezone,
 		});
+
+		// Auto-select first available day when availableDays updates and no date is selected
+		React.useEffect(() => {
+			if (!selectedDate && availableDays.size > 0) {
+				const sortedDays = Array.from(availableDays).sort();
+
+				// Filter out past days using local comparison to today
+				const today = new Date();
+				today.setHours(0, 0, 0, 0);
+				const todayStr = format(today, 'yyyy-MM-dd');
+
+				// We assume availableDays are in YYYY-MM-DD format
+				// We want to filter for days >= todayStr
+				const futureDays = sortedDays.filter((day) => day >= todayStr);
+
+				if (futureDays.length > 0) {
+					const firstDay = futureDays[0];
+					const date = fromDayKey(firstDay!);
+					setSelectedDate(date);
+				}
+			}
+		}, [availableDays, selectedDate]);
 
 		// Availability Stream (Deltas)
 		useAvailabilityStream({
@@ -83,7 +115,6 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			onDelta: (event: LedgerEvent) => {
 				applyDelta(event);
 
-				// If our hold expired/released remotely
 				if (activeHold) {
 					if (
 						event.type === 'HoldExpired' &&
@@ -236,14 +267,46 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			const list = [];
 			const resolutionMs = durationMs || 60 * 60000;
 
-			// 1. Generate ALL possible slots for the day based on fromHour/toHour
-			const dayStart = new Date(selectedDate);
-			dayStart.setHours(fromHour, 0, 0, 0);
-			const dayEnd = new Date(selectedDate);
-			dayEnd.setHours(toHour, 0, 0, 0);
+			// 1. Generate ALL possible slots for the day based on fromHour/toHour in the TARGET timezone
+			// selectedDate is a local Date object, e.g., Nov 24 at 00:00 local time.
+			// We extract the date string "2025-11-24"
+			const dateStr = format(selectedDate, 'yyyy-MM-dd');
 
-			let current = dayStart.getTime();
-			const end = dayEnd.getTime();
+			// Create start timestamp: YYYY-MM-DD at fromHour:00 in target timezone
+			const startStr = `${dateStr}T${fromHour.toString().padStart(2, '0')}:00:00`;
+
+			let startTime: number;
+			let endTime: number;
+
+			try {
+				startTime = fromZonedTime(startStr, timezone).getTime();
+
+				if (toHour === 24) {
+					// Handle 24:00 safely by moving to next day 00:00
+					const nextDay = new Date(selectedDate);
+					nextDay.setDate(nextDay.getDate() + 1);
+					const nextDayStr = format(nextDay, 'yyyy-MM-dd');
+					endTime = fromZonedTime(`${nextDayStr}T00:00:00`, timezone).getTime();
+				} else {
+					const endStr = `${dateStr}T${toHour.toString().padStart(2, '0')}:00:00`;
+					endTime = fromZonedTime(endStr, timezone).getTime();
+				}
+
+				console.log('[BookingFlow] Generating slots', {
+					dateStr,
+					timezone,
+					startStr,
+					startTime,
+					endTime,
+					slotsCount: slots.length,
+				});
+			} catch (e) {
+				console.error('[BookingFlow] Timezone conversion error', e);
+				return [];
+			}
+
+			let current = startTime;
+			const end = endTime;
 
 			while (current + resolutionMs <= end) {
 				const slotStart = current;
@@ -265,27 +328,20 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 				current += resolutionMs;
 			}
 
-			// If there is an active hold, ensure its slot is marked available (or specially handled)
-			// The hold actually CONSUMES availability, so it might not be in `slots` anymore.
-			// But for the user who HOLDS it, it should be visible/selected.
 			if (activeHold) {
-				// Find the slot in our list that matches the hold
-				const holdSlotIndex = list.findIndex(
-					(s) => s.start === activeHold.slot.start,
-				);
-				if (holdSlotIndex !== -1) {
-					// It exists in the grid.
-					// If it's my hold, it should be interactable?
-					// Actually the UI handles activeHold state separately in the view.
-					// But we should make sure it renders as "available" in the list logic if we want to show it?
-					// Wait, if I hold it, I am in "booking" view, so this list isn't shown.
-					// If I release it, it goes back to being available (via WS delta).
-					// So we probably don't need to force it here for the *list* view.
-				}
+				// Handle active hold logic if needed
 			}
 
 			return list;
-		}, [slots, activeHold, durationMs, selectedDate, fromHour, toHour]);
+		}, [
+			slots,
+			activeHold,
+			durationMs,
+			selectedDate,
+			fromHour,
+			toHour,
+			timezone,
+		]);
 
 		return (
 			<div
@@ -301,6 +357,8 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 						onMonthChange={handleMonthChange}
 						availableDays={availableDays}
 						isLoading={isLoading}
+						timezone={timezone}
+						onTimezoneChange={setTimezone}
 					/>
 				</div>
 
@@ -323,7 +381,7 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 							error={error}
 							displayedSlots={displayedSlots}
 							onSlotClick={handleSlotClick}
-							formatTime={formatTime}
+							timezone={timezone}
 						/>
 					)}
 				</div>

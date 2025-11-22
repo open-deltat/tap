@@ -1,3 +1,5 @@
+import { format as formatTz, fromZonedTime, toZonedTime } from 'date-fns-tz';
+
 export const getClientTimezone = (): string => {
 	return Intl.DateTimeFormat().resolvedOptions().timeZone;
 };
@@ -18,11 +20,11 @@ export const fromISODateString = (isoString: string): Date => {
 	return new Date(isoString);
 };
 
-export const getDayKey = (date: Date): string => {
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, '0');
-	const day = String(date.getDate()).padStart(2, '0');
-	return `${year}-${month}-${day}`;
+export const getDayKey = (date: Date, timezone?: string): string => {
+	if (timezone) {
+		return formatTz(date, 'yyyy-MM-dd', { timeZone: timezone });
+	}
+	return format(date, 'yyyy-MM-dd');
 };
 
 export const fromDayKey = (dayKey: string): Date => {
@@ -47,3 +49,4 @@ export const setMinutesFromMidnight = (date: Date, minutes: number): Date => {
 };
 
 export { format } from 'date-fns';
+export { format as formatTz, fromZonedTime, toZonedTime } from 'date-fns-tz';

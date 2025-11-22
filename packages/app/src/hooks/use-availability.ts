@@ -4,6 +4,7 @@ import type { LedgerEvent } from '@tap/core';
 import type { AvailabilityPostResponse } from '@tap/protocol';
 import { AvailabilityStore } from '@tap/ws-client';
 import { format } from 'date-fns';
+import { format as formatTz, fromZonedTime } from 'date-fns-tz'; // Use date-fns-tz for timezone aware formatting and conversion
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export type AvailabilitySlot = {
@@ -19,6 +20,7 @@ export type UseAvailabilityOptions = {
 	durationMs?: number;
 	fromHour?: number;
 	toHour?: number;
+	timezone?: string;
 };
 
 export type UseAvailabilityResult = {
@@ -44,6 +46,7 @@ export const useAvailability = (
 		durationMs = 60 * 60000,
 		fromHour = 0,
 		toHour = 24,
+		timezone,
 	} = options;
 
 	const store = useMemo(() => new AvailabilityStore(), []);
@@ -61,10 +64,43 @@ export const useAvailability = (
 			setError(null);
 
 			try {
-				const fromDate = new Date(date);
-				fromDate.setHours(fromHour, 0, 0, 0);
-				const toDate = new Date(date);
-				toDate.setHours(toHour, 0, 0, 0);
+				// Construct fetch window based on selected timezone or fallback to local logic
+				let fromDate: Date;
+				let toDate: Date;
+
+				if (timezone) {
+					// If we have a timezone, we interpret 'date' (which is a local date object from Calendar)
+					// as "The day YYYY-MM-DD in the target timezone".
+					const dateStr = format(date, 'yyyy-MM-dd'); // '2025-11-24'
+
+					// Use strictly ISO format for fromZonedTime: YYYY-MM-DDTHH:mm:ss
+					const startStr = `${dateStr}T${fromHour.toString().padStart(2, '0')}:00:00`;
+
+					fromDate = fromZonedTime(startStr, timezone);
+
+					if (toHour === 24) {
+						const nextDay = new Date(date);
+						nextDay.setDate(nextDay.getDate() + 1);
+						const nextDayStr = format(nextDay, 'yyyy-MM-dd');
+						toDate = fromZonedTime(`${nextDayStr}T00:00:00`, timezone);
+					} else {
+						const endStr = `${dateStr}T${toHour.toString().padStart(2, '0')}:00:00`;
+						toDate = fromZonedTime(endStr, timezone);
+					}
+
+					console.log('[useAvailability] Fetching range (TZ)', {
+						timezone,
+						dateStr,
+						from: fromDate.toISOString(),
+						to: toDate.toISOString(),
+					});
+				} else {
+					// Legacy local fallback
+					fromDate = new Date(date);
+					fromDate.setHours(fromHour, 0, 0, 0);
+					toDate = new Date(date);
+					toDate.setHours(toHour, 0, 0, 0);
+				}
 
 				const body = {
 					tenantId: tenantSlug,
@@ -103,7 +139,16 @@ export const useAvailability = (
 				setIsLoading(false);
 			}
 		},
-		[apiBaseUrl, tenantSlug, resourceSlug, durationMs, fromHour, toHour, store],
+		[
+			apiBaseUrl,
+			tenantSlug,
+			resourceSlug,
+			durationMs,
+			fromHour,
+			toHour,
+			store,
+			timezone,
+		],
 	);
 
 	// Fetch availability for the whole month to populate the calendar
@@ -118,6 +163,10 @@ export const useAvailability = (
 			const endOfGrid = new Date(endOfMonth);
 			endOfGrid.setDate(endOfGrid.getDate() + 7); // +7 days buffer
 			endOfGrid.setHours(23, 59, 59, 999);
+
+			// NOTE: For refreshMonth we are using local date range approximation.
+			// Since we fetch +/- 7 days buffer, it should cover timezone shifts comfortably.
+			// We don't strictly convert the query range to timezone here because we just want "all slots around this month".
 
 			try {
 				const body = {
@@ -138,8 +187,14 @@ export const useAvailability = (
 					const data = (await response.json()) as AvailabilityPostResponse;
 					const days = new Set<string>();
 					for (const slot of data.freeSlots) {
-						// Use local date formatting to match calendar date keys
-						const dateKey = format(new Date(slot.start), 'yyyy-MM-dd');
+						// Use timezone aware formatting to determine which "Day" this slot belongs to
+						// If timezone is provided, we use it. Otherwise fallback to local.
+						const dateKey = timezone
+							? formatTz(new Date(slot.start), 'yyyy-MM-dd', {
+									timeZone: timezone,
+								})
+							: formatTz(new Date(slot.start), 'yyyy-MM-dd'); // Local fallback
+
 						if (dateKey) days.add(dateKey);
 					}
 					setAvailableDays(days);
@@ -148,7 +203,7 @@ export const useAvailability = (
 				console.error('Failed to fetch month availability', e);
 			}
 		},
-		[apiBaseUrl, tenantSlug, resourceSlug, durationMs],
+		[apiBaseUrl, tenantSlug, resourceSlug, durationMs, timezone],
 	);
 
 	const refresh = useCallback(async () => {
@@ -166,7 +221,7 @@ export const useAvailability = (
 	// Initial month fetch
 	useEffect(() => {
 		refreshMonth(selectedDate || new Date());
-	}, [refreshMonth, selectedDate]);
+	}, [refreshMonth, selectedDate]); // Added selectedDate dependency
 
 	const applyDelta = useCallback(
 		(event: LedgerEvent) => {
