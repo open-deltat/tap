@@ -3,9 +3,11 @@
 import { useCallback, useState } from 'react';
 import { getClientTimezone } from '@/lib/timezone';
 
-export const useClientTimezone = () => {
-	// Initialize with browser timezone
-	const [timezone, setTimezone] = useState<string>(() => getClientTimezone());
+export const useClientTimezone = (initialTimezone?: string) => {
+	// Initialize with provided timezone or browser timezone
+	const [timezone, setTimezone] = useState<string>(
+		() => initialTimezone || getClientTimezone(),
+	);
 
 	// Helper to format dates in the current timezone using native Intl
 	// This bypasses potential date-fns-tz version mismatch issues

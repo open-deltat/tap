@@ -29,7 +29,13 @@ export const SlotsView = ({
 	};
 
 	const formatDateTitle = (date: Date) => {
-		return formatDate(date, 'EEEE, MMMM d');
+		// Use local formatting to match the calendar selection visual,
+		// ignoring the target timezone shift for the header title.
+		return date.toLocaleDateString('en-US', {
+			weekday: 'long',
+			month: 'long',
+			day: 'numeric',
+		});
 	};
 
 	return (

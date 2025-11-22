@@ -32,6 +32,7 @@ export type BookingFlowProps = {
 	toHour?: number;
 	onBookingConfirmed?: (bookingId: string) => void;
 	className?: string;
+	initialTimezone?: string;
 };
 
 export const BookingFlow = React.memo<BookingFlowProps>(
@@ -44,6 +45,7 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 		toHour = 24,
 		onBookingConfirmed,
 		className,
+		initialTimezone,
 	}) => {
 		// Start with no selected date to allow auto-selection of first available day
 		const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(
@@ -51,7 +53,11 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 		);
 
 		// Use the new hook for timezone management
-		const { timezone, setTimezone, format: formatTz } = useClientTimezone();
+		const {
+			timezone,
+			setTimezone,
+			format: formatTz,
+		} = useClientTimezone(initialTimezone);
 
 		const [activeHold, setActiveHold] = React.useState<{
 			holdId: string;

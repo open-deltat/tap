@@ -56,6 +56,7 @@ export default function Home() {
 								durationMs={60 * 60000}
 								onBookingConfirmed={handleBookingConfirmed}
 								className="h-[450px] border-none shadow-none"
+								initialTimezone="Europe/Berlin"
 							/>
 						</div>
 					</div>
@@ -81,6 +82,7 @@ export default function Home() {
 								durationMs={60 * 60000}
 								onBookingConfirmed={handleBookingConfirmed}
 								className="h-[450px] border-none shadow-none"
+								initialTimezone="America/New_York"
 							/>
 						</div>
 					</div>
