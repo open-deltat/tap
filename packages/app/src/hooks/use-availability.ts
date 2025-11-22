@@ -3,6 +3,7 @@
 import type { LedgerEvent } from '@tap/core';
 import type { AvailabilityPostResponse } from '@tap/protocol';
 import { AvailabilityStore } from '@tap/ws-client';
+import { format } from 'date-fns';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export type AvailabilitySlot = {
@@ -108,16 +109,22 @@ export const useAvailability = (
 	// Fetch availability for the whole month to populate the calendar
 	const refreshMonth = useCallback(
 		async (date: Date) => {
+			// Fetch a slightly wider range to cover calendar grid (prev/next month days)
 			const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+			const startOfGrid = new Date(startOfMonth);
+			startOfGrid.setDate(startOfGrid.getDate() - 7); // -7 days buffer
+
 			const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-			endOfMonth.setHours(23, 59, 59, 999);
+			const endOfGrid = new Date(endOfMonth);
+			endOfGrid.setDate(endOfGrid.getDate() + 7); // +7 days buffer
+			endOfGrid.setHours(23, 59, 59, 999);
 
 			try {
 				const body = {
 					tenantId: tenantSlug,
 					resourceId: resourceSlug,
-					from: startOfMonth.toISOString(),
-					to: endOfMonth.toISOString(),
+					from: startOfGrid.toISOString(),
+					to: endOfGrid.toISOString(),
 					slotDurationMs: durationMs,
 				};
 
@@ -131,7 +138,8 @@ export const useAvailability = (
 					const data = (await response.json()) as AvailabilityPostResponse;
 					const days = new Set<string>();
 					for (const slot of data.freeSlots) {
-						const dateKey = slot.start.split('T')[0];
+						// Use local date formatting to match calendar date keys
+						const dateKey = format(new Date(slot.start), 'yyyy-MM-dd');
 						if (dateKey) days.add(dateKey);
 					}
 					setAvailableDays(days);

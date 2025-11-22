@@ -2,7 +2,7 @@
 
 import type { ResourceId, TenantId } from '@tap/protocol';
 import Link from 'next/link';
-import { EnhancedCalendar } from '@/components/booking/enhanced-calendar';
+import { BookingFlow } from '@/components/booking/booking-flow';
 
 export default function Home() {
 	const apiBaseUrl =
@@ -30,7 +30,7 @@ export default function Home() {
 			</div>
 
 			<div className="bg-white rounded-xl shadow-sm border p-6">
-				<EnhancedCalendar
+				<BookingFlow
 					apiBaseUrl={apiBaseUrl}
 					tenantSlug={TENANT_ID}
 					resourceSlug={RESOURCE_ID}

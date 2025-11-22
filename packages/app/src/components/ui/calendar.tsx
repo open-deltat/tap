@@ -87,7 +87,7 @@ function Calendar({
 		<DayPicker
 			showOutsideDays={showOutsideDays}
 			className={cn(
-				'bg-background group/calendar p-3 [--cell-size:--spacing(8)] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent',
+				'bg-background group/calendar p-3 [--cell-size:--spacing(8)] in-data-[slot=card-content]:bg-transparent in-data-[slot=popover-content]:bg-transparent',
 				String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
 				String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
 				className,
@@ -104,23 +104,26 @@ function Calendar({
 					'flex gap-4 flex-col md:flex-row relative',
 					defaultClassNames.months,
 				),
-				month: cn('flex flex-col w-full gap-4', defaultClassNames.month),
+				month: cn(
+					'flex flex-col w-full gap-4 relative',
+					defaultClassNames.month,
+				),
 				nav: cn(
-					'flex items-center gap-1 w-full absolute top-0 inset-x-0 justify-between',
+					'absolute left-0 top-0 right-0 flex justify-between px-2 items-center h-[40px] z-10 pointer-events-none',
 					defaultClassNames.nav,
 				),
 				button_previous: cn(
 					buttonVariants({ variant: buttonVariant }),
-					'size-(--cell-size) aria-disabled:opacity-50 p-0 select-none',
+					'size-7 bg-transparent p-0 opacity-50 hover:opacity-100 pointer-events-auto',
 					defaultClassNames.button_previous,
 				),
 				button_next: cn(
 					buttonVariants({ variant: buttonVariant }),
-					'size-(--cell-size) aria-disabled:opacity-50 p-0 select-none',
+					'size-7 bg-transparent p-0 opacity-50 hover:opacity-100 pointer-events-auto',
 					defaultClassNames.button_next,
 				),
 				month_caption: cn(
-					'flex items-center justify-center h-(--cell-size) w-full px-(--cell-size)',
+					'flex items-center justify-center h-[40px] w-full relative',
 					defaultClassNames.month_caption,
 				),
 				dropdowns: cn(
@@ -175,7 +178,7 @@ function Calendar({
 					defaultClassNames.today,
 				),
 				outside: cn(
-					'text-muted-foreground aria-selected:text-muted-foreground',
+					'aria-selected:text-muted-foreground',
 					defaultClassNames.outside,
 				),
 				disabled: cn(

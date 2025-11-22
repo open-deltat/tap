@@ -15,9 +15,9 @@ const DEFAULT_OFFER: Offer = {
 	id: 'default',
 	tenantId: 'default' as TenantId,
 	resourceId: 'default' as ResourceId,
-	daysOfWeek: [1, 2, 3, 4, 5],
-	startTime: '09:00',
-	endTime: '17:00',
+	daysOfWeek: [1, 2, 3, 4, 5], // Mon-Fri
+	startTime: '00:00',
+	endTime: '22:00',
 	currency: 'USD',
 };
 

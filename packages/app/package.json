@@ -14,6 +14,9 @@
 	},
 	"dependencies": {
 		"@radix-ui/react-slot": "^1.2.4",
+		"@tap/core": "workspace:*",
+		"@tap/protocol": "workspace:*",
+		"@tap/ws-client": "workspace:*",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"date-fns": "^4.1.0",
@@ -23,9 +26,7 @@
 		"react-day-picker": "^9.11.1",
 		"react-dom": "19.2.0",
 		"tailwind-merge": "^3.4.0",
-		"@tap/core": "workspace:*",
-		"@tap/protocol": "workspace:*",
-		"@tap/ws-client": "workspace:*"
+		"zod": "^3.23.8"
 	},
 	"devDependencies": {
 		"@tailwindcss/postcss": "^4",
