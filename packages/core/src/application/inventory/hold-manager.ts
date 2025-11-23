@@ -188,7 +188,7 @@ export const createHoldManager = (params: {
 					startUnix,
 					endUnix,
 					expiresAt,
-					clientRef,
+					...(clientRef !== undefined && { clientRef }),
 				});
 
 				return { success: true, holdId, event };

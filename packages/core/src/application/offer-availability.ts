@@ -10,6 +10,7 @@ const DEFAULT_OFFER: Offer = {
 	startTime: '09:00',
 	endTime: '17:00',
 	currency: 'USD',
+	capacity: 1,
 };
 
 export const getAvailableMinutesFromOffers = (
