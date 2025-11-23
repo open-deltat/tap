@@ -37,7 +37,7 @@ async function confirmBookingWithHold(
 		end: end.getTime(),
 		customerName: customer.name,
 		customerEmail: customer.email,
-		customerPhone: customer.phone,
+		...(customer.phone !== undefined && { customerPhone: customer.phone }),
 		paymentStatus: 'PENDING',
 		priceCents: 1000, // Mock
 	});
@@ -46,7 +46,7 @@ async function confirmBookingWithHold(
 
 export async function handleBook(
 	req: Request,
-	server: Server,
+	server: Server<any>,
 ): Promise<Response> {
 	try {
 		const json = await req.json();
@@ -93,7 +93,7 @@ export async function handleBook(
 				startUnix: start.getTime(),
 				endUnix: end.getTime(),
 				expiresAt: Date.now() + 60000, // 1 min expiry
-				clientRef: body.clientRef,
+				...(body.clientRef !== undefined && { clientRef: body.clientRef }),
 			});
 
 			if (!holdResult.success) {
@@ -147,8 +147,8 @@ export async function handleBook(
 			slotId: body.slotId,
 			resourceId: body.resourceId,
 			tenantId: body.tenantId,
-			start: start.toISOString(),
-			end: end.toISOString(),
+			startUnix: start.getTime(),
+			endUnix: end.getTime(),
 			bookingId: event.payload.bookingId,
 			holdId: holdId || undefined,
 		};
@@ -166,8 +166,8 @@ export async function handleBook(
 			tenantId: body.tenantId,
 			resourceId: body.resourceId,
 			slotId: body.slotId,
-			start: start.toISOString(),
-			end: end.toISOString(),
+			start: start.getTime(),
+			end: end.getTime(),
 			paymentStatus: 'PENDING',
 			clientRef: body.clientRef || undefined,
 		};

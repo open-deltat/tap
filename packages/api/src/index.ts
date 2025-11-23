@@ -1,5 +1,9 @@
-import type { ResourceId, SlotId, TenantId } from '@tap/core';
-import { API_ROUTES } from '@tap/protocol';
+import {
+	API_ROUTES,
+	type ResourceId,
+	type SlotId,
+	type TenantId,
+} from '@tap/protocol';
 import type { Server } from 'bun';
 import { handleAvailability } from './routes/availability';
 import { handleBook } from './routes/book';

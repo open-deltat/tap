@@ -19,17 +19,37 @@ export const ResourceSchema = z.object({
 	metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const OfferSchema = z.object({
+// --- Flexible Offer Types ---
+
+const OfferBaseSchema = z.object({
 	id: ULIDSchema,
 	tenantId: ULIDSchema.transform((v) => v as TenantId),
 	resourceId: ULIDSchema.transform((v) => v as ResourceId),
-	daysOfWeek: z.array(z.number().int().min(0).max(6)),
-	startTime: z.string(),
-	endTime: z.string(),
 	priceCents: z.number().int().optional(),
 	currency: z.string().default('USD'),
 	capacity: z.number().int().min(1).default(1),
+	// Timezone for the offer itself (if different from resource, or used for calculations)
+	// Recurrence rules generally need a timezone to be meaningful (e.g. "9am" is ambiguous without it)
+	timezone: z.string().optional(),
 });
+
+export const WeeklyOfferSchema = OfferBaseSchema.extend({
+	type: z.literal('weekly'),
+	daysOfWeek: z.array(z.number().int().min(0).max(6)), // 0=Sun
+	startTime: z.string(), // "09:00"
+	endTime: z.string(), // "17:00"
+});
+
+export const RangeOfferSchema = OfferBaseSchema.extend({
+	type: z.literal('range'),
+	start: z.string(), // ISO or DateTime string
+	end: z.string(), // ISO or DateTime string
+});
+
+export const OfferSchema = z.discriminatedUnion('type', [
+	WeeklyOfferSchema,
+	RangeOfferSchema,
+]);
 
 export const BookingSchema = z.object({
 	id: ULIDSchema,
@@ -63,5 +83,7 @@ export const HoldSchema = z.object({
 export type Tenant = z.infer<typeof TenantSchema>;
 export type Resource = z.infer<typeof ResourceSchema>;
 export type Offer = z.infer<typeof OfferSchema>;
+export type WeeklyOffer = z.infer<typeof WeeklyOfferSchema>;
+export type RangeOffer = z.infer<typeof RangeOfferSchema>;
 export type Booking = z.infer<typeof BookingSchema>;
 export type Hold = z.infer<typeof HoldSchema>;

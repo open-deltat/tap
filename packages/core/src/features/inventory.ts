@@ -11,13 +11,13 @@ import type {
 	HoldExpiredEvent,
 	HoldPlacedEvent,
 	HoldReleasedEvent,
-} from '../../domain/events';
-import { createMutex } from '../../infrastructure/mutex';
-import { createBookingManager } from './booking-manager';
-import { createExpiryManager } from './expiry-manager';
-import { createHoldManager } from './hold-manager';
-import { createStateManager } from './state-manager';
-import type { HoldMetadata, InventoryState } from './types';
+} from '../domain/events';
+import { createMutex } from '../infrastructure/mutex';
+import { createBookingManager } from './booking/manager';
+import { createExpiryManager } from './hold/expiry';
+import { createHoldManager } from './hold/manager';
+import type { HoldMetadata, InventoryState } from './inventory-types';
+import { createStateManager } from './state/manager';
 
 export type Inventory = {
 	placeHold: (params: {

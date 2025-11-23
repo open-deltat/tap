@@ -1,5 +1,5 @@
 import type { ResourceId, TenantId } from '@tap/protocol';
-import type { InventoryState } from './types';
+import type { InventoryState } from '../inventory-types';
 
 export type StateManager = {
 	getState: (tenantId: TenantId, resourceId: ResourceId) => InventoryState;
@@ -16,12 +16,15 @@ export const createStateManager = (): {
 		resourceId: ResourceId,
 	): InventoryState => {
 		const key = `${tenantId}:${resourceId}`;
-		let dayMap = state.get(key);
-		if (!dayMap) {
-			dayMap = new Map();
-			state.set(key, dayMap);
+		let inventoryState = state.get(key);
+		if (!inventoryState) {
+			inventoryState = {
+				booked: [],
+				held: [],
+			};
+			state.set(key, inventoryState);
 		}
-		return dayMap;
+		return inventoryState;
 	};
 
 	return {
