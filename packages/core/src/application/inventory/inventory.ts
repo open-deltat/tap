@@ -26,9 +26,9 @@ export type Inventory = {
 		tenantId: TenantId;
 		resourceId: ResourceId;
 		sessionId: SessionId;
-		day: DayKey;
-		startMinute: Minute;
-		endMinute: Minute;
+		timezone: string;
+		startUnix: number;
+		endUnix: number;
 		expiresAt: number;
 		clientRef?: string;
 	}) => Promise<
@@ -53,9 +53,8 @@ export type Inventory = {
 		tenantId: TenantId;
 		resourceId: ResourceId;
 		bookingId: BookingId;
-		day: DayKey;
-		startMinute: Minute;
-		endMinute: Minute;
+		startUnix: number;
+		endUnix: number;
 	}) => Promise<BookingCancelledEvent | null>;
 	expireHolds: (now: number) => HoldExpiredEvent[];
 	releaseHold: (params: {

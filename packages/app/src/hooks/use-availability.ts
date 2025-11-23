@@ -116,8 +116,8 @@ export const useAvailability = (
 
 				// Convert protocol slots to store slots
 				const initialSlots = data.freeSlots.map((s) => ({
-					start: new Date(s.start).getTime(),
-					end: new Date(s.end).getTime(),
+					start: s.start,
+					end: s.end,
 				}));
 
 				store.setSnapshot(initialSlots, data.asOfEventId);

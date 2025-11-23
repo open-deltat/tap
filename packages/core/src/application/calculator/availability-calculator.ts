@@ -125,8 +125,8 @@ export function calculateAvailability(params: {
 							slotId: createSlotId(slotStart, slotEnd),
 							resourceId,
 							tenantId,
-							start: slotStart.toISOString(),
-							end: slotEnd.toISOString(),
+							start: slotStart.getTime(),
+							end: slotEnd.getTime(),
 						});
 					}
 				}

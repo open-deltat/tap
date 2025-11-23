@@ -112,20 +112,13 @@ export default function DebugPage() {
 					delta.kind === 'HoldReleased' ||
 					delta.kind === 'HoldExpired'
 				) {
-					const start = new Date(delta.start);
-					const end = new Date(delta.end);
-					const day = start.toISOString().split('T')[0];
-					const startMinute = start.getUTCHours() * 60 + start.getUTCMinutes();
-					const endMinute = end.getUTCHours() * 60 + end.getUTCMinutes();
-
 					coreEvent = {
 						...coreEventBase,
 						type: delta.kind,
 						payload: {
 							holdId: delta.holdId,
-							day,
-							startMinute,
-							endMinute,
+							startUnix: delta.startUnix,
+							endUnix: delta.endUnix,
 							expiresAt: 0, // Not needed for merge
 						},
 					} as unknown as LedgerEvent;
@@ -138,8 +131,8 @@ export default function DebugPage() {
 						type: delta.kind,
 						payload: {
 							bookingId: delta.bookingId,
-							start: new Date(delta.start).getTime(),
-							end: new Date(delta.end).getTime(),
+							start: delta.startUnix,
+							end: delta.endUnix,
 							holdId: delta.holdId,
 						},
 					} as unknown as LedgerEvent;
@@ -157,8 +150,8 @@ export default function DebugPage() {
 						slotId: createSlotId(new Date(s.start), new Date(s.end)),
 						resourceId: prev.resourceId,
 						tenantId: prev.tenantId,
-						start: new Date(s.start).toISOString(),
-						end: new Date(s.end).toISOString(),
+						start: s.start,
+						end: s.end,
 					}));
 
 					return {
