@@ -16,7 +16,8 @@ type EventLoggerProps = {
 type LogEntry = {
 	id: string;
 	timestamp: Date;
-	event: LedgerEvent;
+	type: string;
+	payload?: Record<string, unknown>;
 };
 
 export const EventLogger = ({
@@ -26,21 +27,26 @@ export const EventLogger = ({
 }: EventLoggerProps) => {
 	const [logs, setLogs] = useState<LogEntry[]>([]);
 
+	const addLog = (type: string, payload?: Record<string, unknown>) => {
+		setLogs((prev) => [
+			{
+				id: Math.random().toString(36).substring(7),
+				timestamp: new Date(),
+				type,
+				payload,
+			},
+			...prev.slice(0, 49),
+		]);
+	};
+
 	const { isConnected } = useAvailabilityStream({
 		apiBaseUrl,
 		tenantSlug,
 		resourceSlug,
 		enabled: true,
-		onDelta: (event) => {
-			setLogs((prev) => [
-				{
-					id: Math.random().toString(36).substring(7),
-					timestamp: new Date(),
-					event,
-				},
-				...prev.slice(0, 49), // Keep last 50 events
-			]);
-		},
+		onConnect: () => addLog('Connection', { status: 'Connected' }),
+		onDisconnect: () => addLog('Connection', { status: 'Disconnected' }),
+		onDelta: (event) => addLog(event.type, event.payload),
 	});
 
 	return (
@@ -89,15 +95,17 @@ export const EventLogger = ({
 											variant="outline"
 											className="font-mono text-[10px] uppercase tracking-wider"
 										>
-											{log.event.type}
+											{log.type}
 										</Badge>
 										<span className="text-[10px] text-muted-foreground font-mono">
 											{log.timestamp.toLocaleTimeString()}
 										</span>
 									</div>
-									<div className="font-mono text-[10px] text-muted-foreground break-all bg-muted/30 p-2 rounded-md">
-										{JSON.stringify(log.event.payload, null, 2)}
-									</div>
+									{log.payload && (
+										<div className="font-mono text-[10px] text-muted-foreground break-all bg-muted/30 p-2 rounded-md">
+											{JSON.stringify(log.payload, null, 2)}
+										</div>
+									)}
 								</div>
 							))
 						)}

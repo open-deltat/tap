@@ -13,6 +13,8 @@ type UseAvailabilityStreamOptions = {
 	resourceSlug: string;
 	enabled: boolean;
 	onDelta?: (event: LedgerEvent) => void;
+	onConnect?: () => void;
+	onDisconnect?: () => void;
 };
 
 export const useAvailabilityStream = ({
@@ -21,14 +23,20 @@ export const useAvailabilityStream = ({
 	resourceSlug,
 	enabled,
 	onDelta,
+	onConnect,
+	onDisconnect,
 }: UseAvailabilityStreamOptions) => {
 	const [isConnected, setIsConnected] = useState(false);
 	const wsRef = useRef<WebSocket | null>(null);
 	const onDeltaRef = useRef(onDelta);
+	const onConnectRef = useRef(onConnect);
+	const onDisconnectRef = useRef(onDisconnect);
 
 	useEffect(() => {
 		onDeltaRef.current = onDelta;
-	}, [onDelta]);
+		onConnectRef.current = onConnect;
+		onDisconnectRef.current = onDisconnect;
+	}, [onDelta, onConnect, onDisconnect]);
 
 	useEffect(() => {
 		if (!enabled) {
@@ -36,6 +44,7 @@ export const useAvailabilityStream = ({
 				wsRef.current.close();
 				wsRef.current = null;
 				setIsConnected(false);
+				onDisconnectRef.current?.();
 			}
 			return;
 		}
@@ -47,6 +56,7 @@ export const useAvailabilityStream = ({
 		ws.onopen = () => {
 			console.log('[AvailStream] Connected');
 			setIsConnected(true);
+			onConnectRef.current?.();
 			// Subscribe
 			ws.send(
 				JSON.stringify({
@@ -78,6 +88,7 @@ export const useAvailabilityStream = ({
 			console.log('[AvailStream] Disconnected');
 			setIsConnected(false);
 			wsRef.current = null;
+			onDisconnectRef.current?.();
 		};
 
 		return () => {

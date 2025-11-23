@@ -140,11 +140,21 @@ export const createBookingManager = (deps: {
 					bookingId: params.bookingId,
 					startUnix: params.start,
 					endUnix: params.end,
-					customerName: params.customerName,
-					customerEmail: params.customerEmail,
-					customerPhone: params.customerPhone,
-					paymentStatus: params.paymentStatus,
-					priceCents: params.priceCents,
+					...(params.customerName !== undefined && {
+						customerName: params.customerName,
+					}),
+					...(params.customerEmail !== undefined && {
+						customerEmail: params.customerEmail,
+					}),
+					...(params.customerPhone !== undefined && {
+						customerPhone: params.customerPhone,
+					}),
+					...(params.paymentStatus !== undefined && {
+						paymentStatus: params.paymentStatus,
+					}),
+					...(params.priceCents !== undefined && {
+						priceCents: params.priceCents,
+					}),
 				});
 			} finally {
 				for (const release of releases.reverse()) {
