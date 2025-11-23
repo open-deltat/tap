@@ -6,11 +6,7 @@ import { fromUnixTimestamp } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { useBooking } from '../availability-picker/hooks/use-booking';
 import { useHoldStream } from '../availability-picker/hooks/use-hold-stream';
-import {
-	AvailabilityPicker,
-	type AvailabilitySlot,
-	useClientTimezone,
-} from '.';
+import { AvailabilityPicker, type TimeRange, useClientTimezone } from '.';
 import { BookingForm } from './booking-form';
 
 export type BookingFlowProps = {
@@ -49,7 +45,7 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			holdId: string;
 			sessionId: string;
 			expiresAt: number;
-			slot: AvailabilitySlot;
+			slot: TimeRange;
 		} | null>(null);
 
 		// UI States
@@ -116,7 +112,7 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 		}, [activeHold]);
 
 		const handleSlotClick = React.useCallback(
-			async (slot: AvailabilitySlot) => {
+			async (slot: TimeRange) => {
 				try {
 					const slotId = createSlotId(new Date(slot.start), new Date(slot.end));
 

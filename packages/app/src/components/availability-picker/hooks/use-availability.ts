@@ -1,14 +1,15 @@
-'use client';
-
 import {
 	AvailabilityClient,
 	type AvailabilitySlot,
 	AvailabilityStore,
+	getDayRange,
+	getMonthGridRange,
+	type TimeRange,
 } from '@tap/client';
 import type { LedgerEvent } from '@tap/core';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-export type { AvailabilitySlot };
+export type { AvailabilitySlot, TimeRange };
 
 export type UseAvailabilityOptions = {
 	apiBaseUrl: string;
@@ -65,17 +66,17 @@ export const useAvailability = (
 			setError(null);
 
 			try {
+				const range = getDayRange(date, timezone, fromHour, toHour);
+
 				const result = await client.getAvailability({
-					date,
-					timezone,
-					durationMs,
-					fromHour,
-					toHour,
+					from: range.from,
+					to: range.to,
+					slotDurationMs: durationMs,
 				});
 
-				store.setSnapshot(result.slots, result.asOfEventId);
+				store.setSnapshot(result.freeSlots, result.asOfEventId);
 				const snapshot = store.getSnapshot();
-				setSlots(snapshot.slots);
+				setSlots(snapshot.slots as AvailabilitySlot[]); // Cast back since store works with TimeRange
 				setCursor(snapshot.cursor);
 			} catch (err) {
 				setError(err instanceof Error ? err : new Error('Unknown error'));
@@ -90,11 +91,15 @@ export const useAvailability = (
 	const refreshMonth = useCallback(
 		async (date: Date) => {
 			try {
-				const days = await client.getMonthlyAvailability({
-					date,
-					timezone,
-					durationMs,
+				const range = getMonthGridRange(date);
+
+				const result = await client.getAvailability({
+					from: range.from,
+					to: range.to,
+					slotDurationMs: durationMs,
 				});
+
+				const days = client.extractAvailableDays(result.freeSlots, timezone);
 				setAvailableDays(days);
 			} catch (e) {
 				console.error('Failed to fetch month availability', e);
@@ -124,7 +129,7 @@ export const useAvailability = (
 		(event: LedgerEvent) => {
 			store.applyEvent(event);
 			const snapshot = store.getSnapshot();
-			setSlots(snapshot.slots);
+			setSlots(snapshot.slots as AvailabilitySlot[]);
 			setCursor(snapshot.cursor);
 		},
 		[store],

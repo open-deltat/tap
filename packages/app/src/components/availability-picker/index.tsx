@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { DatePickerSection as Calendar } from './calendar';
 import {
 	type AvailabilitySlot,
+	type TimeRange,
 	useAvailability,
 } from './hooks/use-availability';
 import { useAvailabilityStream } from './hooks/use-availability-stream';
@@ -15,7 +16,7 @@ import { useClientTimezone } from './hooks/use-client-timezone';
 import { SlotsView as SlotsList } from './slots-list';
 import { TimezoneSelector as TimezoneSelect } from './timezone-select';
 
-export type { AvailabilitySlot };
+export type { AvailabilitySlot, TimeRange };
 // Re-export hooks for consumers who want to build custom UIs
 export { useAvailability, useAvailabilityStream, useClientTimezone };
 
@@ -23,7 +24,7 @@ export type AvailabilityPickerProps = {
 	apiBaseUrl: string;
 	tenantSlug: string;
 	resourceSlug: string;
-	onSlotSelect: (slot: AvailabilitySlot) => void;
+	onSlotSelect: (slot: TimeRange) => void;
 	className?: string;
 	durationMs?: number;
 	fromHour?: number;

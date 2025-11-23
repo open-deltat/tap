@@ -1,5 +1,6 @@
-export * from './clients/availability';
-export * from './clients/booking';
-export * from './clients/hold';
-export * from './stores/availability';
-export * from './types';
+export type { AvailabilityPostResponse, AvailabilitySlot } from '@tap/protocol';
+export * from './availability/client';
+export * from './availability/operations';
+export * from './availability/store';
+export * from './booking/client';
+export * from './hold/client';

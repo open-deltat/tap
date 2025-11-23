@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import type { AvailabilitySlot } from './hooks/use-availability';
+import type { TimeRange } from './hooks/use-availability';
 
 export type SlotsViewProps = {
 	selectedDate: Date | undefined;
@@ -17,7 +17,7 @@ export type SlotsViewProps = {
 		available: boolean;
 		isReleased?: boolean;
 	}[];
-	onSlotClick: (slot: AvailabilitySlot) => void;
+	onSlotClick: (slot: TimeRange) => void;
 	timezone: string;
 	formatDate: (date: Date | number, fmt: string) => string;
 };
@@ -105,7 +105,7 @@ const SlotButton = ({
 		isReleased?: boolean;
 	};
 	formatTime: (ts: number) => string;
-	onClick: (slot: AvailabilitySlot) => void;
+	onClick: (slot: TimeRange) => void;
 }) => {
 	const [isFlashing, setIsFlashing] = useState(false);
 	const [isReappearing, setIsReappearing] = useState(false);
