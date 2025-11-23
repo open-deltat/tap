@@ -204,8 +204,11 @@ export const websocketHandler = {
 										holdId: msg.holdId,
 									} as AvailabilityDeltaPayload,
 								};
-								// ws.publish(topic, JSON.stringify(message));
-								serverContext.server?.publish(topic, JSON.stringify(message));
+								// Use server.publish to ensure broadcast to all subscribers
+								const bytes = serverContext.server?.publish(
+									topic,
+									JSON.stringify(message),
+								);
 							}
 							ws.close();
 						});
@@ -255,7 +258,10 @@ export const websocketHandler = {
 								} as AvailabilityDeltaPayload,
 							};
 							// ws.publish(topic, JSON.stringify(message));
-							serverContext.server?.publish(topic, JSON.stringify(message));
+							const bytes = serverContext.server?.publish(
+								topic,
+								JSON.stringify(message),
+							);
 						}
 					});
 			}

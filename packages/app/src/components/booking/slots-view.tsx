@@ -11,7 +11,12 @@ export type SlotsViewProps = {
 	selectedDate: Date | undefined;
 	isLoading: boolean;
 	error: Error | null;
-	displayedSlots: { start: number; end: number; available: boolean }[];
+	displayedSlots: {
+		start: number;
+		end: number;
+		available: boolean;
+		isReleased?: boolean;
+	}[];
 	onSlotClick: (slot: AvailabilitySlot) => void;
 	timezone: string;
 	formatDate: (date: Date | number, fmt: string) => string;
@@ -111,11 +116,17 @@ const SlotButton = ({
 	formatTime,
 	onClick,
 }: {
-	slot: { start: number; end: number; available: boolean };
+	slot: {
+		start: number;
+		end: number;
+		available: boolean;
+		isReleased?: boolean;
+	};
 	formatTime: (ts: number) => string;
 	onClick: (slot: AvailabilitySlot) => void;
 }) => {
 	const [isFlashing, setIsFlashing] = useState(false);
+	const [isReappearing, setIsReappearing] = useState(false);
 	const prevAvailable = useRef(slot.available);
 
 	useEffect(() => {
@@ -124,8 +135,17 @@ const SlotButton = ({
 			const timer = setTimeout(() => setIsFlashing(false), 500);
 			return () => clearTimeout(timer);
 		}
+		// Trigger reappearing animation either by state transition or explicit flag
+		if (
+			(prevAvailable.current === false && slot.available === true) ||
+			slot.isReleased
+		) {
+			setIsReappearing(true);
+			const timer = setTimeout(() => setIsReappearing(false), 500);
+			return () => clearTimeout(timer);
+		}
 		prevAvailable.current = slot.available;
-	}, [slot.available]);
+	}, [slot.available, slot.isReleased]);
 
 	return (
 		<Button
@@ -135,9 +155,11 @@ const SlotButton = ({
 				'h-auto py-2 px-3 justify-center flex-col gap-0.5 transition-all duration-500 group',
 				isFlashing
 					? 'bg-destructive/10 border-destructive text-destructive disabled:opacity-100'
-					: !slot.available
-						? 'opacity-30 hover:bg-transparent hover:border-input'
-						: 'hover:border-primary hover:bg-primary/5 hover:text-primary',
+					: isReappearing
+						? 'bg-green-500/10 border-green-500 text-green-600'
+						: !slot.available
+							? 'opacity-30 hover:bg-transparent hover:border-input'
+							: 'hover:border-primary hover:bg-primary/5 hover:text-primary',
 			)}
 			onClick={() => onClick(slot)}
 		>

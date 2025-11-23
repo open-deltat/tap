@@ -66,6 +66,8 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			slot: AvailabilitySlot;
 		} | null>(null);
 
+		const [lastEvent, setLastEvent] = React.useState<LedgerEvent | null>(null);
+
 		// UI States
 		const [view, setView] = React.useState<'slots' | 'booking'>('slots');
 		const [holdExpirationCountdown, setHoldExpirationCountdown] =
@@ -121,6 +123,7 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			enabled: true,
 			onDelta: (event: LedgerEvent) => {
 				applyDelta(event);
+				setLastEvent(event);
 
 				if (activeHold) {
 					if (
@@ -314,17 +317,29 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 					(s) => s.start <= slotStart && s.end >= slotEnd,
 				);
 
+				let isReleased = false;
+				if (lastEvent?.type === 'HoldReleased' && lastEvent.payload.startUnix) {
+					const evStart = lastEvent.payload.startUnix;
+					const evEnd = lastEvent.payload.endUnix || evStart;
+
+					// Check if event overlaps with slot
+					if (Math.max(slotStart, evStart) < Math.min(slotEnd, evEnd)) {
+						isReleased = true;
+					}
+				}
+
 				list.push({
 					start: slotStart,
 					end: slotEnd,
 					available: isAvailable,
+					isReleased,
 				});
 
 				current += resolutionMs;
 			}
 
 			return list;
-		}, [slots, durationMs, selectedDate, timezone]);
+		}, [slots, durationMs, selectedDate, timezone, lastEvent]);
 
 		return (
 			<div
