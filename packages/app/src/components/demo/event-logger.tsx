@@ -1,6 +1,5 @@
 'use client';
 
-import type { LedgerEvent } from '@tap/core';
 import { Activity, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
