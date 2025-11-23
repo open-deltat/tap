@@ -1,6 +1,5 @@
 import type { LedgerEvent } from '@tap/core';
-
-export type TimeSlot = { start: number; end: number };
+import type { TimeSlot } from '../types';
 
 export class AvailabilityStore {
 	private slots: TimeSlot[] = [];

@@ -4,7 +4,7 @@ import { Activity, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAvailabilityStream } from '@/hooks/use-availability-stream';
+import { useAvailabilityStream } from '../availability-picker';
 
 type EventLoggerProps = {
 	apiBaseUrl: string;

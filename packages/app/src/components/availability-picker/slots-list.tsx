@@ -4,8 +4,8 @@ import { Calendar as CalendarIcon, Clock, Info } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { AvailabilitySlot } from '@/hooks/use-availability';
 import { cn } from '@/lib/utils';
+import type { AvailabilitySlot } from './hooks/use-availability';
 
 export type SlotsViewProps = {
 	selectedDate: Date | undefined;

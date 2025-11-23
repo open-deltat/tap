@@ -1,7 +1,7 @@
 'use client';
 
 import type { ResourceId, TenantId } from '@tap/protocol';
-import { BookingFlow } from '@/components/booking/booking-flow';
+import { BookingFlow } from '@/components/availability-picker/booking-flow';
 import { EventLogger } from '@/components/demo/event-logger';
 import { NetworkStatus } from '@/components/demo/network-status';
 

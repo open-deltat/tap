@@ -1,7 +1,7 @@
 {
-	"name": "@tap/ws-client",
+	"name": "@tap/client",
 	"version": "0.1.0",
-	"description": "TAP v0.1 WebSocket Client - Framework-agnostic client for TAP availability and bookings",
+	"description": "TAP Client SDK - Framework-agnostic client for TAP availability and bookings",
 	"type": "module",
 	"main": "./src/index.ts",
 	"types": "./src/index.ts",
@@ -23,7 +23,10 @@
 		"lint:fix": "biome check --write ."
 	},
 	"dependencies": {
-		"@tap/core": "workspace:*"
+		"@tap/core": "workspace:*",
+		"@tap/protocol": "workspace:*",
+		"date-fns": "^3.6.0",
+		"date-fns-tz": "^3.1.3"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

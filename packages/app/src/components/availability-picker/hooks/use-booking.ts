@@ -1,15 +1,7 @@
 'use client';
 
-import type {
-	BookPostRequestBody,
-	BookPostResponse,
-	HoldId,
-	ResourceId,
-	SessionId,
-	SlotId,
-	TenantId,
-} from '@tap/protocol';
-import { useState } from 'react';
+import { BookingClient } from '@tap/client';
+import { useMemo, useState } from 'react';
 
 export type UseBookingOptions = {
 	apiBaseUrl: string;
@@ -37,6 +29,16 @@ export const useBooking = (options: UseBookingOptions): UseBookingResult => {
 	const [isConfirming, setIsConfirming] = useState(false);
 	const [error, setError] = useState<Error | null>(null);
 
+	const client = useMemo(
+		() =>
+			new BookingClient({
+				apiBaseUrl,
+				tenantSlug,
+				resourceSlug,
+			}),
+		[apiBaseUrl, tenantSlug, resourceSlug],
+	);
+
 	const confirmBooking = async (params: {
 		slotId: string;
 		holdId: string;
@@ -49,39 +51,9 @@ export const useBooking = (options: UseBookingOptions): UseBookingResult => {
 		setError(null);
 
 		try {
-			const body: BookPostRequestBody = {
-				tenantId: tenantSlug as TenantId,
-				resourceId: resourceSlug as ResourceId,
-				slotId: params.slotId as SlotId,
-				holdId: params.holdId as HoldId,
-				holdSessionId: params.sessionId as SessionId,
-				customer: {
-					name: params.customerName,
-					email: params.customerEmail,
-					phone: params.customerPhone,
-				},
-			};
-
-			const response = await fetch(`${apiBaseUrl}/book`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify(body),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({
-					error: response.statusText,
-				}));
-				throw new Error(
-					errorData.error?.message || `Failed to book: ${response.status}`,
-				);
-			}
-
-			const data = (await response.json()) as BookPostResponse;
-			onSuccess?.(data.bookingId);
-			return data.bookingId;
+			const bookingId = await client.confirmBooking(params);
+			onSuccess?.(bookingId);
+			return bookingId;
 		} catch (err) {
 			const error = err instanceof Error ? err : new Error('Unknown error');
 			setError(error);

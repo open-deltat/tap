@@ -1,4 +1,5 @@
 import type { ResourceId, SlotId, TenantId } from '@tap/core';
+import { API_ROUTES } from '@tap/protocol';
 import type { Server } from 'bun';
 import { handleAvailability } from './routes/availability';
 import { handleBook } from './routes/book';
@@ -34,7 +35,7 @@ function handleHttp(
 	};
 
 	try {
-		if (pathname === '/availability' && method === 'POST') {
+		if (pathname === API_ROUTES.AVAILABILITY && method === 'POST') {
 			return handleAvailability(req)
 				.then(addCors)
 				.catch((e) => {
@@ -50,7 +51,7 @@ function handleHttp(
 				});
 		}
 
-		if (pathname === '/book' && method === 'POST') {
+		if (pathname === API_ROUTES.BOOK && method === 'POST') {
 			return handleBook(req, server)
 				.then(addCors)
 				.catch((e) => {
@@ -66,7 +67,7 @@ function handleHttp(
 				});
 		}
 
-		if (pathname === '/availability-ws') {
+		if (pathname === API_ROUTES.AVAILABILITY_WS) {
 			const success = server.upgrade(req, {
 				data: { type: 'availability' },
 			});
@@ -74,7 +75,7 @@ function handleHttp(
 			return new Response('WebSocket upgrade failed', { status: 400 });
 		}
 
-		if (pathname === '/hold-ws') {
+		if (pathname === API_ROUTES.HOLD_WS) {
 			const tenantId = url.searchParams.get('tenantId');
 			const resourceId = url.searchParams.get('resourceId');
 			const slotId = url.searchParams.get('slotId');
