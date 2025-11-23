@@ -43,8 +43,8 @@ export const createBookingConfirmedEvent = (params: {
 	resourceId: ResourceId;
 	bookingId: BookingId;
 	holdId: HoldId;
-	start: number;
-	end: number;
+	startUnix: number;
+	endUnix: number;
 	customerName?: string;
 	customerEmail?: string;
 	customerPhone?: string;
@@ -60,8 +60,8 @@ export const createBookingConfirmedEvent = (params: {
 	payload: {
 		bookingId: params.bookingId,
 		holdId: params.holdId,
-		start: params.start,
-		end: params.end,
+		start: params.startUnix,
+		end: params.endUnix,
 		customerName: params.customerName,
 		customerEmail: params.customerEmail,
 		customerPhone: params.customerPhone,
