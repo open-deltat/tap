@@ -85,17 +85,13 @@ export async function handleBook(
 		if (!holdId || !sessionId) {
 			const tempSessionId = `session_${ulid()}` as SessionId;
 
-			const dayKey = start.toISOString().split('T')[0] as DayKey; // core DayKey (UTC)
-			const startMinute = start.getUTCHours() * 60 + start.getUTCMinutes();
-			const endMinute = end.getUTCHours() * 60 + end.getUTCMinutes();
-
 			const holdResult = await core.placeHold({
 				tenantId: body.tenantId,
 				resourceId: body.resourceId,
 				sessionId: tempSessionId,
-				day: dayKey,
-				startMinute,
-				endMinute,
+				timezone: 'UTC', // TODO: Fetch resource timezone
+				startUnix: start.getTime(),
+				endUnix: end.getTime(),
 				expiresAt: Date.now() + 60000, // 1 min expiry
 				clientRef: body.clientRef,
 			});

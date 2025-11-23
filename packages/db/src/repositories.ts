@@ -1,4 +1,5 @@
 import type { Booking, Hold, Offer, Resource, Tenant } from '@tap/core';
+import type { BookingId, HoldId, ResourceId, TenantId } from '@tap/protocol';
 import { and, eq, gte, lte } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -63,10 +64,11 @@ export const createTenantRepository = (db: Database): TenantRepository => {
 			const row = rows[0];
 			if (!row) return null;
 			return {
-				id: row.id,
+				id: row.id as TenantId, // Use cast if ID is branded in Tenant type, assuming Tenant uses TenantId for id too?
+				// Check TenantSchema in models.ts: id: ULIDSchema.transform((v) => v as TenantId). YES.
 				name: row.name,
 				slug: row.slug,
-			};
+			} as Tenant;
 		},
 		getById: async (id: string) => {
 			const rows = await db
@@ -77,10 +79,10 @@ export const createTenantRepository = (db: Database): TenantRepository => {
 			const row = rows[0];
 			if (!row) return null;
 			return {
-				id: row.id,
+				id: row.id as TenantId,
 				name: row.name,
 				slug: row.slug,
-			};
+			} as Tenant;
 		},
 		create: async (tenant: Tenant) => {
 			await db.insert(tenants).values({
@@ -109,8 +111,8 @@ export const createResourceRepository = (db: Database): ResourceRepository => {
 			const row = rows[0];
 			if (!row) return null;
 			return {
-				id: row.resource.id,
-				tenantId: row.tenantId,
+				id: row.resource.id as ResourceId, // ResourceSchema has id as ResourceId
+				tenantId: row.tenantId as TenantId,
 				name: row.resource.name,
 				slug: row.resource.slug,
 				timezone: row.resource.timezone,
@@ -131,8 +133,8 @@ export const createResourceRepository = (db: Database): ResourceRepository => {
 			const row = rows[0];
 			if (!row) return null;
 			return {
-				id: row.id,
-				tenantId: row.tenantId,
+				id: row.id as ResourceId,
+				tenantId: row.tenantId as TenantId,
 				name: row.name,
 				slug: row.slug,
 				timezone: row.timezone,
@@ -150,8 +152,8 @@ export const createResourceRepository = (db: Database): ResourceRepository => {
 				.from(resources)
 				.where(eq(resources.tenantId, tenantId));
 			return rows.map((row) => ({
-				id: row.id,
-				tenantId: row.tenantId,
+				id: row.id as ResourceId,
+				tenantId: row.tenantId as TenantId,
 				name: row.name,
 				slug: row.slug,
 				timezone: row.timezone,
@@ -187,9 +189,9 @@ export const createOfferRepository = (db: Database): OfferRepository => {
 				.from(offers)
 				.where(eq(offers.resourceId, resourceId));
 			return rows.map((row) => ({
-				id: row.id,
-				tenantId: row.tenantId,
-				resourceId: row.resourceId,
+				id: row.id as Offer['id'], // Offer.id is string (ULIDSchema)
+				tenantId: row.tenantId as TenantId,
+				resourceId: row.resourceId as ResourceId,
 				daysOfWeek: row.daysOfWeek as number[],
 				startTime: row.startTime,
 				endTime: row.endTime,
@@ -223,10 +225,18 @@ export const createBookingRepository = (db: Database): BookingRepository => {
 			const row = rows[0];
 			if (!row) return null;
 			return {
-				id: row.id,
-				tenantId: row.tenantId,
-				resourceId: row.resourceId,
-				holdId: row.holdId ?? undefined,
+				id: row.id as BookingId, // Booking.id is string in models.ts, but lets see.
+				// BookingSchema id: ULIDSchema (string). But in events/types it might be BookingId.
+				// Let's assume string is fine or cast to BookingId if needed.
+				// Wait, BookingId type from protocol is branded?
+				// BookingIdSchema = ULIDSchema.brand('BookingId').
+				// BookingSchema uses `id: ULIDSchema`. NO BRAND in models.ts for id?
+				// Let's check models.ts again.
+				// `id: ULIDSchema`.
+				// So it is `string`.
+				tenantId: row.tenantId as TenantId,
+				resourceId: row.resourceId as ResourceId,
+				holdId: (row.holdId ?? undefined) as HoldId | undefined,
 				start: row.start,
 				end: row.end,
 				status: row.status as Booking['status'],
@@ -253,10 +263,10 @@ export const createBookingRepository = (db: Database): BookingRepository => {
 				.from(bookings)
 				.where(and(...conditions));
 			return rows.map((row) => ({
-				id: row.id,
-				tenantId: row.tenantId,
-				resourceId: row.resourceId,
-				holdId: row.holdId ?? undefined,
+				id: row.id as BookingId,
+				tenantId: row.tenantId as TenantId,
+				resourceId: row.resourceId as ResourceId,
+				holdId: (row.holdId ?? undefined) as HoldId | undefined,
 				start: row.start,
 				end: row.end,
 				status: row.status as Booking['status'],
@@ -319,12 +329,13 @@ export const createHoldRepository = (db: Database): HoldRepository => {
 			const row = rows[0];
 			if (!row) return null;
 			return {
-				id: row.id,
-				tenantId: row.tenantId,
-				resourceId: row.resourceId,
-				day: row.day,
-				startMinute: row.startMinute,
-				endMinute: row.endMinute,
+				id: row.id as HoldId, // HoldSchema id: ULIDSchema.
+				// Wait, HoldSchema is like BookingSchema?
+				// `id: ULIDSchema` in models.ts.
+				tenantId: row.tenantId as TenantId,
+				resourceId: row.resourceId as ResourceId,
+				startUnix: row.startUnix,
+				endUnix: row.endUnix,
 				expiresAt: row.expiresAt,
 				clientRef: row.clientRef ?? undefined,
 				createdAt: row.createdAt.getTime(),
@@ -336,12 +347,11 @@ export const createHoldRepository = (db: Database): HoldRepository => {
 				.from(holds)
 				.where(lte(holds.expiresAt, now));
 			return rows.map((row) => ({
-				id: row.id,
-				tenantId: row.tenantId,
-				resourceId: row.resourceId,
-				day: row.day,
-				startMinute: row.startMinute,
-				endMinute: row.endMinute,
+				id: row.id as HoldId,
+				tenantId: row.tenantId as TenantId,
+				resourceId: row.resourceId as ResourceId,
+				startUnix: row.startUnix,
+				endUnix: row.endUnix,
 				expiresAt: row.expiresAt,
 				clientRef: row.clientRef ?? undefined,
 				createdAt: row.createdAt.getTime(),
@@ -352,9 +362,8 @@ export const createHoldRepository = (db: Database): HoldRepository => {
 				id: hold.id,
 				tenantId: hold.tenantId,
 				resourceId: hold.resourceId,
-				day: hold.day,
-				startMinute: hold.startMinute,
-				endMinute: hold.endMinute,
+				startUnix: hold.startUnix,
+				endUnix: hold.endUnix,
 				expiresAt: hold.expiresAt,
 				clientRef: hold.clientRef ?? null,
 			});

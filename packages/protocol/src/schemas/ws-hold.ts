@@ -36,8 +36,8 @@ export const HoldWsConfirmedSchema = z.object({
 	tenantId: TenantIdSchema,
 	resourceId: ResourceIdSchema,
 	slotId: SlotIdSchema,
-	start: IsoDateTimeSchema,
-	end: IsoDateTimeSchema,
+	startUnix: z.number(),
+	endUnix: z.number(),
 });
 export type HoldWsConfirmed = z.infer<typeof HoldWsConfirmedSchema>;
 

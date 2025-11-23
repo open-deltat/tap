@@ -84,16 +84,14 @@ export class AvailabilityStore {
 			event.type === 'HoldReleased'
 		) {
 			if (
-				!event.payload.day ||
-				event.payload.startMinute === undefined ||
-				event.payload.endMinute === undefined
+				event.payload.startUnix === undefined ||
+				event.payload.endUnix === undefined
 			) {
 				return null;
 			}
-			const dayStart = parseDayToUnixStartOfDayUTC(event.payload.day);
 			return {
-				start: dayStart + event.payload.startMinute * 60000,
-				end: dayStart + event.payload.endMinute * 60000,
+				start: event.payload.startUnix,
+				end: event.payload.endUnix,
 			};
 		}
 		if (

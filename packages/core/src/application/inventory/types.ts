@@ -13,8 +13,8 @@ export type HoldMetadata = {
 	tenantId: TenantId;
 	resourceId: ResourceId;
 	sessionId: SessionId;
-	day: DayKey;
-	start: Minute;
-	end: Minute;
+	timezone: string;
+	startUnix: number;
+	endUnix: number;
 	expiresAt: number;
 };

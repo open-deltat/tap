@@ -47,8 +47,8 @@ export async function handleAvailability(req: Request): Promise<Response> {
 				slotId: s.slotId,
 				resourceId: s.resourceId,
 				tenantId: s.tenantId,
-				start: s.start,
-				end: s.end,
+				start: new Date(s.start).getTime(),
+				end: new Date(s.end).getTime(),
 			})),
 			pricing: slots.map((s) => ({
 				slotId: s.slotId,

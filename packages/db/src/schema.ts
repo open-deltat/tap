@@ -73,8 +73,8 @@ export const bookings = pgTable('bookings', {
 		.notNull()
 		.references(() => resources.id),
 	holdId: text('hold_id'),
-	start: integer('start').notNull(),
-	end: integer('end').notNull(),
+	start: bigint('start', { mode: 'number' }).notNull(),
+	end: bigint('end', { mode: 'number' }).notNull(),
 	status: text('status').notNull().default('CONFIRMED'),
 	paymentStatus: text('payment_status').notNull().default('NONE'),
 	paymentProvider: text('payment_provider'),
@@ -96,10 +96,9 @@ export const holds = pgTable('holds', {
 	resourceId: text('resource_id')
 		.notNull()
 		.references(() => resources.id),
-	day: text('day').notNull(),
-	startMinute: integer('start_minute').notNull(),
-	endMinute: integer('end_minute').notNull(),
-	expiresAt: integer('expires_at').notNull(),
+	startUnix: bigint('start_unix', { mode: 'number' }).notNull(),
+	endUnix: bigint('end_unix', { mode: 'number' }).notNull(),
+	expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
 	clientRef: text('client_ref'),
 	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
 		.notNull()

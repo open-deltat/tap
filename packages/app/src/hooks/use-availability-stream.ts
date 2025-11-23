@@ -106,19 +106,13 @@ function mapDeltaToLedgerEvent(
 		delta.kind === 'HoldReleased' ||
 		delta.kind === 'HoldExpired'
 	) {
-		const start = new Date(delta.start);
-		const end = new Date(delta.end);
-		const dayStart = new Date(start);
-		dayStart.setUTCHours(0, 0, 0, 0);
-
 		return {
 			...base,
 			type: delta.kind,
 			payload: {
 				holdId: delta.holdId,
-				day: start.toISOString().split('T')[0],
-				startMinute: Math.round((start.getTime() - dayStart.getTime()) / 60000),
-				endMinute: Math.round((end.getTime() - dayStart.getTime()) / 60000),
+				startUnix: delta.startUnix,
+				endUnix: delta.endUnix,
 			},
 		};
 	}
@@ -129,8 +123,8 @@ function mapDeltaToLedgerEvent(
 			type: delta.kind,
 			payload: {
 				bookingId: delta.bookingId,
-				start: new Date(delta.start).getTime(),
-				end: new Date(delta.end).getTime(),
+				start: delta.startUnix,
+				end: delta.endUnix,
 				holdId: delta.holdId,
 			},
 		};

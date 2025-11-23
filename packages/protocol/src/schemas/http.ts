@@ -57,8 +57,8 @@ export const BookPostResponseSchema = z.object({
 	tenantId: TenantIdSchema,
 	resourceId: ResourceIdSchema,
 	slotId: SlotIdSchema,
-	start: IsoDateTimeSchema,
-	end: IsoDateTimeSchema,
+	start: z.number(),
+	end: z.number(),
 	paymentStatus: z.enum(BOOKING_STATUSES),
 	clientRef: z.string().optional(),
 });

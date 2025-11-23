@@ -6,6 +6,7 @@ import type {
 	SessionId,
 	TenantId,
 } from '@tap/protocol';
+import { format as formatTz, fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { ulid } from 'ulid';
 import type {
 	HoldExpiredEvent,
@@ -29,9 +30,9 @@ export type HoldManager = {
 		tenantId: TenantId;
 		resourceId: ResourceId;
 		sessionId: SessionId;
-		day: DayKey;
-		startMinute: Minute;
-		endMinute: Minute;
+		timezone: string;
+		startUnix: number;
+		endUnix: number;
 		expiresAt: number;
 		clientRef?: string;
 	}) => Promise<
@@ -47,6 +48,57 @@ export type HoldManager = {
 	releaseHoldsForSession: (sessionId: SessionId) => Promise<HoldExpiredEvent[]>;
 };
 
+// Helper to calculate daily segments from a unix range in a timezone
+const getSegments = (startUnix: number, endUnix: number, timezone: string) => {
+	const segments: { day: DayKey; start: Minute; end: Minute }[] = [];
+
+	let current = startUnix;
+
+	// Safety break to prevent infinite loops on invalid ranges
+	if (endUnix <= startUnix) return [];
+
+	// Max range check (e.g. 90 days) could be done here or by caller.
+	// For now we assume reasonable ranges.
+
+	while (current < endUnix) {
+		const date = toZonedTime(current, timezone);
+		const day = formatTz(date, 'yyyy-MM-dd', { timeZone: timezone }) as DayKey;
+
+		const startMinute = (date.getHours() * 60 + date.getMinutes()) as Minute;
+
+		// Find when this day ends (next day 00:00:00)
+		const nextDay = new Date(date);
+		nextDay.setDate(nextDay.getDate() + 1);
+		nextDay.setHours(0, 0, 0, 0);
+
+		// Determine if endUnix is on the same day as current.
+		const endDate = toZonedTime(endUnix, timezone);
+		const endDay = formatTz(endDate, 'yyyy-MM-dd', {
+			timeZone: timezone,
+		}) as DayKey;
+
+		let endMinute: Minute = 1440;
+		let stepEndUnix = 0; // The real unix time where this segment ends
+
+		if (day === endDay) {
+			const m = endDate.getHours() * 60 + endDate.getMinutes();
+			endMinute = m as Minute;
+			stepEndUnix = endUnix;
+		} else {
+			// Ends on a later day.
+			// This segment goes to 1440 (end of day).
+			endMinute = 1440;
+			// Calculate start of next day in UTC to advance loop
+			// nextDay is "local" 00:00. date-fns-tz fromZonedTime converts "local" date to UTC timestamp.
+			stepEndUnix = fromZonedTime(nextDay, timezone).getTime();
+		}
+
+		segments.push({ day, start: startMinute, end: endMinute });
+		current = stepEndUnix;
+	}
+	return segments;
+};
+
 export const createHoldManager = (params: {
 	getState: (tenantId: TenantId, resourceId: ResourceId) => InventoryState;
 	holds: Map<HoldId, HoldMetadata>;
@@ -57,60 +109,84 @@ export const createHoldManager = (params: {
 			tenantId,
 			resourceId,
 			sessionId,
-			day,
-			startMinute,
-			endMinute,
+			timezone,
+			startUnix,
+			endUnix,
 			expiresAt,
 			clientRef,
 		}) => {
-			const lockKey = `${tenantId}:${resourceId}:${day}`;
-			const release = await params.withLock(lockKey);
+			const segments = getSegments(startUnix, endUnix, timezone);
+			if (segments.length === 0) return { success: false };
+
+			// Acquire locks for all days involved
+			const lockKeys = segments
+				.map((s) => `${tenantId}:${resourceId}:${s.day}`)
+				.sort();
+			const uniqueLockKeys = [...new Set(lockKeys)];
+
+			const releases: (() => void)[] = [];
 			try {
-				const dayMap = params.getState(tenantId, resourceId);
-				let dayState = dayMap.get(day);
-				if (!dayState) {
-					dayState = createBitmapDay(15);
-					dayMap.set(day, dayState);
+				for (const key of uniqueLockKeys) {
+					releases.push(await params.withLock(key));
 				}
 
-				if (
-					!isRangeFree(dayState.booked, dayState.held, startMinute, endMinute)
-				) {
-					return { success: false };
+				// 1. Check all segments availability
+				for (const segment of segments) {
+					const dayMap = params.getState(tenantId, resourceId);
+					let dayState = dayMap.get(segment.day);
+					if (!dayState) {
+						dayState = createBitmapDay(15);
+						dayMap.set(segment.day, dayState);
+					}
+					if (
+						!isRangeFree(
+							dayState.booked,
+							dayState.held,
+							segment.start,
+							segment.end,
+						)
+					) {
+						return { success: false };
+					}
 				}
 
-				setBitRange(dayState.held, startMinute, endMinute, true);
+				// 2. If all free, apply hold
+				for (const segment of segments) {
+					const dayMap = params.getState(tenantId, resourceId);
+					const dayState = dayMap.get(segment.day);
+					// Should exist because we created it above
+					if (dayState) {
+						setBitRange(dayState.held, segment.start, segment.end, true);
+					}
+				}
 
 				const holdId = ulid() as HoldId;
 				params.holds.set(holdId, {
 					tenantId,
 					resourceId,
 					sessionId,
-					day,
-					start: startMinute,
-					end: endMinute,
+					timezone,
+					startUnix,
+					endUnix,
 					expiresAt,
 				});
 
-				const eventParams: Parameters<typeof createHoldPlacedEvent>[0] = {
+				const event = createHoldPlacedEvent({
 					tenantId,
 					resourceId,
 					holdId,
-					day,
-					startMinute,
-					endMinute,
+					startUnix,
+					endUnix,
 					expiresAt,
-				};
-
-				if (clientRef !== undefined) {
-					eventParams.clientRef = clientRef;
-				}
-
-				const event = createHoldPlacedEvent(eventParams);
+					clientRef,
+				});
 
 				return { success: true, holdId, event };
 			} finally {
-				release();
+				// Release in reverse order
+				for (const release of releases.reverse()) {
+					release();
+				}
 			}
 		},
 		releaseHold: async ({ holdId, sessionId }) => {
@@ -119,20 +195,30 @@ export const createHoldManager = (params: {
 				return { success: false };
 			}
 
-			const lockKey = `${hold.tenantId}:${hold.resourceId}:${hold.day}`;
-			const release = await params.withLock(lockKey);
+			const segments = getSegments(hold.startUnix, hold.endUnix, hold.timezone);
+			const lockKeys = segments
+				.map((s) => `${hold.tenantId}:${hold.resourceId}:${s.day}`)
+				.sort();
+			const uniqueLockKeys = [...new Set(lockKeys)];
+
+			const releases: (() => void)[] = [];
 			try {
-				// Re-check in case it changed while waiting for lock
+				for (const key of uniqueLockKeys) {
+					releases.push(await params.withLock(key));
+				}
+
+				// Re-check existence
 				const currentHold = params.holds.get(holdId);
 				if (!currentHold || currentHold.sessionId !== sessionId) {
 					return { success: false };
 				}
 
-				const dayMap = params.getState(hold.tenantId, hold.resourceId);
-				const dayState = dayMap.get(hold.day);
-
-				if (dayState) {
-					setBitRange(dayState.held, hold.start, hold.end, false);
+				for (const segment of segments) {
+					const dayMap = params.getState(hold.tenantId, hold.resourceId);
+					const dayState = dayMap.get(segment.day);
+					if (dayState) {
+						setBitRange(dayState.held, segment.start, segment.end, false);
+					}
 				}
 
 				params.holds.delete(holdId);
@@ -141,14 +227,15 @@ export const createHoldManager = (params: {
 					tenantId: hold.tenantId,
 					resourceId: hold.resourceId,
 					holdId,
-					day: hold.day,
-					startMinute: hold.start,
-					endMinute: hold.end,
+					startUnix: hold.startUnix,
+					endUnix: hold.endUnix,
 				});
 
 				return { success: true, event };
 			} finally {
-				release();
+				for (const release of releases.reverse()) {
+					release();
+				}
 			}
 		},
 		releaseHoldsForSession: async (sessionId) => {
@@ -161,21 +248,34 @@ export const createHoldManager = (params: {
 
 			const events: HoldExpiredEvent[] = [];
 
-			// Optimization: group by lockKey to avoid acquiring/releasing lock multiple times
-			// but for simplicity and correctness with existing locking, we iterate.
 			for (const holdId of sessionHolds) {
 				const hold = params.holds.get(holdId);
 				if (!hold) continue;
 
-				const lockKey = `${hold.tenantId}:${hold.resourceId}:${hold.day}`;
-				const release = await params.withLock(lockKey);
+				const segments = getSegments(
+					hold.startUnix,
+					hold.endUnix,
+					hold.timezone,
+				);
+				const lockKeys = segments
+					.map((s) => `${hold.tenantId}:${hold.resourceId}:${s.day}`)
+					.sort();
+				const uniqueLockKeys = [...new Set(lockKeys)];
+
+				const releases: (() => void)[] = [];
 				try {
+					for (const key of uniqueLockKeys) {
+						releases.push(await params.withLock(key));
+					}
+
 					if (!params.holds.has(holdId)) continue;
 
-					const dayMap = params.getState(hold.tenantId, hold.resourceId);
-					const dayState = dayMap.get(hold.day);
-					if (dayState) {
-						setBitRange(dayState.held, hold.start, hold.end, false);
+					for (const segment of segments) {
+						const dayMap = params.getState(hold.tenantId, hold.resourceId);
+						const dayState = dayMap.get(segment.day);
+						if (dayState) {
+							setBitRange(dayState.held, segment.start, segment.end, false);
+						}
 					}
 					params.holds.delete(holdId);
 
@@ -184,13 +284,14 @@ export const createHoldManager = (params: {
 							tenantId: hold.tenantId,
 							resourceId: hold.resourceId,
 							holdId,
-							day: hold.day,
-							startMinute: hold.start,
-							endMinute: hold.end,
+							startUnix: hold.startUnix,
+							endUnix: hold.endUnix,
 						}),
 					);
 				} finally {
-					release();
+					for (const release of releases.reverse()) {
+						release();
+					}
 				}
 			}
 			return events;

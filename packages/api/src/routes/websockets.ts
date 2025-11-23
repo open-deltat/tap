@@ -59,13 +59,16 @@ export const websocketHandler = {
 				ws.data.start = start.toISOString();
 				ws.data.end = end.toISOString();
 
+				const startUnix = start.getTime();
+				const endUnix = end.getTime();
+
 				const result = await core.placeHold({
 					tenantId,
 					resourceId,
 					sessionId,
-					day: start.toISOString().split('T')[0] as DayKey,
-					startMinute: start.getUTCHours() * 60 + start.getUTCMinutes(),
-					endMinute: end.getUTCHours() * 60 + end.getUTCMinutes(),
+					timezone: 'UTC', // TODO: Fetch resource timezone
+					startUnix,
+					endUnix,
 					expiresAt: Date.now() + 5 * 60 * 1000, // 5 min hold
 				});
 
@@ -93,8 +96,8 @@ export const websocketHandler = {
 						tenantId,
 						resourceId,
 						slotId,
-						start: start.toISOString(),
-						end: end.toISOString(),
+						startUnix,
+						endUnix,
 					};
 					ws.send(JSON.stringify(confirmed));
 
@@ -108,8 +111,8 @@ export const websocketHandler = {
 							slotId,
 							resourceId,
 							tenantId,
-							start: start.toISOString(),
-							end: end.toISOString(),
+							startUnix,
+							endUnix,
 							holdId,
 						} as AvailabilityDeltaPayload,
 					};
@@ -196,9 +199,10 @@ export const websocketHandler = {
 										slotId: ws.data.slotId,
 										resourceId: ws.data.resourceId,
 										tenantId: ws.data.tenantId,
-										start: ws.data.start,
-										end: ws.data.end,
-									},
+										startUnix: new Date(ws.data.start).getTime(),
+										endUnix: new Date(ws.data.end).getTime(),
+										holdId: msg.holdId,
+									} as AvailabilityDeltaPayload,
 								};
 								// ws.publish(topic, JSON.stringify(message));
 								serverContext.server?.publish(topic, JSON.stringify(message));
@@ -228,7 +232,8 @@ export const websocketHandler = {
 								!ws.data.resourceId ||
 								!ws.data.slotId ||
 								!ws.data.start ||
-								!ws.data.end
+								!ws.data.end ||
+								!ws.data.holdId
 							) {
 								return;
 							}
@@ -244,9 +249,10 @@ export const websocketHandler = {
 									slotId: ws.data.slotId,
 									resourceId: ws.data.resourceId,
 									tenantId: ws.data.tenantId,
-									start: ws.data.start,
-									end: ws.data.end,
-								},
+									startUnix: new Date(ws.data.start).getTime(),
+									endUnix: new Date(ws.data.end).getTime(),
+									holdId: ws.data.holdId,
+								} as AvailabilityDeltaPayload,
 							};
 							// ws.publish(topic, JSON.stringify(message));
 							serverContext.server?.publish(topic, JSON.stringify(message));

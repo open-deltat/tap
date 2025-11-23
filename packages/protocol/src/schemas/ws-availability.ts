@@ -27,8 +27,8 @@ export const AvailabilityDeltaPayloadSchema = z.object({
 	slotId: SlotIdSchema,
 	resourceId: ResourceIdSchema,
 	tenantId: TenantIdSchema,
-	start: IsoDateTimeSchema,
-	end: IsoDateTimeSchema,
+	startUnix: z.number(),
+	endUnix: z.number(),
 	holdId: HoldIdSchema.optional(),
 	bookingId: BookingIdSchema.optional(),
 });

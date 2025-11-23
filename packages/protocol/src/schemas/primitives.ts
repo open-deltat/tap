@@ -95,8 +95,8 @@ export const AvailabilitySlotSchema = z.object({
 	slotId: SlotIdSchema,
 	resourceId: ResourceIdSchema,
 	tenantId: TenantIdSchema,
-	start: IsoDateTimeSchema,
-	end: IsoDateTimeSchema,
+	start: z.number(),
+	end: z.number(),
 });
 export type AvailabilitySlot = z.infer<typeof AvailabilitySlotSchema>;
 

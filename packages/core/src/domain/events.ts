@@ -33,9 +33,8 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 		type: z.literal('HoldPlaced'),
 		payload: z.object({
 			holdId: HoldIdSchema,
-			day: z.string(),
-			startMinute: z.number().int().min(0).max(1439),
-			endMinute: z.number().int().min(1).max(1440),
+			startUnix: z.number(),
+			endUnix: z.number(),
 			expiresAt: z.number(),
 			clientRef: z.string().optional(),
 		}),
@@ -44,18 +43,16 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 		type: z.literal('HoldExpired'),
 		payload: z.object({
 			holdId: HoldIdSchema,
-			day: z.string().optional(),
-			startMinute: z.number().int().min(0).max(1439).optional(),
-			endMinute: z.number().int().min(1).max(1440).optional(),
+			startUnix: z.number().optional(),
+			endUnix: z.number().optional(),
 		}),
 	}),
 	EventBase.extend({
 		type: z.literal('HoldReleased'),
 		payload: z.object({
 			holdId: HoldIdSchema,
-			day: z.string().optional(),
-			startMinute: z.number().int().min(0).max(1439).optional(),
-			endMinute: z.number().int().min(1).max(1440).optional(),
+			startUnix: z.number().optional(),
+			endUnix: z.number().optional(),
 		}),
 	}),
 	EventBase.extend({
