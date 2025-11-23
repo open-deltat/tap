@@ -36,7 +36,7 @@ export const SlotsView = ({
 		return formatDate(timestamp, 'h:mm a');
 	};
 
-	const formatDateTitle = (date: Date) => {
+	const _formatDateTitle = (date: Date) => {
 		// Use local formatting to match the calendar selection visual,
 		// ignoring the target timezone shift for the header title.
 		return date.toLocaleDateString('en-US', {
@@ -48,24 +48,6 @@ export const SlotsView = ({
 
 	return (
 		<div className="flex-1 flex flex-col h-full bg-background">
-			<div className="p-4 border-b bg-background sticky top-0 z-10">
-				<h3 className="text-sm font-semibold flex items-center gap-2">
-					{selectedDate ? (
-						<>
-							<CalendarIcon className="h-4 w-4 text-muted-foreground" />
-							{formatDateTitle(selectedDate)}
-						</>
-					) : (
-						'Availability'
-					)}
-				</h3>
-				<p className="text-xs text-muted-foreground mt-0.5">
-					{selectedDate
-						? `Select a time (${timezone})`
-						: 'Select a date from the calendar.'}
-				</p>
-			</div>
-
 			<div className="flex-1 overflow-y-auto p-4">
 				{error && (
 					<div className="p-3 mb-4 rounded-md border border-destructive/20 bg-destructive/5 text-destructive text-xs flex items-center gap-2">

@@ -5,7 +5,11 @@ import type {
 	HoldPlacedEvent,
 	LedgerEvent,
 } from '../domain/events';
-import { createBitmapDay, setBitRange } from '../infrastructure/bitmap';
+import {
+	createBitmapDay,
+	decrementRange,
+	incrementRange,
+} from '../infrastructure/bitmap';
 import type { Inventory } from './inventory/inventory';
 import type { InventoryState } from './inventory/types';
 
@@ -120,7 +124,7 @@ export const replayEvents = async (
 					dayState = createBitmapDay(15);
 					state.set(day, dayState);
 				}
-				setBitRange(dayState.held, start, end, true);
+				incrementRange(dayState.held, start, end);
 			}
 		} else if (event.type === 'HoldExpired') {
 			const holdId = event.payload.holdId as HoldId;
@@ -138,7 +142,28 @@ export const replayEvents = async (
 				for (const { day, start, end } of segments) {
 					const dayState = state.get(day);
 					if (dayState) {
-						setBitRange(dayState.held, start, end, false);
+						decrementRange(dayState.held, start, end);
+					}
+				}
+			}
+		} else if (event.type === 'HoldReleased') {
+			// Similar to expired
+			const holdId = event.payload.holdId as HoldId;
+			const holdEvents = events.filter(
+				(e): e is HoldPlacedEvent =>
+					e.type === 'HoldPlaced' &&
+					e.payload.holdId === holdId &&
+					e.createdAt < event.createdAt,
+			);
+			const holdEvent = holdEvents[holdEvents.length - 1];
+			if (holdEvent) {
+				const { startUnix, endUnix } = holdEvent.payload;
+				const segments = getSegments(startUnix, endUnix, DEFAULT_TIMEZONE);
+
+				for (const { day, start, end } of segments) {
+					const dayState = state.get(day);
+					if (dayState) {
+						decrementRange(dayState.held, start, end);
 					}
 				}
 			}
@@ -170,8 +195,8 @@ export const replayEvents = async (
 							dayState = createBitmapDay(15);
 							state.set(day, dayState);
 						}
-						setBitRange(dayState.held, start, end, false);
-						setBitRange(dayState.booked, start, end, true);
+						decrementRange(dayState.held, start, end);
+						incrementRange(dayState.booked, start, end);
 					}
 				}
 			}
@@ -200,7 +225,7 @@ export const replayEvents = async (
 					for (const { day, start, end } of segments) {
 						const dayState = state.get(day);
 						if (dayState) {
-							setBitRange(dayState.booked, start, end, false);
+							decrementRange(dayState.booked, start, end);
 						}
 					}
 				}

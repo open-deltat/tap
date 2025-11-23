@@ -28,6 +28,7 @@ export const OfferSchema = z.object({
 	endTime: z.string(),
 	priceCents: z.number().int().optional(),
 	currency: z.string().default('USD'),
+	capacity: z.number().int().min(1).default(1),
 });
 
 export const BookingSchema = z.object({

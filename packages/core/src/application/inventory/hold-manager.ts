@@ -15,8 +15,9 @@ import type {
 } from '../../domain/events';
 import {
 	createBitmapDay,
-	isRangeFree,
-	setBitRange,
+	decrementRange,
+	incrementRange,
+	isRangeAvailable,
 } from '../../infrastructure/bitmap';
 import {
 	createHoldExpiredEvent,
@@ -35,6 +36,7 @@ export type HoldManager = {
 		endUnix: number;
 		expiresAt: number;
 		clientRef?: string;
+		capacity?: number;
 	}) => Promise<
 		| { success: true; holdId: HoldId; event: HoldPlacedEvent }
 		| { success: false }
@@ -114,6 +116,7 @@ export const createHoldManager = (params: {
 			endUnix,
 			expiresAt,
 			clientRef,
+			capacity = 1,
 		}) => {
 			const segments = getSegments(startUnix, endUnix, timezone);
 			if (segments.length === 0) return { success: false };
@@ -131,6 +134,8 @@ export const createHoldManager = (params: {
 				}
 
 				// 1. Check all segments availability
+				// capacity is passed in params, default 1
+
 				for (const segment of segments) {
 					const dayMap = params.getState(tenantId, resourceId);
 					let dayState = dayMap.get(segment.day);
@@ -139,11 +144,12 @@ export const createHoldManager = (params: {
 						dayMap.set(segment.day, dayState);
 					}
 					if (
-						!isRangeFree(
+						!isRangeAvailable(
 							dayState.booked,
 							dayState.held,
-							segment.start,
-							segment.end,
+							segment.start as Minute,
+							segment.end as Minute,
+							capacity,
 						)
 					) {
 						return { success: false };
@@ -156,7 +162,11 @@ export const createHoldManager = (params: {
 					const dayState = dayMap.get(segment.day);
 					// Should exist because we created it above
 					if (dayState) {
-						setBitRange(dayState.held, segment.start, segment.end, true);
+						incrementRange(
+							dayState.held,
+							segment.start as Minute,
+							segment.end as Minute,
+						);
 					}
 				}
 
@@ -217,7 +227,11 @@ export const createHoldManager = (params: {
 					const dayMap = params.getState(hold.tenantId, hold.resourceId);
 					const dayState = dayMap.get(segment.day);
 					if (dayState) {
-						setBitRange(dayState.held, segment.start, segment.end, false);
+						decrementRange(
+							dayState.held,
+							segment.start as Minute,
+							segment.end as Minute,
+						);
 					}
 				}
 
@@ -274,7 +288,11 @@ export const createHoldManager = (params: {
 						const dayMap = params.getState(hold.tenantId, hold.resourceId);
 						const dayState = dayMap.get(segment.day);
 						if (dayState) {
-							setBitRange(dayState.held, segment.start, segment.end, false);
+							decrementRange(
+								dayState.held,
+								segment.start as Minute,
+								segment.end as Minute,
+							);
 						}
 					}
 					params.holds.delete(holdId);

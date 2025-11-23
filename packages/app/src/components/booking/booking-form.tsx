@@ -3,7 +3,10 @@
 import { createSlotId } from '@tap/protocol';
 import { Check, ChevronLeft, Clock, Info, Loader2 } from 'lucide-react';
 import * as React from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { AvailabilitySlot } from '@/hooks/use-availability';
 
 export type BookingFormProps = {
@@ -86,9 +89,12 @@ export const BookingForm = ({
 					</div>
 				</div>
 				{holdExpirationCountdown !== null && (
-					<div className="text-[10px] font-medium px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full animate-pulse tabular-nums">
+					<Badge
+						variant="secondary"
+						className="text-[10px] font-medium px-2 py-0.5 bg-orange-100 text-orange-700 hover:bg-orange-100 animate-pulse tabular-nums"
+					>
 						{formatCountdown(holdExpirationCountdown)}
-					</div>
+					</Badge>
 				)}
 			</div>
 
@@ -105,59 +111,43 @@ export const BookingForm = ({
 					className="space-y-4 max-w-sm mx-auto mt-2"
 				>
 					<div className="space-y-1.5">
-						<label
-							htmlFor={nameId}
-							className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-						>
-							Full Name
-						</label>
-						<input
+						<Label htmlFor={nameId}>Full Name</Label>
+						<Input
 							id={nameId}
 							type="text"
 							required
 							value={customerName}
 							onChange={(e) => setCustomerName(e.target.value)}
-							className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
 							placeholder="Jane Doe"
 							disabled={isConfirming}
 						/>
 					</div>
 
 					<div className="space-y-1.5">
-						<label
-							htmlFor={emailId}
-							className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-						>
-							Email Address
-						</label>
-						<input
+						<Label htmlFor={emailId}>Email Address</Label>
+						<Input
 							id={emailId}
 							type="email"
 							required
 							value={customerEmail}
 							onChange={(e) => setCustomerEmail(e.target.value)}
-							className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
 							placeholder="jane@example.com"
 							disabled={isConfirming}
 						/>
 					</div>
 
 					<div className="space-y-1.5">
-						<label
-							htmlFor={phoneId}
-							className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-						>
+						<Label htmlFor={phoneId}>
 							Phone Number{' '}
 							<span className="text-muted-foreground font-normal">
 								(Optional)
 							</span>
-						</label>
-						<input
+						</Label>
+						<Input
 							id={phoneId}
 							type="tel"
 							value={customerPhone}
 							onChange={(e) => setCustomerPhone(e.target.value)}
-							className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
 							placeholder="+1 (555) 000-0000"
 							disabled={isConfirming}
 						/>

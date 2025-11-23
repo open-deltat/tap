@@ -7,7 +7,7 @@ import {
 	type TenantId,
 } from '@tap/protocol';
 import type { Offer } from '../../domain/models';
-import { getBit } from '../../infrastructure/bitmap';
+import { isRangeAvailable } from '../../infrastructure/bitmap';
 import type { InventoryState } from '../inventory/types';
 
 // Default offer: Mon-Fri, 09:00-17:00
@@ -118,6 +118,7 @@ export function calculateAvailability(params: {
 						dayKey,
 						slotStart,
 						durationMinutes,
+						offer.capacity ?? 1,
 					);
 
 					if (isFree) {
@@ -144,22 +145,21 @@ function checkBitmapAvailability(
 	dayKey: DayKey,
 	slotStart: Date,
 	duration: number,
+	capacity: number,
 ): boolean {
 	const dayState = stateMap.get(dayKey);
 	// If no state exists for this day, it means no bookings/holds, so it's free (assuming offers permit)
 	if (!dayState) return true;
 
-	const startMinute = slotStart.getUTCHours() * 60 + slotStart.getUTCMinutes();
+	const startMinute = (slotStart.getUTCHours() * 60 +
+		slotStart.getUTCMinutes()) as Minute;
+	const endMinute = (startMinute + duration) as Minute;
 
-	for (let i = 0; i < duration; i++) {
-		const m = startMinute + i;
-		if (
-			getBit(dayState.booked, m as Minute) ||
-			getBit(dayState.held, m as Minute)
-		) {
-			return false;
-		}
-	}
-
-	return true;
+	return isRangeAvailable(
+		dayState.booked,
+		dayState.held,
+		startMinute,
+		endMinute,
+		capacity,
+	);
 }

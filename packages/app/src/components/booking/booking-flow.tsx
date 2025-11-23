@@ -2,6 +2,7 @@
 
 import type { LedgerEvent } from '@tap/core';
 import { createSlotId } from '@tap/protocol';
+import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import {
 	type AvailabilitySlot,
@@ -21,6 +22,7 @@ import { cn } from '@/lib/utils';
 import { BookingForm } from './booking-form';
 import { DatePickerSection } from './date-picker-section';
 import { SlotsView } from './slots-view';
+import { TimezoneSelector } from './timezone-selector';
 
 export type BookingFlowProps = {
 	apiBaseUrl: string;
@@ -343,51 +345,97 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			return list;
 		}, [slots, durationMs, selectedDate, timezone, lastEvent]);
 
+		const formatDateTitle = (date: Date) => {
+			return date.toLocaleDateString('en-US', {
+				weekday: 'long',
+				month: 'long',
+				day: 'numeric',
+			});
+		};
+
 		return (
 			<div
 				className={cn(
-					'flex flex-col md:flex-row gap-4 h-auto md:h-[500px]',
+					'flex flex-col gap-0 h-auto md:h-[600px] border rounded-3xl overflow-hidden shadow-sm bg-background',
 					className,
 				)}
 			>
-				<div className="w-full md:w-[320px] bg-background border rounded-3xl shadow-sm overflow-hidden shrink-0">
-					<DatePickerSection
-						selectedDate={selectedDate}
-						onSelectDate={(date) => {
-							setSelectedDate(date);
-							if (activeHold) handleReleaseHold();
-						}}
-						onMonthChange={handleMonthChange}
-						availableDays={availableDays}
-						isLoading={isLoading}
+				{/* Header Section */}
+				<div className="flex items-center justify-between p-4 border-b bg-background z-10">
+					<div className="flex flex-col">
+						<h3 className="text-sm font-semibold flex items-center gap-2">
+							{selectedDate ? (
+								<>
+									<CalendarIcon className="h-4 w-4 text-muted-foreground" />
+									{formatDateTitle(selectedDate)}
+								</>
+							) : (
+								'Select Date'
+							)}
+							<div
+								className={`transition-opacity duration-300 ml-2 ${isLoading ? 'opacity-100' : 'opacity-0'}`}
+							>
+								<Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+							</div>
+						</h3>
+						<div className="flex items-center gap-2 mt-1">
+							<p className="text-xs text-muted-foreground">
+								{selectedDate
+									? `Times shown in ${timezone}`
+									: 'Select a date from the calendar'}
+							</p>
+						</div>
+					</div>
+				</div>
+
+				<div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+					<div className="w-full md:w-[320px] bg-background shrink-0">
+						<DatePickerSection
+							selectedDate={selectedDate}
+							onSelectDate={(date) => {
+								setSelectedDate(date);
+								if (activeHold) handleReleaseHold();
+							}}
+							onMonthChange={handleMonthChange}
+							availableDays={availableDays}
+							isLoading={isLoading}
+							timezone={timezone}
+							onTimezoneChange={setTimezone}
+						/>
+					</div>
+
+					<div className="flex-1 relative bg-background flex flex-col min-h-[300px] md:min-h-0 overflow-hidden">
+						{view === 'booking' && activeHold ? (
+							<BookingForm
+								activeHold={activeHold}
+								bookingError={bookingError}
+								isConfirming={isConfirming}
+								onReleaseHold={handleReleaseHold}
+								onConfirmBooking={handleConfirmBooking}
+								formatTime={formatTime}
+								formatCountdown={formatCountdown}
+								holdExpirationCountdown={holdExpirationCountdown}
+							/>
+						) : (
+							<SlotsView
+								selectedDate={selectedDate}
+								isLoading={isLoading}
+								error={error}
+								displayedSlots={displayedSlots}
+								onSlotClick={handleSlotClick}
+								timezone={timezone}
+								formatDate={formatTz}
+							/>
+						)}
+					</div>
+				</div>
+
+				{/* Footer Section with Timezone Selector */}
+				<div className="p-3 border-t bg-muted/5 flex justify-start">
+					<TimezoneSelector
 						timezone={timezone}
 						onTimezoneChange={setTimezone}
 					/>
-				</div>
-
-				<div className="flex-1 relative bg-background border rounded-3xl shadow-sm overflow-hidden flex flex-col min-h-[300px] md:min-h-0">
-					{view === 'booking' && activeHold ? (
-						<BookingForm
-							activeHold={activeHold}
-							bookingError={bookingError}
-							isConfirming={isConfirming}
-							onReleaseHold={handleReleaseHold}
-							onConfirmBooking={handleConfirmBooking}
-							formatTime={formatTime}
-							formatCountdown={formatCountdown}
-							holdExpirationCountdown={holdExpirationCountdown}
-						/>
-					) : (
-						<SlotsView
-							selectedDate={selectedDate}
-							isLoading={isLoading}
-							error={error}
-							displayedSlots={displayedSlots}
-							onSlotClick={handleSlotClick}
-							timezone={timezone}
-							formatDate={formatTz}
-						/>
-					)}
 				</div>
 			</div>
 		);

@@ -7,7 +7,7 @@ import type {
 } from '@tap/protocol';
 import { format as formatTz, fromZonedTime, toZonedTime } from 'date-fns-tz';
 import type { HoldExpiredEvent } from '../../domain/events';
-import { setBitRange } from '../../infrastructure/bitmap';
+import { decrementRange } from '../../infrastructure/bitmap';
 import { createHoldExpiredEvent } from '../event-factory';
 import type { HoldMetadata, InventoryState } from './types';
 
@@ -75,7 +75,7 @@ export const createExpiryManager = (params: {
 						);
 						const dayState = dayMap.get(day);
 						if (dayState) {
-							setBitRange(dayState.held, start as Minute, end as Minute, false);
+							decrementRange(dayState.held, start as Minute, end as Minute);
 						}
 					}
 					params.holds.delete(holdId);

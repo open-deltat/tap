@@ -1,48 +1,56 @@
 import type { Minute } from '@tap/protocol';
 import type { BitmapDay } from './types';
 
-export const createEmptyBitmap = (): Uint8Array => new Uint8Array(180);
+// 1440 minutes in a day.
+export const createEmptyBitmap = (): Uint16Array => new Uint16Array(1440);
 
-export const getBit = (bitmap: Uint8Array, minute: Minute): boolean => {
-	const byte = minute >> 3;
-	const bit = minute & 7;
-	const byteValue = bitmap[byte];
-	if (byteValue === undefined) {
-		return false;
-	}
-	return (byteValue & (1 << bit)) !== 0;
+export const getUsage = (bitmap: Uint16Array, minute: Minute): number => {
+	return bitmap[minute] || 0;
 };
 
-export const setBitRange = (
-	bitmap: Uint8Array,
+export const incrementRange = (
+	bitmap: Uint16Array,
 	start: Minute,
 	end: Minute,
-	value: boolean,
+	amount: number = 1,
 ): void => {
 	for (let m = start; m < end; m++) {
-		const byte = m >> 3;
-		const bit = m & 7;
-		const byteValue = bitmap[byte];
-		if (byteValue === undefined) {
-			continue;
-		}
-		if (value) {
-			bitmap[byte] = byteValue | (1 << bit);
-		} else {
-			bitmap[byte] = byteValue & ~(1 << bit);
+		if (m >= 0 && m < 1440) {
+			bitmap[m] = (bitmap[m] || 0) + amount;
 		}
 	}
 };
 
-export const isRangeFree = (
-	booked: Uint8Array,
-	held: Uint8Array,
+export const decrementRange = (
+	bitmap: Uint16Array,
 	start: Minute,
 	end: Minute,
+	amount: number = 1,
+): void => {
+	for (let m = start; m < end; m++) {
+		if (m >= 0 && m < 1440) {
+			const current = bitmap[m] || 0;
+			bitmap[m] = Math.max(0, current - amount);
+		}
+	}
+};
+
+export const isRangeAvailable = (
+	booked: Uint16Array,
+	held: Uint16Array,
+	start: Minute,
+	end: Minute,
+	capacity: number,
 ): boolean => {
 	for (let m = start; m < end; m++) {
-		if (getBit(booked, m) || getBit(held, m)) {
-			return false;
+		if (m >= 0 && m < 1440) {
+			const bookedCount = booked[m] || 0;
+			const heldCount = held[m] || 0;
+			const totalUsage = bookedCount + heldCount;
+
+			if (totalUsage >= capacity) {
+				return false;
+			}
 		}
 	}
 	return true;
@@ -53,3 +61,8 @@ export const createBitmapDay = (resolution: number = 15): BitmapDay => ({
 	held: createEmptyBitmap(),
 	resolution,
 });
+
+// Backward compatibility helpers if needed, but we're shifting to usage counts
+export const getBit = (bitmap: Uint16Array, minute: Minute): boolean => {
+	return (bitmap[minute] || 0) > 0;
+};

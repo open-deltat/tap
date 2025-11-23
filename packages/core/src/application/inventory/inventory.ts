@@ -29,6 +29,7 @@ export type Inventory = {
 		endUnix: number;
 		expiresAt: number;
 		clientRef?: string;
+		capacity?: number;
 	}) => Promise<
 		| { success: true; holdId: HoldId; event: HoldPlacedEvent }
 		| { success: false }
