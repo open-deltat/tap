@@ -1,9 +1,7 @@
 import type {
 	BookingId,
-	DayKey,
 	EventId,
 	HoldId,
-	Minute,
 	ResourceId,
 	TenantId,
 } from '@tap/protocol';

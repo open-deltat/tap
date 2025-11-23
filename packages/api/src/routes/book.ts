@@ -1,4 +1,4 @@
-import { type BookingConfirmedEvent, type DayKey, TapError } from '@tap/core';
+import { type BookingConfirmedEvent, TapError } from '@tap/core';
 import {
 	type AvailabilityDeltaPayload,
 	type AvailabilityWsServerMessage,

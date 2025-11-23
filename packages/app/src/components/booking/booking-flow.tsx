@@ -109,8 +109,10 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 
 				if (futureDays.length > 0) {
 					const firstDay = futureDays[0];
-					const date = fromDayKey(firstDay!);
-					setSelectedDate(date);
+					if (firstDay) {
+						const date = fromDayKey(firstDay);
+						setSelectedDate(date);
+					}
 				}
 			}
 		}, [availableDays, selectedDate]);

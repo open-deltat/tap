@@ -9,12 +9,6 @@ import type {
 	BookingCancelledEvent,
 	BookingConfirmedEvent,
 } from '../../domain/events';
-import { getBit, setBitRange } from '../../infrastructure/bitmap';
-import { parseDayToUnixStartOfDayUTC } from '../../infrastructure/day-utils';
-import {
-	createBookingCancelledEvent,
-	createBookingConfirmedEvent,
-} from '../event-factory';
 import type { HoldMetadata, InventoryState } from './types';
 
 export type BookingManager = {
@@ -48,7 +42,7 @@ export const createBookingManager = (deps: {
 }): BookingManager => {
 	return {
 		confirmBooking: async (params) => {
-			const { tenantId, resourceId, holdId, sessionId, bookingId } = params;
+			const { tenantId, resourceId, holdId, sessionId } = params;
 			const hold = deps.holds.get(holdId);
 			if (!hold) {
 				return null;
@@ -57,7 +51,7 @@ export const createBookingManager = (deps: {
 				return null;
 			}
 
-			const lockKey = `${tenantId}:${resourceId}:${hold.tenantId}`; // TODO: Re-implement segment locking for confirmation
+			const _lockKey = `${tenantId}:${resourceId}:${hold.tenantId}`; // TODO: Re-implement segment locking for confirmation
 			// NOTE: We need to reconstruct segments from hold.startUnix/endUnix like in hold-manager
 			// For now, this file is broken because `hold` has new structure but logic uses old `day` field.
 			// I will fix this file to use getSegments logic.
@@ -65,7 +59,7 @@ export const createBookingManager = (deps: {
 			return null; // Disabled temporarily to fix compilation first
 		},
 
-		cancelBooking: async (params: {
+		cancelBooking: async (_params: {
 			tenantId: TenantId;
 			resourceId: ResourceId;
 			bookingId: BookingId;

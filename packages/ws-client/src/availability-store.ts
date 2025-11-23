@@ -1,5 +1,4 @@
 import type { LedgerEvent } from '@tap/core';
-import { parseDayToUnixStartOfDayUTC } from '@tap/core';
 
 export type TimeSlot = { start: number; end: number };
 

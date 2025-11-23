@@ -3,7 +3,6 @@ import {
 	AvailabilityWsClientMessageSchema,
 	type AvailabilityWsServerMessage,
 	createAvailabilityTopic,
-	type DayKey,
 	type HoldId,
 	type SessionId as HoldSessionId,
 	HoldWsClientMessageSchema,
@@ -205,7 +204,7 @@ export const websocketHandler = {
 									} as AvailabilityDeltaPayload,
 								};
 								// Use server.publish to ensure broadcast to all subscribers
-								const bytes = serverContext.server?.publish(
+								const _bytes = serverContext.server?.publish(
 									topic,
 									JSON.stringify(message),
 								);
@@ -258,7 +257,7 @@ export const websocketHandler = {
 								} as AvailabilityDeltaPayload,
 							};
 							// ws.publish(topic, JSON.stringify(message));
-							const bytes = serverContext.server?.publish(
+							const _bytes = serverContext.server?.publish(
 								topic,
 								JSON.stringify(message),
 							);

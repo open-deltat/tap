@@ -1,7 +1,6 @@
 'use client';
 
 import { Globe } from 'lucide-react';
-import * as React from 'react';
 
 // Common timezones for the dropdown
 const COMMON_TIMEZONES = [

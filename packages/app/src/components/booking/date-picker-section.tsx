@@ -2,7 +2,7 @@
 
 import { Loader2 } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
-import { format, getClientTimezone } from '@/lib/timezone';
+import { format } from '@/lib/timezone';
 import { TimezoneSelector } from './timezone-selector';
 
 export type DatePickerSectionProps = {

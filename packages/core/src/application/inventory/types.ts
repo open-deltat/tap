@@ -1,10 +1,4 @@
-import type {
-	DayKey,
-	Minute,
-	ResourceId,
-	SessionId,
-	TenantId,
-} from '@tap/protocol';
+import type { DayKey, ResourceId, SessionId, TenantId } from '@tap/protocol';
 import type { BitmapDay } from '../../infrastructure/bitmap';
 
 export type InventoryState = Map<DayKey, BitmapDay>;

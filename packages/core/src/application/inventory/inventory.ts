@@ -1,8 +1,6 @@
 import type {
 	BookingId,
-	DayKey,
 	HoldId,
-	Minute,
 	ResourceId,
 	SessionId,
 	TenantId,

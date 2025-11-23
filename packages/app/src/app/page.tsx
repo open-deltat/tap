@@ -1,7 +1,6 @@
 'use client';
 
 import type { ResourceId, TenantId } from '@tap/protocol';
-import Link from 'next/link';
 import { BookingFlow } from '@/components/booking/booking-flow';
 import { EventLogger } from '@/components/demo/event-logger';
 import { NetworkStatus } from '@/components/demo/network-status';
@@ -24,7 +23,7 @@ export default function Home() {
 			<div className="max-w-[1600px] mx-auto space-y-6">
 				<header className="flex justify-between items-center">
 					<div>
-						<h1 className="text-2xl font-bold tracking-tight">
+						<h1 className="text-2xl font-bold tracking-tight text-foreground">
 							TAP Protocol Demo
 						</h1>
 						<p className="text-sm text-muted-foreground">
@@ -39,8 +38,8 @@ export default function Home() {
 					<div className="space-y-3">
 						<div className="flex items-center justify-between px-1">
 							<div className="flex items-center gap-2">
-								<div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
-								<h2 className="text-sm font-medium text-blue-600">
+								<div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+								<h2 className="text-sm font-medium text-foreground">
 									Client A (Berlin)
 								</h2>
 							</div>
@@ -65,8 +64,8 @@ export default function Home() {
 					<div className="space-y-3">
 						<div className="flex items-center justify-between px-1">
 							<div className="flex items-center gap-2">
-								<div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-								<h2 className="text-sm font-medium text-indigo-600">
+								<div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+								<h2 className="text-sm font-medium text-foreground">
 									Client B (New York)
 								</h2>
 							</div>
