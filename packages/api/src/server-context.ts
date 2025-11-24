@@ -1,5 +1,5 @@
 import type { Server } from 'bun';
-import type { WSData } from './routes/websockets';
+import type { WSData } from './index';
 
 // Mutable container for the server instance
 export const serverContext: { server: Server<WSData> | null } = {

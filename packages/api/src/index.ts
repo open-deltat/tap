@@ -1,14 +1,24 @@
+import { TapError } from '@tap/core';
 import {
 	API_ROUTES,
 	type ResourceId,
 	type SlotId,
 	type TenantId,
 } from '@tap/protocol';
-import type { Server } from 'bun';
+import type { Server, ServerWebSocket } from 'bun';
 import { handleAvailability } from './routes/availability';
+import {
+	type AvailabilityWSData,
+	availabilityWebSocketHandler,
+} from './routes/availability/websocket-handler';
 import { handleBook } from './routes/book';
-import { type WSData, websocketHandler } from './routes/websockets';
+import {
+	type HoldWSData,
+	holdWebSocketHandler,
+} from './routes/hold/websocket-handler';
 import { setServer } from './server-context';
+
+export type WSData = AvailabilityWSData | HoldWSData;
 
 // CORS headers
 const CORS_HEADERS = {
@@ -21,12 +31,10 @@ function handleHttp(
 	req: Request,
 	server: Server<WSData>,
 ): Promise<Response> | Response | undefined {
-	console.log(`[${req.method}] ${req.url}`);
 	const url = new URL(req.url);
 	const method = req.method;
 	const pathname = url.pathname;
 
-	// Handle CORS preflight
 	if (method === 'OPTIONS') {
 		return new Response(null, { headers: CORS_HEADERS });
 	}
@@ -43,15 +51,11 @@ function handleHttp(
 			return handleAvailability(req)
 				.then(addCors)
 				.catch((e) => {
-					console.error('Error in handleAvailability:', e);
-					const res = new Response(
-						JSON.stringify({ error: 'Internal Server Error' }),
-						{
-							status: 500,
-							headers: { 'Content-Type': 'application/json' },
-						},
+					const error = new TapError(
+						'TAP_INTERNAL_ERROR',
+						e instanceof Error ? e.message : 'Unknown error',
 					);
-					return addCors(res);
+					return addCors(error.toResponse());
 				});
 		}
 
@@ -59,21 +63,17 @@ function handleHttp(
 			return handleBook(req, server)
 				.then(addCors)
 				.catch((e) => {
-					console.error('Error in handleBook:', e);
-					const res = new Response(
-						JSON.stringify({ error: 'Internal Server Error' }),
-						{
-							status: 500,
-							headers: { 'Content-Type': 'application/json' },
-						},
+					const error = new TapError(
+						'TAP_INTERNAL_ERROR',
+						e instanceof Error ? e.message : 'Unknown error',
 					);
-					return addCors(res);
+					return addCors(error.toResponse());
 				});
 		}
 
 		if (pathname === API_ROUTES.AVAILABILITY_WS) {
 			const success = server.upgrade(req, {
-				data: { type: 'availability' },
+				data: { type: 'availability' } as AvailabilityWSData,
 			});
 			if (success) return undefined;
 			return new Response('WebSocket upgrade failed', { status: 400 });
@@ -84,12 +84,7 @@ function handleHttp(
 			const resourceId = url.searchParams.get('resourceId');
 			const slotId = url.searchParams.get('slotId');
 
-			console.log(
-				`[WS-Upgrade] hold-ws request params: tenant=${tenantId}, resource=${resourceId}, slot=${slotId}`,
-			);
-
 			if (!tenantId || !resourceId || !slotId) {
-				console.log('[WS-Upgrade] Missing params');
 				return new Response('Missing query params', { status: 400 });
 			}
 
@@ -99,25 +94,58 @@ function handleHttp(
 					tenantId: tenantId as TenantId,
 					resourceId: resourceId as ResourceId,
 					slotId: slotId as SlotId,
-				},
+				} as HoldWSData,
 			});
-			console.log(`[WS-Upgrade] Upgrade success: ${success}`);
 			if (success) return undefined;
 			return new Response('WebSocket upgrade failed', { status: 400 });
 		}
 
 		return new Response('Not Found', { status: 404 });
 	} catch (e) {
-		console.error('Critical Error in handleHttp:', e);
-		const res = new Response('Internal Server Error', { status: 500 });
-		return addCors(res);
+		const error = new TapError(
+			'TAP_INTERNAL_ERROR',
+			e instanceof Error ? e.message : 'Unknown error',
+		);
+		return addCors(error.toResponse());
 	}
 }
 
 const server = Bun.serve({
 	port: 3000,
 	fetch: handleHttp,
-	websocket: websocketHandler,
+	websocket: {
+		open(ws: ServerWebSocket<WSData>) {
+			if (ws.data.type === 'availability') {
+				availabilityWebSocketHandler.open(
+					ws as ServerWebSocket<AvailabilityWSData>,
+				);
+			} else if (ws.data.type === 'hold') {
+				holdWebSocketHandler.open(ws as ServerWebSocket<HoldWSData>);
+			}
+		},
+		message(ws: ServerWebSocket<WSData>, message: string | Buffer) {
+			if (ws.data.type === 'availability') {
+				availabilityWebSocketHandler.message(
+					ws as ServerWebSocket<AvailabilityWSData>,
+					message,
+				);
+			} else if (ws.data.type === 'hold') {
+				holdWebSocketHandler.message(
+					ws as ServerWebSocket<HoldWSData>,
+					message,
+				);
+			}
+		},
+		close(ws: ServerWebSocket<WSData>) {
+			if (ws.data.type === 'availability') {
+				availabilityWebSocketHandler.close(
+					ws as ServerWebSocket<AvailabilityWSData>,
+				);
+			} else if (ws.data.type === 'hold') {
+				holdWebSocketHandler.close(ws as ServerWebSocket<HoldWSData>);
+			}
+		},
+	},
 });
 
 // Share server instance globally

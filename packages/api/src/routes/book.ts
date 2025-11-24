@@ -1,52 +1,26 @@
-import { type BookingConfirmedEvent, TapError } from '@tap/core';
+import {
+	calculateHoldExpiration,
+	createBookingId,
+	createSessionId,
+	DEFAULT_BOOKING_HOLD_EXPIRATION_MS,
+	TapError,
+} from '@tap/core';
 import {
 	type AvailabilityDeltaPayload,
 	type AvailabilityWsServerMessage,
-	type BookingId,
-	type BookPostRequestBody,
 	BookPostRequestBodySchema,
 	type BookPostResponse,
 	createAvailabilityTopic,
-	type HoldId,
 	parseSlotId,
-	type ResourceId,
-	type SessionId,
-	type TenantId,
+	type SlotId,
 } from '@tap/protocol';
 import type { Server } from 'bun';
-import { ulid } from 'ulid';
 import { core } from '../core';
-
-async function confirmBookingWithHold(
-	tenantId: TenantId,
-	resourceId: ResourceId,
-	holdId: HoldId,
-	sessionId: SessionId,
-	_slotId: string,
-	start: Date,
-	end: Date,
-	customer: BookPostRequestBody['customer'],
-): Promise<BookingConfirmedEvent | null> {
-	const event = await core.confirmBooking({
-		tenantId,
-		resourceId,
-		holdId,
-		sessionId,
-		bookingId: ulid() as BookingId,
-		start: start.getTime(),
-		end: end.getTime(),
-		customerName: customer.name,
-		customerEmail: customer.email,
-		...(customer.phone !== undefined && { customerPhone: customer.phone }),
-		paymentStatus: 'PENDING',
-		priceCents: 1000, // Mock
-	});
-	return event;
-}
+import { serverContext } from '../server-context';
 
 export async function handleBook(
 	req: Request,
-	server: Server<unknown>,
+	_server: Server<unknown>,
 ): Promise<Response> {
 	try {
 		const json = await req.json();
@@ -63,17 +37,14 @@ export async function handleBook(
 
 		const body = result.data;
 
-		let start: Date;
-		let end: Date;
+		let parsed: { start: Date; end: Date };
 		try {
-			const parsed = parseSlotId(body.slotId);
-			start = parsed.start;
-			end = parsed.end;
+			parsed = parseSlotId(body.slotId);
 		} catch (err) {
 			const error = new TapError(
 				'TAP_INVALID_INPUT',
 				'Invalid slot ID format',
-				err as Record<string, unknown>,
+				err instanceof Error ? { message: err.message } : undefined,
 			);
 			return error.toResponse();
 		}
@@ -81,18 +52,19 @@ export async function handleBook(
 		let holdId = body.holdId;
 		let sessionId = body.holdSessionId;
 
-		// If no hold provided, try to place one instantly
 		if (!holdId || !sessionId) {
-			const tempSessionId = `session_${ulid()}` as SessionId;
-
+			const tempSessionId = createSessionId();
 			const holdResult = await core.placeHold({
 				tenantId: body.tenantId,
 				resourceId: body.resourceId,
 				sessionId: tempSessionId,
-				timezone: 'UTC', // TODO: Fetch resource timezone
-				startUnix: start.getTime(),
-				endUnix: end.getTime(),
-				expiresAt: Date.now() + 60000, // 1 min expiry
+				timezone: 'UTC',
+				startUnix: parsed.start.getTime(),
+				endUnix: parsed.end.getTime(),
+				expiresAt: calculateHoldExpiration(
+					Date.now(),
+					DEFAULT_BOOKING_HOLD_EXPIRATION_MS,
+				),
 				...(body.clientRef !== undefined && { clientRef: body.clientRef }),
 			});
 
@@ -104,11 +76,6 @@ export async function handleBook(
 				return error.toResponse();
 			}
 
-			// Core placeHold returns HoldPlacedEvent | Failure
-			// If success is true, it should have holdId.
-			// We might need to check the type of holdResult more closely.
-			// Assuming holdResult.success means holdResult is HoldPlacedEvent (or contains holdId)
-			// Let's check core types later if this fails, but assuming holdId exists on success.
 			if ('holdId' in holdResult) {
 				holdId = holdResult.holdId;
 			}
@@ -123,32 +90,35 @@ export async function handleBook(
 			return error.toResponse();
 		}
 
-		const event = await confirmBookingWithHold(
-			body.tenantId,
-			body.resourceId,
+		const event = await core.confirmBooking({
+			tenantId: body.tenantId,
+			resourceId: body.resourceId,
 			holdId,
 			sessionId,
-			body.slotId,
-			start,
-			end,
-			body.customer,
-		);
+			bookingId: createBookingId(),
+			start: parsed.start.getTime(),
+			end: parsed.end.getTime(),
+			customerName: body.customer.name,
+			customerEmail: body.customer.email,
+			...(body.customer.phone !== undefined && {
+				customerPhone: body.customer.phone,
+			}),
+		});
 
 		if (!event) {
-			// This implies the hold was invalid or expired or session mismatch
 			const error = new TapError('TAP_HOLD_EXPIRED', 'Hold invalid or expired');
 			return error.toResponse();
 		}
 
-		// Broadcast update via Server Pub/Sub
+		// Broadcast via WebSocket
 		const topic = createAvailabilityTopic(body.tenantId, body.resourceId);
 		const payload: AvailabilityDeltaPayload = {
 			kind: 'BookingConfirmed',
-			slotId: body.slotId,
+			slotId: body.slotId as SlotId,
 			resourceId: body.resourceId,
 			tenantId: body.tenantId,
-			startUnix: start.getTime(),
-			endUnix: end.getTime(),
+			startUnix: parsed.start.getTime(),
+			endUnix: parsed.end.getTime(),
 			bookingId: event.payload.bookingId,
 			holdId: holdId || undefined,
 		};
@@ -159,16 +129,16 @@ export async function handleBook(
 			payload,
 		};
 
-		server.publish(topic, JSON.stringify(message));
+		serverContext.server?.publish(topic, JSON.stringify(message));
 
 		const response: BookPostResponse = {
 			bookingId: event.payload.bookingId,
 			tenantId: body.tenantId,
 			resourceId: body.resourceId,
 			slotId: body.slotId,
-			start: start.getTime(),
-			end: end.getTime(),
-			paymentStatus: 'PENDING',
+			start: parsed.start.getTime(),
+			end: parsed.end.getTime(),
+			paymentStatus: event.payload.paymentStatus || 'NONE',
 			clientRef: body.clientRef || undefined,
 		};
 
