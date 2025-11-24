@@ -21,7 +21,7 @@ export class HoldManager {
 		sessionId: null,
 	};
 
-	constructor(private options: HoldManagerOptions) {
+	constructor(options: HoldManagerOptions) {
 		this.client = new HoldClient(options);
 	}
 

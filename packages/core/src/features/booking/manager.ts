@@ -11,7 +11,6 @@ import type {
 } from '../../domain/events';
 import { createEvent } from '../../domain/factory';
 import {
-	getCompositeTimeline,
 	type Interval,
 	mergeIntervals,
 	subtractInterval,

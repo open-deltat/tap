@@ -23,7 +23,7 @@ export class AvailabilityStreamManager {
 		isConnected: false,
 	};
 
-	constructor(private options: AvailabilityStreamManagerOptions) {
+	constructor(options: AvailabilityStreamManagerOptions) {
 		this.client = new AvailabilityWebSocketClient(options);
 	}
 

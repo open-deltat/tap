@@ -1,5 +1,3 @@
-import type { DayKey } from '@tap/protocol';
-
 // In the interval model, horizon checking is just unix timestamp comparison.
 // We don't need complex day parsing.
 

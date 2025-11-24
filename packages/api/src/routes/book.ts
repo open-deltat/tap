@@ -46,7 +46,7 @@ async function confirmBookingWithHold(
 
 export async function handleBook(
 	req: Request,
-	server: Server<any>,
+	server: Server<unknown>,
 ): Promise<Response> {
 	try {
 		const json = await req.json();

@@ -42,11 +42,11 @@ export function generateOfferIntervals(
 			// Construct "Midnight" in that timezone for every day in range.
 
 			// Start from 'from' date, move day by day.
-			const current = new Date(from);
+			const _current = new Date(from);
 			// Back up to start of day to ensure we catch partial first day if needed?
 			// Actually, simpler to just construct the ISO string YYYY-MM-DD.
 
-			const endTs = to.getTime();
+			const _endTs = to.getTime();
 
 			// Loop constraint: We need to prevent infinite loops. Max 365 days or something?
 			// Or just while loop.

@@ -5,7 +5,6 @@ import {
 	type TenantId,
 } from '@tap/protocol';
 import type { Offer, WeeklyOffer } from '../../domain/models';
-import type { Interval } from '../../infrastructure/intervals';
 import {
 	getCompositeTimeline,
 	mergeIntervals,
@@ -86,7 +85,7 @@ export function calculateAvailability(params: {
 
 	// A. Timeline of Capacity Provision (Offers)
 	//    Since offers might overlap (Alice + Bob), we sum them.
-	const capacityProvided = getCompositeTimeline(
+	const _capacityProvided = getCompositeTimeline(
 		offerIntervals.map((i) => ({ ...i, value: i.value ?? 1 })),
 	);
 
@@ -99,7 +98,7 @@ export function calculateAvailability(params: {
 	// Actually, we want to SUM consumption.
 	// But `state.booked` usually contains distinct bookings.
 	// Let's sum them.
-	const capacityConsumed = getCompositeTimeline(consumptionIntervals);
+	const _capacityConsumed = getCompositeTimeline(consumptionIntervals);
 
 	// C. Subtract Consumption from Provision
 	//    Available = Provided - Consumed

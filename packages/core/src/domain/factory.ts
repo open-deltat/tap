@@ -8,12 +8,10 @@ export function createEvent<T extends LedgerEvent['type']>(
 	params: {
 		tenantId: TenantId;
 		resourceId: ResourceId;
-		[key: string]: any;
+		[key: string]: unknown;
 	},
 ): LedgerEvent {
 	const { tenantId, resourceId, ...rest } = params;
-	// Cast to any to bypass strict discriminated union checks during construction
-	// The callers are strongly typed via the specific event type casts they perform
 	return {
 		eventId: ulid() as EventId,
 		tenantId,
@@ -22,5 +20,5 @@ export function createEvent<T extends LedgerEvent['type']>(
 		version: 1,
 		createdAt: Date.now(),
 		payload: rest,
-	} as any as LedgerEvent;
+	} as unknown as LedgerEvent;
 }

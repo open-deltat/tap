@@ -20,7 +20,7 @@ export const AvailabilityState = ({
 	resourceSlug,
 	timezone = 'UTC',
 }: AvailabilityStateProps) => {
-	const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+	const [selectedDate] = useState<Date>(() => new Date());
 
 	const { slots, isLoading, error, cursor, availableDays, refresh } =
 		useAvailability({
@@ -78,16 +78,6 @@ export const AvailabilityState = ({
 			timeZone: timezone,
 			month: 'short',
 			day: 'numeric',
-		}).format(date);
-	};
-
-	const formatDate = (timestamp: number): string => {
-		const date = new Date(timestamp);
-		return new Intl.DateTimeFormat('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric',
-			timeZone: timezone,
 		}).format(date);
 	};
 

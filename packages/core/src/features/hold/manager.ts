@@ -152,14 +152,14 @@ export const createHoldManager = (params: {
 
 				const state = params.getState(hold.tenantId, hold.resourceId);
 
-				const holdInterval: Interval = {
+				const _holdInterval: Interval = {
 					start: hold.startUnix,
 					end: hold.endUnix,
 					value: 1,
 				};
 
 				// Remove from Held
-				const newHeld: Interval[] = [];
+				const _newHeld: Interval[] = [];
 				// We want to remove ONE instance of this interval.
 				// Since we append new intervals on hold, we can just remove the matching one?
 				// BUT, if we have identical holds (same start/end), we need to be careful.
