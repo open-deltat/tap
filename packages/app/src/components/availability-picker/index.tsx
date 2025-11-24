@@ -1,9 +1,10 @@
 'use client';
 
+import { generateDisplayedSlots } from '@tap/client';
 import type { LedgerEvent } from '@tap/core';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import * as React from 'react';
-import { format, fromDayKey, fromZonedTime } from '@/lib/timezone';
+import { format, fromDayKey } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { DatePickerSection as Calendar } from './calendar';
 import {
@@ -120,72 +121,13 @@ export const AvailabilityPicker = React.memo<AvailabilityPickerProps>(
 
 		const displayedSlots = React.useMemo(() => {
 			if (!selectedDate) return [];
-
-			const list = [];
-			const resolutionMs = durationMs || 60 * 60000;
-
-			// 1. Generate ALL possible slots for the day based on fromHour/toHour in the TARGET timezone
-			// selectedDate is a local Date object, e.g., Nov 24 at 00:00 local time.
-			// We extract the date string "2025-11-24"
-			const dateStr = format(selectedDate, 'yyyy-MM-dd');
-
-			// Create start timestamp: YYYY-MM-DD at 00:00:00 in target timezone (Always start at midnight)
-			const startStr = `${dateStr}T00:00:00`;
-
-			let startTime: number;
-			let endTime: number;
-
-			try {
-				// startStr is e.g. 2025-11-24T00:00:00
-				// fromZonedTime interprets this as 00:00 in NY (UTC-5) -> 05:00 UTC
-				startTime = fromZonedTime(startStr, timezone).getTime();
-
-				// Always generate 24 hours from start
-				const nextDay = new Date(selectedDate);
-				nextDay.setDate(nextDay.getDate() + 1);
-				const nextDayStr = format(nextDay, 'yyyy-MM-dd');
-				endTime = fromZonedTime(`${nextDayStr}T00:00:00`, timezone).getTime();
-			} catch (e) {
-				console.error('Timezone conversion error', e);
-				return [];
-			}
-
-			let current = startTime;
-			const end = endTime;
-
-			while (current + resolutionMs <= end) {
-				const slotStart = current;
-				const slotEnd = current + resolutionMs;
-
-				// 2. Check if this specific range is fully covered by an available slot
-				// We look for ANY available slot that completely contains [slotStart, slotEnd]
-				// (Since slots from store are merged free ranges)
-				const isAvailable = slots.some(
-					(s) => s.start <= slotStart && s.end >= slotEnd,
-				);
-
-				let isReleased = false;
-				if (lastEvent?.type === 'HoldReleased' && lastEvent.payload.startUnix) {
-					const evStart = lastEvent.payload.startUnix;
-					const evEnd = lastEvent.payload.endUnix || evStart;
-
-					// Check if event overlaps with slot
-					if (Math.max(slotStart, evStart) < Math.min(slotEnd, evEnd)) {
-						isReleased = true;
-					}
-				}
-
-				list.push({
-					start: slotStart,
-					end: slotEnd,
-					available: isAvailable,
-					isReleased,
-				});
-
-				current += resolutionMs;
-			}
-
-			return list;
+			return generateDisplayedSlots({
+				selectedDate,
+				slots,
+				durationMs,
+				timezone,
+				lastEvent,
+			});
 		}, [slots, durationMs, selectedDate, timezone, lastEvent]);
 
 		const formatDateTitle = (date: Date) => {

@@ -1,7 +1,7 @@
 'use client';
 
-import { HoldClient } from '@tap/client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { HoldManager } from '@tap/client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type UseHoldStreamOptions = {
 	apiBaseUrl: string;
@@ -14,38 +14,46 @@ export const useHoldStream = ({
 	tenantSlug,
 	resourceSlug,
 }: UseHoldStreamOptions) => {
-	const [sessionId, setSessionId] = useState<string | null>(null);
-	const clientRef = useRef<HoldClient | null>(null);
+	const manager = useMemo(
+		() =>
+			new HoldManager({
+				apiBaseUrl,
+				tenantSlug,
+				resourceSlug,
+			}),
+		[apiBaseUrl, tenantSlug, resourceSlug],
+	);
 
-	// Recreate client if config changes, but generally this shouldn't change often in a session
+	const [state, setState] = useState(() => manager.getState());
+
 	useEffect(() => {
-		clientRef.current = new HoldClient({
-			apiBaseUrl,
-			tenantSlug,
-			resourceSlug,
+		manager.setCallbacks({
+			onStateChange: (newState) => {
+				setState(newState);
+			},
 		});
+
 		return () => {
-			clientRef.current?.disconnect();
+			manager.disconnect();
 		};
-	}, [apiBaseUrl, tenantSlug, resourceSlug]);
+	}, [manager]);
 
-	const placeHold = useCallback(async (slot: { slotId: string }) => {
-		if (!clientRef.current) throw new Error('Client not initialized');
-		const result = await clientRef.current.placeHold(slot.slotId);
-		setSessionId(result.sessionId);
-		return result.holdId;
-	}, []);
+	const placeHold = useCallback(
+		async (slot: { slotId: string }) => {
+			return await manager.placeHold(slot.slotId);
+		},
+		[manager],
+	);
 
-	const releaseHold = useCallback((holdId: string) => {
-		if (clientRef.current) {
-			clientRef.current.releaseHold(holdId);
-			// Session ID might remain until we explicitly clear or disconnect,
-			// but for this flow it usually clears on disconnect or new hold.
-		}
-	}, []);
+	const releaseHold = useCallback(
+		(holdId: string) => {
+			manager.releaseHold(holdId);
+		},
+		[manager],
+	);
 
 	return {
-		sessionId,
+		sessionId: state.sessionId,
 		placeHold,
 		releaseHold,
 	};

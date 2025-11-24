@@ -1,7 +1,7 @@
 'use client';
 
-import { BookingClient } from '@tap/client';
-import { useMemo, useState } from 'react';
+import { BookingManager } from '@tap/client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export type UseBookingOptions = {
 	apiBaseUrl: string;
@@ -26,47 +26,46 @@ export type UseBookingResult = {
 
 export const useBooking = (options: UseBookingOptions): UseBookingResult => {
 	const { apiBaseUrl, tenantSlug, resourceSlug, onSuccess, onError } = options;
-	const [isConfirming, setIsConfirming] = useState(false);
-	const [error, setError] = useState<Error | null>(null);
 
-	const client = useMemo(
+	const manager = useMemo(
 		() =>
-			new BookingClient({
+			new BookingManager({
 				apiBaseUrl,
 				tenantSlug,
 				resourceSlug,
+				onSuccess,
+				onError,
 			}),
-		[apiBaseUrl, tenantSlug, resourceSlug],
+		[apiBaseUrl, tenantSlug, resourceSlug, onSuccess, onError],
 	);
 
-	const confirmBooking = async (params: {
-		slotId: string;
-		holdId: string;
-		sessionId: string;
-		customerName: string;
-		customerEmail: string;
-		customerPhone?: string;
-	}): Promise<string | null> => {
-		setIsConfirming(true);
-		setError(null);
+	const [state, setState] = useState(() => manager.getState());
 
-		try {
-			const bookingId = await client.confirmBooking(params);
-			onSuccess?.(bookingId);
-			return bookingId;
-		} catch (err) {
-			const error = err instanceof Error ? err : new Error('Unknown error');
-			setError(error);
-			onError?.(error);
-			return null;
-		} finally {
-			setIsConfirming(false);
-		}
-	};
+	useEffect(() => {
+		manager.setCallbacks({
+			onStateChange: (newState) => {
+				setState(newState);
+			},
+		});
+	}, [manager]);
+
+	const confirmBooking = useCallback(
+		async (params: {
+			slotId: string;
+			holdId: string;
+			sessionId: string;
+			customerName: string;
+			customerEmail: string;
+			customerPhone?: string;
+		}): Promise<string | null> => {
+			return await manager.confirmBooking(params);
+		},
+		[manager],
+	);
 
 	return {
 		confirmBooking,
-		isConfirming,
-		error,
+		isConfirming: state.isConfirming,
+		error: state.error,
 	};
 };

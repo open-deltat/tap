@@ -1,7 +1,13 @@
 export type { AvailabilityPostResponse, AvailabilitySlot } from '@tap/protocol';
 export * from './availability/client';
+export * from './availability/manager';
 export * from './availability/operations';
+export * from './availability/slot-display';
 export * from './availability/store';
+export * from './availability/stream-manager';
+export * from './availability/websocket-client';
 export * from './booking/client';
+export * from './booking/manager';
 export * from './hold/client';
+export * from './hold/manager';
 export * from './timezone/store';

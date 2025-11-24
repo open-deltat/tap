@@ -1,11 +1,8 @@
 'use client';
 
+import { AvailabilityStreamManager } from '@tap/client';
 import type { LedgerEvent } from '@tap/core';
-import type {
-	AvailabilityDeltaPayload,
-	AvailabilityWsServerMessage,
-} from '@tap/protocol';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type UseAvailabilityStreamOptions = {
 	apiBaseUrl: string;
@@ -26,8 +23,6 @@ export const useAvailabilityStream = ({
 	onConnect,
 	onDisconnect,
 }: UseAvailabilityStreamOptions) => {
-	const [isConnected, setIsConnected] = useState(false);
-	const wsRef = useRef<WebSocket | null>(null);
 	const onDeltaRef = useRef(onDelta);
 	const onConnectRef = useRef(onConnect);
 	const onDisconnectRef = useRef(onDisconnect);
@@ -38,108 +33,40 @@ export const useAvailabilityStream = ({
 		onDisconnectRef.current = onDisconnect;
 	}, [onDelta, onConnect, onDisconnect]);
 
+	const manager = useMemo(
+		() =>
+			new AvailabilityStreamManager({
+				apiBaseUrl,
+				tenantSlug,
+				resourceSlug,
+			}),
+		[apiBaseUrl, tenantSlug, resourceSlug],
+	);
+
+	const [state, setState] = useState(() => manager.getState());
+
 	useEffect(() => {
-		if (!enabled) {
-			if (wsRef.current) {
-				wsRef.current.close();
-				wsRef.current = null;
-				setIsConnected(false);
-				onDisconnectRef.current?.();
-			}
-			return;
-		}
-
-		const wsUrl = `${apiBaseUrl.replace(/^http/, 'ws')}/availability-ws`;
-		const ws = new WebSocket(wsUrl);
-		wsRef.current = ws;
-
-		ws.onopen = () => {
-			console.log('[AvailStream] Connected');
-			setIsConnected(true);
-			onConnectRef.current?.();
-			// Subscribe
-			ws.send(
-				JSON.stringify({
-					type: 'stream.subscribe',
-					tenantId: tenantSlug,
-					resourceId: resourceSlug,
-				}),
-			);
-		};
-
-		ws.onmessage = (event) => {
-			console.log('[AvailStream] Message:', event.data);
-			try {
-				const msg = JSON.parse(event.data) as AvailabilityWsServerMessage;
-				if (msg.type === 'stream.delta') {
-					const delta = msg.payload;
-					// Map Protocol Delta to Core LedgerEvent (simplified for Client Store)
-					const coreEvent = mapDeltaToLedgerEvent(msg.eventId, delta);
-					if (coreEvent) {
-						onDeltaRef.current?.(coreEvent as LedgerEvent);
-					}
+		manager.setCallbacks({
+			onStateChange: (newState) => {
+				setState(newState);
+				if (newState.isConnected) {
+					onConnectRef.current?.();
+				} else {
+					onDisconnectRef.current?.();
 				}
-			} catch (err) {
-				console.error('[AvailStream] Error parsing message:', err);
-			}
-		};
+			},
+			onDelta: (event) => {
+				onDeltaRef.current?.(event);
+			},
+		});
+	}, [manager]);
 
-		ws.onclose = () => {
-			console.log('[AvailStream] Disconnected');
-			setIsConnected(false);
-			wsRef.current = null;
-			onDisconnectRef.current?.();
-		};
-
+	useEffect(() => {
+		manager.connect(enabled);
 		return () => {
-			ws.close();
+			manager.disconnect();
 		};
-	}, [apiBaseUrl, tenantSlug, resourceSlug, enabled]);
+	}, [manager, enabled]);
 
-	return { isConnected };
+	return { isConnected: state.isConnected };
 };
-
-// Helper to map protocol delta to the shape expected by AvailabilityStore (LedgerEvent)
-function mapDeltaToLedgerEvent(
-	eventId: string,
-	delta: AvailabilityDeltaPayload,
-) {
-	const base = {
-		eventId,
-		tenantId: delta.tenantId,
-		resourceId: delta.resourceId,
-		createdAt: Date.now(),
-		version: 1,
-	};
-
-	if (
-		delta.kind === 'HoldPlaced' ||
-		delta.kind === 'HoldReleased' ||
-		delta.kind === 'HoldExpired'
-	) {
-		return {
-			...base,
-			type: delta.kind,
-			payload: {
-				holdId: delta.holdId,
-				startUnix: delta.startUnix,
-				endUnix: delta.endUnix,
-			},
-		};
-	}
-
-	if (delta.kind === 'BookingConfirmed' || delta.kind === 'BookingCancelled') {
-		return {
-			...base,
-			type: delta.kind,
-			payload: {
-				bookingId: delta.bookingId,
-				start: delta.startUnix,
-				end: delta.endUnix,
-				holdId: delta.holdId,
-			},
-		};
-	}
-
-	return null;
-}

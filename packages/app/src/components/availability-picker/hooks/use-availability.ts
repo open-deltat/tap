@@ -1,9 +1,6 @@
 import {
-	AvailabilityClient,
+	AvailabilityManager,
 	type AvailabilitySlot,
-	AvailabilityStore,
-	getDayRange,
-	getMonthGridRange,
 	type TimeRange,
 } from '@tap/client';
 import type { LedgerEvent } from '@tap/core';
@@ -29,7 +26,7 @@ export type UseAvailabilityResult = {
 	refresh: () => Promise<void>;
 	applyDelta: (event: LedgerEvent) => void;
 	cursor: string | null;
-	availableDays: Set<string>; // 'YYYY-MM-DD'
+	availableDays: Set<string>;
 	refreshMonth: (date: Date) => Promise<void>;
 };
 
@@ -47,102 +44,74 @@ export const useAvailability = (
 		timezone,
 	} = options;
 
-	const store = useMemo(() => new AvailabilityStore(), []);
-	const client = useMemo(
-		() => new AvailabilityClient(apiBaseUrl, tenantSlug, resourceSlug),
-		[apiBaseUrl, tenantSlug, resourceSlug],
+	const manager = useMemo(
+		() =>
+			new AvailabilityManager({
+				apiBaseUrl,
+				tenantSlug,
+				resourceSlug,
+				durationMs,
+				fromHour,
+				toHour,
+				timezone,
+			}),
+		[
+			apiBaseUrl,
+			tenantSlug,
+			resourceSlug,
+			durationMs,
+			fromHour,
+			toHour,
+			timezone,
+		],
 	);
 
-	const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
-	const [cursor, setCursor] = useState<string | null>(null);
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState<Error | null>(null);
-	const [availableDays, setAvailableDays] = useState<Set<string>>(new Set());
+	const [state, setState] = useState(() => manager.getState());
 
-	// Fetch slots for the specific selected day
-	const fetchAvailability = useCallback(
-		async (date: Date) => {
-			setIsLoading(true);
-			setError(null);
+	useEffect(() => {
+		manager.setCallbacks({
+			onStateChange: (newState) => {
+				setState(newState);
+			},
+		});
+	}, [manager]);
 
-			try {
-				const range = getDayRange(date, timezone, fromHour, toHour);
+	useEffect(() => {
+		if (selectedDate) {
+			manager.fetchAvailability(selectedDate);
+		}
+	}, [manager, selectedDate]);
 
-				const result = await client.getAvailability({
-					from: range.from,
-					to: range.to,
-					slotDurationMs: durationMs,
-				});
-
-				store.setSnapshot(result.freeSlots, result.asOfEventId);
-				const snapshot = store.getSnapshot();
-				setSlots(snapshot.slots as AvailabilitySlot[]); // Cast back since store works with TimeRange
-				setCursor(snapshot.cursor);
-			} catch (err) {
-				setError(err instanceof Error ? err : new Error('Unknown error'));
-			} finally {
-				setIsLoading(false);
-			}
-		},
-		[client, durationMs, fromHour, toHour, store, timezone],
-	);
-
-	// Fetch availability for the whole month to populate the calendar
-	const refreshMonth = useCallback(
-		async (date: Date) => {
-			try {
-				const range = getMonthGridRange(date);
-
-				const result = await client.getAvailability({
-					from: range.from,
-					to: range.to,
-					slotDurationMs: durationMs,
-				});
-
-				const days = client.extractAvailableDays(result.freeSlots, timezone);
-				setAvailableDays(days);
-			} catch (e) {
-				console.error('Failed to fetch month availability', e);
-			}
-		},
-		[client, durationMs, timezone],
-	);
+	useEffect(() => {
+		manager.refreshMonth(selectedDate || new Date());
+	}, [manager, selectedDate]);
 
 	const refresh = useCallback(async () => {
-		if (selectedDate) {
-			await fetchAvailability(selectedDate);
-		}
-	}, [selectedDate, fetchAvailability]);
-
-	useEffect(() => {
-		if (selectedDate) {
-			fetchAvailability(selectedDate);
-		}
-	}, [selectedDate, fetchAvailability]);
-
-	// Initial month fetch
-	useEffect(() => {
-		refreshMonth(selectedDate || new Date());
-	}, [refreshMonth, selectedDate]);
+		await manager.refresh(selectedDate);
+	}, [manager, selectedDate]);
 
 	const applyDelta = useCallback(
 		(event: LedgerEvent) => {
-			store.applyEvent(event);
-			const snapshot = store.getSnapshot();
-			setSlots(snapshot.slots as AvailabilitySlot[]);
-			setCursor(snapshot.cursor);
+			manager.applyDelta(event);
 		},
-		[store],
+		[manager],
+	);
+
+	const refreshMonth = useCallback(
+		async (date: Date) => {
+			await manager.refreshMonth(date);
+		},
+		[manager],
 	);
 
 	return {
-		slots,
-		isLoading,
-		error,
+		slots: state.slots,
+		isLoading: state.isLoading,
+		error: state.error,
+		cursor: state.cursor,
+		availableDays: state.availableDays,
 		refresh,
 		applyDelta,
-		cursor,
-		availableDays,
 		refreshMonth,
 	};
 };
