@@ -53,12 +53,8 @@ export const AvailabilityPicker = React.memo<AvailabilityPickerProps>(
 			undefined,
 		);
 
-		// Use the new hook for timezone management
-		const {
-			timezone: internalTimezone,
-			setTimezone: setInternalTimezone,
-			format: formatTz,
-		} = useClientTimezone(initialTimezone);
+		const { timezone: internalTimezone, setTimezone: setInternalTimezone } =
+			useClientTimezone(initialTimezone);
 
 		const timezone = controlledTimezone ?? internalTimezone;
 		const setTimezone = controlledOnTimezoneChange ?? setInternalTimezone;
@@ -256,7 +252,6 @@ export const AvailabilityPicker = React.memo<AvailabilityPickerProps>(
 							displayedSlots={displayedSlots}
 							onSlotClick={onSlotSelect}
 							timezone={timezone}
-							formatDate={formatTz}
 						/>
 					</div>
 				</div>

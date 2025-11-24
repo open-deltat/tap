@@ -1,42 +1,31 @@
 'use client';
 
-import { useCallback, useState } from 'react';
-import { getClientTimezone } from '@/lib/timezone';
+import { TimezoneStore } from '@tap/client';
+import { useCallback, useMemo, useState } from 'react';
 
 export const useClientTimezone = (initialTimezone?: string) => {
-	// Initialize with provided timezone or browser timezone
-	const [timezone, setTimezone] = useState<string>(
-		() => initialTimezone || getClientTimezone(),
+	const store = useMemo(
+		() => new TimezoneStore(initialTimezone),
+		[initialTimezone],
 	);
 
-	// Helper to format dates in the current timezone using native Intl
-	// This bypasses potential date-fns-tz version mismatch issues
+	const [timezone, setTimezoneState] = useState<string>(() =>
+		store.getTimezone(),
+	);
+
+	const setTimezone = useCallback(
+		(newTimezone: string) => {
+			store.setTimezone(newTimezone);
+			setTimezoneState(newTimezone);
+		},
+		[store],
+	);
+
 	const format = useCallback(
 		(date: Date | number, fmt: string) => {
-			const d = new Date(date);
-
-			if (fmt === 'h:mm a') {
-				return new Intl.DateTimeFormat('en-US', {
-					hour: 'numeric',
-					minute: 'numeric',
-					hour12: true,
-					timeZone: timezone,
-				}).format(d);
-			}
-
-			if (fmt === 'EEEE, MMMM d') {
-				return new Intl.DateTimeFormat('en-US', {
-					weekday: 'long',
-					month: 'long',
-					day: 'numeric',
-					timeZone: timezone,
-				}).format(d);
-			}
-
-			// Fallback for debug or other formats
-			return d.toLocaleString('en-US', { timeZone: timezone });
+			return store.format(date, fmt);
 		},
-		[timezone],
+		[store],
 	);
 
 	return {

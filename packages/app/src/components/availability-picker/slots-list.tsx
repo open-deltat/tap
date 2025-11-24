@@ -19,7 +19,6 @@ export type SlotsViewProps = {
 	}[];
 	onSlotClick: (slot: TimeRange) => void;
 	timezone: string;
-	formatDate: (date: Date | number, fmt: string) => string;
 };
 
 export const SlotsView = ({
@@ -29,11 +28,15 @@ export const SlotsView = ({
 	displayedSlots,
 	onSlotClick,
 	timezone,
-	formatDate,
 }: SlotsViewProps) => {
-	// Format helper using the passed formatter
 	const formatTime = (timestamp: number) => {
-		return formatDate(timestamp, 'h:mm a');
+		const date = new Date(timestamp);
+		return new Intl.DateTimeFormat('en-US', {
+			hour: 'numeric',
+			minute: 'numeric',
+			hour12: true,
+			timeZone: timezone,
+		}).format(date);
 	};
 
 	const _formatDateTitle = (date: Date) => {

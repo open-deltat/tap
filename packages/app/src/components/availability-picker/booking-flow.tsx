@@ -2,7 +2,6 @@
 
 import { createSlotId } from '@tap/protocol';
 import * as React from 'react';
-import { fromUnixTimestamp } from '@/lib/timezone';
 import { cn } from '@/lib/utils';
 import { useBooking } from '../availability-picker/hooks/use-booking';
 import { useHoldStream } from '../availability-picker/hooks/use-hold-stream';
@@ -20,6 +19,7 @@ export type BookingFlowProps = {
 	onBookingConfirmed?: (bookingId: string) => void;
 	className?: string;
 	initialTimezone?: string;
+	onTimezoneChange?: (timezone: string) => void;
 };
 
 export const BookingFlow = React.memo<BookingFlowProps>(
@@ -33,13 +33,21 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 		onBookingConfirmed,
 		className,
 		initialTimezone,
+		onTimezoneChange,
 	}) => {
-		// Use the new hook for timezone management
-		const {
-			timezone,
-			setTimezone,
-			format: formatTz,
-		} = useClientTimezone(initialTimezone);
+		const { timezone, setTimezone } = useClientTimezone(initialTimezone);
+
+		const handleTimezoneChange = React.useCallback(
+			(newTimezone: string) => {
+				setTimezone(newTimezone);
+				onTimezoneChange?.(newTimezone);
+			},
+			[setTimezone, onTimezoneChange],
+		);
+
+		React.useEffect(() => {
+			onTimezoneChange?.(timezone);
+		}, [timezone, onTimezoneChange]);
 
 		const [activeHold, setActiveHold] = React.useState<{
 			holdId: string;
@@ -162,8 +170,13 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 		);
 
 		const formatTime = (timestamp: number): string => {
-			const date = fromUnixTimestamp(timestamp);
-			return formatTz(date, 'h:mm a');
+			const date = new Date(timestamp);
+			return new Intl.DateTimeFormat('en-US', {
+				hour: 'numeric',
+				minute: 'numeric',
+				hour12: true,
+				timeZone: timezone,
+			}).format(date);
 		};
 
 		const formatCountdown = (ms: number): string => {
@@ -199,7 +212,7 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 						toHour={toHour}
 						initialTimezone={initialTimezone}
 						timezone={timezone}
-						onTimezoneChange={setTimezone}
+						onTimezoneChange={handleTimezoneChange}
 						onSlotSelect={handleSlotClick}
 						className="border-none shadow-none h-full"
 					/>

@@ -1,6 +1,7 @@
 'use client';
 
 import type { ResourceId, TenantId } from '@tap/protocol';
+import * as React from 'react';
 import { BookingFlow } from '@/components/availability-picker/booking-flow';
 import { EventLogger } from '@/components/demo/event-logger';
 import { NetworkStatus } from '@/components/demo/network-status';
@@ -9,13 +10,16 @@ export default function Home() {
 	const apiBaseUrl =
 		process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
-	// Hardcoded IDs for demo
 	const TENANT_ID = '01AN4Z07BY79KA1307SR9X4MV3' as TenantId;
 	const RESOURCE_ID = '01AN4Z07BY79KA1307SR9X4MV4' as ResourceId;
 
+	const [clientATimezone, setClientATimezone] =
+		React.useState<string>('Europe/Berlin');
+	const [clientBTimezone, setClientBTimezone] =
+		React.useState<string>('America/New_York');
+
 	const handleBookingConfirmed = (bookingId: string) => {
 		console.log('Booking confirmed:', bookingId);
-		// alert(`Booking Confirmed! ID: ${bookingId}`);
 	};
 
 	return (
@@ -40,7 +44,7 @@ export default function Home() {
 							<div className="flex items-center gap-2">
 								<div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
 								<h2 className="text-sm font-medium text-foreground">
-									Client A (Berlin)
+									Client A ({clientATimezone.split('/').pop()})
 								</h2>
 							</div>
 							<span className="text-[10px] text-muted-foreground uppercase tracking-wider">
@@ -56,6 +60,7 @@ export default function Home() {
 								onBookingConfirmed={handleBookingConfirmed}
 								className="h-auto md:h-[500px] border-none shadow-none"
 								initialTimezone="Europe/Berlin"
+								onTimezoneChange={setClientATimezone}
 							/>
 						</div>
 					</div>
@@ -66,7 +71,7 @@ export default function Home() {
 							<div className="flex items-center gap-2">
 								<div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
 								<h2 className="text-sm font-medium text-foreground">
-									Client B (New York)
+									Client B ({clientBTimezone.split('/').pop()})
 								</h2>
 							</div>
 							<span className="text-[10px] text-muted-foreground uppercase tracking-wider">
@@ -82,6 +87,7 @@ export default function Home() {
 								onBookingConfirmed={handleBookingConfirmed}
 								className="h-auto md:h-[500px] border-none shadow-none"
 								initialTimezone="America/New_York"
+								onTimezoneChange={setClientBTimezone}
 							/>
 						</div>
 					</div>
