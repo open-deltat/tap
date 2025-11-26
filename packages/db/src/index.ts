@@ -15,3 +15,7 @@ export {
 	type TenantRepository,
 } from './repositories';
 export { ledgerEvents } from './schema';
+export {
+	createDbStateManager,
+	type DbStateManager,
+} from './state-manager';

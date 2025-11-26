@@ -38,10 +38,12 @@ export class HoldManager {
 		this.callbacks.onStateChange?.(this.state);
 	}
 
-	async placeHold(slotId: string): Promise<string> {
+	async placeHold(
+		slotId: string,
+	): Promise<{ holdId: string; sessionId: string }> {
 		const result = await this.client.placeHold(slotId);
 		this.updateState({ sessionId: result.sessionId });
-		return result.holdId;
+		return result;
 	}
 
 	releaseHold(holdId: string): void {

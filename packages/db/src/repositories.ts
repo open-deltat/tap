@@ -42,14 +42,33 @@ export type BookingRepository = {
 		from?: number,
 		to?: number,
 	) => Promise<Booking[]>;
-	create: (booking: Booking) => Promise<void>;
+	create: (booking: Omit<Booking, 'createdAt'>) => Promise<void>;
 	update: (id: string, updates: Partial<Booking>) => Promise<void>;
 };
 
 export type HoldRepository = {
 	getById: (id: string) => Promise<Hold | null>;
-	getExpired: (now: number) => Promise<Hold[]>;
-	create: (hold: Hold) => Promise<void>;
+	getBySessionId: (sessionId: string) => Promise<Hold[]>;
+	getExpired: (now: number) => Promise<
+		Array<{
+			id: HoldId;
+			tenantId: TenantId;
+			resourceId: ResourceId;
+			startUnix: number;
+			endUnix: number;
+			expiresAt: number;
+		}>
+	>;
+	create: (hold: {
+		id: HoldId;
+		tenantId: TenantId;
+		resourceId: ResourceId;
+		sessionId: SessionId;
+		startUnix: number;
+		endUnix: number;
+		expiresAt: number;
+		clientRef?: string;
+	}) => Promise<void>;
 	delete: (id: string) => Promise<void>;
 };
 
@@ -341,6 +360,22 @@ export const createHoldRepository = (db: Database): HoldRepository => {
 				createdAt: row.createdAt.getTime(),
 			};
 		},
+		getBySessionId: async (sessionId: string) => {
+			const rows = await db
+				.select()
+				.from(holds)
+				.where(eq(holds.sessionId, sessionId));
+			return rows.map((row) => ({
+				id: row.id as HoldId,
+				tenantId: row.tenantId as TenantId,
+				resourceId: row.resourceId as ResourceId,
+				startUnix: row.startUnix,
+				endUnix: row.endUnix,
+				expiresAt: row.expiresAt,
+				clientRef: row.clientRef ?? undefined,
+				createdAt: row.createdAt.getTime(),
+			}));
+		},
 		getExpired: async (now: number) => {
 			const rows = await db
 				.select()
@@ -353,15 +388,23 @@ export const createHoldRepository = (db: Database): HoldRepository => {
 				startUnix: row.startUnix,
 				endUnix: row.endUnix,
 				expiresAt: row.expiresAt,
-				clientRef: row.clientRef ?? undefined,
-				createdAt: row.createdAt.getTime(),
 			}));
 		},
-		create: async (hold: Hold) => {
+		create: async (hold: {
+			id: HoldId;
+			tenantId: TenantId;
+			resourceId: ResourceId;
+			sessionId: SessionId;
+			startUnix: number;
+			endUnix: number;
+			expiresAt: number;
+			clientRef?: string;
+		}) => {
 			await db.insert(holds).values({
 				id: hold.id,
 				tenantId: hold.tenantId,
 				resourceId: hold.resourceId,
+				sessionId: hold.sessionId,
 				startUnix: hold.startUnix,
 				endUnix: hold.endUnix,
 				expiresAt: hold.expiresAt,

@@ -15,7 +15,7 @@ import {
 	type SlotId,
 } from '@tap/protocol';
 import type { Server } from 'bun';
-import { core } from '../core';
+import { getInventory } from '../core';
 import { serverContext } from '../server-context';
 
 export async function handleBook(
@@ -53,8 +53,9 @@ export async function handleBook(
 		let sessionId = body.holdSessionId;
 
 		if (!holdId || !sessionId) {
+			const inventory = getInventory(body.tenantId, body.resourceId);
 			const tempSessionId = createSessionId();
-			const holdResult = await core.placeHold({
+			const holdResult = await inventory.placeHold({
 				tenantId: body.tenantId,
 				resourceId: body.resourceId,
 				sessionId: tempSessionId,
@@ -90,7 +91,8 @@ export async function handleBook(
 			return error.toResponse();
 		}
 
-		const event = await core.confirmBooking({
+		const inventory = getInventory(body.tenantId, body.resourceId);
+		const event = await inventory.confirmBooking({
 			tenantId: body.tenantId,
 			resourceId: body.resourceId,
 			holdId,

@@ -13,9 +13,8 @@
 	},
 	"dependencies": {
 		"@tap/core": "workspace:*",
-		"@tap/protocol": "workspace:*",
-		"date-fns": "^3.6.0",
-		"zod": "^3.23.8"
+		"@tap/db": "workspace:*",
+		"@tap/protocol": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

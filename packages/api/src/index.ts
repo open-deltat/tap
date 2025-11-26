@@ -96,6 +96,7 @@ function handleHttp(
 					slotId: slotId as SlotId,
 				} as HoldWSData,
 			});
+
 			if (success) return undefined;
 			return new Response('WebSocket upgrade failed', { status: 400 });
 		}

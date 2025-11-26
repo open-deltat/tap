@@ -10,12 +10,8 @@ import type {
 	BookingConfirmedEvent,
 } from '../../domain/events';
 import { createEvent } from '../../domain/factory';
-import {
-	type Interval,
-	mergeIntervals,
-	subtractInterval,
-} from '../../infrastructure/intervals';
-import type { HoldMetadata, InventoryState } from '../inventory-types';
+import type { Interval } from '../../infrastructure/intervals';
+import type { InventoryState } from '../inventory-types';
 
 export type BookingManager = {
 	confirmBooking: (params: {
@@ -42,14 +38,43 @@ export type BookingManager = {
 };
 
 export const createBookingManager = (deps: {
-	getState: (tenantId: TenantId, resourceId: ResourceId) => InventoryState;
-	holds: Map<HoldId, HoldMetadata>;
+	getState: (
+		tenantId: TenantId,
+		resourceId: ResourceId,
+	) => Promise<InventoryState>;
+	getHoldById: (holdId: HoldId) => Promise<{
+		tenantId: TenantId;
+		resourceId: ResourceId;
+		sessionId: SessionId;
+		startUnix: number;
+		endUnix: number;
+		expiresAt: number;
+	} | null>;
+	holdRepository: {
+		delete: (id: HoldId) => Promise<void>;
+	};
+	bookingRepository: {
+		create: (booking: {
+			id: BookingId;
+			tenantId: TenantId;
+			resourceId: ResourceId;
+			holdId?: HoldId;
+			start: number;
+			end: number;
+			status: string;
+			paymentStatus: string;
+			customerName?: string;
+			customerEmail?: string;
+			customerPhone?: string;
+		}) => Promise<void>;
+		update: (id: string, updates: Partial<{ status: string }>) => Promise<void>;
+	};
 	withLock: (key: string) => Promise<() => void>;
 }): BookingManager => {
 	return {
 		confirmBooking: async (params) => {
 			const { tenantId, resourceId, holdId, sessionId } = params;
-			const hold = deps.holds.get(holdId);
+			const hold = await deps.getHoldById(holdId);
 			if (!hold) {
 				return null;
 			}
@@ -61,50 +86,56 @@ export const createBookingManager = (deps: {
 			const release = await deps.withLock(lockKey);
 
 			try {
-				// Verify hold still exists after lock
-				if (!deps.holds.has(holdId)) {
+				const currentHold = await deps.getHoldById(holdId);
+				if (!currentHold || currentHold.sessionId !== sessionId) {
 					return null;
 				}
 
-				const state = deps.getState(tenantId, resourceId);
-
-				// 1. Find the hold interval in state.held
-				//    Since holds are merged in state, we need to find the interval that covers this hold range.
-				//    BUT, wait. Holds are distinct entities for expiration.
-				//    In `inventory-types`, `held` is a list of Intervals.
-				//    To move capacity from Held to Booked, we subtract from Held and add to Booked.
+				const state = await deps.getState(tenantId, resourceId);
 
 				const bookingInterval: Interval = {
 					start: hold.startUnix,
 					end: hold.endUnix,
-					value: 1, // Assuming capacity 1 for now, or fetch from hold metadata if available
+					value: 1,
 				};
 
-				// Remove from Held
-				// This is tricky if `state.held` contains merged intervals.
-				// If we want to remove EXACTLY this hold's contribution, we need to know its original interval.
-				// Since we are just using a flat list of intervals for now, we can subtract it.
-				// Actually, for capacity management, we should just remove the specific interval we added.
-				// But if they are merged, we subtract.
+				const allBusy = [
+					...state.booked,
+					...state.held.filter(
+						(h) => !(h.start === hold.startUnix && h.end === hold.endUnix),
+					),
+				];
+				const hasOverlap = allBusy.some(
+					(busy) =>
+						Math.max(busy.start, bookingInterval.start) <
+						Math.min(busy.end, bookingInterval.end),
+				);
 
-				// Simpler approach for V1 (List of intervals):
-				// Just filter out the interval? No, timestamps might be merged.
-				// Let's implement `removeFromList` helper or just subtract.
-				// Subtracting `bookingInterval` from `state.held` is correct.
-
-				const newHeld: Interval[] = [];
-				for (const interval of state.held) {
-					newHeld.push(...subtractInterval(interval, bookingInterval));
+				if (hasOverlap) {
+					return null;
 				}
-				state.held = newHeld;
 
-				// Add to Booked
-				state.booked.push(bookingInterval);
-				// Optional: Clean up/merge booked intervals to keep list small
-				state.booked = mergeIntervals(state.booked);
+				await deps.holdRepository.delete(holdId as string);
 
-				// Remove the hold metadata
-				deps.holds.delete(holdId);
+				await deps.bookingRepository.create({
+					id: params.bookingId,
+					tenantId,
+					resourceId,
+					holdId,
+					start: params.start,
+					end: params.end,
+					status: 'CONFIRMED',
+					paymentStatus: params.paymentStatus || 'NONE',
+					...(params.customerName !== undefined && {
+						customerName: params.customerName,
+					}),
+					...(params.customerEmail !== undefined && {
+						customerEmail: params.customerEmail,
+					}),
+					...(params.customerPhone !== undefined && {
+						customerPhone: params.customerPhone,
+					}),
+				});
 
 				return createEvent('BookingConfirmed', {
 					tenantId,
@@ -141,20 +172,9 @@ export const createBookingManager = (deps: {
 			const release = await deps.withLock(lockKey);
 
 			try {
-				const state = deps.getState(tenantId, resourceId);
-
-				const bookingInterval: Interval = {
-					start: startUnix,
-					end: endUnix,
-					value: 1,
-				};
-
-				// Remove from Booked
-				const newBooked: Interval[] = [];
-				for (const interval of state.booked) {
-					newBooked.push(...subtractInterval(interval, bookingInterval));
-				}
-				state.booked = newBooked;
+				await deps.bookingRepository.update(bookingId as string, {
+					status: 'CANCELLED',
+				});
 
 				return createEvent('BookingCancelled', {
 					tenantId,

@@ -3,8 +3,8 @@ CREATE TABLE IF NOT EXISTS "bookings" (
 	"tenant_id" text NOT NULL,
 	"resource_id" text NOT NULL,
 	"hold_id" text,
-	"start" integer NOT NULL,
-	"end" integer NOT NULL,
+	"start" bigint NOT NULL,
+	"end" bigint NOT NULL,
 	"status" text DEFAULT 'CONFIRMED' NOT NULL,
 	"payment_status" text DEFAULT 'NONE' NOT NULL,
 	"payment_provider" text,
@@ -20,11 +20,21 @@ CREATE TABLE IF NOT EXISTS "holds" (
 	"id" text PRIMARY KEY NOT NULL,
 	"tenant_id" text NOT NULL,
 	"resource_id" text NOT NULL,
-	"day" text NOT NULL,
-	"start_minute" integer NOT NULL,
-	"end_minute" integer NOT NULL,
-	"expires_at" integer NOT NULL,
+	"session_id" text NOT NULL,
+	"start_unix" bigint NOT NULL,
+	"end_unix" bigint NOT NULL,
+	"expires_at" bigint NOT NULL,
 	"client_ref" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "ledger_events" (
+	"event_id" text PRIMARY KEY NOT NULL,
+	"tenant_id" text NOT NULL,
+	"resource_id" text NOT NULL,
+	"type" text NOT NULL,
+	"version" integer NOT NULL,
+	"payload" jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint

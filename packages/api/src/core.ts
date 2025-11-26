@@ -1,9 +1,26 @@
-import { createInventory } from '@tap/core';
+import { createInventory, type Inventory } from '@tap/core';
+import { createDatabase, createDbStateManager } from '@tap/db';
+import type { ResourceId, TenantId } from '@tap/protocol';
 
-// Create a singleton inventory instance
-// In a real app, this might be dependency injected or context-based
-export let core = createInventory();
+const connectionString =
+	process.env.DATABASE_URL ||
+	process.env.POSTGRES_URL ||
+	'postgresql://tap:tap@localhost:5432/tap';
 
-export const resetCore = () => {
-	core = createInventory();
+const db = createDatabase(connectionString);
+
+const inventories = new Map<string, Inventory>();
+
+export const getInventory = (
+	tenantId: TenantId,
+	resourceId: ResourceId,
+): Inventory => {
+	const key = `${tenantId}:${resourceId}`;
+	let inventory = inventories.get(key);
+	if (!inventory) {
+		const dbStateManager = createDbStateManager(db);
+		inventory = createInventory(dbStateManager);
+		inventories.set(key, inventory);
+	}
+	return inventory;
 };

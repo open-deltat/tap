@@ -62,15 +62,12 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			React.useState<number | null>(null);
 
 		// Hold Manager
-		const {
-			sessionId: currentSessionId,
-			placeHold: placeHoldWS,
-			releaseHold: releaseHoldWS,
-		} = useHoldStream({
-			apiBaseUrl,
-			tenantSlug,
-			resourceSlug,
-		});
+		const { placeHold: placeHoldWS, releaseHold: releaseHoldWS } =
+			useHoldStream({
+				apiBaseUrl,
+				tenantSlug,
+				resourceSlug,
+			});
 
 		// Booking
 		const {
@@ -123,14 +120,13 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 			async (slot: TimeRange) => {
 				try {
 					const slotId = createSlotId(new Date(slot.start), new Date(slot.end));
-
-					const holdId = await placeHoldWS({ slotId });
+					const { holdId, sessionId } = await placeHoldWS({ slotId });
 
 					setActiveHold({
 						holdId,
-						sessionId: '', // We'll read currentSessionId from the hook scope on submit
+						sessionId,
 						slot,
-						expiresAt: Date.now() + 60000, // 60s
+						expiresAt: Date.now() + 60000,
 					});
 					setView('booking');
 				} catch (e) {
@@ -155,18 +151,18 @@ export const BookingFlow = React.memo<BookingFlowProps>(
 				customerEmail: string;
 				customerPhone: string;
 			}) => {
-				if (!activeHold || !currentSessionId) return;
+				if (!activeHold || !activeHold.sessionId) return;
 
 				await confirmBooking({
 					slotId: params.slotId,
 					holdId: activeHold.holdId,
-					sessionId: currentSessionId,
+					sessionId: activeHold.sessionId,
 					customerName: params.customerName,
 					customerEmail: params.customerEmail,
 					customerPhone: params.customerPhone || undefined,
 				});
 			},
-			[activeHold, currentSessionId, confirmBooking],
+			[activeHold, confirmBooking],
 		);
 
 		const formatTime = (timestamp: number): string => {

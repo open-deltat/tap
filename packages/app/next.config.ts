@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-	transpilePackages: ['@tap/ws-client', '@tap/core'],
+	transpilePackages: ['@tap/core'],
 	turbopack: {},
 };
 

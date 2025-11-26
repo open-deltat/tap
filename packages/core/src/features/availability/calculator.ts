@@ -6,7 +6,6 @@ import {
 } from '@tap/protocol';
 import type { Offer, WeeklyOffer } from '../../domain/models';
 import {
-	getCompositeTimeline,
 	mergeIntervals,
 	subtractIntervals,
 } from '../../infrastructure/intervals';
@@ -41,17 +40,17 @@ function getOffersForResource(
 	];
 }
 
-export function calculateAvailability(params: {
+export async function calculateAvailability(params: {
 	inventoryState: (
 		tenantId: TenantId,
 		resourceId: ResourceId,
-	) => InventoryState;
+	) => Promise<InventoryState>;
 	tenantId: TenantId;
 	resourceId: ResourceId;
 	from: Date;
 	to: Date;
 	slotDurationMs?: number;
-}): AvailabilitySlot[] {
+}): Promise<AvailabilitySlot[]> {
 	const {
 		inventoryState,
 		tenantId,
@@ -61,7 +60,7 @@ export function calculateAvailability(params: {
 		slotDurationMs = 15 * 60000,
 	} = params;
 
-	const state = inventoryState(tenantId, resourceId);
+	const state = await inventoryState(tenantId, resourceId);
 	const offers = getOffersForResource(tenantId, resourceId);
 
 	// 1. Generate "Green" Intervals (Offers)
@@ -85,20 +84,15 @@ export function calculateAvailability(params: {
 
 	// A. Timeline of Capacity Provision (Offers)
 	//    Since offers might overlap (Alice + Bob), we sum them.
-	const _capacityProvided = getCompositeTimeline(
-		offerIntervals.map((i) => ({ ...i, value: i.value ?? 1 })),
-	);
+	//    Note: Currently using boolean availability (capacity = 1)
+	//    For multi-capacity support, use getCompositeTimeline here
 
 	// B. Timeline of Capacity Consumption (Inventory)
 	const consumptionIntervals = [...state.booked, ...state.held].map((i) => ({
 		...i,
 		value: i.value ?? 1,
 	}));
-	// Merge consumption to flatten overlaps if any (though usually distinct bookings)
-	// Actually, we want to SUM consumption.
-	// But `state.booked` usually contains distinct bookings.
-	// Let's sum them.
-	const _capacityConsumed = getCompositeTimeline(consumptionIntervals);
+	// Note: For multi-capacity support, use getCompositeTimeline to sum consumption
 
 	// C. Subtract Consumption from Provision
 	//    Available = Provided - Consumed

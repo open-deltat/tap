@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+	bigint,
 	boolean,
 	integer,
 	jsonb,
@@ -96,6 +97,7 @@ export const holds = pgTable('holds', {
 	resourceId: text('resource_id')
 		.notNull()
 		.references(() => resources.id),
+	sessionId: text('session_id').notNull(),
 	startUnix: bigint('start_unix', { mode: 'number' }).notNull(),
 	endUnix: bigint('end_unix', { mode: 'number' }).notNull(),
 	expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),

@@ -39,16 +39,6 @@ export const SlotsView = ({
 		}).format(date);
 	};
 
-	const _formatDateTitle = (date: Date) => {
-		// Use local formatting to match the calendar selection visual,
-		// ignoring the target timezone shift for the header title.
-		return date.toLocaleDateString('en-US', {
-			weekday: 'long',
-			month: 'long',
-			day: 'numeric',
-		});
-	};
-
 	return (
 		<div className="flex-1 flex flex-col h-full bg-background">
 			<div className="flex-1 overflow-y-auto p-4">
@@ -132,21 +122,30 @@ const SlotButton = ({
 		prevAvailable.current = slot.available;
 	}, [slot.available, slot.isReleased]);
 
+	const handleClick = (e: React.MouseEvent) => {
+		e.preventDefault();
+		e.stopPropagation();
+		if (slot.available) {
+			onClick({ start: slot.start, end: slot.end });
+		}
+	};
+
 	return (
 		<Button
 			variant="outline"
 			disabled={!slot.available}
+			type="button"
 			className={cn(
-				'h-auto py-2 px-3 justify-center flex-col gap-0.5 transition-all duration-500 group',
+				'h-auto py-2 px-3 justify-center flex-col gap-0.5 transition-all duration-500 group cursor-pointer',
 				isFlashing
 					? 'bg-destructive/10 border-destructive text-destructive disabled:opacity-100'
 					: isReappearing
 						? 'bg-green-500/10 border-green-500 text-green-600'
 						: !slot.available
-							? 'opacity-30 hover:bg-transparent hover:border-input'
-							: 'hover:border-primary hover:bg-primary/5 hover:text-primary',
+							? 'opacity-30 hover:bg-transparent hover:border-input cursor-not-allowed'
+							: 'hover:border-primary hover:bg-primary/5 hover:text-primary cursor-pointer',
 			)}
-			onClick={() => onClick(slot)}
+			onClick={handleClick}
 		>
 			<span className="font-medium text-sm">{formatTime(slot.start)}</span>
 		</Button>

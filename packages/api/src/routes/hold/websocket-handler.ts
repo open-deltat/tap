@@ -17,7 +17,7 @@ import {
 	type TenantId,
 } from '@tap/protocol';
 import type { ServerWebSocket } from 'bun';
-import { core } from '../../core';
+import { getInventory } from '../../core';
 import { serverContext } from '../../server-context';
 
 export type HoldWSData = {
@@ -32,13 +32,16 @@ export type HoldWSData = {
 export const holdWebSocketHandler = {
 	async open(ws: ServerWebSocket<HoldWSData>) {
 		const { tenantId, resourceId, slotId } = ws.data;
+
 		if (!tenantId || !resourceId || !slotId) {
 			ws.close(1008, 'Missing params');
 			return;
 		}
 
 		try {
+			const inventory = getInventory(tenantId, resourceId);
 			const sessionId = createSessionId();
+
 			let parsed: { start: Date; end: Date };
 			try {
 				parsed = parseSlotId(slotId);
@@ -54,18 +57,31 @@ export const holdWebSocketHandler = {
 				return;
 			}
 
-			const result = await core.placeHold({
-				tenantId,
-				resourceId,
-				sessionId,
-				timezone: 'UTC',
-				startUnix: parsed.start.getTime(),
-				endUnix: parsed.end.getTime(),
-				expiresAt: calculateHoldExpiration(
-					Date.now(),
-					DEFAULT_HOLD_EXPIRATION_MS,
-				),
-			});
+			let result: Awaited<ReturnType<typeof inventory.placeHold>>;
+			try {
+				result = await inventory.placeHold({
+					tenantId,
+					resourceId,
+					sessionId,
+					timezone: 'UTC',
+					startUnix: parsed.start.getTime(),
+					endUnix: parsed.end.getTime(),
+					expiresAt: calculateHoldExpiration(
+						Date.now(),
+						DEFAULT_HOLD_EXPIRATION_MS,
+					),
+				});
+			} catch (error) {
+				const errorMsg: HoldWsServerMessage = {
+					type: 'hold.error',
+					errorValue: 'TAP_INTERNAL_ERROR',
+					message:
+						error instanceof Error ? error.message : 'Failed to place hold',
+				};
+				ws.send(JSON.stringify(errorMsg));
+				ws.close();
+				return;
+			}
 
 			if (result.success) {
 				const successResult = result as {
@@ -123,7 +139,18 @@ export const holdWebSocketHandler = {
 				ws.send(JSON.stringify(error));
 				ws.close();
 			}
-		} catch (_e) {
+		} catch (e) {
+			console.error('[Hold WS] Unhandled error:', e);
+			const error: HoldWsServerMessage = {
+				type: 'hold.error',
+				errorValue: 'TAP_INTERNAL_ERROR',
+				message: e instanceof Error ? e.message : 'Internal server error',
+			};
+			try {
+				ws.send(JSON.stringify(error));
+			} catch {
+				// Connection may already be closed
+			}
 			ws.close(1011, 'Internal Error');
 		}
 	},
@@ -141,8 +168,10 @@ export const holdWebSocketHandler = {
 		if (result.success) {
 			const msg = result.data;
 			if (msg.type === 'hold.release' && ws.data.holdId === msg.holdId) {
-				if (!ws.data.sessionId) return;
-				core
+				if (!ws.data.sessionId || !ws.data.tenantId || !ws.data.resourceId)
+					return;
+				const inventory = getInventory(ws.data.tenantId, ws.data.resourceId);
+				inventory
 					.releaseHold({
 						holdId: msg.holdId,
 						sessionId: ws.data.sessionId,
@@ -187,8 +216,14 @@ export const holdWebSocketHandler = {
 	},
 
 	close(ws: ServerWebSocket<HoldWSData>) {
-		if (ws.data.sessionId && ws.data.holdId) {
-			core
+		if (
+			ws.data.sessionId &&
+			ws.data.holdId &&
+			ws.data.tenantId &&
+			ws.data.resourceId
+		) {
+			const inventory = getInventory(ws.data.tenantId, ws.data.resourceId);
+			inventory
 				.releaseHold({
 					holdId: ws.data.holdId,
 					sessionId: ws.data.sessionId,

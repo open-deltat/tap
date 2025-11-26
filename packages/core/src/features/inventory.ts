@@ -16,8 +16,74 @@ import { createMutex } from '../infrastructure/mutex';
 import { createBookingManager } from './booking/manager';
 import { createExpiryManager } from './hold/expiry';
 import { createHoldManager } from './hold/manager';
-import type { HoldMetadata, InventoryState } from './inventory-types';
-import { createStateManager } from './state/manager';
+import type { InventoryState } from './inventory-types';
+
+export type DbStateManager = {
+	getState: (
+		tenantId: TenantId,
+		resourceId: ResourceId,
+	) => Promise<InventoryState>;
+	getHoldById: (holdId: HoldId) => Promise<{
+		tenantId: TenantId;
+		resourceId: ResourceId;
+		sessionId: SessionId;
+		startUnix: number;
+		endUnix: number;
+		expiresAt: number;
+	} | null>;
+	getHoldsBySession: (sessionId: SessionId) => Promise<
+		Array<{
+			holdId: HoldId;
+			tenantId: TenantId;
+			resourceId: ResourceId;
+			startUnix: number;
+			endUnix: number;
+			expiresAt: number;
+		}>
+	>;
+	holdRepository: {
+		create: (hold: {
+			id: HoldId;
+			tenantId: TenantId;
+			resourceId: ResourceId;
+			sessionId: SessionId;
+			startUnix: number;
+			endUnix: number;
+			expiresAt: number;
+			clientRef?: string;
+		}) => Promise<void>;
+		delete: (id: string) => Promise<void>;
+		getExpired: (now: number) => Promise<
+			Array<{
+				id: HoldId;
+				tenantId: TenantId;
+				resourceId: ResourceId;
+				startUnix: number;
+				endUnix: number;
+				expiresAt: number;
+			}>
+		>;
+	};
+	bookingRepository: {
+		create: (booking: {
+			id: BookingId;
+			tenantId: TenantId;
+			resourceId: ResourceId;
+			holdId?: HoldId;
+			start: number;
+			end: number;
+			status: 'CONFIRMED' | 'CANCELLED';
+			paymentStatus: 'NONE' | 'PENDING' | 'PAID';
+			customerName?: string;
+			customerEmail?: string;
+			customerPhone?: string;
+		}) => Promise<void>;
+		update: (
+			id: string,
+			updates: Partial<{ status: 'CONFIRMED' | 'CANCELLED' }>,
+		) => Promise<void>;
+	};
+};
 
 export type Inventory = {
 	placeHold: (params: {
@@ -55,7 +121,7 @@ export type Inventory = {
 		startUnix: number;
 		endUnix: number;
 	}) => Promise<BookingCancelledEvent | null>;
-	expireHolds: (now: number) => HoldExpiredEvent[];
+	expireHolds: (now: number) => Promise<HoldExpiredEvent[]>;
 	releaseHold: (params: {
 		holdId: HoldId;
 		sessionId: SessionId;
@@ -63,33 +129,38 @@ export type Inventory = {
 		{ success: true; event: HoldReleasedEvent } | { success: false }
 	>;
 	releaseHoldsForSession: (sessionId: SessionId) => Promise<HoldExpiredEvent[]>;
-	getState: (tenantId: TenantId, resourceId: ResourceId) => InventoryState;
+	getState: (
+		tenantId: TenantId,
+		resourceId: ResourceId,
+	) => Promise<InventoryState>;
 };
 
-export const createInventory = (): Inventory => {
-	const { manager } = createStateManager();
-	const holds = new Map<HoldId, HoldMetadata>();
+export const createInventory = (dbStateManager: DbStateManager): Inventory => {
 	const withLock = createMutex();
 
 	const holdManager = createHoldManager({
-		getState: manager.getState,
-		holds,
+		getState: dbStateManager.getState,
+		getHoldById: dbStateManager.getHoldById,
+		getHoldsBySession: dbStateManager.getHoldsBySession,
+		holdRepository: dbStateManager.holdRepository,
 		withLock,
 	});
 
 	const bookingManager = createBookingManager({
-		getState: manager.getState,
-		holds,
+		getState: dbStateManager.getState,
+		getHoldById: dbStateManager.getHoldById,
+		holdRepository: dbStateManager.holdRepository,
+		bookingRepository: dbStateManager.bookingRepository,
 		withLock,
 	});
 
 	const expiryManager = createExpiryManager({
-		getState: manager.getState,
-		holds,
+		getHoldsBySession: dbStateManager.getHoldsBySession,
+		holdRepository: dbStateManager.holdRepository,
 	});
 
 	return {
-		getState: manager.getState,
+		getState: dbStateManager.getState,
 		placeHold: holdManager.placeHold,
 		confirmBooking: bookingManager.confirmBooking,
 		cancelBooking: bookingManager.cancelBooking,

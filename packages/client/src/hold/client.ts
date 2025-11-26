@@ -23,13 +23,25 @@ export class HoldClient {
 		const { apiBaseUrl, tenantSlug, resourceSlug } = this.options;
 		const wsUrl =
 			apiBaseUrl.replace(/^http/, 'ws') +
-			`${API_ROUTES.HOLD_WS}?tenantId=${tenantSlug}&resourceId=${resourceSlug}&slotId=${slotId}`;
+			`${API_ROUTES.HOLD_WS}?tenantId=${encodeURIComponent(tenantSlug)}&resourceId=${encodeURIComponent(resourceSlug)}&slotId=${encodeURIComponent(slotId)}`;
 
 		return new Promise((resolve, reject) => {
 			const ws = new WebSocket(wsUrl);
 			this.ws = ws;
 
-			// Safety timeout
+			let holdId: string | null = null;
+			let sessionId: string | null = null;
+
+			const tryResolve = () => {
+				if (holdId && sessionId) {
+					clearTimeout(timeout);
+					resolve({
+						holdId,
+						sessionId,
+					});
+				}
+			};
+
 			const timeout = setTimeout(() => {
 				if (this.ws === ws) {
 					this.cleanup();
@@ -37,47 +49,50 @@ export class HoldClient {
 				}
 			}, 5000);
 
-			ws.onopen = () => {
-				// Connection established
-			};
-
 			ws.onmessage = (event) => {
 				try {
 					const msg = JSON.parse(event.data) as HoldWsServerMessage;
 
 					if (msg.type === 'hold.session.hello') {
-						this.sessionId = msg.sessionId;
+						sessionId = msg.sessionId;
+						this.sessionId = sessionId;
+						tryResolve();
 					} else if (msg.type === 'hold.confirmed') {
-						clearTimeout(timeout);
-						if (this.sessionId) {
-							resolve({
-								holdId: msg.holdId,
-								sessionId: this.sessionId,
-							});
-						} else {
-							// Should technically have session ID by now or very soon
-							// But for safety, we might wait or just resolve if we have it.
-							// The protocol usually sends hello immediately.
-						}
+						holdId = msg.holdId;
+						tryResolve();
 					} else if (msg.type === 'hold.error') {
 						clearTimeout(timeout);
 						this.cleanup();
 						reject(new Error(msg.message));
 					}
 				} catch (err) {
-					console.error('Hold WS parse error', err);
+					clearTimeout(timeout);
+					this.cleanup();
+					reject(
+						err instanceof Error ? err : new Error('Failed to parse message'),
+					);
 				}
 			};
 
-			ws.onclose = () => {
+			ws.onclose = (event) => {
 				if (this.ws === ws) {
 					this.ws = null;
 					this.sessionId = null;
 				}
+				if (!holdId || !sessionId) {
+					clearTimeout(timeout);
+					reject(
+						new Error(
+							`WebSocket closed before hold confirmed: ${event.code} ${event.reason || ''}`,
+						),
+					);
+				}
 			};
 
 			ws.onerror = () => {
-				// Error handling usually falls through to close or timeout
+				clearTimeout(timeout);
+				this.cleanup();
+				reject(new Error('WebSocket connection error'));
 			};
 		});
 	}

@@ -8,7 +8,7 @@ import {
 	AvailabilityPostRequestBodySchema,
 	type AvailabilityPostResponse,
 } from '@tap/protocol';
-import { core } from '../core';
+import { getInventory } from '../core';
 
 export async function handleAvailability(req: Request): Promise<Response> {
 	try {
@@ -25,8 +25,9 @@ export async function handleAvailability(req: Request): Promise<Response> {
 		}
 
 		const body = result.data;
-		const slots = calculateAvailability({
-			inventoryState: core.getState,
+		const inventory = getInventory(body.tenantId, body.resourceId);
+		const slots = await calculateAvailability({
+			inventoryState: inventory.getState,
 			tenantId: body.tenantId,
 			resourceId: body.resourceId,
 			from: new Date(body.from),
@@ -46,6 +47,7 @@ export async function handleAvailability(req: Request): Promise<Response> {
 			headers: { 'Content-Type': 'application/json' },
 		});
 	} catch (e) {
+		console.error('[Availability] Error:', e);
 		const error = new TapError(
 			'TAP_INTERNAL_ERROR',
 			e instanceof Error ? e.message : 'Unknown error',
