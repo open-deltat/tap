@@ -8,7 +8,7 @@ const getConnectionString = () => {
 	const connString =
 		process.env.DATABASE_URL ||
 		process.env.POSTGRES_URL ||
-		'postgresql://tap:tap@localhost:5432/tap';
+		'postgres://postgres:u1y8TpeBLfdIVjycOu6wZxKRJaYz2mCOk7hmgV07n42rnfdwbqpe8A9khHeNCQ7A@142.132.169.70:4653/postgres';
 
 	return connString;
 };
