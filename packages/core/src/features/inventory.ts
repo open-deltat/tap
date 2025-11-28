@@ -79,7 +79,7 @@ export type DbStateManager = {
 			customerPhone?: string;
 		}) => Promise<void>;
 		update: (
-			id: string,
+			id: BookingId,
 			updates: Partial<{ status: 'CONFIRMED' | 'CANCELLED' }>,
 		) => Promise<void>;
 	};

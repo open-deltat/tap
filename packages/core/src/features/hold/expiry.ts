@@ -1,4 +1,4 @@
-import type { HoldId, ResourceId, TenantId } from '@tap/protocol';
+import type { HoldId, ResourceId, SessionId, TenantId } from '@tap/protocol';
 import type { HoldExpiredEvent } from '../../domain/events';
 import { createEvent } from '../../domain/factory';
 
@@ -7,7 +7,7 @@ export type ExpiryManager = {
 };
 
 export const createExpiryManager = (params: {
-	getHoldsBySession: (sessionId: string) => Promise<
+	getHoldsBySession: (sessionId: SessionId) => Promise<
 		Array<{
 			holdId: HoldId;
 			tenantId: TenantId;

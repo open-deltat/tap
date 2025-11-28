@@ -51,7 +51,7 @@ export const createBookingManager = (deps: {
 		expiresAt: number;
 	} | null>;
 	holdRepository: {
-		delete: (id: HoldId) => Promise<void>;
+		delete: (id: string) => Promise<void>;
 	};
 	bookingRepository: {
 		create: (booking: {
@@ -61,13 +61,16 @@ export const createBookingManager = (deps: {
 			holdId?: HoldId;
 			start: number;
 			end: number;
-			status: string;
-			paymentStatus: string;
+			status: 'CONFIRMED' | 'CANCELLED';
+			paymentStatus: 'NONE' | 'PENDING' | 'PAID';
 			customerName?: string;
 			customerEmail?: string;
 			customerPhone?: string;
 		}) => Promise<void>;
-		update: (id: string, updates: Partial<{ status: string }>) => Promise<void>;
+		update: (
+			id: BookingId,
+			updates: Partial<{ status: 'CONFIRMED' | 'CANCELLED' }>,
+		) => Promise<void>;
 	};
 	withLock: (key: string) => Promise<() => void>;
 }): BookingManager => {
@@ -115,7 +118,7 @@ export const createBookingManager = (deps: {
 					return null;
 				}
 
-				await deps.holdRepository.delete(holdId as string);
+				await deps.holdRepository.delete(holdId);
 
 				await deps.bookingRepository.create({
 					id: params.bookingId,
@@ -172,7 +175,7 @@ export const createBookingManager = (deps: {
 			const release = await deps.withLock(lockKey);
 
 			try {
-				await deps.bookingRepository.update(bookingId as string, {
+				await deps.bookingRepository.update(bookingId, {
 					status: 'CANCELLED',
 				});
 

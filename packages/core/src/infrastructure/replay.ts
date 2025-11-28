@@ -2,12 +2,25 @@ import type { LedgerEvent } from '../domain/events';
 import type { Inventory } from '../features/inventory';
 import { type Interval, mergeIntervals, subtractInterval } from './intervals';
 
+function removeHoldFromState(
+	state: { held: Interval[] },
+	startUnix: number,
+	endUnix: number,
+): void {
+	const index = state.held.findIndex(
+		(i) => i.start === startUnix && i.end === endUnix,
+	);
+	if (index !== -1) {
+		state.held.splice(index, 1);
+	}
+}
+
 export const replayEvents = async (
 	inventory: Inventory,
 	events: LedgerEvent[],
 ): Promise<void> => {
 	for (const event of events) {
-		const state = inventory.getState(event.tenantId, event.resourceId);
+		const state = await inventory.getState(event.tenantId, event.resourceId);
 
 		switch (event.type) {
 			case 'HoldPlaced': {
@@ -24,32 +37,21 @@ export const replayEvents = async (
 			}
 			case 'HoldReleased': {
 				const { startUnix, endUnix } = event.payload;
-				const index = state.held.findIndex(
-					(i) => i.start === startUnix && i.end === endUnix,
-				);
-				if (index !== -1) {
-					state.held.splice(index, 1);
+				if (startUnix !== undefined && endUnix !== undefined) {
+					removeHoldFromState(state, startUnix, endUnix);
 				}
 				break;
 			}
 			case 'HoldExpired': {
 				const { startUnix, endUnix } = event.payload;
-				const index = state.held.findIndex(
-					(i) => i.start === startUnix && i.end === endUnix,
-				);
-				if (index !== -1) {
-					state.held.splice(index, 1);
+				if (startUnix !== undefined && endUnix !== undefined) {
+					removeHoldFromState(state, startUnix, endUnix);
 				}
 				break;
 			}
 			case 'BookingConfirmed': {
 				const { start, end } = event.payload;
-				const holdIndex = state.held.findIndex(
-					(i) => i.start === start && i.end === end,
-				);
-				if (holdIndex !== -1) {
-					state.held.splice(holdIndex, 1);
-				}
+				removeHoldFromState(state, start, end);
 
 				state.booked.push({
 					start,

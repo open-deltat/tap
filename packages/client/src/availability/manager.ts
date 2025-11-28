@@ -106,9 +106,11 @@ export class AvailabilityManager {
 				result.freeSlots,
 				this.options.timezone,
 			);
-			this.updateState({ availableDays: days });
+			this.updateState({ availableDays: days, error: null });
 		} catch (e) {
-			console.error('Failed to fetch month availability', e);
+			const error = e instanceof Error ? e : new Error('Unknown error');
+			console.error('Failed to fetch month availability', error);
+			this.updateState({ error });
 		}
 	}
 

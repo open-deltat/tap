@@ -28,20 +28,31 @@ export class AvailabilityClient {
 			...params,
 		};
 
-		const response = await fetch(
-			`${this.apiBaseUrl}${API_ROUTES.AVAILABILITY}`,
-			{
+		const url = `${this.apiBaseUrl}${API_ROUTES.AVAILABILITY}`;
+
+		try {
+			const response = await fetch(url, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(body),
-			},
-		);
+			});
 
-		if (!response.ok) {
-			throw new Error(`Failed to fetch: ${response.status}`);
+			if (!response.ok) {
+				const errorText = await response.text().catch(() => 'Unknown error');
+				throw new Error(
+					`API request failed: ${response.status} ${response.statusText}. ${errorText}`,
+				);
+			}
+
+			return (await response.json()) as AvailabilityPostResponse;
+		} catch (error) {
+			if (error instanceof TypeError && error.message === 'Failed to fetch') {
+				throw new Error(
+					`Unable to connect to API at ${url}. Make sure the API server is running.`,
+				);
+			}
+			throw error;
 		}
-
-		return (await response.json()) as AvailabilityPostResponse;
 	}
 
 	/**
