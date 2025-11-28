@@ -7,9 +7,10 @@ COPY package.json bun.lock ./
 COPY turbo.json tsconfig.json ./
 
 # Copy package.json files for all relevant workspaces to install dependencies
-# We only need api, core, and protocol for the API service
+# We need api, core, db, and protocol for the API service
 COPY packages/api/package.json ./packages/api/
 COPY packages/core/package.json ./packages/core/
+COPY packages/db/package.json ./packages/db/
 COPY packages/protocol/package.json ./packages/protocol/
 
 # Install dependencies including dev dependencies (needed for build/typescript)
@@ -18,6 +19,7 @@ RUN bun install
 # Copy source code for relevant packages
 COPY packages/api ./packages/api
 COPY packages/core ./packages/core
+COPY packages/db ./packages/db
 COPY packages/protocol ./packages/protocol
 
 # Set working directory to the API package
