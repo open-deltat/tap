@@ -1,4 +1,4 @@
-import type { Booking, Hold, Resource, Tenant, WeeklyOffer } from '@tap/core';
+import type { Booking, Hold, Offer, Resource, Tenant } from '@tap/core';
 import {
 	type BookingId,
 	bookingId,
@@ -41,8 +41,9 @@ export type ResourceRepository = {
 };
 
 export type OfferRepository = {
-	getByResourceId: (rid: ResourceId) => Promise<WeeklyOffer[]>;
-	create: (offer: WeeklyOffer) => Promise<void>;
+	getByResourceId: (rid: ResourceId) => Promise<readonly Offer[]>;
+	create: (offer: Offer) => Promise<void>;
+	delete: (id: string) => Promise<void>;
 };
 
 export type BookingRepository = {
@@ -199,20 +200,58 @@ export const createResourceRepository = (db: Database): ResourceRepository => ({
 	},
 });
 
-const toWeeklyOffer = (row: typeof offers.$inferSelect): WeeklyOffer => ({
-	type: 'weekly',
-	id: row.id,
-	tenantId: tenantId(row.tenantId),
-	resourceId: resourceId(row.resourceId),
-	daysOfWeek: Array.isArray(row.daysOfWeek)
-		? row.daysOfWeek.filter((d): d is number => typeof d === 'number')
-		: [],
-	startTime: row.startTime,
-	endTime: row.endTime,
-	priceCents: row.priceCents ?? undefined,
-	currency: row.currency,
-	capacity: 1,
-});
+type WeeklyConfig = {
+	daysOfWeek: number[];
+	startTime: string;
+	endTime: string;
+};
+type RangeConfig = { start: string; end: string };
+
+const isWeeklyConfig = (config: unknown): config is WeeklyConfig =>
+	typeof config === 'object' &&
+	config !== null &&
+	'daysOfWeek' in config &&
+	'startTime' in config &&
+	'endTime' in config;
+
+const isRangeConfig = (config: unknown): config is RangeConfig =>
+	typeof config === 'object' &&
+	config !== null &&
+	'start' in config &&
+	'end' in config;
+
+const toOffer = (row: typeof offers.$inferSelect): Offer | null => {
+	const base = {
+		id: row.id,
+		tenantId: tenantId(row.tenantId),
+		resourceId: resourceId(row.resourceId),
+		priceCents: row.priceCents ?? undefined,
+		currency: row.currency,
+		capacity: row.capacity,
+		timezone: row.timezone ?? undefined,
+	};
+
+	if (row.type === 'weekly' && isWeeklyConfig(row.config)) {
+		return {
+			...base,
+			type: 'weekly',
+			daysOfWeek: row.config.daysOfWeek,
+			startTime: row.config.startTime,
+			endTime: row.config.endTime,
+		};
+	}
+
+	if (row.type === 'range' && isRangeConfig(row.config)) {
+		return {
+			...base,
+			type: 'range',
+			start: row.config.start,
+			end: row.config.end,
+		};
+	}
+
+	return null;
+};
 
 export const createOfferRepository = (db: Database): OfferRepository => ({
 	getByResourceId: async (rid) => {
@@ -220,19 +259,32 @@ export const createOfferRepository = (db: Database): OfferRepository => ({
 			.select()
 			.from(offers)
 			.where(eq(offers.resourceId, rid));
-		return rows.map(toWeeklyOffer);
+		return rows.map(toOffer).filter((o): o is Offer => o !== null);
 	},
 	create: async (offer) => {
+		const config =
+			offer.type === 'weekly'
+				? {
+						daysOfWeek: offer.daysOfWeek,
+						startTime: offer.startTime,
+						endTime: offer.endTime,
+					}
+				: { start: offer.start, end: offer.end };
+
 		await db.insert(offers).values({
 			id: offer.id,
 			tenantId: offer.tenantId,
 			resourceId: offer.resourceId,
-			daysOfWeek: offer.daysOfWeek,
-			startTime: offer.startTime,
-			endTime: offer.endTime,
+			type: offer.type,
+			config,
+			timezone: offer.timezone ?? null,
+			capacity: offer.capacity,
 			priceCents: offer.priceCents ?? null,
 			currency: offer.currency,
 		});
+	},
+	delete: async (id) => {
+		await db.delete(offers).where(eq(offers.id, id));
 	},
 });
 

@@ -11,8 +11,47 @@ import {
 	SlotIdSchema,
 	SlotPricingSchema,
 	TenantIdSchema,
+	ULIDSchema,
 } from './primitives';
 import { BOOKING_STATUSES } from './values';
+
+const WeeklyOfferConfigSchema = z.object({
+	daysOfWeek: z.array(z.number().int().min(0).max(6)),
+	startTime: z.string().regex(/^\d{2}:\d{2}$/),
+	endTime: z.string().regex(/^\d{2}:\d{2}$/),
+});
+
+const RangeOfferConfigSchema = z.object({
+	start: IsoDateTimeSchema,
+	end: IsoDateTimeSchema,
+});
+
+const OfferBaseSchema = z.object({
+	id: ULIDSchema.optional(),
+	tenantId: TenantIdSchema,
+	resourceId: ResourceIdSchema,
+	timezone: z.string().optional(),
+	capacity: z.number().int().min(1).default(1),
+	priceCents: z.number().int().optional(),
+	currency: z.string().default('USD'),
+});
+
+export const WeeklyOfferSchema = OfferBaseSchema.extend({
+	type: z.literal('weekly'),
+}).merge(WeeklyOfferConfigSchema);
+
+export const RangeOfferSchema = OfferBaseSchema.extend({
+	type: z.literal('range'),
+}).merge(RangeOfferConfigSchema);
+
+export const OfferSchema = z.discriminatedUnion('type', [
+	WeeklyOfferSchema,
+	RangeOfferSchema,
+]);
+
+export type WeeklyOfferInput = z.infer<typeof WeeklyOfferSchema>;
+export type RangeOfferInput = z.infer<typeof RangeOfferSchema>;
+export type OfferInput = z.infer<typeof OfferSchema>;
 
 export const httpRoutes = {
 	'/availability': {
@@ -118,6 +157,41 @@ export const httpRoutes = {
 			),
 		}),
 	},
+	'/offers': {
+		method: 'get' as const,
+		summary: 'List offers',
+		description: 'Returns all offers for a resource.',
+		tag: 'Offers',
+		request: z.object({
+			resourceId: ResourceIdSchema,
+		}),
+		response: z.object({
+			offers: z.array(OfferSchema),
+		}),
+	},
+	'/offers/create': {
+		method: 'post' as const,
+		summary: 'Create offer',
+		description:
+			'Creates a new offer for a resource. Weekly offers repeat on specified days. Range offers are one-time.',
+		tag: 'Offers',
+		request: OfferSchema,
+		response: z.object({
+			offer: OfferSchema,
+		}),
+	},
+	'/offers/delete': {
+		method: 'post' as const,
+		summary: 'Delete offer',
+		description: 'Deletes an offer by ID.',
+		tag: 'Offers',
+		request: z.object({
+			offerId: ULIDSchema,
+		}),
+		response: z.object({
+			deleted: z.boolean(),
+		}),
+	},
 } as const;
 
 export const AvailabilityPostRequestBodySchema =
@@ -131,6 +205,12 @@ export const CancelPostResponseSchema = httpRoutes['/cancel'].response;
 export const HealthResponseSchema = httpRoutes['/health'].response;
 export const BookingsPostRequestBodySchema = httpRoutes['/bookings'].request;
 export const BookingsPostResponseSchema = httpRoutes['/bookings'].response;
+export const OffersGetRequestSchema = httpRoutes['/offers'].request;
+export const OffersGetResponseSchema = httpRoutes['/offers'].response;
+export const OfferCreateRequestSchema = httpRoutes['/offers/create'].request;
+export const OfferCreateResponseSchema = httpRoutes['/offers/create'].response;
+export const OfferDeleteRequestSchema = httpRoutes['/offers/delete'].request;
+export const OfferDeleteResponseSchema = httpRoutes['/offers/delete'].response;
 
 export type AvailabilityPostRequestBody = z.infer<
 	typeof AvailabilityPostRequestBodySchema
@@ -147,3 +227,9 @@ export type BookingsPostRequestBody = z.infer<
 	typeof BookingsPostRequestBodySchema
 >;
 export type BookingsPostResponse = z.infer<typeof BookingsPostResponseSchema>;
+export type OffersGetRequest = z.infer<typeof OffersGetRequestSchema>;
+export type OffersGetResponse = z.infer<typeof OffersGetResponseSchema>;
+export type OfferCreateRequest = z.infer<typeof OfferCreateRequestSchema>;
+export type OfferCreateResponse = z.infer<typeof OfferCreateResponseSchema>;
+export type OfferDeleteRequest = z.infer<typeof OfferDeleteRequestSchema>;
+export type OfferDeleteResponse = z.infer<typeof OfferDeleteResponseSchema>;

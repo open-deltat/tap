@@ -1,5 +1,9 @@
-import { createInventory, type Inventory } from '@tap/core';
-import { createDatabase, createDbStateManager } from '@tap/db';
+import { createInventory, type Inventory, type Offer } from '@tap/core';
+import {
+	createDatabase,
+	createDbStateManager,
+	createOfferRepository,
+} from '@tap/db';
 import type { ResourceId, TenantId } from '@tap/protocol';
 
 const connectionString =
@@ -8,6 +12,7 @@ const connectionString =
 	'postgresql://tap:tap@localhost:5432/tap';
 
 const db = createDatabase(connectionString);
+const offerRepository = createOfferRepository(db);
 
 const inventories = new Map<string, Inventory>();
 
@@ -24,3 +29,11 @@ export const getInventory = (
 	}
 	return inventory;
 };
+
+export const getOffersForResource = async (
+	resourceId: ResourceId,
+): Promise<readonly Offer[]> => {
+	return offerRepository.getByResourceId(resourceId);
+};
+
+export { offerRepository };

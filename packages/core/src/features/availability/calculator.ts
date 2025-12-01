@@ -4,7 +4,7 @@ import {
 	type ResourceId,
 	type TenantId,
 } from '@tap/protocol';
-import type { Offer, WeeklyOffer } from '../../domain/models';
+import type { Offer } from '../../domain/models';
 import {
 	mergeIntervals,
 	subtractIntervals,
@@ -12,29 +12,12 @@ import {
 import type { InventoryState } from '../inventory-types';
 import { generateOfferIntervals } from './offers';
 
-const DEFAULT_OFFER: WeeklyOffer = {
-	type: 'weekly',
-	id: 'default',
-	tenantId: 'default' as TenantId,
-	resourceId: 'default' as ResourceId,
-	daysOfWeek: [1, 2, 3, 4, 5],
-	startTime: '09:00',
-	endTime: '17:00',
-	currency: 'USD',
-	capacity: 1,
-	timezone: 'UTC',
-};
-
-const getOffersForResource = (
-	tenantId: TenantId,
-	resourceId: ResourceId,
-): Offer[] => [{ ...DEFAULT_OFFER, tenantId, resourceId }];
-
 export type CalculateAvailabilityParams = {
 	inventoryState: (
 		tenantId: TenantId,
 		resourceId: ResourceId,
 	) => Promise<InventoryState>;
+	offers: readonly Offer[];
 	tenantId: TenantId;
 	resourceId: ResourceId;
 	from: Date;
@@ -49,6 +32,7 @@ export const calculateAvailability = async (
 ): Promise<AvailabilitySlot[]> => {
 	const {
 		inventoryState,
+		offers,
 		tenantId,
 		resourceId,
 		from,
@@ -57,7 +41,6 @@ export const calculateAvailability = async (
 	} = params;
 
 	const state = await inventoryState(tenantId, resourceId);
-	const offers = getOffersForResource(tenantId, resourceId);
 
 	const offerIntervals = generateOfferIntervals(offers, from, to);
 	const consumptionIntervals = [...state.booked, ...state.held].map((i) => ({

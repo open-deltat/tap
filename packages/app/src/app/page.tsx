@@ -5,6 +5,7 @@ import * as React from 'react';
 import { BookingFlow } from '@/components/availability-picker/booking-flow';
 import { BookingsCalendar } from '@/components/demo/bookings-calendar';
 import { EventLogger } from '@/components/demo/event-logger';
+import { OffersManager } from '@/components/demo/offers-manager';
 
 export default function Home() {
 	const apiBaseUrl =
@@ -90,13 +91,20 @@ export default function Home() {
 					</div>
 				</div>
 
-				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-[400px]">
+				<div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-auto lg:h-[400px]">
 					<div className="lg:col-span-2">
 						<BookingsCalendar
 							apiBaseUrl={apiBaseUrl}
 							tenantId={TENANT_ID}
 							resourceId={RESOURCE_ID}
 							initialTimezone="Europe/Berlin"
+						/>
+					</div>
+					<div className="lg:col-span-1">
+						<OffersManager
+							apiBaseUrl={apiBaseUrl}
+							tenantId={TENANT_ID}
+							resourceId={RESOURCE_ID}
 						/>
 					</div>
 					<div className="lg:col-span-1">

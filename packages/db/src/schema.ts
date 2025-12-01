@@ -47,6 +47,10 @@ export const resources = pgTable('resources', {
 		.default(sql`now()`),
 });
 
+export type OfferConfig =
+	| { daysOfWeek: number[]; startTime: string; endTime: string }
+	| { start: string; end: string };
+
 export const offers = pgTable('offers', {
 	id: text('id').primaryKey(),
 	tenantId: text('tenant_id')
@@ -55,9 +59,10 @@ export const offers = pgTable('offers', {
 	resourceId: text('resource_id')
 		.notNull()
 		.references(() => resources.id),
-	daysOfWeek: jsonb('days_of_week').notNull().$type<number[]>(),
-	startTime: text('start_time').notNull(),
-	endTime: text('end_time').notNull(),
+	type: text('type').notNull().$type<'weekly' | 'range'>(),
+	config: jsonb('config').notNull().$type<OfferConfig>(),
+	timezone: text('timezone'),
+	capacity: integer('capacity').notNull().default(1),
 	priceCents: integer('price_cents'),
 	currency: text('currency').notNull().default('USD'),
 	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })

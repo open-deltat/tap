@@ -8,7 +8,7 @@ import {
 	AvailabilityPostRequestBodySchema,
 	type AvailabilityPostResponse,
 } from '@tap/protocol';
-import { getInventory } from '../core';
+import { getInventory, getOffersForResource } from '../core';
 
 export async function handleAvailability(req: Request): Promise<Response> {
 	try {
@@ -26,8 +26,10 @@ export async function handleAvailability(req: Request): Promise<Response> {
 
 		const body = result.data;
 		const inventory = getInventory(body.tenantId, body.resourceId);
+		const offers = await getOffersForResource(body.resourceId);
 		const slots = await calculateAvailability({
 			inventoryState: inventory.getState,
+			offers,
 			tenantId: body.tenantId,
 			resourceId: body.resourceId,
 			from: new Date(body.from),

@@ -20,6 +20,11 @@ import {
 	type HoldWSData,
 	holdWebSocketHandler,
 } from './routes/hold/websocket-handler';
+import {
+	handleOfferCreate,
+	handleOfferDelete,
+	handleOffersGet,
+} from './routes/offers';
 import { setServer } from './server-context';
 
 const VERSION = '0.1.0';
@@ -126,15 +131,52 @@ const handleHttp = (
 					availability: API_ROUTES.AVAILABILITY,
 					book: API_ROUTES.BOOK,
 					cancel: API_ROUTES.CANCEL,
+					offers: API_ROUTES.OFFERS,
 					availability_ws: API_ROUTES.AVAILABILITY_WS,
 					hold_ws: API_ROUTES.HOLD_WS,
 					health: API_ROUTES.HEALTH,
 					docs: API_ROUTES.DOCS,
 					openapi: API_ROUTES.OPENAPI,
 				},
-				capabilities: ['holds', 'bookings', 'realtime'],
+				capabilities: ['holds', 'bookings', 'realtime', 'offers'],
 			};
 			return addCors(Response.json(discovery));
+		}
+
+		if (pathname === API_ROUTES.OFFERS && method === 'GET') {
+			return handleOffersGet(req)
+				.then(addCors)
+				.catch((e) => {
+					const error = new TapError(
+						'TAP_INTERNAL_ERROR',
+						e instanceof Error ? e.message : 'Unknown error',
+					);
+					return addCors(error.toResponse());
+				});
+		}
+
+		if (pathname === API_ROUTES.OFFERS_CREATE && method === 'POST') {
+			return handleOfferCreate(req)
+				.then(addCors)
+				.catch((e) => {
+					const error = new TapError(
+						'TAP_INTERNAL_ERROR',
+						e instanceof Error ? e.message : 'Unknown error',
+					);
+					return addCors(error.toResponse());
+				});
+		}
+
+		if (pathname === API_ROUTES.OFFERS_DELETE && method === 'POST') {
+			return handleOfferDelete(req)
+				.then(addCors)
+				.catch((e) => {
+					const error = new TapError(
+						'TAP_INTERNAL_ERROR',
+						e instanceof Error ? e.message : 'Unknown error',
+					);
+					return addCors(error.toResponse());
+				});
 		}
 
 		if (pathname === API_ROUTES.AVAILABILITY_WS) {

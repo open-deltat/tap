@@ -64,7 +64,7 @@ const generateWeeklyOfferIntervals = (
 };
 
 export const generateOfferIntervals = (
-	offers: Offer[],
+	offers: readonly Offer[],
 	from: Date,
 	to: Date,
 ): Interval[] => {
