@@ -25,7 +25,7 @@ export const DatePickerSection = ({
 	return (
 		<div className="flex flex-col h-full bg-background">
 			<div
-				className={`flex-1 flex justify-center p-4 transition-opacity duration-300 ${isLoading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}
+				className={`flex-1 flex justify-center transition-opacity duration-300 ${isLoading ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}
 			>
 				<Calendar
 					mode="single"

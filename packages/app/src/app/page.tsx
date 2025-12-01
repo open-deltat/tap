@@ -59,7 +59,7 @@ export default function Home() {
 								resourceSlug={RESOURCE_ID}
 								durationMs={60 * 60000}
 								onBookingConfirmed={handleBookingConfirmed}
-								className="h-auto md:h-[500px] border-none shadow-none"
+								className="border-none shadow-none"
 								initialTimezone="Europe/Berlin"
 								onTimezoneChange={setClientATimezone}
 							/>
@@ -86,7 +86,7 @@ export default function Home() {
 								resourceSlug={RESOURCE_ID}
 								durationMs={60 * 60000}
 								onBookingConfirmed={handleBookingConfirmed}
-								className="h-auto md:h-[500px] border-none shadow-none"
+								className="border-none shadow-none"
 								initialTimezone="America/New_York"
 								onTimezoneChange={setClientBTimezone}
 							/>
