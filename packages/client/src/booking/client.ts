@@ -1,7 +1,10 @@
 import {
 	API_ROUTES,
+	type BookingId,
 	type BookPostRequestBody,
 	type BookPostResponse,
+	type CancelPostRequestBody,
+	type CancelPostResponse,
 	type HoldId,
 	type ResourceId,
 	type SessionId,
@@ -45,9 +48,7 @@ export class BookingClient {
 
 		const response = await fetch(`${apiBaseUrl}${API_ROUTES.BOOK}`, {
 			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
+			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body),
 		});
 
@@ -62,5 +63,32 @@ export class BookingClient {
 
 		const data = (await response.json()) as BookPostResponse;
 		return data.bookingId;
+	}
+
+	async cancelBooking(bookingId: string): Promise<CancelPostResponse> {
+		const { apiBaseUrl, tenantSlug, resourceSlug } = this.options;
+
+		const body: CancelPostRequestBody = {
+			tenantId: tenantSlug as TenantId,
+			resourceId: resourceSlug as ResourceId,
+			bookingId: bookingId as BookingId,
+		};
+
+		const response = await fetch(`${apiBaseUrl}${API_ROUTES.CANCEL}`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body),
+		});
+
+		if (!response.ok) {
+			const errorData = await response.json().catch(() => ({
+				error: response.statusText,
+			}));
+			throw new Error(
+				errorData.error?.message || `Failed to cancel: ${response.status}`,
+			);
+		}
+
+		return (await response.json()) as CancelPostResponse;
 	}
 }

@@ -1,5 +1,7 @@
-import type { InventoryState } from '@tap/core';
+import type { BookingInfo, InventoryState } from '@tap/core';
 import {
+	type BookingId,
+	bookingId,
 	type HoldId,
 	holdId,
 	type ResourceId,
@@ -17,6 +19,11 @@ import type {
 } from './repositories';
 import { createBookingRepository, createHoldRepository } from './repositories';
 import { bookings, holds } from './schema';
+
+const BOOKING_STATUS = ['CONFIRMED', 'CANCELLED'] as const;
+type BookingStatus = (typeof BOOKING_STATUS)[number];
+const isBookingStatus = (value: string): value is BookingStatus =>
+	BOOKING_STATUS.includes(value as BookingStatus);
 
 export type DbStateManager = {
 	getState: (tid: TenantId, rid: ResourceId) => Promise<InventoryState>;
@@ -38,6 +45,7 @@ export type DbStateManager = {
 			expiresAt: number;
 		}>
 	>;
+	getBookingById: (bid: BookingId) => Promise<BookingInfo | null>;
 	holdRepository: HoldRepository;
 	bookingRepository: BookingRepository;
 };
@@ -115,6 +123,23 @@ export const createDbStateManager = (db: Database): DbStateManager => {
 				endUnix: row.endUnix,
 				expiresAt: row.expiresAt,
 			}));
+		},
+		getBookingById: async (bid) => {
+			const [row] = await db
+				.select()
+				.from(bookings)
+				.where(eq(bookings.id, bid))
+				.limit(1);
+			if (!row) return null;
+			if (!isBookingStatus(row.status)) return null;
+			return {
+				id: bookingId(row.id),
+				tenantId: tenantId(row.tenantId),
+				resourceId: resourceId(row.resourceId),
+				start: row.start,
+				end: row.end,
+				status: row.status,
+			};
 		},
 		holdRepository: holdRepo,
 		bookingRepository: bookingRepo,

@@ -3,9 +3,8 @@
 import type { ResourceId, TenantId } from '@tap/protocol';
 import * as React from 'react';
 import { BookingFlow } from '@/components/availability-picker/booking-flow';
-import { AvailabilityState } from '@/components/demo/availability-state';
+import { BookingsCalendar } from '@/components/demo/bookings-calendar';
 import { EventLogger } from '@/components/demo/event-logger';
-import { NetworkStatus } from '@/components/demo/network-status';
 
 export default function Home() {
 	const apiBaseUrl =
@@ -37,9 +36,7 @@ export default function Home() {
 					</div>
 				</header>
 
-				{/* Main Demo Area: Two Independent Clients */}
 				<div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-					{/* Client A */}
 					<div className="space-y-3">
 						<div className="flex items-center justify-between px-1">
 							<div className="flex items-center gap-2">
@@ -66,7 +63,6 @@ export default function Home() {
 						</div>
 					</div>
 
-					{/* Client B */}
 					<div className="space-y-3">
 						<div className="flex items-center justify-between px-1">
 							<div className="flex items-center gap-2">
@@ -94,25 +90,17 @@ export default function Home() {
 					</div>
 				</div>
 
-				{/* Info & Logs Section */}
-				<div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-auto lg:h-[400px]">
+				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-[400px]">
 					<div className="lg:col-span-2">
+						<BookingsCalendar
+							apiBaseUrl={apiBaseUrl}
+							tenantId={TENANT_ID}
+							resourceId={RESOURCE_ID}
+							initialTimezone="Europe/Berlin"
+						/>
+					</div>
+					<div className="lg:col-span-1">
 						<EventLogger
-							apiBaseUrl={apiBaseUrl}
-							tenantSlug={TENANT_ID}
-							resourceSlug={RESOURCE_ID}
-						/>
-					</div>
-					<div className="lg:col-span-1">
-						<AvailabilityState
-							apiBaseUrl={apiBaseUrl}
-							tenantSlug={TENANT_ID}
-							resourceSlug={RESOURCE_ID}
-							timezone={clientATimezone}
-						/>
-					</div>
-					<div className="lg:col-span-1">
-						<NetworkStatus
 							apiBaseUrl={apiBaseUrl}
 							tenantSlug={TENANT_ID}
 							resourceSlug={RESOURCE_ID}

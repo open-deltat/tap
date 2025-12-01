@@ -33,6 +33,10 @@ export const ERROR_META: Record<
 		category: 'CLIENT_CONFLICT',
 		httpStatus: 404,
 	},
+	TAP_BOOKING_ALREADY_CANCELLED: {
+		category: 'CLIENT_CONFLICT',
+		httpStatus: 409,
+	},
 	TAP_RATE_LIMIT_EXCEEDED: {
 		category: 'RATE_LIMIT',
 		httpStatus: 429,

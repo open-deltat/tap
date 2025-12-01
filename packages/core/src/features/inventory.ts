@@ -18,6 +18,15 @@ import { createExpiryManager } from './hold/expiry';
 import { createHoldManager } from './hold/manager';
 import type { InventoryState } from './inventory-types';
 
+export type BookingInfo = {
+	id: BookingId;
+	tenantId: TenantId;
+	resourceId: ResourceId;
+	start: number;
+	end: number;
+	status: 'CONFIRMED' | 'CANCELLED';
+};
+
 export type DbStateManager = {
 	getState: (
 		tenantId: TenantId,
@@ -41,6 +50,7 @@ export type DbStateManager = {
 			expiresAt: number;
 		}>
 	>;
+	getBookingById: (bookingId: BookingId) => Promise<BookingInfo | null>;
 	holdRepository: {
 		create: (hold: {
 			id: HoldId;
@@ -121,6 +131,7 @@ export type Inventory = {
 		startUnix: number;
 		endUnix: number;
 	}) => Promise<BookingCancelledEvent | null>;
+	getBookingById: (bookingId: BookingId) => Promise<BookingInfo | null>;
 	expireHolds: (now: number) => Promise<HoldExpiredEvent[]>;
 	releaseHold: (params: {
 		holdId: HoldId;
@@ -164,6 +175,7 @@ export const createInventory = (dbStateManager: DbStateManager): Inventory => {
 		placeHold: holdManager.placeHold,
 		confirmBooking: bookingManager.confirmBooking,
 		cancelBooking: bookingManager.cancelBooking,
+		getBookingById: dbStateManager.getBookingById,
 		expireHolds: expiryManager.expireHolds,
 		releaseHold: holdManager.releaseHold,
 		releaseHoldsForSession: holdManager.releaseHoldsForSession,

@@ -1,6 +1,7 @@
 import { TapError } from '@tap/core';
 import {
 	API_ROUTES,
+	type HealthResponse,
 	type ResourceId,
 	type SlotId,
 	type TenantId,
@@ -13,11 +14,15 @@ import {
 	availabilityWebSocketHandler,
 } from './routes/availability/websocket-handler';
 import { handleBook } from './routes/book';
+import { handleBookings } from './routes/bookings';
+import { handleCancel } from './routes/cancel';
 import {
 	type HoldWSData,
 	holdWebSocketHandler,
 } from './routes/hold/websocket-handler';
 import { setServer } from './server-context';
+
+const VERSION = '0.1.0';
 
 export type WSData = AvailabilityWSData | HoldWSData;
 
@@ -79,6 +84,57 @@ const handleHttp = (
 					);
 					return addCors(error.toResponse());
 				});
+		}
+
+		if (pathname === API_ROUTES.CANCEL && method === 'POST') {
+			return handleCancel(req, server)
+				.then(addCors)
+				.catch((e) => {
+					const error = new TapError(
+						'TAP_INTERNAL_ERROR',
+						e instanceof Error ? e.message : 'Unknown error',
+					);
+					return addCors(error.toResponse());
+				});
+		}
+
+		if (pathname === API_ROUTES.BOOKINGS && method === 'POST') {
+			return handleBookings(req)
+				.then(addCors)
+				.catch((e) => {
+					const error = new TapError(
+						'TAP_INTERNAL_ERROR',
+						e instanceof Error ? e.message : 'Unknown error',
+					);
+					return addCors(error.toResponse());
+				});
+		}
+
+		if (pathname === API_ROUTES.HEALTH && method === 'GET') {
+			const response: HealthResponse = {
+				status: 'ok',
+				version: VERSION,
+				timestamp: Date.now(),
+			};
+			return addCors(Response.json(response));
+		}
+
+		if (pathname === API_ROUTES.DISCOVERY && method === 'GET') {
+			const discovery = {
+				tap_version: VERSION,
+				endpoints: {
+					availability: API_ROUTES.AVAILABILITY,
+					book: API_ROUTES.BOOK,
+					cancel: API_ROUTES.CANCEL,
+					availability_ws: API_ROUTES.AVAILABILITY_WS,
+					hold_ws: API_ROUTES.HOLD_WS,
+					health: API_ROUTES.HEALTH,
+					docs: API_ROUTES.DOCS,
+					openapi: API_ROUTES.OPENAPI,
+				},
+				capabilities: ['holds', 'bookings', 'realtime'],
+			};
+			return addCors(Response.json(discovery));
 		}
 
 		if (pathname === API_ROUTES.AVAILABILITY_WS) {
