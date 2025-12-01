@@ -9,17 +9,21 @@
 		".": {
 			"types": "./src/index.ts",
 			"default": "./src/index.ts"
+		},
+		"./openapi": {
+			"types": "./src/openapi.ts",
+			"default": "./src/openapi.ts"
 		}
 	},
 	"scripts": {
-		"clean": "rm -rf dist",
 		"typecheck": "tsc --noEmit",
 		"lint": "biome check .",
 		"format": "biome format --write .",
 		"lint:fix": "biome check --write ."
 	},
 	"dependencies": {
-		"zod": "^3.23.8"
+		"zod": "^3.23.8",
+		"@asteasolutions/zod-to-openapi": "^7.3.0"
 	},
 	"devDependencies": {
 		"@types/bun": "latest",

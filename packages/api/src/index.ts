@@ -6,6 +6,7 @@ import {
 	type TenantId,
 } from '@tap/protocol';
 import type { Server, ServerWebSocket } from 'bun';
+import { docsHtml, openApiDocument } from './docs';
 import { handleAvailability } from './routes/availability';
 import {
 	type AvailabilityWSData,
@@ -26,10 +27,10 @@ const CORS_HEADERS = {
 	'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-function handleHttp(
+const handleHttp = (
 	req: Request,
 	server: Server<WSData>,
-): Promise<Response> | Response | undefined {
+): Promise<Response> | Response | undefined => {
 	const url = new URL(req.url);
 	const method = req.method;
 	const pathname = url.pathname;
@@ -46,6 +47,16 @@ function handleHttp(
 	};
 
 	try {
+		if (pathname === API_ROUTES.DOCS && method === 'GET') {
+			return addCors(
+				new Response(docsHtml, { headers: { 'Content-Type': 'text/html' } }),
+			);
+		}
+
+		if (pathname === API_ROUTES.OPENAPI && method === 'GET') {
+			return addCors(Response.json(openApiDocument));
+		}
+
 		if (pathname === API_ROUTES.AVAILABILITY && method === 'POST') {
 			return handleAvailability(req)
 				.then(addCors)
@@ -108,7 +119,7 @@ function handleHttp(
 		);
 		return addCors(error.toResponse());
 	}
-}
+};
 
 const server = Bun.serve({
 	port: 3000,
