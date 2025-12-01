@@ -1,5 +1,4 @@
 import type { HoldId, ResourceId, SessionId, TenantId } from '@tap/protocol';
-import { ulid } from 'ulid';
 import type {
 	HoldExpiredEvent,
 	HoldPlacedEvent,
@@ -7,6 +6,7 @@ import type {
 } from '../../domain/events';
 import { createEvent } from '../../domain/factory';
 import type { Interval } from '../../infrastructure/intervals';
+import { createHoldId } from '../../infrastructure/utils';
 import type { InventoryState } from '../inventory-types';
 
 export type HoldManager = {
@@ -67,7 +67,7 @@ export const createHoldManager = (params: {
 			expiresAt: number;
 			clientRef?: string;
 		}) => Promise<void>;
-		delete: (id: string) => Promise<void>;
+		delete: (id: HoldId) => Promise<void>;
 	};
 	withLock: (key: string) => Promise<() => void>;
 }): HoldManager => {
@@ -106,10 +106,10 @@ export const createHoldManager = (params: {
 					return { success: false };
 				}
 
-				const holdId = ulid() as HoldId;
+				const generatedHoldId = createHoldId();
 
 				await params.holdRepository.create({
-					id: holdId,
+					id: generatedHoldId,
 					tenantId,
 					resourceId,
 					sessionId,
@@ -122,14 +122,14 @@ export const createHoldManager = (params: {
 				const event = createEvent('HoldPlaced', {
 					tenantId,
 					resourceId,
-					holdId,
+					holdId: generatedHoldId,
 					startUnix,
 					endUnix,
 					expiresAt,
 					...(clientRef !== undefined && { clientRef }),
 				}) as HoldPlacedEvent;
 
-				return { success: true, holdId, event };
+				return { success: true, holdId: generatedHoldId, event };
 			} finally {
 				release();
 			}
@@ -149,7 +149,7 @@ export const createHoldManager = (params: {
 					return { success: false };
 				}
 
-				await params.holdRepository.delete(holdId as string);
+				await params.holdRepository.delete(holdId);
 
 				const event = createEvent('HoldReleased', {
 					tenantId: hold.tenantId,
@@ -179,7 +179,7 @@ export const createHoldManager = (params: {
 						continue;
 					}
 
-					await params.holdRepository.delete(hold.holdId as string);
+					await params.holdRepository.delete(hold.holdId);
 
 					events.push(
 						createEvent('HoldExpired', {

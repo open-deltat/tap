@@ -20,7 +20,6 @@ import { setServer } from './server-context';
 
 export type WSData = AvailabilityWSData | HoldWSData;
 
-// CORS headers
 const CORS_HEADERS = {
 	'Access-Control-Allow-Origin': '*',
 	'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -149,11 +148,8 @@ const server = Bun.serve({
 	},
 });
 
-// Share server instance globally
 setServer(server);
 
 if (import.meta.main) {
 	console.log(`Listening on localhost:${server.port}`);
 }
-
-// export default server;

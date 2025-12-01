@@ -52,7 +52,7 @@ export type DbStateManager = {
 			expiresAt: number;
 			clientRef?: string;
 		}) => Promise<void>;
-		delete: (id: string) => Promise<void>;
+		delete: (id: HoldId) => Promise<void>;
 		getExpired: (now: number) => Promise<
 			Array<{
 				id: HoldId;

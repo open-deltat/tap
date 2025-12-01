@@ -1,5 +1,3 @@
-// Enums and Constants for TAP Protocol
-
 export const ERROR_VALUES = [
 	'TAP_INVALID_INPUT',
 	'TAP_RESOURCE_NOT_FOUND',

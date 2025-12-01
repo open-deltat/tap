@@ -55,10 +55,6 @@ export class AvailabilityClient {
 		}
 	}
 
-	/**
-	 * Extracts available days (YYYY-MM-DD) from a set of slots.
-	 * This logic is client-specific (presentation), but useful to have near the fetcher.
-	 */
 	extractAvailableDays(
 		slots: AvailabilityPostResponse['freeSlots'],
 		timezone?: string,

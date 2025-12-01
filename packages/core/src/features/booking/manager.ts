@@ -51,7 +51,7 @@ export const createBookingManager = (deps: {
 		expiresAt: number;
 	} | null>;
 	holdRepository: {
-		delete: (id: string) => Promise<void>;
+		delete: (id: HoldId) => Promise<void>;
 	};
 	bookingRepository: {
 		create: (booking: {

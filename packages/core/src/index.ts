@@ -12,3 +12,4 @@ export * from './infrastructure/event-store';
 export * from './infrastructure/mutex';
 export * from './infrastructure/replay';
 export * from './infrastructure/utils';
+export * from './types/result';

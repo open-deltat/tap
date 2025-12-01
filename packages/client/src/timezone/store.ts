@@ -1,43 +1,35 @@
-export const getClientTimezone = (): string => {
-	return Intl.DateTimeFormat().resolvedOptions().timeZone;
+export const getClientTimezone = (): string =>
+	Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+const TIME_FORMAT: Intl.DateTimeFormatOptions = {
+	hour: 'numeric',
+	minute: 'numeric',
+	hour12: true,
+};
+
+const DATE_FORMAT: Intl.DateTimeFormatOptions = {
+	weekday: 'long',
+	month: 'long',
+	day: 'numeric',
 };
 
 export class TimezoneStore {
-	private timezone: string;
+	constructor(private timezone: string = getClientTimezone()) {}
 
-	constructor(initialTimezone?: string) {
-		this.timezone = initialTimezone || getClientTimezone();
-	}
-
-	getTimezone(): string {
-		return this.timezone;
-	}
-
-	setTimezone(timezone: string): void {
+	getTimezone = (): string => this.timezone;
+	setTimezone = (timezone: string): void => {
 		this.timezone = timezone;
-	}
+	};
 
-	format(date: Date | number, format: string): string {
-		const d = new Date(date);
+	formatTime = (date: Date | number): string =>
+		new Intl.DateTimeFormat('en-US', {
+			...TIME_FORMAT,
+			timeZone: this.timezone,
+		}).format(new Date(date));
 
-		if (format === 'h:mm a') {
-			return new Intl.DateTimeFormat('en-US', {
-				hour: 'numeric',
-				minute: 'numeric',
-				hour12: true,
-				timeZone: this.timezone,
-			}).format(d);
-		}
-
-		if (format === 'EEEE, MMMM d') {
-			return new Intl.DateTimeFormat('en-US', {
-				weekday: 'long',
-				month: 'long',
-				day: 'numeric',
-				timeZone: this.timezone,
-			}).format(d);
-		}
-
-		return d.toLocaleString('en-US', { timeZone: this.timezone });
-	}
+	formatDate = (date: Date | number): string =>
+		new Intl.DateTimeFormat('en-US', {
+			...DATE_FORMAT,
+			timeZone: this.timezone,
+		}).format(new Date(date));
 }

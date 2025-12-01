@@ -2,15 +2,14 @@ import type { EventId, ResourceId, TenantId } from '@tap/protocol';
 import { ulid } from 'ulid';
 import type { LedgerEvent } from './events';
 
-// Simplified factory that is less generic-heavy to appease TS
-export function createEvent<T extends LedgerEvent['type']>(
+export const createEvent = <T extends LedgerEvent['type']>(
 	type: T,
 	params: {
 		tenantId: TenantId;
 		resourceId: ResourceId;
 		[key: string]: unknown;
 	},
-): LedgerEvent {
+): LedgerEvent => {
 	const { tenantId, resourceId, ...rest } = params;
 	return {
 		eventId: ulid() as EventId,
@@ -21,4 +20,4 @@ export function createEvent<T extends LedgerEvent['type']>(
 		createdAt: Date.now(),
 		payload: rest,
 	} as unknown as LedgerEvent;
-}
+};

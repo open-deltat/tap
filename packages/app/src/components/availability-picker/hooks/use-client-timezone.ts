@@ -8,29 +8,26 @@ export const useClientTimezone = (initialTimezone?: string) => {
 		() => new TimezoneStore(initialTimezone),
 		[initialTimezone],
 	);
-
 	const [timezone, setTimezoneState] = useState<string>(() =>
 		store.getTimezone(),
 	);
 
 	const setTimezone = useCallback(
-		(newTimezone: string) => {
-			store.setTimezone(newTimezone);
-			setTimezoneState(newTimezone);
+		(tz: string) => {
+			store.setTimezone(tz);
+			setTimezoneState(tz);
 		},
 		[store],
 	);
 
-	const format = useCallback(
-		(date: Date | number, fmt: string) => {
-			return store.format(date, fmt);
-		},
+	const formatTime = useCallback(
+		(date: Date | number) => store.formatTime(date),
+		[store],
+	);
+	const formatDate = useCallback(
+		(date: Date | number) => store.formatDate(date),
 		[store],
 	);
 
-	return {
-		timezone,
-		setTimezone,
-		format,
-	};
+	return { timezone, setTimezone, formatTime, formatDate };
 };

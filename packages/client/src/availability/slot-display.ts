@@ -10,72 +10,73 @@ export type DisplayedSlot = {
 	isReleased?: boolean;
 };
 
-export type GenerateDisplayedSlotsOptions = {
-	selectedDate: Date;
-	slots: AvailabilitySlot[];
-	durationMs: number;
-	timezone: string;
-	lastEvent?: LedgerEvent | null;
+const DEFAULT_SLOT_DURATION_MS = 60 * 60000;
+
+const getDayBoundsInTimezone = (
+	date: Date,
+	timezone: string,
+): { start: number; end: number } | null => {
+	try {
+		const dateStr = format(date, 'yyyy-MM-dd');
+		const nextDay = new Date(date);
+		nextDay.setDate(nextDay.getDate() + 1);
+
+		return {
+			start: fromZonedTime(`${dateStr}T00:00:00`, timezone).getTime(),
+			end: fromZonedTime(
+				`${format(nextDay, 'yyyy-MM-dd')}T00:00:00`,
+				timezone,
+			).getTime(),
+		};
+	} catch {
+		return null;
+	}
 };
 
-export function generateDisplayedSlots(
-	options: GenerateDisplayedSlotsOptions,
-): DisplayedSlot[] {
-	const { selectedDate, slots, durationMs, timezone, lastEvent } = options;
+const isSlotAvailable = (
+	slotStart: number,
+	slotEnd: number,
+	availableSlots: AvailabilitySlot[],
+): boolean =>
+	availableSlots.some((s) => s.start <= slotStart && s.end >= slotEnd);
 
+const wasSlotReleased = (
+	slotStart: number,
+	slotEnd: number,
+	lastEvent?: LedgerEvent | null,
+): boolean => {
+	if (lastEvent?.type !== 'HoldReleased' || !lastEvent.payload.startUnix)
+		return false;
+	const { startUnix, endUnix = startUnix } = lastEvent.payload;
+	return Math.max(slotStart, startUnix) < Math.min(slotEnd, endUnix);
+};
+
+export const generateDisplayedSlots = (
+	selectedDate: Date,
+	availableSlots: AvailabilitySlot[],
+	timezone: string,
+	durationMs = DEFAULT_SLOT_DURATION_MS,
+	lastEvent?: LedgerEvent | null,
+): DisplayedSlot[] => {
 	if (!selectedDate) return [];
 
-	const list: DisplayedSlot[] = [];
-	const resolutionMs = durationMs || 60 * 60000;
+	const bounds = getDayBoundsInTimezone(selectedDate, timezone);
+	if (!bounds) return [];
 
-	const dateStr = format(selectedDate, 'yyyy-MM-dd');
-	const startStr = `${dateStr}T00:00:00`;
+	const displayedSlots: DisplayedSlot[] = [];
 
-	let startTime: number;
-	let endTime: number;
-
-	try {
-		startTime = fromZonedTime(startStr, timezone).getTime();
-
-		const nextDay = new Date(selectedDate);
-		nextDay.setDate(nextDay.getDate() + 1);
-		const nextDayStr = format(nextDay, 'yyyy-MM-dd');
-		endTime = fromZonedTime(`${nextDayStr}T00:00:00`, timezone).getTime();
-	} catch (e) {
-		console.error('Timezone conversion error', e);
-		return [];
-	}
-
-	let current = startTime;
-	const end = endTime;
-
-	while (current + resolutionMs <= end) {
-		const slotStart = current;
-		const slotEnd = current + resolutionMs;
-
-		const isAvailable = slots.some(
-			(s) => s.start <= slotStart && s.end >= slotEnd,
-		);
-
-		let isReleased = false;
-		if (lastEvent?.type === 'HoldReleased' && lastEvent.payload.startUnix) {
-			const evStart = lastEvent.payload.startUnix;
-			const evEnd = lastEvent.payload.endUnix || evStart;
-
-			if (Math.max(slotStart, evStart) < Math.min(slotEnd, evEnd)) {
-				isReleased = true;
-			}
-		}
-
-		list.push({
-			start: slotStart,
-			end: slotEnd,
-			available: isAvailable,
-			isReleased,
+	for (
+		let current = bounds.start;
+		current + durationMs <= bounds.end;
+		current += durationMs
+	) {
+		displayedSlots.push({
+			start: current,
+			end: current + durationMs,
+			available: isSlotAvailable(current, current + durationMs, availableSlots),
+			isReleased: wasSlotReleased(current, current + durationMs, lastEvent),
 		});
-
-		current += resolutionMs;
 	}
 
-	return list;
-}
+	return displayedSlots;
+};

@@ -1,11 +1,10 @@
-// In the interval model, horizon checking is just unix timestamp comparison.
-// We don't need complex day parsing.
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export const isWithinHorizon = (
 	timestamp: number,
 	horizonDays: number,
-	now: number = Date.now(),
+	now = Date.now(),
 ): boolean => {
-	const horizonMs = horizonDays * 24 * 60 * 60 * 1000;
+	const horizonMs = horizonDays * MS_PER_DAY;
 	return timestamp >= now && timestamp <= now + horizonMs;
 };

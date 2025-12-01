@@ -121,13 +121,13 @@ export const AvailabilityPicker = React.memo<AvailabilityPickerProps>(
 
 		const displayedSlots = React.useMemo(() => {
 			if (!selectedDate) return [];
-			return generateDisplayedSlots({
+			return generateDisplayedSlots(
 				selectedDate,
 				slots,
-				durationMs,
 				timezone,
+				durationMs,
 				lastEvent,
-			});
+			);
 		}, [slots, durationMs, selectedDate, timezone, lastEvent]);
 
 		const formatDateTitle = (date: Date) => {

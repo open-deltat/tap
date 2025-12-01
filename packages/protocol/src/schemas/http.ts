@@ -14,8 +14,6 @@ import {
 } from './primitives';
 import { BOOKING_STATUSES } from './values';
 
-// --- POST /availability ---
-
 export const AvailabilityPostRequestBodySchema = z.object({
 	tenantId: TenantIdSchema,
 	resourceId: ResourceIdSchema,
@@ -38,8 +36,6 @@ export const AvailabilityPostResponseSchema = z.object({
 export type AvailabilityPostResponse = z.infer<
 	typeof AvailabilityPostResponseSchema
 >;
-
-// --- POST /book ---
 
 export const BookPostRequestBodySchema = z.object({
 	tenantId: TenantIdSchema,

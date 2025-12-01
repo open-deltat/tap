@@ -19,8 +19,6 @@ export const ResourceSchema = z.object({
 	metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
-// --- Flexible Offer Types ---
-
 const OfferBaseSchema = z.object({
 	id: ULIDSchema,
 	tenantId: ULIDSchema.transform((v) => v as TenantId),
@@ -28,22 +26,20 @@ const OfferBaseSchema = z.object({
 	priceCents: z.number().int().optional(),
 	currency: z.string().default('USD'),
 	capacity: z.number().int().min(1).default(1),
-	// Timezone for the offer itself (if different from resource, or used for calculations)
-	// Recurrence rules generally need a timezone to be meaningful (e.g. "9am" is ambiguous without it)
 	timezone: z.string().optional(),
 });
 
 export const WeeklyOfferSchema = OfferBaseSchema.extend({
 	type: z.literal('weekly'),
-	daysOfWeek: z.array(z.number().int().min(0).max(6)), // 0=Sun
-	startTime: z.string(), // "09:00"
-	endTime: z.string(), // "17:00"
+	daysOfWeek: z.array(z.number().int().min(0).max(6)),
+	startTime: z.string(),
+	endTime: z.string(),
 });
 
 export const RangeOfferSchema = OfferBaseSchema.extend({
 	type: z.literal('range'),
-	start: z.string(), // ISO or DateTime string
-	end: z.string(), // ISO or DateTime string
+	start: z.string(),
+	end: z.string(),
 });
 
 export const OfferSchema = z.discriminatedUnion('type', [

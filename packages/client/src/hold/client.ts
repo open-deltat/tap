@@ -99,14 +99,7 @@ export class HoldClient {
 
 	releaseHold(holdId: string): void {
 		if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-			this.ws.send(
-				JSON.stringify({
-					type: 'hold.release',
-					holdId,
-				}),
-			);
-			// We effectively consider it released/closed locally
-			// The server will close the connection.
+			this.ws.send(JSON.stringify({ type: 'hold.release', holdId }));
 		}
 	}
 

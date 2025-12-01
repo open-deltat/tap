@@ -26,12 +26,11 @@ export class AvailabilityWebSocketClient {
 	constructor(private options: AvailabilityWebSocketClientOptions) {}
 
 	connect(callbacks: AvailabilityWebSocketCallbacks = {}): void {
-		if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-			this.callbacks = callbacks;
-			return;
-		}
-
-		if (this.ws && this.ws.readyState === WebSocket.CONNECTING) {
+		if (
+			this.ws &&
+			(this.ws.readyState === WebSocket.OPEN ||
+				this.ws.readyState === WebSocket.CONNECTING)
+		) {
 			this.callbacks = callbacks;
 			return;
 		}
@@ -47,11 +46,11 @@ export class AvailabilityWebSocketClient {
 			ws = new WebSocket(wsUrl);
 			this.ws = ws;
 		} catch (error) {
-			const err =
+			this.callbacks.onError?.(
 				error instanceof Error
 					? error
-					: new Error('Failed to create WebSocket');
-			this.callbacks.onError?.(err);
+					: new Error('Failed to create WebSocket'),
+			);
 			return;
 		}
 
@@ -69,31 +68,24 @@ export class AvailabilityWebSocketClient {
 
 		ws.onmessage = (event) => {
 			try {
-				const msg = JSON.parse(event.data) as AvailabilityWsServerMessage;
+				const message = JSON.parse(event.data) as AvailabilityWsServerMessage;
 
-				if (msg.type === 'stream.hello') {
+				if (message.type === 'stream.hello') return;
+				if (message.type === 'stream.error') {
+					this.callbacks.onError?.(new Error(message.message));
 					return;
 				}
-
-				if (msg.type === 'stream.error') {
-					const error = new Error(msg.message);
-					this.callbacks.onError?.(error);
-					return;
-				}
-
-				if (msg.type === 'stream.delta') {
-					const coreEvent = this.mapDeltaToLedgerEvent(
-						msg.eventId,
-						msg.payload,
+				if (message.type === 'stream.delta') {
+					const ledgerEvent = this.mapDeltaToLedgerEvent(
+						message.eventId,
+						message.payload,
 					);
-					if (coreEvent) {
-						this.callbacks.onDelta?.(coreEvent);
-					}
+					if (ledgerEvent) this.callbacks.onDelta?.(ledgerEvent);
 				}
 			} catch (err) {
-				const error =
-					err instanceof Error ? err : new Error('Failed to parse message');
-				this.callbacks.onError?.(error);
+				this.callbacks.onError?.(
+					err instanceof Error ? err : new Error('Failed to parse message'),
+				);
 			}
 		};
 
@@ -103,10 +95,7 @@ export class AvailabilityWebSocketClient {
 			this.callbacks.onDisconnect?.();
 		};
 
-		ws.onerror = () => {
-			// WebSocket error events don't provide useful information
-			// Actual errors come through stream.error messages
-		};
+		ws.onerror = () => {};
 	}
 
 	disconnect(): void {
@@ -137,8 +126,7 @@ export class AvailabilityWebSocketClient {
 			version: 1 as const,
 		};
 
-		if (delta.kind === 'HoldPlaced') {
-			if (!delta.holdId) return null;
+		if (delta.kind === 'HoldPlaced' && delta.holdId) {
 			return {
 				...base,
 				type: 'HoldPlaced' as const,
@@ -151,8 +139,7 @@ export class AvailabilityWebSocketClient {
 			};
 		}
 
-		if (delta.kind === 'HoldReleased') {
-			if (!delta.holdId) return null;
+		if (delta.kind === 'HoldReleased' && delta.holdId) {
 			return {
 				...base,
 				type: 'HoldReleased' as const,
@@ -164,8 +151,7 @@ export class AvailabilityWebSocketClient {
 			};
 		}
 
-		if (delta.kind === 'HoldExpired') {
-			if (!delta.holdId) return null;
+		if (delta.kind === 'HoldExpired' && delta.holdId) {
 			return {
 				...base,
 				type: 'HoldExpired' as const,
@@ -177,8 +163,7 @@ export class AvailabilityWebSocketClient {
 			};
 		}
 
-		if (delta.kind === 'BookingConfirmed') {
-			if (!delta.bookingId || !delta.holdId) return null;
+		if (delta.kind === 'BookingConfirmed' && delta.bookingId && delta.holdId) {
 			return {
 				...base,
 				type: 'BookingConfirmed' as const,
@@ -191,8 +176,7 @@ export class AvailabilityWebSocketClient {
 			};
 		}
 
-		if (delta.kind === 'BookingCancelled') {
-			if (!delta.bookingId) return null;
+		if (delta.kind === 'BookingCancelled' && delta.bookingId) {
 			return {
 				...base,
 				type: 'BookingCancelled' as const,

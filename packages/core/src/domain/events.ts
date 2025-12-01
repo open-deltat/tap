@@ -81,9 +81,20 @@ export const LedgerEventSchema = z.discriminatedUnion('type', [
 
 export type LedgerEvent = z.infer<typeof LedgerEventSchema>;
 
-export type ResourceCreatedEvent = LedgerEvent & { type: 'ResourceCreated' };
-export type HoldPlacedEvent = LedgerEvent & { type: 'HoldPlaced' };
-export type HoldExpiredEvent = LedgerEvent & { type: 'HoldExpired' };
-export type HoldReleasedEvent = LedgerEvent & { type: 'HoldReleased' };
-export type BookingConfirmedEvent = LedgerEvent & { type: 'BookingConfirmed' };
-export type BookingCancelledEvent = LedgerEvent & { type: 'BookingCancelled' };
+export type ResourceCreatedEvent = Extract<
+	LedgerEvent,
+	{ type: 'ResourceCreated' }
+>;
+export type HoldPlacedEvent = Extract<LedgerEvent, { type: 'HoldPlaced' }>;
+export type HoldExpiredEvent = Extract<LedgerEvent, { type: 'HoldExpired' }>;
+export type HoldReleasedEvent = Extract<LedgerEvent, { type: 'HoldReleased' }>;
+export type BookingConfirmedEvent = Extract<
+	LedgerEvent,
+	{ type: 'BookingConfirmed' }
+>;
+export type BookingCancelledEvent = Extract<
+	LedgerEvent,
+	{ type: 'BookingCancelled' }
+>;
+
+export type LedgerEventType = LedgerEvent['type'];

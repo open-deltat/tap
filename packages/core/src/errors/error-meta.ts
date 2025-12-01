@@ -1,22 +1,6 @@
 import type { ErrorValue } from '@tap/protocol';
 import type { ErrorCategory } from './types';
 
-// If ERROR_VALUES from protocol is an array, we might need to map it.
-// In protocol/src/schemas/values.ts it is an array `as const`.
-// In core/src/domain/error-codes.ts we mapped it to an object.
-// Let's use the object from core if available, or rebuild it.
-// Actually, let's use the strings directly since they are typed.
-
-// We need to satisfy Record<ErrorValue, ...>
-// Since ErrorValue is a union of strings, we can just key off them.
-
-// To make this safe, we need to ensure we cover all keys.
-// The protocol exports ERROR_VALUES as an array.
-// We can iterate or just define the object literals.
-
-// Let's try to import the object version if we want runtime iteration,
-// but for defining this map we just need the keys.
-
 export const ERROR_META: Record<
 	ErrorValue,
 	{ category: ErrorCategory; httpStatus: number }

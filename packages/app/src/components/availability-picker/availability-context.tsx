@@ -19,7 +19,8 @@ export type AvailabilityContextValue = {
 	availableDays: Set<string>;
 	refreshMonth: (date: Date) => Promise<void>;
 	onSlotSelect: (slot: AvailabilitySlot) => void;
-	formatDate: (date: Date | number, fmt: string) => string;
+	formatTime: (date: Date | number) => string;
+	formatDate: (date: Date | number) => string;
 };
 
 export const AvailabilityContext = React.createContext<

@@ -1,6 +1,8 @@
 import type { LedgerEvent } from '@tap/core';
 import { applyEventToSlots, type TimeRange } from './operations';
 
+const MAX_LOG_ENTRIES = 100;
+
 export class AvailabilityStore {
 	private slots: TimeRange[] = [];
 	private cursor: string | null = null;
@@ -15,32 +17,28 @@ export class AvailabilityStore {
 		this.addLog('Store initialized');
 	}
 
-	public getSnapshot() {
-		return {
-			slots: [...this.slots],
-			cursor: this.cursor,
-		};
+	getSnapshot() {
+		return { slots: [...this.slots], cursor: this.cursor };
 	}
 
-	public getLogs() {
+	getLogs() {
 		return [...this.logs];
 	}
 
-	private addLog(msg: string) {
-		this.logs.unshift(`[${new Date().toISOString()}] ${msg}`);
-		if (this.logs.length > 100) this.logs.pop();
+	private addLog(message: string) {
+		this.logs.unshift(`[${new Date().toISOString()}] ${message}`);
+		if (this.logs.length > MAX_LOG_ENTRIES) this.logs.pop();
 	}
 
-	public setSnapshot(slots: TimeRange[], cursor: string | null) {
+	setSnapshot(slots: TimeRange[], cursor: string | null) {
 		this.slots = slots;
 		this.cursor = cursor;
 		this.addLog(`Snapshot set: ${slots.length} slots, cursor: ${cursor}`);
 	}
 
-	public applyEvent(event: LedgerEvent): void {
+	applyEvent(event: LedgerEvent): void {
 		this.addLog(`Received event ${event.type} (${event.eventId})`);
 
-		// Ignore events older than our snapshot
 		if (this.cursor && (event.eventId as string) <= this.cursor) {
 			this.addLog(
 				`Ignored old event ${event.eventId} (cursor: ${this.cursor})`,
@@ -48,16 +46,17 @@ export class AvailabilityStore {
 			return;
 		}
 
-		// Ideally we should track the latest cursor seen
 		if (!this.cursor || (event.eventId as string) > this.cursor) {
 			this.cursor = event.eventId as string;
 		}
 
-		const prevCount = this.slots.length;
+		const previousSlotCount = this.slots.length;
 		this.slots = applyEventToSlots(this.slots, event);
 
-		if (this.slots.length !== prevCount) {
-			this.addLog(`Slots updated: ${prevCount} -> ${this.slots.length}`);
+		if (this.slots.length !== previousSlotCount) {
+			this.addLog(
+				`Slots updated: ${previousSlotCount} -> ${this.slots.length}`,
+			);
 		}
 	}
 }

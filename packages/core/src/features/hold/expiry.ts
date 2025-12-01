@@ -28,7 +28,7 @@ export const createExpiryManager = (params: {
 				expiresAt: number;
 			}>
 		>;
-		delete: (id: string) => Promise<void>;
+		delete: (id: HoldId) => Promise<void>;
 	};
 }): ExpiryManager => {
 	return {

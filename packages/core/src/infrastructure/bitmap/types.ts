@@ -1,5 +1,5 @@
 export type BitmapDay = {
-	booked: Uint16Array; // Usage count instead of bits
-	held: Uint16Array; // Usage count instead of bits
+	booked: Uint16Array;
+	held: Uint16Array;
 	resolution: number;
 };

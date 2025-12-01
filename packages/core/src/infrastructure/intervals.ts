@@ -1,19 +1,13 @@
 export type Interval = {
 	start: number;
 	end: number;
-	// For weighted intervals (e.g. capacity usage)
 	value?: number;
-	// For metadata tracking (e.g. which booking caused this)
 	meta?: Record<string, unknown>;
 };
 
-/**
- * Pure functional interval operations
- */
-
-export function mergeIntervals(intervals: Interval[]): Interval[] {
+export const mergeIntervals = (intervals: Interval[]): Interval[] => {
 	if (intervals.length === 0) return [];
-	// Sort by start time
+
 	const sorted = [...intervals].sort((a, b) => a.start - b.start);
 	const merged: Interval[] = [];
 	let current = { ...sorted[0] };
@@ -23,10 +17,7 @@ export function mergeIntervals(intervals: Interval[]): Interval[] {
 		if (!next || current.end === undefined) continue;
 
 		if (next.start <= current.end) {
-			// Overlap or adjacent, merge
 			current.end = Math.max(current.end, next.end);
-			// Value merging strategy depends on context, for simple boolean availability we ignore value
-			// For capacity summing, we'd need a different algorithm (sweepline)
 		} else {
 			merged.push(current as Interval);
 			current = { ...next };
@@ -34,24 +25,18 @@ export function mergeIntervals(intervals: Interval[]): Interval[] {
 	}
 	merged.push(current as Interval);
 	return merged;
-}
+};
 
-/**
- * Returns A - B (A excluding B)
- * Returns a list of intervals representing the parts of A that are NOT covered by B.
- */
-export function subtractInterval(
+export const subtractInterval = (
 	source: Interval,
 	subtraction: Interval,
-): Interval[] {
-	// 1. No overlap
+): Interval[] => {
 	if (subtraction.end <= source.start || subtraction.start >= source.end) {
 		return [source];
 	}
 
 	const result: Interval[] = [];
 
-	// 2. Left remnant
 	if (subtraction.start > source.start) {
 		result.push({
 			start: source.start,
@@ -60,7 +45,6 @@ export function subtractInterval(
 		} as Interval);
 	}
 
-	// 3. Right remnant
 	if (subtraction.end < source.end) {
 		result.push({
 			start: subtraction.end,
@@ -70,15 +54,12 @@ export function subtractInterval(
 	}
 
 	return result;
-}
+};
 
-/**
- * Subtracts a list of exclusion intervals from a list of source intervals.
- */
-export function subtractIntervals(
+export const subtractIntervals = (
 	sources: Interval[],
 	exclusions: Interval[],
-): Interval[] {
+): Interval[] => {
 	let currentSources = [...sources];
 
 	for (const exclusion of exclusions) {
@@ -90,33 +71,18 @@ export function subtractIntervals(
 	}
 
 	return currentSources;
-}
+};
 
-/**
- * Checks if an interval fits within any of the available intervals.
- * This is useful for checking if a slot [start, end] exists in the "Free Time" availability set.
- */
-export function isIntervalAvailable(
+export const isIntervalAvailable = (
 	availableIntervals: Interval[],
 	target: Interval,
-): boolean {
-	// We need to find ONE interval in `availableIntervals` that completely contains `target`.
-	// Since `availableIntervals` are usually merged, this is a simple check.
-	return availableIntervals.some(
+): boolean =>
+	availableIntervals.some(
 		(available) =>
 			available.start <= target.start && available.end >= target.end,
 	);
-}
 
-/**
- * Timeline Sweepline Algorithm to calculate composite usage.
- * Converts a list of weighted intervals (e.g. Bookings with capacity cost)
- * into a flat list of time segments with total value.
- *
- * Input: [ {s:0, e:10, v:1}, {s:5, e:15, v:1} ]
- * Output: [ {s:0, e:5, v:1}, {s:5, e:10, v:2}, {s:10, e:15, v:1} ]
- */
-export function getCompositeTimeline(intervals: Interval[]): Interval[] {
+export const getCompositeTimeline = (intervals: Interval[]): Interval[] => {
 	if (intervals.length === 0) return [];
 
 	const points: { time: number; type: 'start' | 'end'; value: number }[] = [];
@@ -134,38 +100,26 @@ export function getCompositeTimeline(intervals: Interval[]): Interval[] {
 		});
 	}
 
-	// Sort points: time asc, then 'end' before 'start' to handle abutting intervals correctly?
-	// Actually for capacity 'end' usually releases, 'start' consumes.
-	// If [0, 10) and [10, 20), at 10 we have -1 and +1. Net 0 change if capacity is consumed.
-	// Logic: process all changes at a given timestamp before emitting segment.
 	points.sort((a, b) => a.time - b.time);
 
 	const result: Interval[] = [];
 	let currentValue = 0;
 	let lastTime = points[0]?.time ?? 0;
 
-	for (let i = 0; i < points.length; i++) {
-		const point = points[i];
+	for (const point of points) {
 		if (!point) continue;
 
-		if (point.time > lastTime) {
-			if (currentValue > 0) {
-				result.push({
-					start: lastTime,
-					end: point.time,
-					value: currentValue,
-				} as Interval);
-			}
+		if (point.time > lastTime && currentValue > 0) {
+			result.push({
+				start: lastTime,
+				end: point.time,
+				value: currentValue,
+			} as Interval);
 		}
 
-		if (point.type === 'start') {
-			currentValue += point.value;
-		} else {
-			currentValue -= point.value;
-		}
-
+		currentValue += point.type === 'start' ? point.value : -point.value;
 		lastTime = point.time;
 	}
 
 	return result;
-}
+};
