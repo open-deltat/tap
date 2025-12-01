@@ -16,18 +16,17 @@ const reset = async (): Promise<void> => {
 	const client = postgres(connString, { max: 1 });
 
 	try {
-		console.log('🗑️  Clearing database...');
+		console.log('🗑️  Dropping all tables...');
 		await client.unsafe(`
-			TRUNCATE TABLE
-				bookings,
-				holds,
-				offers,
-				resources,
-				tenants,
-				ledger_events
-			RESTART IDENTITY CASCADE;
+			DROP TABLE IF EXISTS bookings CASCADE;
+			DROP TABLE IF EXISTS holds CASCADE;
+			DROP TABLE IF EXISTS offers CASCADE;
+			DROP TABLE IF EXISTS resources CASCADE;
+			DROP TABLE IF EXISTS tenants CASCADE;
+			DROP TABLE IF EXISTS ledger_events CASCADE;
+			DROP SCHEMA IF EXISTS drizzle CASCADE;
 		`);
-		console.log('✅ Database cleared');
+		console.log('✅ Tables dropped');
 
 		console.log('🔄 Running migrations...');
 		await migrate(connString);
