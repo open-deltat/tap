@@ -14,7 +14,7 @@ const generateRangeOfferInterval = (
 
 	if (end < from.getTime() || start > to.getTime()) return null;
 
-	return { start, end, value: offer.capacity };
+	return { start, end };
 };
 
 const getDayOfWeekInTimezone = (
@@ -57,7 +57,7 @@ const generateWeeklyOfferIntervals = (
 
 		if (endUnix < from.getTime() || startUnix > to.getTime()) continue;
 
-		intervals.push({ start: startUnix, end: endUnix, value: offer.capacity });
+		intervals.push({ start: startUnix, end: endUnix });
 	}
 
 	return intervals;

@@ -36,9 +36,12 @@ A bookable entity that represents something that can be scheduled. Resources bel
 ```
 Venue (container)
   └── VIP Section (container)
-        └── Seat A1 (bookable)
-        └── Seat A2 (bookable)
-  └── General Admission (bookable, capacity: 5000)
+        └── Seat A1 (bookable leaf)
+        └── Seat A2 (bookable leaf)
+  └── General Admission (container)
+        └── ga-spot-1 (bookable leaf)
+        └── ga-spot-2 (bookable leaf)
+        └── ... (N leaf resources)
 ```
 
 **Example Resources:** "Conference Room A", "Dr. Smith", "Seat 12A", "Economy Class"
@@ -122,16 +125,17 @@ A confirmed, permanent allocation of a slot. Bookings are created by converting 
 
 ## Time & Scheduling
 
-### Capacity
-The maximum number of concurrent bookings allowed for a single time slot. Capacity determines whether a resource represents fungible or non-fungible inventory.
+### Leaf-Only Booking Model
+TAP uses a **leaf-only** booking model where all bookable units are individual leaf resources. This eliminates complexity around capacity counting and provides clear identity for every booking.
 
-- **Default:** 1 (Single booking per slot — non-fungible)
-- **Capacity > 1:** Multiple bookings allowed (fungible — "any seat in this section")
-- **Usage:** Checked against current usage count. If `usage < capacity`, the slot is available.
+**Key Principles:**
+- **Leaf resources are bookable**: Resources with no children
+- **Container resources are for grouping**: Organization and offer inheritance only
+- **Each booking = one leaf resource**: Simple 1:1 mapping
 
-**Decision Guide:** Ask "Does the customer care WHICH one they get?"
-- **No** → Use capacity > 1 (fungible)
-- **Yes** → Use individual resources with capacity: 1 (non-fungible)
+**Decision Guide:** Ask "Does the customer need to know WHICH one they got?"
+- **No** → Create N identical leaf resources under a container (fungible)
+- **Yes** → Create uniquely named leaf resources (non-fungible)
 
 ---
 
@@ -143,7 +147,7 @@ Resources where individual units are interchangeable. The customer gets "a spot"
 - Parking lot (50 spaces)
 - General admission (5000 tickets)
 
-**Implementation:** Single resource with `capacity > 1`
+**Implementation:** N leaf resources under a container (e.g., `yoga-spot-1`, `yoga-spot-2`, ... `yoga-spot-20`)
 
 ---
 
@@ -155,7 +159,7 @@ Resources where each unit has unique identity. The customer books a specific, id
 - Hotel room "401 Ocean View"
 - Airplane seat "12A Window"
 
-**Implementation:** Individual resources (each with `capacity: 1`) organized in hierarchy via `parentId`
+**Implementation:** Uniquely named leaf resources organized in hierarchy via `parentId`
 
 ---
 
@@ -171,7 +175,6 @@ A published availability template that defines when a resource is available. Off
 - `timezone`: IANA timezone for interpreting times
 - `priceCents`: Optional price in cents
 - `currency`: Currency code (default: 'USD')
-- `capacity`: Maximum concurrent bookings (default: 1)
 
 **Add-Only Model:**
 - No offer = no availability

@@ -7,6 +7,7 @@ import {
 	OffersGetRequestSchema,
 	type OffersGetResponse,
 	resourceId,
+	validateRangeOffer,
 } from '@tap/protocol';
 import { ulid } from 'ulid';
 import { offerRepository } from '../core';
@@ -56,6 +57,15 @@ export const handleOfferCreate = async (req: Request): Promise<Response> => {
 				'TAP_INVALID_INPUT',
 				'Invalid request body',
 				result.error.format() as Record<string, unknown>,
+			);
+			return error.toResponse();
+		}
+
+		// Validate range offer start < end
+		if (result.data.type === 'range' && !validateRangeOffer(result.data)) {
+			const error = new TapError(
+				'TAP_INVALID_INPUT',
+				'Range offer start must be before end',
 			);
 			return error.toResponse();
 		}

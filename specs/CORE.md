@@ -50,7 +50,6 @@ Offer {
   resourceId: string
   type: "weekly" | "range"
   config: WeeklyConfig | RangeConfig
-  capacity: integer (≥ 1)
 }
 
 WeeklyConfig {
@@ -188,11 +187,6 @@ Where:
 - `offers` = union of all applicable offers (self + ancestors)
 - `holds` = active holds on this resource
 - `bookings` = confirmed bookings on this resource
-
-For capacity > 1:
-```
-available = capacity − (active_holds + confirmed_bookings)
-```
 
 ---
 

@@ -1,14 +1,14 @@
 # TAP Architecture: Time as an Asset
 
-TAP (Time Allocation Protocol) treats **time as inventory**—a tradeable asset that can be fungible or non-fungible depending on how you model it.
+TAP (Time Allocation Protocol) treats **time as inventory**—a tradeable asset modeled through hierarchical resources.
 
 ## The Core Insight
 
 Time slots are like tokens:
-- **Fungible**: "A seat in economy" (any seat will do)
-- **Non-fungible**: "Seat 12A" (this specific seat)
+- **Fungible**: "A yoga class spot" (any spot will do) → Model as N identical leaf resources
+- **Non-fungible**: "Seat 12A" (this specific seat) → Model as unique leaf resource
 
-TAP doesn't care which model you use. It provides the same primitives for both.
+TAP uses the same primitive—**leaf resources**—for both models.
 
 ## Hierarchical Resources
 
@@ -18,18 +18,20 @@ Resources can contain other resources via `parentId`:
 Venue (container)
   └── VIP Section (container)
   │     └── Row A (container)
-  │           └── Seat A1 (bookable)
-  │           └── Seat A2 (bookable)
+  │           └── Seat A1 (bookable leaf)
+  │           └── Seat A2 (bookable leaf)
   │
-  └── General Admission (bookable, capacity: 5000)
+  └── General Admission (container)
+        └── ga-spot-1 (bookable leaf)
+        └── ga-spot-2 (bookable leaf)
+        └── ... (5000 spots)
 ```
 
 ### Rules
 
 1. **Leaf resources are bookable**: Resources with no children
 2. **Container resources are for grouping**: Query, organize, cascade offers
-3. **Capacity enables fungible booking**: GA with capacity 5000 = 5000 interchangeable spots
-4. **Individual resources enable non-fungible**: Each seat is its own resource
+3. **Each leaf = one bookable unit**: No capacity > 1, just more resources
 
 ### Querying
 
@@ -68,19 +70,20 @@ Venue: Offer 9am-9pm (base hours)
 - Predictable behavior
 - Simple implementation
 
-## Capacity vs Hierarchy
+## Modeling Strategies
 
-| Model | When to Use | Example |
-|-------|-------------|---------|
-| **Capacity > 1** | Fungible, no identity needed | Yoga class (20 spots) |
-| **Many resources** | Non-fungible, identity matters | Concert seats (each unique) |
-| **Hybrid** | Mix of both | GA floor + reserved VIP seats |
+| Scenario | Strategy | Example |
+|----------|----------|---------|
+| **Single resource** | One leaf | Doctor's calendar |
+| **Fungible inventory** | N identical leaves under container | 20 yoga class spots |
+| **Non-fungible inventory** | Unique leaves | Specific concert seats |
+| **Hierarchical** | Nested containers + leaves | Venue → Section → Row → Seat |
 
 ### Decision Guide
 
-Ask: "Does the customer care WHICH one they get?"
-- **No** → Use capacity (one resource, capacity: N)
-- **Yes** → Use individual resources (N resources, capacity: 1 each)
+Ask: "Does the customer need to know WHICH one they got?"
+- **No** → Create N identical leaf resources (fungible)
+- **Yes** → Create uniquely named leaf resources (non-fungible)
 
 ## Scale Considerations
 
@@ -118,8 +121,8 @@ Resource is resource—whether leaf (bookable) or container (grouping).
 ### 3. Minimal Surface
 One field (`parentId`) unlocks full hierarchy.
 
-### 4. Composable
-Combine fungible + non-fungible in same tree.
+### 4. Leaf-Only Booking
+All bookable units are leaf resources. Simple, trackable, no hidden capacity.
 
 ### 5. Add-Only Offers
 No conflicts, no precedence, no surprises.
@@ -128,22 +131,21 @@ No conflicts, no precedence, no surprises.
 
 | System | Model | TAP Equivalent |
 |--------|-------|----------------|
-| Airline GDS | Flights with seat maps | Resource hierarchy + capacity |
+| Airline GDS | Flights with seat maps | Resource hierarchy |
 | Hotel PMS | Room inventory | Resources per room |
-| Calendar (ICS) | Single resource | One resource, offers define hours |
-| Ticketmaster | Sections + seats | Hierarchy with mixed capacity |
+| Calendar (ICS) | Single resource | One leaf resource |
+| Ticketmaster | Sections + seats | Hierarchical leaves |
 
 TAP unifies these into one simple model.
 
 ## Summary
 
 ```
-Time = Asset (fungible or non-fungible)
-Resource = Container or Bookable
+Time = Asset (modeled through resources)
+Resource = Container or Leaf
+Leaf = Bookable unit (always 1:1)
 Hierarchy = Simple parentId reference
 Offers = Add-only, inherited, stackable
-Capacity = For fungible within a resource
 ```
 
 This is the foundation of TAP: treating time as inventory with a simple, composable model that scales from a single doctor's calendar to a 50,000-seat stadium.
-

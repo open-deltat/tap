@@ -25,7 +25,6 @@ const OfferBaseSchema = z.object({
 	resourceId: ULIDSchema.transform((v) => v as ResourceId),
 	priceCents: z.number().int().optional(),
 	currency: z.string().default('USD'),
-	capacity: z.number().int().min(1).default(1),
 	timezone: z.string().optional(),
 });
 

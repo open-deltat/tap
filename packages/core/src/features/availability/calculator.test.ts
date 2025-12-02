@@ -23,7 +23,6 @@ const createWeeklyOffer = (
 	startTime: '09:00',
 	endTime: '17:00',
 	timezone: 'UTC',
-	capacity: 1,
 	...overrides,
 });
 
@@ -36,7 +35,6 @@ const createRangeOffer = (
 	type: 'range',
 	start: '2025-01-15T09:00:00.000Z',
 	end: '2025-01-15T17:00:00.000Z',
-	capacity: 1,
 	...overrides,
 });
 

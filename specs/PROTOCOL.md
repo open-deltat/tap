@@ -69,9 +69,7 @@ Response:
       "slotId": "2025-01-01T09:00:00.000Z_2025-01-01T10:00:00.000Z",
       "start": 1234567890000,
       "end": 1234567890000,
-      "available": true,
-      "capacity": 1,
-      "remaining": 1
+      "available": true
     }
   ],
   "cursor": "string"

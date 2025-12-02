@@ -227,7 +227,6 @@ const toOffer = (row: typeof offers.$inferSelect): Offer | null => {
 		resourceId: resourceId(row.resourceId),
 		priceCents: row.priceCents ?? undefined,
 		currency: row.currency,
-		capacity: row.capacity,
 		timezone: row.timezone ?? undefined,
 	};
 
@@ -278,7 +277,6 @@ export const createOfferRepository = (db: Database): OfferRepository => ({
 			type: offer.type,
 			config,
 			timezone: offer.timezone ?? null,
-			capacity: offer.capacity,
 			priceCents: offer.priceCents ?? null,
 			currency: offer.currency,
 		});

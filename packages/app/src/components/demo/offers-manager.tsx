@@ -108,7 +108,6 @@ export const OffersManager = ({
 							startTime,
 							endTime,
 							timezone,
-							capacity: 1,
 							currency: 'USD',
 						}
 					: {
@@ -118,7 +117,6 @@ export const OffersManager = ({
 							start: new Date(rangeStart).toISOString(),
 							end: new Date(rangeEnd).toISOString(),
 							timezone,
-							capacity: 1,
 							currency: 'USD',
 						};
 

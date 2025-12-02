@@ -62,7 +62,6 @@ export const offers = pgTable('offers', {
 	type: text('type').notNull().$type<'weekly' | 'range'>(),
 	config: jsonb('config').notNull().$type<OfferConfig>(),
 	timezone: text('timezone'),
-	capacity: integer('capacity').notNull().default(1),
 	priceCents: integer('price_cents'),
 	currency: text('currency').notNull().default('USD'),
 	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })

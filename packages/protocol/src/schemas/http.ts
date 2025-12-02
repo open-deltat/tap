@@ -31,7 +31,6 @@ const OfferBaseSchema = z.object({
 	tenantId: TenantIdSchema,
 	resourceId: ResourceIdSchema,
 	timezone: z.string().optional(),
-	capacity: z.number().int().min(1).default(1),
 	priceCents: z.number().int().optional(),
 	currency: z.string().default('USD'),
 });
@@ -43,6 +42,14 @@ export const WeeklyOfferSchema = OfferBaseSchema.extend({
 export const RangeOfferSchema = OfferBaseSchema.extend({
 	type: z.literal('range'),
 }).merge(RangeOfferConfigSchema);
+
+/** Validates that range offer start is before end */
+export const validateRangeOffer = (offer: {
+	start: string;
+	end: string;
+}): boolean => {
+	return new Date(offer.start).getTime() < new Date(offer.end).getTime();
+};
 
 export const OfferSchema = z.discriminatedUnion('type', [
 	WeeklyOfferSchema,

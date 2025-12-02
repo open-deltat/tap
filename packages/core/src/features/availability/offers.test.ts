@@ -13,7 +13,6 @@ const createWeeklyOffer = (
 	startTime: '09:00',
 	endTime: '17:00',
 	timezone: 'UTC',
-	capacity: 1,
 	...overrides,
 });
 
@@ -26,7 +25,6 @@ const createRangeOffer = (
 	type: 'range',
 	start: '2025-01-15T10:00:00.000Z',
 	end: '2025-01-15T14:00:00.000Z',
-	capacity: 1,
 	...overrides,
 });
 
@@ -137,20 +135,6 @@ describe('offers', () => {
 				expect(intervals.length).toBeGreaterThanOrEqual(7);
 			});
 
-			it('uses capacity from offer', () => {
-				const offer = createWeeklyOffer({
-					daysOfWeek: [1],
-					capacity: 10,
-				});
-
-				const from = new Date('2025-01-06T00:00:00.000Z');
-				const to = new Date('2025-01-07T00:00:00.000Z');
-
-				const intervals = generateOfferIntervals([offer], from, to);
-				const mondayInterval = intervals[0];
-				expect(mondayInterval?.value).toBe(10);
-			});
-
 			it('defaults timezone to UTC when not specified', () => {
 				const offer = createWeeklyOffer({
 					daysOfWeek: [1],
@@ -244,18 +228,6 @@ describe('offers', () => {
 				expect(intervals).toHaveLength(1);
 			});
 
-			it('uses capacity from range offer', () => {
-				const offer = createRangeOffer({
-					capacity: 50,
-				});
-
-				const from = new Date('2025-01-01T00:00:00.000Z');
-				const to = new Date('2025-01-31T23:59:59.999Z');
-
-				const intervals = generateOfferIntervals([offer], from, to);
-				expect(intervals[0]?.value).toBe(50);
-			});
-
 			it('handles multi-day range offer', () => {
 				const offer = createRangeOffer({
 					start: '2025-01-10T00:00:00.000Z',
@@ -312,14 +284,12 @@ describe('offers', () => {
 					daysOfWeek: [1],
 					startTime: '09:00',
 					endTime: '12:00',
-					capacity: 5,
 				});
 				const offer2 = createWeeklyOffer({
 					id: 'offer-2',
 					daysOfWeek: [1],
 					startTime: '10:00',
 					endTime: '14:00',
-					capacity: 3,
 				});
 
 				const from = new Date('2025-01-06T00:00:00.000Z');
@@ -415,74 +385,6 @@ describe('offers', () => {
 
 				const intervals = generateOfferIntervals([offer], from, to);
 				expect(intervals).toHaveLength(1);
-			});
-		});
-
-		describe('capacity scenarios', () => {
-			it('preserves capacity for weekly offers', () => {
-				const offer = createWeeklyOffer({
-					daysOfWeek: [1, 2, 3, 4, 5],
-					capacity: 20,
-				});
-
-				const from = new Date('2025-01-06T00:00:00.000Z');
-				const to = new Date('2025-01-11T00:00:00.000Z');
-
-				const intervals = generateOfferIntervals([offer], from, to);
-
-				for (const interval of intervals) {
-					expect(interval.value).toBe(20);
-				}
-			});
-
-			it('preserves different capacities for multiple offers', () => {
-				const yogaClass = createWeeklyOffer({
-					id: 'yoga',
-					daysOfWeek: [1],
-					startTime: '09:00',
-					endTime: '10:00',
-					capacity: 15,
-				});
-				const privateSession = createWeeklyOffer({
-					id: 'private',
-					daysOfWeek: [1],
-					startTime: '11:00',
-					endTime: '12:00',
-					capacity: 1,
-				});
-
-				const from = new Date('2025-01-06T00:00:00.000Z');
-				const to = new Date('2025-01-07T00:00:00.000Z');
-
-				const intervals = generateOfferIntervals(
-					[yogaClass, privateSession],
-					from,
-					to,
-				);
-
-				const yogaInterval = intervals.find(
-					(i) => new Date(i.start).getUTCHours() === 9,
-				);
-				const privateInterval = intervals.find(
-					(i) => new Date(i.start).getUTCHours() === 11,
-				);
-
-				expect(yogaInterval?.value).toBe(15);
-				expect(privateInterval?.value).toBe(1);
-			});
-
-			it('handles large capacity values', () => {
-				const concertSection = createRangeOffer({
-					start: '2025-06-15T19:00:00.000Z',
-					end: '2025-06-15T23:00:00.000Z',
-					capacity: 5000,
-				});
-
-				const from = new Date('2025-06-01T00:00:00.000Z');
-				const to = new Date('2025-06-30T00:00:00.000Z');
-
-				const intervals = generateOfferIntervals([concertSection], from, to);
-				expect(intervals[0]?.value).toBe(5000);
 			});
 		});
 
@@ -790,13 +692,11 @@ describe('offers', () => {
 					id: 'event-1',
 					start: '2025-01-15T10:00:00.000Z',
 					end: '2025-01-15T14:00:00.000Z',
-					capacity: 10,
 				});
 				const offer2 = createRangeOffer({
 					id: 'event-2',
 					start: '2025-01-15T12:00:00.000Z',
 					end: '2025-01-15T16:00:00.000Z',
-					capacity: 5,
 				});
 
 				const from = new Date('2025-01-15T00:00:00.000Z');
@@ -845,13 +745,11 @@ describe('offers', () => {
 					daysOfWeek: [3],
 					startTime: '09:00',
 					endTime: '17:00',
-					capacity: 1,
 				});
 				const specialEvent = createRangeOffer({
 					id: 'special',
 					start: '2025-01-15T12:00:00.000Z',
 					end: '2025-01-15T14:00:00.000Z',
-					capacity: 10,
 				});
 
 				const from = new Date('2025-01-15T00:00:00.000Z');
@@ -872,21 +770,18 @@ describe('offers', () => {
 					daysOfWeek: [1, 3, 5],
 					startTime: '07:00',
 					endTime: '08:00',
-					capacity: 15,
 				});
 				const eveningYoga = createWeeklyOffer({
 					id: 'evening-yoga',
 					daysOfWeek: [1, 3, 5],
 					startTime: '18:00',
 					endTime: '19:00',
-					capacity: 20,
 				});
 				const weekendYoga = createWeeklyOffer({
 					id: 'weekend-yoga',
 					daysOfWeek: [0, 6],
 					startTime: '10:00',
 					endTime: '11:30',
-					capacity: 25,
 				});
 
 				const from = new Date('2025-01-06T00:00:00.000Z');
@@ -901,48 +796,45 @@ describe('offers', () => {
 				expect(intervals.length).toBeGreaterThanOrEqual(8);
 			});
 
-			it('handles doctor schedule with varying capacity', () => {
+			it('handles doctor schedule with multiple slot types', () => {
 				const regularAppointments = createWeeklyOffer({
 					id: 'regular',
 					daysOfWeek: [1, 2, 3, 4, 5],
 					startTime: '09:00',
 					endTime: '12:00',
-					capacity: 1,
 				});
-				const groupSession = createWeeklyOffer({
-					id: 'group',
+				const afternoonSlots = createWeeklyOffer({
+					id: 'afternoon',
 					daysOfWeek: [3],
 					startTime: '14:00',
 					endTime: '16:00',
-					capacity: 8,
 				});
 				const emergencySlots = createRangeOffer({
 					id: 'emergency',
 					start: '2025-01-15T08:00:00.000Z',
 					end: '2025-01-15T09:00:00.000Z',
-					capacity: 2,
 				});
 
 				const from = new Date('2025-01-13T00:00:00.000Z');
 				const to = new Date('2025-01-18T00:00:00.000Z');
 
 				const intervals = generateOfferIntervals(
-					[regularAppointments, groupSession, emergencySlots],
+					[regularAppointments, afternoonSlots, emergencySlots],
 					from,
 					to,
 				);
 
-				const groupInterval = intervals.find(
+				const afternoonInterval = intervals.find(
 					(i) => new Date(i.start).getUTCHours() === 14,
 				);
-				expect(groupInterval?.value).toBe(8);
+				expect(afternoonInterval).toBeDefined();
 
 				const emergencyInterval = intervals.find(
 					(i) =>
 						new Date(i.start).getUTCHours() === 8 &&
 						new Date(i.start).getUTCDate() === 15,
 				);
-				expect(emergencyInterval?.value).toBe(2);
+				expect(emergencyInterval).toBeDefined();
 			});
 		});
 
