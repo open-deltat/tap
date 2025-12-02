@@ -17,20 +17,31 @@ An organization, company, or entity that owns and manages resources. Each tenant
 ---
 
 ### Resource
-A bookable entity that represents something that can be scheduled. Resources belong to tenants and define the granularity of booking (e.g., a specific room, doctor, stylist, or API endpoint).
+A bookable entity that represents something that can be scheduled. Resources belong to tenants and can be organized hierarchically via `parentId`. Leaf resources (no children) are directly bookable; container resources group children for querying and offer inheritance.
 
 **Properties:**
 - `id` (ResourceId): Unique identifier (ULID)
 - `tenantId`: Owner tenant
+- `parentId`: Optional parent resource (enables hierarchy)
 - `name`: Display name
 - `slug`: URL-friendly identifier
 - `timezone`: IANA timezone string (e.g., "America/New_York")
 - `slotMinutes`: Granularity of time slots ('5', '10', '15', '30', '60')
 - `horizonDays`: How far in advance bookings can be made (default: 90)
 - `requiresPayment`: Whether payment is required for bookings
+- `disabled`: If true, resource and children are not bookable
 - `metadata`: Optional key-value pairs for custom data
 
-**Example:** "Conference Room A", "Dr. Smith", "Haircut Station 3"
+**Hierarchy Example:**
+```
+Venue (container)
+  └── VIP Section (container)
+        └── Seat A1 (bookable)
+        └── Seat A2 (bookable)
+  └── General Admission (bookable, capacity: 5000)
+```
+
+**Example Resources:** "Conference Room A", "Dr. Smith", "Seat 12A", "Economy Class"
 
 ---
 
@@ -112,29 +123,70 @@ A confirmed, permanent allocation of a slot. Bookings are created by converting 
 ## Time & Scheduling
 
 ### Capacity
-The maximum number of concurrent bookings allowed for a single time slot. This enables high-volume resources like flights or concerts to be modeled as a single resource with multiple "seats" per slot.
+The maximum number of concurrent bookings allowed for a single time slot. Capacity determines whether a resource represents fungible or non-fungible inventory.
 
-- **Default:** 1 (Single booking per slot)
-- **Varying:** Can vary per offer (e.g., Morning flight has 100 seats, Evening flight has 50)
-- **Usage:** Checked against current usage count in the inventory bitmap (Uint16Array). If `usage < capacity`, the slot is available.
+- **Default:** 1 (Single booking per slot — non-fungible)
+- **Capacity > 1:** Multiple bookings allowed (fungible — "any seat in this section")
+- **Usage:** Checked against current usage count. If `usage < capacity`, the slot is available.
+
+**Decision Guide:** Ask "Does the customer care WHICH one they get?"
+- **No** → Use capacity > 1 (fungible)
+- **Yes** → Use individual resources with capacity: 1 (non-fungible)
+
+---
+
+### Fungible Inventory
+Resources where individual units are interchangeable. The customer gets "a spot" but doesn't care which specific one.
+
+**Examples:**
+- Yoga class (20 spots)
+- Parking lot (50 spaces)
+- General admission (5000 tickets)
+
+**Implementation:** Single resource with `capacity > 1`
+
+---
+
+### Non-Fungible Inventory
+Resources where each unit has unique identity. The customer books a specific, identifiable item.
+
+**Examples:**
+- Concert seat "A14"
+- Hotel room "401 Ocean View"
+- Airplane seat "12A Window"
+
+**Implementation:** Individual resources (each with `capacity: 1`) organized in hierarchy via `parentId`
 
 ---
 
 ### Offer
-A published availability template that defines when a resource is available. Offers specify recurring patterns (days of week, time ranges), pricing information, and capacity.
+A published availability template that defines when a resource is available. Offers follow an **add-only, inherited, stackable** model.
 
 **Properties:**
 - `id`: Unique identifier (ULID)
 - `tenantId`: Owner tenant
-- `resourceId`: The resource this offer applies to
-- `daysOfWeek`: Array of day numbers (0=Sunday, 6=Saturday)
-- `startTime`: Start time string (e.g., "09:00")
-- `endTime`: End time string (e.g., "17:00")
+- `resourceId`: The resource this offer applies to (can be container or leaf)
+- `type`: Either 'weekly' (recurring) or 'range' (specific dates)
+- `config`: Type-specific configuration (days/times for weekly, start/end for range)
+- `timezone`: IANA timezone for interpreting times
 - `priceCents`: Optional price in cents
 - `currency`: Currency code (default: 'USD')
 - `capacity`: Maximum concurrent bookings (default: 1)
 
-**Purpose:** Offers define the base availability pattern for a resource. The availability calculator uses offers to determine which slots are available and checks usage against the offer's capacity.
+**Add-Only Model:**
+- No offer = no availability
+- Offers ADD availability (never subtract)
+- To block availability, use `disabled` flag on resource
+
+**Inheritance:**
+- Child resources inherit all ancestor offers
+- Children can add MORE offers (extends availability)
+- Example: Venue 9am-9pm + VIP early access 8am-9am = VIP available 8am-9pm
+
+**Stacking:**
+- Multiple offers on same resource = union of availability
+- No conflicts, no precedence rules
+- Simple and predictable
 
 ---
 

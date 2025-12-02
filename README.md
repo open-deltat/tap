@@ -2,6 +2,15 @@
 
 A federated booking protocol for real-time availability and bookings across untrusted parties. TAP treats time as inventory, enabling real-time discovery, holds, and confirmations in a distributed system with multiple sources of truth.
 
+## Specifications
+
+| Spec | Description |
+|------|-------------|
+| [**specs/CORE.md**](./specs/CORE.md) | Data model — entities, state machine, events |
+| [**specs/PROTOCOL.md**](./specs/PROTOCOL.md) | Transport — HTTP/WebSocket API bindings |
+| [**ARCHITECTURE.md**](./ARCHITECTURE.md) | Design philosophy — hierarchy, offers, scale |
+| [**GLOSSARY.md**](./GLOSSARY.md) | Terminology reference |
+
 ## Problem
 
 Multi-tenant, multi-platform scheduling creates a distributed system with multiple sources of truth (Google/Microsoft, vertical SaaS, marketplaces, in-house tools). Today's status quo includes:
@@ -21,15 +30,18 @@ TAP provides a neutral, open protocol for availability and bookings that enables
 
 ## Architecture
 
+> **Deep Dive:** See [ARCHITECTURE.md](./ARCHITECTURE.md) for the complete design philosophy, including hierarchical resources and the add-only offer model.
+
 ### Core Domain Model
 
-- **Actor**: Provider, consumer, broker, marketplace, or calendar-node with stable actorId
-- **Resource**: Bookable entity (room, doctor, stylist, API slot) with resourceId
+- **Tenant**: Organization that owns resources (clinic, venue, airline)
+- **Resource**: Bookable entity with optional hierarchy (room, doctor, seat) — can contain child resources via `parentId`
 - **Slot**: Contiguous time window with deterministic slotId
-- **Offer**: Published availability for a slotId with terms
+- **Offer**: Defines when a resource is available — inherited by children, stackable, add-only
 - **Hold**: Short-lived, exclusive reservation option
-- **Order**: Confirmed allocation with payment/attestation references
+- **Booking**: Confirmed allocation with payment/attestation references
 - **LedgerEvent**: Append-only events for state transitions
+- **Capacity**: How many concurrent bookings per slot (1 for unique items, N for fungible)
 
 ### State Machine (Slot-scoped)
 
