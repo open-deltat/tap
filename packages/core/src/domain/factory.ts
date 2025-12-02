@@ -12,7 +12,6 @@ import type {
 	HoldExpiredEvent,
 	HoldPlacedEvent,
 	HoldReleasedEvent,
-	LedgerEvent,
 	ResourceCreatedEvent,
 } from './events';
 
