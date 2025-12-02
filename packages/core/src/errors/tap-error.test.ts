@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import type { ErrorValue } from '@tap/protocol';
 import { TapError } from './tap-error';
 
 describe('TapError', () => {
@@ -123,7 +124,7 @@ describe('TapError', () => {
 
 	describe('error codes coverage', () => {
 		const errorCases: Array<{
-			code: Parameters<typeof TapError>[0];
+			code: ErrorValue;
 			expectedStatus: number;
 		}> = [
 			{ code: 'TAP_INVALID_INPUT', expectedStatus: 400 },

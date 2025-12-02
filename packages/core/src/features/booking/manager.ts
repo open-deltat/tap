@@ -162,7 +162,7 @@ export const createBookingManager = (deps: {
 					...(params.priceCents !== undefined && {
 						priceCents: params.priceCents,
 					}),
-				}) as BookingConfirmedEvent;
+				});
 			} finally {
 				release();
 			}
@@ -185,7 +185,7 @@ export const createBookingManager = (deps: {
 					bookingId,
 					start: startUnix,
 					end: endUnix,
-				}) as BookingCancelledEvent;
+				});
 			} finally {
 				release();
 			}

@@ -127,7 +127,7 @@ export const createHoldManager = (params: {
 					endUnix,
 					expiresAt,
 					...(clientRef !== undefined && { clientRef }),
-				}) as HoldPlacedEvent;
+				});
 
 				return { success: true, holdId: generatedHoldId, event };
 			} finally {
@@ -157,7 +157,7 @@ export const createHoldManager = (params: {
 					holdId,
 					startUnix: hold.startUnix,
 					endUnix: hold.endUnix,
-				}) as HoldReleasedEvent;
+				});
 
 				return { success: true, event };
 			} finally {
@@ -188,7 +188,7 @@ export const createHoldManager = (params: {
 							holdId: hold.holdId,
 							startUnix: hold.startUnix,
 							endUnix: hold.endUnix,
-						}) as HoldExpiredEvent,
+						}),
 					);
 				} finally {
 					release();

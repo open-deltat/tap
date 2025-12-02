@@ -25,7 +25,7 @@ export const handleOffersGet = async (req: Request): Promise<Response> => {
 			const error = new TapError(
 				'TAP_INVALID_INPUT',
 				'Invalid request parameters',
-				result.error.format() as Record<string, unknown>,
+				result.error.format(),
 			);
 			return error.toResponse();
 		}
@@ -34,8 +34,13 @@ export const handleOffersGet = async (req: Request): Promise<Response> => {
 			resourceId(result.data.resourceId),
 		);
 
+		// Map offers to response format (structurally identical but different type sources)
 		const response: OffersGetResponse = {
-			offers: offers as OffersGetResponse['offers'],
+			offers: offers.map((offer) => ({
+				...offer,
+				tenantId: offer.tenantId,
+				resourceId: offer.resourceId,
+			})),
 		};
 		return Response.json(response);
 	} catch (e) {
@@ -56,7 +61,7 @@ export const handleOfferCreate = async (req: Request): Promise<Response> => {
 			const error = new TapError(
 				'TAP_INVALID_INPUT',
 				'Invalid request body',
-				result.error.format() as Record<string, unknown>,
+				result.error.format(),
 			);
 			return error.toResponse();
 		}
@@ -95,7 +100,7 @@ export const handleOfferDelete = async (req: Request): Promise<Response> => {
 			const error = new TapError(
 				'TAP_INVALID_INPUT',
 				'Invalid request body',
-				result.error.format() as Record<string, unknown>,
+				result.error.format(),
 			);
 			return error.toResponse();
 		}

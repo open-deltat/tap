@@ -301,7 +301,9 @@ describe('primitives', () => {
 
 			const result = createSlotId(start, end);
 
-			expect(result).toBe('2025-01-15T09:00:00.000Z_2025-01-15T10:00:00.000Z');
+			expect(result).toBe(
+				slotId('2025-01-15T09:00:00.000Z_2025-01-15T10:00:00.000Z'),
+			);
 		});
 
 		it('returns branded SlotId type', () => {

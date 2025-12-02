@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import type { ResourceId, TenantId } from '@tap/protocol';
+import type { ResourceId, SlotId, TenantId } from '@tap/protocol';
 import type { Offer } from '../../domain/models';
 import type { InventoryState } from '../inventory-types';
 import { calculateAvailability } from './calculator';
+
+const slotId = (s: string): SlotId => s as SlotId;
 
 const TENANT_ID = 'tenant-test' as TenantId;
 const RESOURCE_ID = 'resource-test' as ResourceId;
@@ -23,6 +25,7 @@ const createWeeklyOffer = (
 	startTime: '09:00',
 	endTime: '17:00',
 	timezone: 'UTC',
+	currency: 'USD',
 	...overrides,
 });
 
@@ -35,6 +38,7 @@ const createRangeOffer = (
 	type: 'range',
 	start: '2025-01-15T09:00:00.000Z',
 	end: '2025-01-15T17:00:00.000Z',
+	currency: 'USD',
 	...overrides,
 });
 
@@ -150,10 +154,10 @@ describe('calculateAvailability', () => {
 			expect(slots).toHaveLength(2);
 
 			expect(slots[0]?.slotId).toBe(
-				'2025-01-15T09:00:00.000Z_2025-01-15T09:15:00.000Z',
+				slotId('2025-01-15T09:00:00.000Z_2025-01-15T09:15:00.000Z'),
 			);
 			expect(slots[1]?.slotId).toBe(
-				'2025-01-15T09:15:00.000Z_2025-01-15T09:30:00.000Z',
+				slotId('2025-01-15T09:15:00.000Z_2025-01-15T09:30:00.000Z'),
 			);
 		});
 	});

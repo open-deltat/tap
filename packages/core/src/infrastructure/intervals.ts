@@ -10,20 +10,23 @@ export const mergeIntervals = (intervals: Interval[]): Interval[] => {
 
 	const sorted = [...intervals].sort((a, b) => a.start - b.start);
 	const merged: Interval[] = [];
-	let current = { ...sorted[0] };
+	const first = sorted[0];
+	if (!first) return [];
+
+	let current: Interval = { ...first };
 
 	for (let i = 1; i < sorted.length; i++) {
 		const next = sorted[i];
-		if (!next || current.end === undefined) continue;
+		if (!next) continue;
 
 		if (next.start <= current.end) {
 			current.end = Math.max(current.end, next.end);
 		} else {
-			merged.push(current as Interval);
+			merged.push(current);
 			current = { ...next };
 		}
 	}
-	merged.push(current as Interval);
+	merged.push(current);
 	return merged;
 };
 
@@ -38,19 +41,21 @@ export const subtractInterval = (
 	const result: Interval[] = [];
 
 	if (subtraction.start > source.start) {
-		result.push({
+		const beforeInterval: Interval = {
 			start: source.start,
 			end: subtraction.start,
-			value: source.value,
-		} as Interval);
+			...(source.value !== undefined && { value: source.value }),
+		};
+		result.push(beforeInterval);
 	}
 
 	if (subtraction.end < source.end) {
-		result.push({
+		const afterInterval: Interval = {
 			start: subtraction.end,
 			end: source.end,
-			value: source.value,
-		} as Interval);
+			...(source.value !== undefined && { value: source.value }),
+		};
+		result.push(afterInterval);
 	}
 
 	return result;
@@ -104,17 +109,19 @@ export const getCompositeTimeline = (intervals: Interval[]): Interval[] => {
 
 	const result: Interval[] = [];
 	let currentValue = 0;
-	let lastTime = points[0]?.time ?? 0;
+	const firstPoint = points[0];
+	let lastTime = firstPoint?.time ?? 0;
 
 	for (const point of points) {
 		if (!point) continue;
 
 		if (point.time > lastTime && currentValue > 0) {
-			result.push({
+			const segment: Interval = {
 				start: lastTime,
 				end: point.time,
 				value: currentValue,
-			} as Interval);
+			};
+			result.push(segment);
 		}
 
 		currentValue += point.type === 'start' ? point.value : -point.value;

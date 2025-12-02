@@ -46,7 +46,7 @@ export const createExpiryManager = (params: {
 						holdId: hold.id,
 						startUnix: hold.startUnix,
 						endUnix: hold.endUnix,
-					}) as HoldExpiredEvent,
+					}),
 				);
 			}
 			return expiredEvents;

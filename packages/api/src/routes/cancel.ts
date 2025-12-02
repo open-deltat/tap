@@ -23,7 +23,7 @@ export const handleCancel = async (
 		const error = new TapError(
 			'TAP_INVALID_INPUT',
 			'Invalid request body',
-			result.error.format() as Record<string, unknown>,
+			result.error.format(),
 		);
 		return error.toResponse();
 	}

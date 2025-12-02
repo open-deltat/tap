@@ -1,16 +1,22 @@
 import type { APIErrorResponse, ErrorValue } from '@tap/protocol';
+import type { ZodFormattedError } from 'zod';
 import { ERROR_META } from './error-meta';
+
+/** Error details can be a Zod validation error or custom object */
+export type TapErrorDetails =
+	| ZodFormattedError<unknown>
+	| Record<string, unknown>;
 
 export class TapError extends Error {
 	public readonly code: ErrorValue;
 	public readonly httpStatus: number;
-	public readonly details: Record<string, unknown> | undefined;
+	public readonly details: TapErrorDetails | undefined;
 	public readonly correlationId: string;
 
 	constructor(
 		code: ErrorValue,
 		message: string,
-		details?: Record<string, unknown>,
+		details?: TapErrorDetails,
 		correlationId?: string,
 	) {
 		super(message);
