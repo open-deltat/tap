@@ -63,7 +63,6 @@ export const holdWebSocketHandler = {
 					tenantId,
 					resourceId,
 					sessionId,
-					timezone: 'UTC',
 					startUnix: parsed.start.getTime(),
 					endUnix: parsed.end.getTime(),
 					expiresAt: calculateHoldExpiration(

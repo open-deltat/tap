@@ -100,7 +100,6 @@ export type Inventory = {
 		tenantId: TenantId;
 		resourceId: ResourceId;
 		sessionId: SessionId;
-		timezone: string;
 		startUnix: number;
 		endUnix: number;
 		expiresAt: number;

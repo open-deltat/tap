@@ -14,7 +14,6 @@ export type HoldManager = {
 		tenantId: TenantId;
 		resourceId: ResourceId;
 		sessionId: SessionId;
-		timezone: string;
 		startUnix: number;
 		endUnix: number;
 		expiresAt: number;
@@ -76,7 +75,6 @@ export const createHoldManager = (params: {
 			tenantId,
 			resourceId,
 			sessionId,
-			timezone: _timezone,
 			startUnix,
 			endUnix,
 			expiresAt,

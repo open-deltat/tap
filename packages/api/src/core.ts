@@ -10,9 +10,9 @@ import {
 	createOfferRepository,
 } from '@tap/db';
 import {
-	type AvailabilityDeltaPayload,
 	type AvailabilityWsServerMessage,
 	createAvailabilityTopic,
+	createSlotId,
 	type ResourceId,
 	type TenantId,
 } from '@tap/protocol';
@@ -48,26 +48,28 @@ export const getOffersForResource = async (
 	return offerRepository.getByResourceId(resourceId);
 };
 
-// Hold expiry scheduler - runs every 30 seconds
 const HOLD_EXPIRY_INTERVAL_MS = 30_000;
 
 const broadcastHoldExpired = (event: HoldExpiredEvent) => {
-	const server = serverContext.getServer();
+	const server = serverContext.server;
 	if (!server) return;
 
+	const startUnix = event.payload.startUnix ?? event.createdAt;
+	const endUnix = event.payload.endUnix ?? event.createdAt;
+
 	const topic = createAvailabilityTopic(event.tenantId, event.resourceId);
-	const payload: AvailabilityDeltaPayload = {
-		kind: 'HoldExpired',
-		slotId: `${new Date(event.payload.startUnix).toISOString()}_${new Date(event.payload.endUnix).toISOString()}`,
-		resourceId: event.resourceId,
-		tenantId: event.tenantId,
-		startUnix: event.payload.startUnix,
-		endUnix: event.payload.endUnix,
-		holdId: event.payload.holdId,
-	};
 	const message: AvailabilityWsServerMessage = {
 		type: 'stream.delta',
-		payload,
+		eventId: event.eventId,
+		payload: {
+			kind: 'HoldExpired',
+			slotId: createSlotId(new Date(startUnix), new Date(endUnix)),
+			resourceId: event.resourceId,
+			tenantId: event.tenantId,
+			startUnix,
+			endUnix,
+			holdId: event.payload.holdId,
+		},
 	};
 	server.publish(topic, JSON.stringify(message));
 };
@@ -87,7 +89,6 @@ export const runHoldExpiry = async (): Promise<number> => {
 	return totalExpired;
 };
 
-// Start the scheduler
 const expiryInterval = setInterval(async () => {
 	try {
 		const expired = await runHoldExpiry();
@@ -99,7 +100,6 @@ const expiryInterval = setInterval(async () => {
 	}
 }, HOLD_EXPIRY_INTERVAL_MS);
 
-// Cleanup on process exit
 process.on('beforeExit', () => {
 	clearInterval(expiryInterval);
 });

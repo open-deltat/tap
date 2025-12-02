@@ -1,5 +1,4 @@
 export { migrate } from './migrate';
-export { createPostgresEventStore } from './postgres-event-store';
 export {
 	type BookingRepository,
 	createBookingRepository,

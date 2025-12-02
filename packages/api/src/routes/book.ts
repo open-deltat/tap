@@ -59,7 +59,6 @@ export async function handleBook(
 				tenantId: body.tenantId,
 				resourceId: body.resourceId,
 				sessionId: tempSessionId,
-				timezone: 'UTC',
 				startUnix: parsed.start.getTime(),
 				endUnix: parsed.end.getTime(),
 				expiresAt: calculateHoldExpiration(
