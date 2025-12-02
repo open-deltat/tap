@@ -1,6 +1,5 @@
 export * from './domain/events';
 export * from './domain/factory';
-export * from './domain/horizon';
 export * from './domain/models';
 export * from './errors';
 export * from './features/availability/calculator';

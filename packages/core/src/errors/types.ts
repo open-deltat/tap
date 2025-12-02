@@ -9,24 +9,15 @@ export type ErrorCategory =
 	| 'SERVER'
 	| 'INTERNAL_INVARIANT';
 
-export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-
-export type TAPLogEvent = {
-	timestamp: string;
-	level: LogLevel;
-	msg: string;
+export type TAPLogContext = {
 	correlationId: string;
 	tenantId?: string;
 	resourceId?: string;
 	bookingId?: string;
 	holdId?: string;
-	clientId?: string;
 	endpoint?: string;
 	method?: string;
-	ip?: string;
 	errorValue?: ErrorValue;
 	errorCategory?: ErrorCategory;
 	httpStatus?: number;
-	stack?: string;
-	extra?: Record<string, unknown>;
 };

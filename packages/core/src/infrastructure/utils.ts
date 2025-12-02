@@ -1,7 +1,6 @@
 import {
 	type BookingId,
 	bookingId,
-	type Cursor,
 	type EventId,
 	eventId,
 	type HoldId,
@@ -19,7 +18,6 @@ export const createSessionId = (): SessionId => sessionId(`session_${ulid()}`);
 export const createEventId = (): EventId => eventId(ulid());
 export const createBookingId = (): BookingId => bookingId(ulid());
 export const createHoldId = (): HoldId => holdId(ulid());
-export const createCursor = (): Cursor => ulid();
 
 export const calculateHoldExpiration = (
 	now = Date.now(),
