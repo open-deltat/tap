@@ -7,6 +7,7 @@ import {
 	type TenantId,
 } from '@tap/protocol';
 import type { Server, ServerWebSocket } from 'bun';
+import { getAuthContext } from './auth/context';
 import { docsHtml, openApiDocument } from './docs';
 import { handleAvailability } from './routes/availability';
 import {
@@ -25,6 +26,7 @@ import {
 	handleOfferDelete,
 	handleOffersGet,
 } from './routes/offers';
+import { handleSessionCreate } from './routes/session';
 import { setServer } from './server-context';
 
 const VERSION = '0.1.0';
@@ -34,7 +36,7 @@ export type WSData = AvailabilityWSData | HoldWSData;
 const CORS_HEADERS = {
 	'Access-Control-Allow-Origin': '*',
 	'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-	'Access-Control-Allow-Headers': 'Content-Type',
+	'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
 const handleHttp = (
@@ -124,6 +126,10 @@ const handleHttp = (
 			return addCors(Response.json(response));
 		}
 
+		if (pathname === API_ROUTES.SESSION && method === 'POST') {
+			return addCors(handleSessionCreate());
+		}
+
 		if (pathname === API_ROUTES.DISCOVERY && method === 'GET') {
 			const discovery = {
 				tap_version: VERSION,
@@ -131,6 +137,7 @@ const handleHttp = (
 					availability: API_ROUTES.AVAILABILITY,
 					book: API_ROUTES.BOOK,
 					cancel: API_ROUTES.CANCEL,
+					session: API_ROUTES.SESSION,
 					offers: API_ROUTES.OFFERS,
 					availability_ws: API_ROUTES.AVAILABILITY_WS,
 					hold_ws: API_ROUTES.HOLD_WS,
@@ -138,13 +145,14 @@ const handleHttp = (
 					docs: API_ROUTES.DOCS,
 					openapi: API_ROUTES.OPENAPI,
 				},
-				capabilities: ['holds', 'bookings', 'realtime', 'offers'],
+				capabilities: ['holds', 'bookings', 'realtime', 'offers', 'sessions'],
 			};
 			return addCors(Response.json(discovery));
 		}
 
 		if (pathname === API_ROUTES.OFFERS && method === 'GET') {
-			return handleOffersGet(req)
+			const authCtx = getAuthContext(req);
+			return handleOffersGet(req, authCtx)
 				.then(addCors)
 				.catch((e) => {
 					const error = new TapError(
@@ -156,7 +164,8 @@ const handleHttp = (
 		}
 
 		if (pathname === API_ROUTES.OFFERS_CREATE && method === 'POST') {
-			return handleOfferCreate(req)
+			const authCtx = getAuthContext(req);
+			return handleOfferCreate(req, authCtx)
 				.then(addCors)
 				.catch((e) => {
 					const error = new TapError(
@@ -168,7 +177,8 @@ const handleHttp = (
 		}
 
 		if (pathname === API_ROUTES.OFFERS_DELETE && method === 'POST') {
-			return handleOfferDelete(req)
+			const authCtx = getAuthContext(req);
+			return handleOfferDelete(req, authCtx)
 				.then(addCors)
 				.catch((e) => {
 					const error = new TapError(

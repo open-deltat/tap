@@ -35,12 +35,14 @@ export const resources = pgTable('resources', {
 	tenantId: text('tenant_id')
 		.notNull()
 		.references(() => tenants.id),
+	parentId: text('parent_id'),
 	name: text('name').notNull(),
 	slug: text('slug').notNull(),
 	timezone: text('timezone').notNull(),
 	slotMinutes: text('slot_minutes').notNull(),
 	horizonDays: integer('horizon_days').notNull().default(90),
 	requiresPayment: boolean('requires_payment').notNull().default(false),
+	disabled: boolean('disabled').notNull().default(false),
 	metadata: jsonb('metadata'),
 	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
 		.notNull()

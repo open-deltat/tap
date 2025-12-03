@@ -1,4 +1,5 @@
 export * from './constants';
+export * from './schemas/auth';
 export * from './schemas/http';
 export * from './schemas/primitives';
 export * from './schemas/values';

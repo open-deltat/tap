@@ -1,5 +1,6 @@
 import { TapError } from '@tap/core';
 import {
+	type AuthContext,
 	OfferCreateRequestSchema,
 	type OfferCreateResponse,
 	OfferDeleteRequestSchema,
@@ -10,9 +11,17 @@ import {
 	validateRangeOffer,
 } from '@tap/protocol';
 import { ulid } from 'ulid';
+import { requireScope } from '../auth/context';
 import { offerRepository } from '../core';
 
-export const handleOffersGet = async (req: Request): Promise<Response> => {
+export const handleOffersGet = async (
+	req: Request,
+	authCtx: AuthContext,
+): Promise<Response> => {
+	const authResult = requireScope(authCtx, 'read');
+	if (!authResult.authorized) {
+		return new TapError('TAP_UNAUTHORIZED', authResult.message).toResponse();
+	}
 	try {
 		const url = new URL(req.url);
 		const resourceIdParam = url.searchParams.get('resourceId');
@@ -52,7 +61,15 @@ export const handleOffersGet = async (req: Request): Promise<Response> => {
 	}
 };
 
-export const handleOfferCreate = async (req: Request): Promise<Response> => {
+export const handleOfferCreate = async (
+	req: Request,
+	authCtx: AuthContext,
+): Promise<Response> => {
+	const authResult = requireScope(authCtx, 'manage');
+	if (!authResult.authorized) {
+		return new TapError('TAP_UNAUTHORIZED', authResult.message).toResponse();
+	}
+
 	try {
 		const json = await req.json();
 		const result = OfferCreateRequestSchema.safeParse(json);
@@ -91,7 +108,15 @@ export const handleOfferCreate = async (req: Request): Promise<Response> => {
 	}
 };
 
-export const handleOfferDelete = async (req: Request): Promise<Response> => {
+export const handleOfferDelete = async (
+	req: Request,
+	authCtx: AuthContext,
+): Promise<Response> => {
+	const authResult = requireScope(authCtx, 'manage');
+	if (!authResult.authorized) {
+		return new TapError('TAP_UNAUTHORIZED', authResult.message).toResponse();
+	}
+
 	try {
 		const json = await req.json();
 		const result = OfferDeleteRequestSchema.safeParse(json);

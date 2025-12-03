@@ -28,6 +28,7 @@ type OffersManagerProps = {
 	tenantId: TenantId;
 	resourceId: ResourceId;
 	initialTimezone?: string;
+	apiKey?: string;
 };
 
 const DAYS = [
@@ -58,7 +59,12 @@ export const OffersManager = ({
 	tenantId,
 	resourceId,
 	initialTimezone = 'Europe/Berlin',
+	apiKey,
 }: OffersManagerProps) => {
+	const authHeaders: HeadersInit = React.useMemo(
+		() => (apiKey ? { Authorization: `TAP-Key ${apiKey}` } : {}),
+		[apiKey],
+	);
 	const [timezone, setTimezone] = React.useState(initialTimezone);
 	const [offers, setOffers] = React.useState<OffersGetResponse['offers']>([]);
 	const [isLoading, setIsLoading] = React.useState(false);
@@ -80,6 +86,7 @@ export const OffersManager = ({
 		try {
 			const response = await fetch(
 				`${apiBaseUrl}${API_ROUTES.OFFERS}?resourceId=${resourceId}`,
+				{ headers: authHeaders },
 			);
 			if (!response.ok) throw new Error('Failed to fetch offers');
 			const data = (await response.json()) as OffersGetResponse;
@@ -89,7 +96,7 @@ export const OffersManager = ({
 		} finally {
 			setIsLoading(false);
 		}
-	}, [apiBaseUrl, resourceId]);
+	}, [apiBaseUrl, resourceId, authHeaders]);
 
 	React.useEffect(() => {
 		fetchOffers();
@@ -122,7 +129,7 @@ export const OffersManager = ({
 
 			const response = await fetch(`${apiBaseUrl}${API_ROUTES.OFFERS_CREATE}`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', ...authHeaders },
 				body: JSON.stringify(offer),
 			});
 
@@ -147,7 +154,7 @@ export const OffersManager = ({
 		try {
 			const response = await fetch(`${apiBaseUrl}${API_ROUTES.OFFERS_DELETE}`, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: { 'Content-Type': 'application/json', ...authHeaders },
 				body: JSON.stringify({ offerId }),
 			});
 

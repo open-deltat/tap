@@ -6,6 +6,7 @@ export const API_ROUTES = {
 	OFFERS: '/offers',
 	OFFERS_CREATE: '/offers/create',
 	OFFERS_DELETE: '/offers/delete',
+	SESSION: '/session',
 	AVAILABILITY_WS: '/availability-ws',
 	HOLD_WS: '/hold-ws',
 	HEALTH: '/health',

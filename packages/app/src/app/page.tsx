@@ -13,6 +13,7 @@ export default function Home() {
 
 	const TENANT_ID = '01AN4Z07BY79KA1307SR9X4MV3' as TenantId;
 	const RESOURCE_ID = '01AN4Z07BY79KA1307SR9X4MV4' as ResourceId;
+	const API_KEY = `${TENANT_ID}:demo_key_123`;
 
 	const [clientATimezone, setClientATimezone] =
 		React.useState<string>('Europe/Berlin');
@@ -105,6 +106,7 @@ export default function Home() {
 							apiBaseUrl={apiBaseUrl}
 							tenantId={TENANT_ID}
 							resourceId={RESOURCE_ID}
+							apiKey={API_KEY}
 						/>
 					</div>
 					<div className="lg:col-span-1">

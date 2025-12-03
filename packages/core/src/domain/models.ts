@@ -10,12 +10,16 @@ export const TenantSchema = z.object({
 export const ResourceSchema = z.object({
 	id: ULIDSchema.transform((v) => v as ResourceId),
 	tenantId: ULIDSchema.transform((v) => v as TenantId),
+	parentId: ULIDSchema.transform((v) => v as ResourceId)
+		.nullable()
+		.optional(),
 	name: z.string(),
 	slug: z.string().min(3),
 	timezone: z.string(),
 	slotMinutes: z.enum(['5', '10', '15', '30', '60']),
 	horizonDays: z.number().int().default(90),
 	requiresPayment: z.boolean().default(false),
+	disabled: z.boolean().default(false),
 	metadata: z.record(z.string(), z.unknown()).optional(),
 });
 

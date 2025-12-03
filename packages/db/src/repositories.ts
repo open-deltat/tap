@@ -38,6 +38,8 @@ export type ResourceRepository = {
 	getById: (id: ResourceId) => Promise<Resource | null>;
 	getByTenantId: (tid: TenantId) => Promise<Resource[]>;
 	create: (resource: Resource) => Promise<void>;
+	getChildren: (parentId: ResourceId) => Promise<Resource[]>;
+	getLeaves: (tenantId: TenantId) => Promise<Resource[]>;
 };
 
 export type OfferRepository = {
@@ -146,12 +148,14 @@ const toResource = (row: typeof resources.$inferSelect): Resource => {
 	return {
 		id: resourceId(row.id),
 		tenantId: tenantId(row.tenantId),
+		parentId: row.parentId ? resourceId(row.parentId) : null,
 		name: row.name,
 		slug: row.slug,
 		timezone: row.timezone,
 		slotMinutes: row.slotMinutes,
 		horizonDays: row.horizonDays,
 		requiresPayment: row.requiresPayment,
+		disabled: row.disabled,
 		metadata: row.metadata
 			? (row.metadata as Record<string, string>)
 			: undefined,
@@ -189,14 +193,33 @@ export const createResourceRepository = (db: Database): ResourceRepository => ({
 		await db.insert(resources).values({
 			id: resource.id,
 			tenantId: resource.tenantId,
+			parentId: resource.parentId ?? null,
 			name: resource.name,
 			slug: resource.slug,
 			timezone: resource.timezone,
 			slotMinutes: resource.slotMinutes,
 			horizonDays: resource.horizonDays,
 			requiresPayment: resource.requiresPayment,
+			disabled: resource.disabled ?? false,
 			metadata: resource.metadata ?? null,
 		});
+	},
+	getChildren: async (parentId) => {
+		const rows = await db
+			.select()
+			.from(resources)
+			.where(eq(resources.parentId, parentId));
+		return rows.map(toResource);
+	},
+	getLeaves: async (tenantId) => {
+		const allResources = await db
+			.select()
+			.from(resources)
+			.where(eq(resources.tenantId, tenantId));
+		const parentIds = new Set(
+			allResources.map((r) => r.parentId).filter(Boolean),
+		);
+		return allResources.filter((r) => !parentIds.has(r.id)).map(toResource);
 	},
 });
 

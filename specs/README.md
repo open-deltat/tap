@@ -1,11 +1,12 @@
 # TAP Specifications
 
-Two specs. Completely separate.
+Three specs. Completely separate.
 
 | Spec | Defines | Concerns |
 |------|---------|----------|
 | [**CORE.md**](./CORE.md) | Data model | What exists |
 | [**PROTOCOL.md**](./PROTOCOL.md) | HTTP/WS API | How to communicate |
+| [**AUTH.md**](./AUTH.md) | Authentication | Who can do what |
 
 ---
 
@@ -55,6 +56,5 @@ WS:    /hold-ws, /availability-ws
 | Spec | Purpose | Status |
 |------|---------|--------|
 | FEDERATION.md | Cross-server discovery | Planned |
-| AUTH.md | Authentication patterns | Planned |
 | SYNC.md | Offline-first reconciliation | Planned |
 
