@@ -299,9 +299,52 @@ Error Response:
 
 ## Idempotency
 
-- `POST /book` with same `holdId` is idempotent
-- `POST /cancel` with same `bookingId` is idempotent
-- Clients SHOULD retry on network errors
+TAP provides **natural idempotency** without requiring separate idempotency stores.
+
+### Idempotency Keys
+
+| Operation | Key | Behavior |
+|-----------|-----|----------|
+| `POST /book` | `holdId` | Returns existing booking if hold was already converted |
+| `POST /book` | `clientRef` | Returns existing booking if clientRef already used (tenant-scoped) |
+| `POST /cancel` | `bookingId` | Canceling twice returns same result |
+| `hold.place` | `clientRef` | Returns existing hold if clientRef already used (session-scoped) |
+
+### Design Principles
+
+1. **Natural Keys Over UUIDs**: Use business-meaningful keys (`holdId`, `clientRef`) rather than requiring clients to generate idempotency tokens
+2. **Safe Retries**: All mutating operations can be safely retried on network errors
+3. **Consistent Responses**: Idempotent retries return the same response as the original request
+4. **No TTL Complexity**: Keys persist with the resource they created (hold or booking)
+
+### clientRef
+
+The `clientRef` field enables client-driven idempotency:
+
+```json
+{
+  "tenantId": "...",
+  "resourceId": "...",
+  "slotId": "...",
+  "clientRef": "checkout-abc123",
+  "customer": { ... }
+}
+```
+
+- MUST be unique within scope (tenant for bookings, session for holds)
+- Clients SHOULD use deterministic values (e.g., `{userId}-{slotId}-{timestamp}`)
+- Servers MUST return existing resource if `clientRef` matches
+
+### Retry Behavior
+
+Clients SHOULD retry on:
+- Network timeouts
+- 5xx responses
+- Connection resets
+
+Clients SHOULD NOT retry on:
+- 4xx responses (except 408 Request Timeout, 429 Too Many Requests)
+- Explicit error codes like `TAP_SLOT_UNAVAILABLE`
 
 ---
 

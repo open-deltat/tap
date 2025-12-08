@@ -92,6 +92,7 @@ export const bookings = pgTable('bookings', {
 	customerEmail: text('customer_email'),
 	customerPhone: text('customer_phone'),
 	externalRef: text('external_ref'),
+	clientRef: text('client_ref'),
 	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
 		.notNull()
 		.default(sql`now()`),

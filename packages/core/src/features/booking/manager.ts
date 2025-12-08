@@ -27,6 +27,7 @@ export type BookingManager = {
 		customerPhone?: string;
 		paymentStatus?: 'NONE' | 'PENDING' | 'PAID';
 		priceCents?: number;
+		clientRef?: string;
 	}) => Promise<BookingConfirmedEvent | null>;
 	cancelBooking: (params: {
 		tenantId: TenantId;
@@ -59,6 +60,7 @@ export const createBookingManager = (deps: {
 			customerName?: string;
 			customerEmail?: string;
 			customerPhone?: string;
+			clientRef?: string;
 		}) => Promise<void>;
 		update: (
 			id: BookingId,
@@ -82,6 +84,7 @@ export const createBookingManager = (deps: {
 				customerPhone,
 				paymentStatus = 'NONE',
 				priceCents,
+				clientRef,
 			} = params;
 
 			const hold = await deps.getHoldById(holdId);
@@ -133,6 +136,7 @@ export const createBookingManager = (deps: {
 					...(customerName !== undefined && { customerName }),
 					...(customerEmail !== undefined && { customerEmail }),
 					...(customerPhone !== undefined && { customerPhone }),
+					...(clientRef !== undefined && { clientRef }),
 				});
 
 				return createEvent('BookingConfirmed', {

@@ -67,6 +67,7 @@ export const BookingSchema = z.object({
 	customerEmail: z.string().email().optional(),
 	customerPhone: z.string().optional(),
 	externalRef: z.string().optional(),
+	clientRef: z.string().optional(),
 	createdAt: z.number().default(() => Date.now()),
 });
 

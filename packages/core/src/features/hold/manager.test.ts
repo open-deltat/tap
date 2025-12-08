@@ -249,6 +249,83 @@ describe('HoldManager', () => {
 				expect(result.event.payload.clientRef).toBe('my-reference');
 			}
 		});
+
+		it('returns existing hold when clientRef matches (idempotency)', async () => {
+			const clientRefHolds = new Map<string, HoldId>();
+			const { deps, holds } = createMockDependencies();
+
+			const depsWithClientRef = {
+				...deps,
+				getHoldByClientRef: async (sessionId: SessionId, clientRef: string) => {
+					const key = `${sessionId}:${clientRef}`;
+					const holdId = clientRefHolds.get(key);
+					if (!holdId) return null;
+					const hold = holds.get(holdId);
+					if (!hold) return null;
+					return {
+						id: holdId,
+						tenantId: hold.tenantId,
+						resourceId: hold.resourceId,
+						startUnix: hold.startUnix,
+						endUnix: hold.endUnix,
+						expiresAt: hold.expiresAt,
+					};
+				},
+				holdRepository: {
+					...deps.holdRepository,
+					create: async (hold: {
+						id: HoldId;
+						tenantId: TenantId;
+						resourceId: ResourceId;
+						sessionId: SessionId;
+						startUnix: number;
+						endUnix: number;
+						expiresAt: number;
+						clientRef?: string;
+					}) => {
+						await deps.holdRepository.create(hold);
+						if (hold.clientRef) {
+							clientRefHolds.set(
+								`${hold.sessionId}:${hold.clientRef}`,
+								hold.id,
+							);
+						}
+					},
+				},
+			};
+
+			const manager = createHoldManager(depsWithClientRef);
+
+			const now = Date.now();
+			const firstResult = await manager.placeHold({
+				tenantId: TENANT_ID,
+				resourceId: RESOURCE_ID,
+				sessionId: SESSION_ID,
+				startUnix: now,
+				endUnix: now + 15 * 60 * 1000,
+				expiresAt: now + 5 * 60 * 1000,
+				clientRef: 'idempotent-ref',
+			});
+
+			expect(firstResult.success).toBe(true);
+			if (!firstResult.success) return;
+
+			const secondResult = await manager.placeHold({
+				tenantId: TENANT_ID,
+				resourceId: RESOURCE_ID,
+				sessionId: SESSION_ID,
+				startUnix: now,
+				endUnix: now + 15 * 60 * 1000,
+				expiresAt: now + 5 * 60 * 1000,
+				clientRef: 'idempotent-ref',
+			});
+
+			expect(secondResult.success).toBe(true);
+			if (!secondResult.success) return;
+
+			expect(secondResult.holdId).toBe(firstResult.holdId);
+			expect(holds.size).toBe(1);
+		});
 	});
 
 	describe('releaseHold', () => {

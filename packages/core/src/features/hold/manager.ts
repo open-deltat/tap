@@ -55,6 +55,17 @@ export const createHoldManager = (params: {
 			expiresAt: number;
 		}>
 	>;
+	getHoldByClientRef?: (
+		sessionId: SessionId,
+		clientRef: string,
+	) => Promise<{
+		id: HoldId;
+		tenantId: TenantId;
+		resourceId: ResourceId;
+		startUnix: number;
+		endUnix: number;
+		expiresAt: number;
+	} | null>;
 	holdRepository: {
 		create: (hold: {
 			id: HoldId;
@@ -81,6 +92,25 @@ export const createHoldManager = (params: {
 			clientRef,
 			capacity = 1,
 		}) => {
+			if (clientRef && params.getHoldByClientRef) {
+				const existingHold = await params.getHoldByClientRef(
+					sessionId,
+					clientRef,
+				);
+				if (existingHold) {
+					const event = createEvent('HoldPlaced', {
+						tenantId: existingHold.tenantId,
+						resourceId: existingHold.resourceId,
+						holdId: existingHold.id,
+						startUnix: existingHold.startUnix,
+						endUnix: existingHold.endUnix,
+						expiresAt: existingHold.expiresAt,
+						clientRef,
+					});
+					return { success: true, holdId: existingHold.id, event };
+				}
+			}
+
 			const lockKey = `${tenantId}:${resourceId}:inventory`;
 			const release = await params.withLock(lockKey);
 

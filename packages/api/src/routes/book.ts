@@ -11,11 +11,12 @@ import {
 	BookPostRequestBodySchema,
 	type BookPostResponse,
 	createAvailabilityTopic,
+	createSlotId,
 	parseSlotId,
 	type SlotId,
 } from '@tap/protocol';
 import type { Server } from 'bun';
-import { getInventory } from '../core';
+import { bookingRepository, getInventory } from '../core';
 import { serverContext } from '../server-context';
 
 export async function handleBook(
@@ -47,6 +48,31 @@ export async function handleBook(
 				err instanceof Error ? { message: err.message } : undefined,
 			);
 			return error.toResponse();
+		}
+
+		const existingBooking = await findExistingBooking(
+			body.tenantId,
+			body.holdId,
+			body.clientRef,
+		);
+
+		if (existingBooking) {
+			const response: BookPostResponse = {
+				bookingId: existingBooking.id,
+				tenantId: existingBooking.tenantId,
+				resourceId: existingBooking.resourceId,
+				slotId: createSlotId(
+					new Date(existingBooking.start),
+					new Date(existingBooking.end),
+				),
+				start: existingBooking.start,
+				end: existingBooking.end,
+				paymentStatus: existingBooking.paymentStatus,
+				clientRef: existingBooking.clientRef,
+			};
+			return new Response(JSON.stringify(response), {
+				headers: { 'Content-Type': 'application/json' },
+			});
 		}
 
 		let holdId = body.holdId;
@@ -101,6 +127,7 @@ export async function handleBook(
 			end: parsed.end.getTime(),
 			customerName: body.customer.name,
 			customerEmail: body.customer.email,
+			clientRef: body.clientRef,
 			...(body.customer.phone !== undefined && {
 				customerPhone: body.customer.phone,
 			}),
@@ -111,7 +138,6 @@ export async function handleBook(
 			return error.toResponse();
 		}
 
-		// Broadcast via WebSocket
 		const topic = createAvailabilityTopic(body.tenantId, body.resourceId);
 		const payload: AvailabilityDeltaPayload = {
 			kind: 'BookingConfirmed',
@@ -153,4 +179,25 @@ export async function handleBook(
 		);
 		return error.toResponse();
 	}
+}
+
+async function findExistingBooking(
+	tenantId: string,
+	holdId?: string,
+	clientRef?: string,
+) {
+	if (holdId) {
+		const byHold = await bookingRepository.getByHoldId(holdId);
+		if (byHold) return byHold;
+	}
+
+	if (clientRef) {
+		const byClientRef = await bookingRepository.getByClientRef(
+			tenantId,
+			clientRef,
+		);
+		if (byClientRef) return byClientRef;
+	}
+
+	return null;
 }

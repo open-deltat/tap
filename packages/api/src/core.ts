@@ -5,8 +5,10 @@ import {
 	type Offer,
 } from '@tap/core';
 import {
+	createBookingRepository,
 	createDatabase,
 	createDbStateManager,
+	createHoldRepository,
 	createOfferRepository,
 } from '@tap/db';
 import {
@@ -25,6 +27,8 @@ const connectionString =
 
 const db = createDatabase(connectionString);
 const offerRepository = createOfferRepository(db);
+const bookingRepository = createBookingRepository(db);
+const holdRepository = createHoldRepository(db);
 
 const inventories = new Map<string, Inventory>();
 
@@ -104,4 +108,4 @@ process.on('beforeExit', () => {
 	clearInterval(expiryInterval);
 });
 
-export { offerRepository };
+export { bookingRepository, holdRepository, offerRepository };

@@ -50,6 +50,11 @@ export type OfferRepository = {
 
 export type BookingRepository = {
 	getById: (id: BookingId) => Promise<Booking | null>;
+	getByHoldId: (holdId: HoldId) => Promise<Booking | null>;
+	getByClientRef: (
+		tenantId: TenantId,
+		clientRef: string,
+	) => Promise<Booking | null>;
 	getByResourceId: (
 		rid: ResourceId,
 		from?: number,
@@ -70,6 +75,10 @@ export type BookingRepository = {
 export type HoldRepository = {
 	getById: (id: HoldId) => Promise<Hold | null>;
 	getBySessionId: (sid: SessionId) => Promise<Hold[]>;
+	getByClientRef: (
+		sessionId: SessionId,
+		clientRef: string,
+	) => Promise<Hold | null>;
 	getExpired: (now: number) => Promise<
 		{
 			id: HoldId;
@@ -335,6 +344,7 @@ const toBooking = (row: typeof bookings.$inferSelect): Booking => {
 		customerEmail: row.customerEmail ?? undefined,
 		customerPhone: row.customerPhone ?? undefined,
 		externalRef: row.externalRef ?? undefined,
+		clientRef: row.clientRef ?? undefined,
 		createdAt: row.createdAt.getTime(),
 	};
 };
@@ -345,6 +355,22 @@ export const createBookingRepository = (db: Database): BookingRepository => ({
 			.select()
 			.from(bookings)
 			.where(eq(bookings.id, id))
+			.limit(1);
+		return row ? toBooking(row) : null;
+	},
+	getByHoldId: async (hid) => {
+		const [row] = await db
+			.select()
+			.from(bookings)
+			.where(eq(bookings.holdId, hid))
+			.limit(1);
+		return row ? toBooking(row) : null;
+	},
+	getByClientRef: async (tid, clientRef) => {
+		const [row] = await db
+			.select()
+			.from(bookings)
+			.where(and(eq(bookings.tenantId, tid), eq(bookings.clientRef, clientRef)))
 			.limit(1);
 		return row ? toBooking(row) : null;
 	},
@@ -374,6 +400,7 @@ export const createBookingRepository = (db: Database): BookingRepository => ({
 			customerEmail: booking.customerEmail ?? null,
 			customerPhone: booking.customerPhone ?? null,
 			externalRef: booking.externalRef ?? null,
+			clientRef: booking.clientRef ?? null,
 		});
 	},
 	update: async (id, updates) => {
@@ -421,6 +448,14 @@ export const createHoldRepository = (db: Database): HoldRepository => ({
 	getBySessionId: async (sid) => {
 		const rows = await db.select().from(holds).where(eq(holds.sessionId, sid));
 		return rows.map(toHold);
+	},
+	getByClientRef: async (sid, clientRef) => {
+		const [row] = await db
+			.select()
+			.from(holds)
+			.where(and(eq(holds.sessionId, sid), eq(holds.clientRef, clientRef)))
+			.limit(1);
+		return row ? toHold(row) : null;
 	},
 	getExpired: async (now) => {
 		const rows = await db.select().from(holds).where(lte(holds.expiresAt, now));
