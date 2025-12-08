@@ -85,9 +85,9 @@ To block availability: use `resource.disabled = true`
 | `/hold-ws` | Place and manage holds |
 | `/availability-ws` | Real-time availability updates |
 
-## Ledger Events
+## Events
 
-All state changes emit events (append-only):
+All state changes emit events (broadcast via WebSocket):
 
 ```typescript
 {

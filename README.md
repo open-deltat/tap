@@ -74,7 +74,7 @@ Tenant
 1. **Reads are free** — Availability is public
 2. **Holds are ephemeral** — Auto-expire, no commitment required
 3. **Bookings need proof** — Payment, signature, or policy
-4. **Events are truth** — Append-only ledger, auditable
+4. **Real-time sync** — WebSocket deltas for instant updates
 
 ---
 

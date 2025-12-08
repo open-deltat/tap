@@ -63,7 +63,7 @@ Writes: Federated to providers
 1. **Separate concerns** — Core is abstract, Protocol is concrete
 2. **Minimal surface** — Few entities, few endpoints
 3. **Add-only offers** — No subtraction, no conflicts
-4. **Events as truth** — Append-only, replayable
+4. **Real-time sync** — WebSocket deltas for instant updates
 5. **Hierarchy is optional** — Single resource works, tree scales
 6. **Local-first queries** — 99.99% cache hits
 7. **Holds solve races** — No distributed locks needed

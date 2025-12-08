@@ -157,7 +157,7 @@ Transitions:
 
 ## Events
 
-All state changes emit events. Events are append-only.
+All state changes emit events. Events are broadcast via WebSocket for real-time sync.
 
 ```
 Event {

@@ -46,7 +46,7 @@ Tenant (owner)
 1. **Reads are free** — Availability is public
 2. **Holds are ephemeral** — Auto-expire, no commitment
 3. **Bookings need proof** — Payment, signature, or policy
-4. **Events are truth** — Append-only, auditable
+4. **Real-time sync** — WebSocket deltas for instant updates
 
 ---
 
