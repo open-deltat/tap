@@ -50,6 +50,8 @@ Offer {
   resourceId: string
   type: "weekly" | "range"
   config: WeeklyConfig | RangeConfig
+  bufferBeforeMinutes: integer (default: 0)
+  bufferAfterMinutes: integer (default: 0)
 }
 
 WeeklyConfig {
@@ -69,6 +71,12 @@ RangeConfig {
 - Offers ADD availability (never subtract)
 - Children inherit ancestor offers
 - Multiple offers stack (union)
+
+**Buffer Time:**
+- `bufferBeforeMinutes`: Time blocked before a booking (prep time)
+- `bufferAfterMinutes`: Time blocked after a booking (cleanup/travel)
+- Buffer expands the blocked interval when calculating availability
+- Max buffer from all offers is used when multiple offers apply
 
 ### Hold
 
@@ -179,14 +187,16 @@ Event {
 ```
 availability(resource, timeRange) =
   offers(resource, timeRange)
-  − holds(resource, timeRange)
-  − bookings(resource, timeRange)
+  − expand(holds(resource, timeRange), buffer)
+  − expand(bookings(resource, timeRange), buffer)
 ```
 
 Where:
 - `offers` = union of all applicable offers (self + ancestors)
 - `holds` = active holds on this resource
 - `bookings` = confirmed bookings on this resource
+- `buffer` = max(bufferBeforeMinutes, bufferAfterMinutes) from offers
+- `expand(intervals, buffer)` = extend each interval by buffer time
 
 ---
 

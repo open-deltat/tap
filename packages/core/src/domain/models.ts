@@ -30,6 +30,8 @@ const OfferBaseSchema = z.object({
 	priceCents: z.number().int().optional(),
 	currency: z.string().default('USD'),
 	timezone: z.string().optional(),
+	bufferBeforeMinutes: z.number().int().min(0).default(0),
+	bufferAfterMinutes: z.number().int().min(0).default(0),
 });
 
 export const WeeklyOfferSchema = OfferBaseSchema.extend({

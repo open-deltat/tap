@@ -251,6 +251,8 @@ const toOffer = (row: typeof offers.$inferSelect): Offer | null => {
 		priceCents: row.priceCents ?? undefined,
 		currency: row.currency,
 		timezone: row.timezone ?? undefined,
+		bufferBeforeMinutes: row.bufferBeforeMinutes,
+		bufferAfterMinutes: row.bufferAfterMinutes,
 	};
 
 	if (row.type === 'weekly' && isWeeklyConfig(row.config)) {
@@ -302,6 +304,8 @@ export const createOfferRepository = (db: Database): OfferRepository => ({
 			timezone: offer.timezone ?? null,
 			priceCents: offer.priceCents ?? null,
 			currency: offer.currency,
+			bufferBeforeMinutes: offer.bufferBeforeMinutes ?? 0,
+			bufferAfterMinutes: offer.bufferAfterMinutes ?? 0,
 		});
 	},
 	delete: async (id) => {

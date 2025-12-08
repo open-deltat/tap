@@ -15,7 +15,7 @@ export const availabilityWebSocketHandler = {
 			type: 'stream.hello',
 			resourceId: null,
 			tenantId: null,
-			cursor: crypto.randomUUID(),
+			cursor: Date.now().toString(),
 		};
 		ws.send(JSON.stringify(hello));
 	},

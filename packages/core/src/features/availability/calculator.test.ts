@@ -580,4 +580,237 @@ describe('calculateAvailability', () => {
 			expect(slots).toHaveLength(4);
 		});
 	});
+
+	describe('buffer time', () => {
+		it('expands blocked time by buffer before minutes', async () => {
+			const offer = createRangeOffer({
+				start: '2025-01-15T09:00:00.000Z',
+				end: '2025-01-15T12:00:00.000Z',
+				bufferBeforeMinutes: 30,
+				bufferAfterMinutes: 0,
+			});
+
+			const bookingStart = new Date('2025-01-15T10:00:00.000Z').getTime();
+			const bookingEnd = new Date('2025-01-15T11:00:00.000Z').getTime();
+
+			const from = new Date('2025-01-15T00:00:00.000Z');
+			const to = new Date('2025-01-16T00:00:00.000Z');
+
+			const slots = await calculateAvailability({
+				inventoryState: async () => ({
+					booked: [{ start: bookingStart, end: bookingEnd }],
+					held: [],
+				}),
+				offers: [offer],
+				tenantId: TENANT_ID,
+				resourceId: RESOURCE_ID,
+				from,
+				to,
+				slotDurationMs: 15 * 60 * 1000,
+			});
+
+			const slotTimes = slots.map((s) => ({
+				start: new Date(s.start).toISOString(),
+				end: new Date(s.end).toISOString(),
+			}));
+
+			expect(
+				slotTimes.some((s) => s.start === '2025-01-15T09:30:00.000Z'),
+			).toBe(false);
+			expect(
+				slotTimes.some((s) => s.start === '2025-01-15T09:00:00.000Z'),
+			).toBe(true);
+		});
+
+		it('expands blocked time by buffer after minutes', async () => {
+			const offer = createRangeOffer({
+				start: '2025-01-15T09:00:00.000Z',
+				end: '2025-01-15T12:00:00.000Z',
+				bufferBeforeMinutes: 0,
+				bufferAfterMinutes: 30,
+			});
+
+			const bookingStart = new Date('2025-01-15T10:00:00.000Z').getTime();
+			const bookingEnd = new Date('2025-01-15T11:00:00.000Z').getTime();
+
+			const from = new Date('2025-01-15T00:00:00.000Z');
+			const to = new Date('2025-01-16T00:00:00.000Z');
+
+			const slots = await calculateAvailability({
+				inventoryState: async () => ({
+					booked: [{ start: bookingStart, end: bookingEnd }],
+					held: [],
+				}),
+				offers: [offer],
+				tenantId: TENANT_ID,
+				resourceId: RESOURCE_ID,
+				from,
+				to,
+				slotDurationMs: 15 * 60 * 1000,
+			});
+
+			const slotTimes = slots.map((s) => ({
+				start: new Date(s.start).toISOString(),
+				end: new Date(s.end).toISOString(),
+			}));
+
+			expect(
+				slotTimes.some((s) => s.start === '2025-01-15T11:00:00.000Z'),
+			).toBe(false);
+			expect(
+				slotTimes.some((s) => s.start === '2025-01-15T11:30:00.000Z'),
+			).toBe(true);
+		});
+
+		it('applies both before and after buffers', async () => {
+			const offer = createRangeOffer({
+				start: '2025-01-15T09:00:00.000Z',
+				end: '2025-01-15T13:00:00.000Z',
+				bufferBeforeMinutes: 15,
+				bufferAfterMinutes: 15,
+			});
+
+			const bookingStart = new Date('2025-01-15T10:30:00.000Z').getTime();
+			const bookingEnd = new Date('2025-01-15T11:00:00.000Z').getTime();
+
+			const from = new Date('2025-01-15T00:00:00.000Z');
+			const to = new Date('2025-01-16T00:00:00.000Z');
+
+			const slots = await calculateAvailability({
+				inventoryState: async () => ({
+					booked: [{ start: bookingStart, end: bookingEnd }],
+					held: [],
+				}),
+				offers: [offer],
+				tenantId: TENANT_ID,
+				resourceId: RESOURCE_ID,
+				from,
+				to,
+				slotDurationMs: 15 * 60 * 1000,
+			});
+
+			const slotStarts = slots.map((s) => new Date(s.start).toISOString());
+
+			expect(slotStarts).not.toContain('2025-01-15T10:15:00.000Z');
+			expect(slotStarts).not.toContain('2025-01-15T10:30:00.000Z');
+			expect(slotStarts).not.toContain('2025-01-15T10:45:00.000Z');
+			expect(slotStarts).not.toContain('2025-01-15T11:00:00.000Z');
+
+			expect(slotStarts).toContain('2025-01-15T10:00:00.000Z');
+			expect(slotStarts).toContain('2025-01-15T11:15:00.000Z');
+		});
+
+		it('uses max buffer from multiple offers', async () => {
+			const offer1 = createRangeOffer({
+				id: 'offer-1',
+				start: '2025-01-15T09:00:00.000Z',
+				end: '2025-01-15T12:00:00.000Z',
+				bufferBeforeMinutes: 15,
+				bufferAfterMinutes: 15,
+			});
+			const offer2 = createRangeOffer({
+				id: 'offer-2',
+				start: '2025-01-15T09:00:00.000Z',
+				end: '2025-01-15T12:00:00.000Z',
+				bufferBeforeMinutes: 30,
+				bufferAfterMinutes: 30,
+			});
+
+			const bookingStart = new Date('2025-01-15T10:00:00.000Z').getTime();
+			const bookingEnd = new Date('2025-01-15T10:30:00.000Z').getTime();
+
+			const from = new Date('2025-01-15T00:00:00.000Z');
+			const to = new Date('2025-01-16T00:00:00.000Z');
+
+			const slots = await calculateAvailability({
+				inventoryState: async () => ({
+					booked: [{ start: bookingStart, end: bookingEnd }],
+					held: [],
+				}),
+				offers: [offer1, offer2],
+				tenantId: TENANT_ID,
+				resourceId: RESOURCE_ID,
+				from,
+				to,
+				slotDurationMs: 15 * 60 * 1000,
+			});
+
+			const slotStarts = slots.map((s) => new Date(s.start).toISOString());
+
+			expect(slotStarts).not.toContain('2025-01-15T09:30:00.000Z');
+			expect(slotStarts).not.toContain('2025-01-15T10:45:00.000Z');
+
+			expect(slotStarts).toContain('2025-01-15T09:00:00.000Z');
+			expect(slotStarts).toContain('2025-01-15T11:00:00.000Z');
+		});
+
+		it('handles zero buffer (default behavior)', async () => {
+			const offer = createRangeOffer({
+				start: '2025-01-15T09:00:00.000Z',
+				end: '2025-01-15T12:00:00.000Z',
+				bufferBeforeMinutes: 0,
+				bufferAfterMinutes: 0,
+			});
+
+			const bookingStart = new Date('2025-01-15T10:00:00.000Z').getTime();
+			const bookingEnd = new Date('2025-01-15T10:30:00.000Z').getTime();
+
+			const from = new Date('2025-01-15T00:00:00.000Z');
+			const to = new Date('2025-01-16T00:00:00.000Z');
+
+			const slots = await calculateAvailability({
+				inventoryState: async () => ({
+					booked: [{ start: bookingStart, end: bookingEnd }],
+					held: [],
+				}),
+				offers: [offer],
+				tenantId: TENANT_ID,
+				resourceId: RESOURCE_ID,
+				from,
+				to,
+				slotDurationMs: 15 * 60 * 1000,
+			});
+
+			const slotStarts = slots.map((s) => new Date(s.start).toISOString());
+
+			expect(slotStarts).toContain('2025-01-15T09:45:00.000Z');
+			expect(slotStarts).toContain('2025-01-15T10:30:00.000Z');
+		});
+
+		it('applies buffer to holds as well', async () => {
+			const offer = createRangeOffer({
+				start: '2025-01-15T09:00:00.000Z',
+				end: '2025-01-15T12:00:00.000Z',
+				bufferBeforeMinutes: 15,
+				bufferAfterMinutes: 15,
+			});
+
+			const holdStart = new Date('2025-01-15T10:00:00.000Z').getTime();
+			const holdEnd = new Date('2025-01-15T10:30:00.000Z').getTime();
+
+			const from = new Date('2025-01-15T00:00:00.000Z');
+			const to = new Date('2025-01-16T00:00:00.000Z');
+
+			const slots = await calculateAvailability({
+				inventoryState: async () => ({
+					booked: [],
+					held: [{ start: holdStart, end: holdEnd }],
+				}),
+				offers: [offer],
+				tenantId: TENANT_ID,
+				resourceId: RESOURCE_ID,
+				from,
+				to,
+				slotDurationMs: 15 * 60 * 1000,
+			});
+
+			const slotStarts = slots.map((s) => new Date(s.start).toISOString());
+
+			expect(slotStarts).not.toContain('2025-01-15T09:45:00.000Z');
+			expect(slotStarts).not.toContain('2025-01-15T10:30:00.000Z');
+
+			expect(slotStarts).toContain('2025-01-15T09:30:00.000Z');
+			expect(slotStarts).toContain('2025-01-15T10:45:00.000Z');
+		});
+	});
 });

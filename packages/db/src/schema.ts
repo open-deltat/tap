@@ -66,6 +66,8 @@ export const offers = pgTable('offers', {
 	timezone: text('timezone'),
 	priceCents: integer('price_cents'),
 	currency: text('currency').notNull().default('USD'),
+	bufferBeforeMinutes: integer('buffer_before_minutes').notNull().default(0),
+	bufferAfterMinutes: integer('buffer_after_minutes').notNull().default(0),
 	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
 		.notNull()
 		.default(sql`now()`),

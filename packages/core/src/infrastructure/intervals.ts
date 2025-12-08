@@ -87,6 +87,22 @@ export const isIntervalAvailable = (
 			available.start <= target.start && available.end >= target.end,
 	);
 
+export const expandInterval = (
+	interval: Interval,
+	beforeMs: number,
+	afterMs: number,
+): Interval => ({
+	start: interval.start - beforeMs,
+	end: interval.end + afterMs,
+	...(interval.value !== undefined && { value: interval.value }),
+});
+
+export const expandIntervals = (
+	intervals: Interval[],
+	beforeMs: number,
+	afterMs: number,
+): Interval[] => intervals.map((i) => expandInterval(i, beforeMs, afterMs));
+
 export const getCompositeTimeline = (intervals: Interval[]): Interval[] => {
 	if (intervals.length === 0) return [];
 

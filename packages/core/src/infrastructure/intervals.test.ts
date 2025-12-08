@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import {
+	expandInterval,
+	expandIntervals,
 	getCompositeTimeline,
 	type Interval,
 	isIntervalAvailable,
@@ -236,6 +238,65 @@ describe('intervals', () => {
 			expect(isIntervalAvailable(available, { start: 180, end: 320 })).toBe(
 				false,
 			);
+		});
+	});
+
+	describe('expandInterval', () => {
+		it('expands interval by before and after amounts', () => {
+			const interval: Interval = { start: 1000, end: 2000 };
+			const result = expandInterval(interval, 100, 200);
+			expect(result).toEqual({ start: 900, end: 2200 });
+		});
+
+		it('handles zero expansion', () => {
+			const interval: Interval = { start: 1000, end: 2000 };
+			const result = expandInterval(interval, 0, 0);
+			expect(result).toEqual({ start: 1000, end: 2000 });
+		});
+
+		it('preserves value if present', () => {
+			const interval: Interval = { start: 1000, end: 2000, value: 5 };
+			const result = expandInterval(interval, 100, 100);
+			expect(result.value).toBe(5);
+		});
+
+		it('does not add value if not present', () => {
+			const interval: Interval = { start: 1000, end: 2000 };
+			const result = expandInterval(interval, 100, 100);
+			expect(result.value).toBeUndefined();
+		});
+
+		it('handles large expansion values', () => {
+			const interval: Interval = { start: 1000, end: 2000 };
+			const result = expandInterval(interval, 500, 500);
+			expect(result).toEqual({ start: 500, end: 2500 });
+		});
+	});
+
+	describe('expandIntervals', () => {
+		it('expands all intervals by the same amount', () => {
+			const intervals: Interval[] = [
+				{ start: 1000, end: 2000 },
+				{ start: 3000, end: 4000 },
+			];
+			const result = expandIntervals(intervals, 100, 200);
+			expect(result).toHaveLength(2);
+			expect(result[0]).toEqual({ start: 900, end: 2200 });
+			expect(result[1]).toEqual({ start: 2900, end: 4200 });
+		});
+
+		it('returns empty array for empty input', () => {
+			expect(expandIntervals([], 100, 100)).toEqual([]);
+		});
+
+		it('preserves values in all intervals', () => {
+			const intervals: Interval[] = [
+				{ start: 1000, end: 2000, value: 1 },
+				{ start: 3000, end: 4000, value: 2 },
+			];
+			const result = expandIntervals(intervals, 100, 100);
+			expect(result[0]?.value).toBe(1);
+			expect(result[1]?.value).toBe(2);
 		});
 	});
 

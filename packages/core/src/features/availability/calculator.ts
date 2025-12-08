@@ -6,6 +6,7 @@ import {
 } from '@tap/protocol';
 import type { Offer } from '../../domain/models';
 import {
+	expandIntervals,
 	mergeIntervals,
 	subtractIntervals,
 } from '../../infrastructure/intervals';
@@ -26,6 +27,22 @@ export type CalculateAvailabilityParams = {
 };
 
 const DEFAULT_SLOT_DURATION_MS = 15 * 60000;
+const MINUTES_TO_MS = 60 * 1000;
+
+const getMaxBuffer = (
+	offers: readonly Offer[],
+): { beforeMs: number; afterMs: number } => {
+	let maxBefore = 0;
+	let maxAfter = 0;
+	for (const offer of offers) {
+		maxBefore = Math.max(maxBefore, offer.bufferBeforeMinutes ?? 0);
+		maxAfter = Math.max(maxAfter, offer.bufferAfterMinutes ?? 0);
+	}
+	return {
+		beforeMs: maxBefore * MINUTES_TO_MS,
+		afterMs: maxAfter * MINUTES_TO_MS,
+	};
+};
 
 export const calculateAvailability = async (
 	params: CalculateAvailabilityParams,
@@ -41,6 +58,7 @@ export const calculateAvailability = async (
 	} = params;
 
 	const state = await inventoryState(tenantId, resourceId);
+	const { beforeMs, afterMs } = getMaxBuffer(offers);
 
 	const offerIntervals = generateOfferIntervals(offers, from, to);
 	const consumptionIntervals = [...state.booked, ...state.held].map((i) => ({
@@ -48,7 +66,12 @@ export const calculateAvailability = async (
 		value: i.value ?? 1,
 	}));
 
-	const busyIntervals = mergeIntervals(consumptionIntervals);
+	const expandedConsumption = expandIntervals(
+		consumptionIntervals,
+		beforeMs,
+		afterMs,
+	);
+	const busyIntervals = mergeIntervals(expandedConsumption);
 	const openIntervals = mergeIntervals(offerIntervals);
 	const freeIntervals = subtractIntervals(openIntervals, busyIntervals);
 

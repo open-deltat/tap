@@ -11,7 +11,7 @@ import type {
 } from '../../domain/events';
 import { createEvent } from '../../domain/factory';
 import type { Interval } from '../../infrastructure/intervals';
-import type { InventoryState } from '../inventory-types';
+import type { HoldMetadata, InventoryState } from '../inventory-types';
 
 export type BookingManager = {
 	confirmBooking: (params: {
@@ -42,14 +42,7 @@ export const createBookingManager = (deps: {
 		tenantId: TenantId,
 		resourceId: ResourceId,
 	) => Promise<InventoryState>;
-	getHoldById: (holdId: HoldId) => Promise<{
-		tenantId: TenantId;
-		resourceId: ResourceId;
-		sessionId: SessionId;
-		startUnix: number;
-		endUnix: number;
-		expiresAt: number;
-	} | null>;
+	getHoldById: (holdId: HoldId) => Promise<HoldMetadata | null>;
 	holdRepository: {
 		delete: (id: HoldId) => Promise<void>;
 	};
@@ -76,7 +69,21 @@ export const createBookingManager = (deps: {
 }): BookingManager => {
 	return {
 		confirmBooking: async (params) => {
-			const { tenantId, resourceId, holdId, sessionId } = params;
+			const {
+				tenantId,
+				resourceId,
+				holdId,
+				sessionId,
+				bookingId,
+				start,
+				end,
+				customerName,
+				customerEmail,
+				customerPhone,
+				paymentStatus = 'NONE',
+				priceCents,
+			} = params;
+
 			const hold = await deps.getHoldById(holdId);
 			if (!hold) {
 				return null;
@@ -96,72 +103,50 @@ export const createBookingManager = (deps: {
 
 				const state = await deps.getState(tenantId, resourceId);
 
-				const bookingInterval: Interval = {
-					start: hold.startUnix,
-					end: hold.endUnix,
+				const requestedInterval: Interval = {
+					start,
+					end,
 					value: 1,
 				};
 
-				const allBusy = [
-					...state.booked,
-					...state.held.filter(
-						(h) => !(h.start === hold.startUnix && h.end === hold.endUnix),
-					),
-				];
-				const hasOverlap = allBusy.some(
-					(busy) =>
-						Math.max(busy.start, bookingInterval.start) <
-						Math.min(busy.end, bookingInterval.end),
+				const hasOverlappingBooking = state.booked.some(
+					(booking) =>
+						Math.max(booking.start, requestedInterval.start) <
+						Math.min(booking.end, requestedInterval.end),
 				);
 
-				if (hasOverlap) {
+				if (hasOverlappingBooking) {
 					return null;
 				}
 
 				await deps.holdRepository.delete(holdId);
 
 				await deps.bookingRepository.create({
-					id: params.bookingId,
+					id: bookingId,
 					tenantId,
 					resourceId,
 					holdId,
-					start: params.start,
-					end: params.end,
+					start,
+					end,
 					status: 'CONFIRMED',
-					paymentStatus: params.paymentStatus || 'NONE',
-					...(params.customerName !== undefined && {
-						customerName: params.customerName,
-					}),
-					...(params.customerEmail !== undefined && {
-						customerEmail: params.customerEmail,
-					}),
-					...(params.customerPhone !== undefined && {
-						customerPhone: params.customerPhone,
-					}),
+					paymentStatus,
+					...(customerName !== undefined && { customerName }),
+					...(customerEmail !== undefined && { customerEmail }),
+					...(customerPhone !== undefined && { customerPhone }),
 				});
 
 				return createEvent('BookingConfirmed', {
 					tenantId,
 					resourceId,
 					holdId,
-					bookingId: params.bookingId,
-					start: params.start,
-					end: params.end,
-					...(params.customerName !== undefined && {
-						customerName: params.customerName,
-					}),
-					...(params.customerEmail !== undefined && {
-						customerEmail: params.customerEmail,
-					}),
-					...(params.customerPhone !== undefined && {
-						customerPhone: params.customerPhone,
-					}),
-					...(params.paymentStatus !== undefined && {
-						paymentStatus: params.paymentStatus,
-					}),
-					...(params.priceCents !== undefined && {
-						priceCents: params.priceCents,
-					}),
+					bookingId,
+					startUnix: start,
+					endUnix: end,
+					...(customerName !== undefined && { customerName }),
+					...(customerEmail !== undefined && { customerEmail }),
+					...(customerPhone !== undefined && { customerPhone }),
+					...(paymentStatus !== undefined && { paymentStatus }),
+					...(priceCents !== undefined && { priceCents }),
 				});
 			} finally {
 				release();
@@ -169,7 +154,7 @@ export const createBookingManager = (deps: {
 		},
 
 		cancelBooking: async (params) => {
-			const { tenantId, resourceId, startUnix, endUnix, bookingId } = params;
+			const { tenantId, resourceId, bookingId, startUnix, endUnix } = params;
 
 			const lockKey = `${tenantId}:${resourceId}:inventory`;
 			const release = await deps.withLock(lockKey);
