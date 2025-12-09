@@ -61,7 +61,7 @@ export const createBookingManager = (deps: {
 			start: number;
 			end: number;
 			status: 'CONFIRMED' | 'CANCELLED';
-			paymentStatus?: 'NONE' | 'PENDING' | 'PAID';
+			paymentStatus: 'NONE' | 'PENDING' | 'PAID';
 			customerName?: string;
 			customerEmail?: string;
 			customerPhone?: string;
@@ -127,6 +127,11 @@ export const createBookingManager = (deps: {
 
 				await deps.holdRepository.delete(holdId);
 
+				const paymentStatus: 'NONE' | 'PENDING' | 'PAID' =
+					params.paymentStatus === 'PENDING' || params.paymentStatus === 'PAID'
+						? params.paymentStatus
+						: 'NONE';
+
 				await deps.bookingRepository.create({
 					id: params.bookingId,
 					tenantId,
@@ -135,7 +140,7 @@ export const createBookingManager = (deps: {
 					start: params.start,
 					end: params.end,
 					status: 'CONFIRMED',
-					paymentStatus: params.paymentStatus ?? 'NONE',
+					paymentStatus,
 					...(params.customerName !== undefined && {
 						customerName: params.customerName,
 					}),
