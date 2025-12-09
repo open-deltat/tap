@@ -7,7 +7,7 @@ import {
 	holdId,
 	type SessionId,
 	sessionId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import { ulid } from 'ulid';
 
 export const DEFAULT_HOLD_EXPIRATION_MS = 5 * 60 * 1000;

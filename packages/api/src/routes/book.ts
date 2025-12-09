@@ -4,7 +4,7 @@ import {
 	createSessionId,
 	DEFAULT_BOOKING_HOLD_EXPIRATION_MS,
 	TapError,
-} from '@tap/core';
+} from '@open-tap/core';
 import {
 	type AvailabilityDeltaPayload,
 	type AvailabilityWsServerMessage,
@@ -14,7 +14,7 @@ import {
 	createSlotId,
 	parseSlotId,
 	type SlotId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import type { Server } from 'bun';
 import { bookingRepository, getInventory } from '../core';
 import { serverContext } from '../server-context';

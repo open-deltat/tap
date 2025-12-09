@@ -1,6 +1,6 @@
 {
-	"name": "@tap/core",
-	"version": "0.1.0",
+	"name": "@open-tap/core",
+	"version": "0.2.0",
 	"description": "TAP Core - Time Allocation Protocol business logic and availability calculation",
 	"keywords": [
 		"tap",
@@ -50,7 +50,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@tap/protocol": "workspace:*",
+		"@open-tap/protocol": "workspace:*",
 		"date-fns": "^3.6.0",
 		"date-fns-tz": "^3.2.0",
 		"ulid": "^2.3.0"

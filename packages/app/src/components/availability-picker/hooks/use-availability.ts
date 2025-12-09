@@ -2,8 +2,8 @@ import {
 	AvailabilityManager,
 	type AvailabilitySlot,
 	type TimeRange,
-} from '@tap/client';
-import type { LedgerEvent } from '@tap/core';
+} from '@open-tap/client';
+import type { LedgerEvent } from '@open-tap/core';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export type { AvailabilitySlot, TimeRange };

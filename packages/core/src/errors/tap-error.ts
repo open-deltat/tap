@@ -1,4 +1,4 @@
-import type { APIErrorResponse, ErrorValue } from '@tap/protocol';
+import type { APIErrorResponse, ErrorValue } from '@open-tap/protocol';
 import type { ZodFormattedError } from 'zod';
 import { ERROR_META } from './error-meta';
 

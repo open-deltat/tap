@@ -1,7 +1,7 @@
 'use client';
 
-import type { LedgerEvent } from '@tap/core';
-import { API_ROUTES, type BookingsPostResponse } from '@tap/protocol';
+import type { LedgerEvent } from '@open-tap/core';
+import { API_ROUTES, type BookingsPostResponse } from '@open-tap/protocol';
 import {
 	Calendar as CalendarIcon,
 	ChevronLeft,

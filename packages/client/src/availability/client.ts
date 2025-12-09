@@ -4,7 +4,7 @@ import {
 	type AvailabilityPostResponse,
 	type ResourceId,
 	type TenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import { format as formatTz } from 'date-fns-tz';
 
 export type GetAvailabilityParams = Omit<

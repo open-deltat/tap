@@ -1,4 +1,4 @@
-export { openApiDocument } from '@tap/protocol/openapi';
+export { openApiDocument } from '@open-tap/protocol/openapi';
 
 export const docsHtml = `<!doctype html>
 <html>

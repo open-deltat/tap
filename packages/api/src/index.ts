@@ -1,11 +1,11 @@
-import { TapError } from '@tap/core';
+import { TapError } from '@open-tap/core';
 import {
 	API_ROUTES,
 	type HealthResponse,
 	type ResourceId,
 	type SlotId,
 	type TenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import type { Server, ServerWebSocket } from 'bun';
 import { getAuthContext } from './auth/context';
 import { docsHtml, openApiDocument } from './docs';

@@ -29,7 +29,7 @@
 	"license": "MIT",
 	"scripts": {
 		"build": "turbo run build",
-		"build:packages": "turbo run build --filter=@tap/protocol --filter=@tap/core --filter=@tap/client",
+		"build:packages": "turbo run build --filter=@open-tap/protocol --filter=@open-tap/core --filter=@open-tap/client",
 		"dev": "bun run scripts/dev.ts",
 		"dev:api": "cd packages/api && bun run dev",
 		"dev:app": "cd packages/app && bun run dev --turbopack",
@@ -42,11 +42,13 @@
 		"db:migrate": "cd packages/db && bun run migrate",
 		"db:reset": "cd packages/db && bun run reset",
 		"check": "biome check --write .",
-		"release": "release-it"
+		"changeset": "changeset",
+		"changeset:version": "changeset version",
+		"changeset:publish": "changeset publish"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "latest",
-		"release-it": "latest",
+		"@changesets/cli": "^2.29.8",
 		"turbo": "latest",
 		"typescript": "latest"
 	},

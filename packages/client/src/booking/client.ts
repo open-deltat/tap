@@ -10,7 +10,7 @@ import {
 	type SessionId,
 	type SlotId,
 	type TenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 
 export type BookingClientOptions = {
 	apiBaseUrl: string;

@@ -1,7 +1,7 @@
 'use client';
 
-import { AvailabilityStreamManager } from '@tap/client';
-import type { LedgerEvent } from '@tap/core';
+import { AvailabilityStreamManager } from '@open-tap/client';
+import type { LedgerEvent } from '@open-tap/core';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 type UseAvailabilityStreamOptions = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { ResourceId, SlotId, TenantId } from '@tap/protocol';
+import type { ResourceId, SlotId, TenantId } from '@open-tap/protocol';
 import type { Offer } from '../../domain/models';
 import type { InventoryState } from '../inventory-types';
 import { calculateAvailability } from './calculator';

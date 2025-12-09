@@ -1,5 +1,5 @@
 {
-	"name": "@tap/app",
+	"name": "@open-tap/app",
 	"version": "0.1.0",
 	"private": true,
 	"scripts": {
@@ -11,9 +11,9 @@
 	"dependencies": {
 		"@radix-ui/react-label": "^2.1.8",
 		"@radix-ui/react-slot": "^1.2.4",
-		"@tap/core": "workspace:*",
-		"@tap/protocol": "workspace:*",
-		"@tap/client": "workspace:*",
+		"@open-tap/core": "workspace:*",
+		"@open-tap/protocol": "workspace:*",
+		"@open-tap/client": "workspace:*",
 		"@toolwind/corner-shape": "^0.0.8-3",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",

@@ -1,4 +1,4 @@
-import type { LedgerEvent } from '@tap/core';
+import type { LedgerEvent } from '@open-tap/core';
 import { applyEventToSlots, type TimeRange } from './operations';
 
 const MAX_LOG_ENTRIES = 100;

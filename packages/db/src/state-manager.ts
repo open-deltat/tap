@@ -1,4 +1,4 @@
-import type { BookingInfo, InventoryState } from '@tap/core';
+import type { BookingInfo, InventoryState } from '@open-tap/core';
 import {
 	type BookingId,
 	bookingId,
@@ -10,7 +10,7 @@ import {
 	sessionId,
 	type TenantId,
 	tenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import { and, eq, gt } from 'drizzle-orm';
 import type {
 	BookingRepository,

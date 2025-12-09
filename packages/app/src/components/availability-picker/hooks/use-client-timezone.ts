@@ -1,6 +1,6 @@
 'use client';
 
-import { TimezoneStore } from '@tap/client';
+import { TimezoneStore } from '@open-tap/client';
 import { useCallback, useMemo, useState } from 'react';
 
 export const useClientTimezone = (initialTimezone?: string) => {

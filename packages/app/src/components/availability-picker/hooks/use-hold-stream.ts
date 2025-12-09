@@ -1,6 +1,6 @@
 'use client';
 
-import { HoldManager } from '@tap/client';
+import { HoldManager } from '@open-tap/client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 type UseHoldStreamOptions = {

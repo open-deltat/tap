@@ -1,4 +1,4 @@
-import type { ErrorValue } from '@tap/protocol';
+import type { ErrorValue } from '@open-tap/protocol';
 import type { ErrorCategory } from './types';
 
 export const ERROR_META: Record<

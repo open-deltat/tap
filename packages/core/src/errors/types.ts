@@ -1,4 +1,4 @@
-import type { ErrorValue } from '@tap/protocol';
+import type { ErrorValue } from '@open-tap/protocol';
 
 export type ErrorCategory =
 	| 'CLIENT_VALIDATION'

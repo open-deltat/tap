@@ -3,7 +3,7 @@ import {
 	type HoldExpiredEvent,
 	type Inventory,
 	type Offer,
-} from '@tap/core';
+} from '@open-tap/core';
 import {
 	createApiKeyRepository,
 	createBookingRepository,
@@ -11,14 +11,14 @@ import {
 	createDbStateManager,
 	createHoldRepository,
 	createOfferRepository,
-} from '@tap/db';
+} from '@open-tap/db';
 import {
 	type AvailabilityWsServerMessage,
 	createAvailabilityTopic,
 	createSlotId,
 	type ResourceId,
 	type TenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import { setApiKeyLookup } from './auth';
 import { serverContext } from './server-context';
 

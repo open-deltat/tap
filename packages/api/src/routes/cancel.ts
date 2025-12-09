@@ -1,4 +1,4 @@
-import { TapError } from '@tap/core';
+import { TapError } from '@open-tap/core';
 import {
 	type AvailabilityDeltaPayload,
 	type AvailabilityWsServerMessage,
@@ -7,7 +7,7 @@ import {
 	createAvailabilityTopic,
 	createSlotId,
 	type SlotId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import type { Server } from 'bun';
 import { getInventory } from '../core';
 import { serverContext } from '../server-context';

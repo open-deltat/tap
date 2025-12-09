@@ -1,6 +1,6 @@
 'use client';
 
-import { createSlotId } from '@tap/protocol';
+import { createSlotId } from '@open-tap/protocol';
 import { Check, ChevronLeft, Clock, Info, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { Badge } from '@/components/ui/badge';

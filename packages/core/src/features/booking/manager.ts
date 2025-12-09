@@ -4,7 +4,7 @@ import type {
 	ResourceId,
 	SessionId,
 	TenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import type {
 	BookingCancelledEvent,
 	BookingConfirmedEvent,

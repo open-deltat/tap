@@ -1,5 +1,5 @@
 {
-	"name": "@tap/api",
+	"name": "@open-tap/api",
 	"version": "0.1.0",
 	"description": "TAP v0.1 HTTP API",
 	"type": "module",
@@ -12,9 +12,9 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@tap/core": "workspace:*",
-		"@tap/db": "workspace:*",
-		"@tap/protocol": "workspace:*"
+		"@open-tap/core": "workspace:*",
+		"@open-tap/db": "workspace:*",
+		"@open-tap/protocol": "workspace:*"
 	},
 	"devDependencies": {
 		"@types/bun": "latest"

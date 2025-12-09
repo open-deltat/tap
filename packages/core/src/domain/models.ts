@@ -1,4 +1,4 @@
-import { type ResourceId, type TenantId, ULIDSchema } from '@tap/protocol';
+import { type ResourceId, type TenantId, ULIDSchema } from '@open-tap/protocol';
 import { z } from 'zod';
 
 export const TenantSchema = z.object({

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import type { HoldId, ResourceId, SessionId, TenantId } from '@tap/protocol';
+import type {
+	HoldId,
+	ResourceId,
+	SessionId,
+	TenantId,
+} from '@open-tap/protocol';
 import type { InventoryState } from '../inventory-types';
 import { createHoldManager } from './manager';
 

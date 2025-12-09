@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { ErrorValue } from '@tap/protocol';
+import type { ErrorValue } from '@open-tap/protocol';
 import { TapError } from './tap-error';
 
 describe('TapError', () => {

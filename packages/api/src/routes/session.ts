@@ -1,4 +1,4 @@
-import type { SessionCreateResponse } from '@tap/protocol';
+import type { SessionCreateResponse } from '@open-tap/protocol';
 import { createSession } from '../auth/session';
 
 export const handleSessionCreate = (): Response => {

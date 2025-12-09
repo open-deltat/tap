@@ -6,7 +6,7 @@ import {
 	type OffersGetResponse,
 	type ResourceId,
 	type TenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import {
 	Calendar,
 	Clock,

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ResourceId, TenantId } from '@tap/protocol';
+import type { ResourceId, TenantId } from '@open-tap/protocol';
 import { BookingsCalendar } from '@/components/demo/bookings-calendar';
 
 const API_BASE_URL =

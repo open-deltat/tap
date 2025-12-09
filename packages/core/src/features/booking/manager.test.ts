@@ -5,7 +5,7 @@ import type {
 	ResourceId,
 	SessionId,
 	TenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import type { InventoryState } from '../inventory-types';
 import { createBookingManager } from './manager';
 

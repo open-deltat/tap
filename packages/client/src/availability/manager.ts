@@ -1,5 +1,5 @@
-import type { LedgerEvent } from '@tap/core';
-import type { AvailabilitySlot } from '@tap/protocol';
+import type { LedgerEvent } from '@open-tap/core';
+import type { AvailabilitySlot } from '@open-tap/protocol';
 import { AvailabilityClient } from './client';
 import { getDayRange, getMonthGridRange } from './operations';
 import { AvailabilityStore } from './store';

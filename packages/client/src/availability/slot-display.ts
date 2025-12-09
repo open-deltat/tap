@@ -1,5 +1,5 @@
-import type { LedgerEvent } from '@tap/core';
-import type { AvailabilitySlot } from '@tap/protocol';
+import type { LedgerEvent } from '@open-tap/core';
+import type { AvailabilitySlot } from '@open-tap/protocol';
 import { format } from 'date-fns';
 import { fromZonedTime } from 'date-fns-tz';
 

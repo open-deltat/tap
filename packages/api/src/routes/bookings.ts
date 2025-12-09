@@ -1,6 +1,9 @@
-import { TapError } from '@tap/core';
-import { createBookingRepository, createDatabase } from '@tap/db';
-import { BookingsPostRequestBodySchema, createSlotId } from '@tap/protocol';
+import { TapError } from '@open-tap/core';
+import { createBookingRepository, createDatabase } from '@open-tap/db';
+import {
+	BookingsPostRequestBodySchema,
+	createSlotId,
+} from '@open-tap/protocol';
 
 const connectionString =
 	process.env.DATABASE_URL ||

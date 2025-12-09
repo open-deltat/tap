@@ -1,6 +1,6 @@
 {
-	"name": "@tap/client",
-	"version": "0.1.0",
+	"name": "@open-tap/client",
+	"version": "0.2.0",
 	"description": "TAP Client SDK - Browser and Node.js client for TAP availability and bookings",
 	"keywords": [
 		"tap",
@@ -49,8 +49,8 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@tap/core": "workspace:*",
-		"@tap/protocol": "workspace:*",
+		"@open-tap/core": "workspace:*",
+		"@open-tap/protocol": "workspace:*",
 		"date-fns": "^3.6.0",
 		"date-fns-tz": "^3.1.3"
 	},

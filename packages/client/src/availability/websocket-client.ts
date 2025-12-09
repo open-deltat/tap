@@ -1,9 +1,9 @@
-import type { LedgerEvent } from '@tap/core';
+import type { LedgerEvent } from '@open-tap/core';
 import {
 	API_ROUTES,
 	type AvailabilityDeltaPayload,
 	type AvailabilityWsServerMessage,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 
 export type AvailabilityWebSocketClientOptions = {
 	apiBaseUrl: string;

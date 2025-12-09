@@ -1,4 +1,4 @@
-import type { ResourceId, SessionId, TenantId } from '@tap/protocol';
+import type { ResourceId, SessionId, TenantId } from '@open-tap/protocol';
 import type { Interval } from '../infrastructure/intervals';
 
 export type InventoryState = {

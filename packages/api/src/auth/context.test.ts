@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { tenantId } from '@tap/protocol';
+import { tenantId } from '@open-tap/protocol';
 import {
 	getAuthContext,
 	hasScope,

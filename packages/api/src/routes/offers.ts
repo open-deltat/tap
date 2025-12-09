@@ -1,4 +1,4 @@
-import { TapError } from '@tap/core';
+import { TapError } from '@open-tap/core';
 import {
 	type AuthContext,
 	OfferCreateRequestSchema,
@@ -9,7 +9,7 @@ import {
 	type OffersGetResponse,
 	resourceId,
 	validateRangeOffer,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import { ulid } from 'ulid';
 import { requireScope } from '../auth/context';
 import { offerRepository } from '../core';

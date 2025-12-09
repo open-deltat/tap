@@ -1,6 +1,6 @@
 'use client';
 
-import type { ResourceId, TenantId } from '@tap/protocol';
+import type { ResourceId, TenantId } from '@open-tap/protocol';
 import * as React from 'react';
 import { BookingFlow } from '@/components/availability-picker/booking-flow';
 import { BookingsCalendar } from '@/components/demo/bookings-calendar';

@@ -1,6 +1,6 @@
 'use client';
 
-import { BookingManager } from '@tap/client';
+import { BookingManager } from '@open-tap/client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 export type UseBookingOptions = {

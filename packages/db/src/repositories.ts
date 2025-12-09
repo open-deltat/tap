@@ -1,4 +1,4 @@
-import type { Booking, Hold, Offer, Resource, Tenant } from '@tap/core';
+import type { Booking, Hold, Offer, Resource, Tenant } from '@open-tap/core';
 import {
 	type AuthScope,
 	type BookingId,
@@ -10,7 +10,7 @@ import {
 	type SessionId,
 	type TenantId,
 	tenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import { and, eq, gte, isNull, lte, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';

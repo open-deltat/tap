@@ -1,4 +1,4 @@
-import type { LedgerEvent } from '@tap/core';
+import type { LedgerEvent } from '@open-tap/core';
 import { AvailabilityWebSocketClient } from './websocket-client';
 
 export type AvailabilityStreamManagerOptions = {

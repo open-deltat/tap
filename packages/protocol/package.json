@@ -1,6 +1,6 @@
 {
-	"name": "@tap/protocol",
-	"version": "0.1.0",
+	"name": "@open-tap/protocol",
+	"version": "0.2.0",
 	"description": "TAP - Time Allocation Protocol schemas, types, and constants",
 	"keywords": [
 		"tap",

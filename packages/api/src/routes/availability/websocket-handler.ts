@@ -2,7 +2,7 @@ import {
 	AvailabilityWsClientMessageSchema,
 	type AvailabilityWsServerMessage,
 	createAvailabilityTopic,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import type { ServerWebSocket } from 'bun';
 
 export type AvailabilityWSData = {

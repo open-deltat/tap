@@ -1,7 +1,7 @@
 'use client';
 
-import { AvailabilityStore } from '@tap/client';
-import type { LedgerEvent } from '@tap/core';
+import { AvailabilityStore } from '@open-tap/client';
+import type { LedgerEvent } from '@open-tap/core';
 import {
 	type AvailabilityPostResponse,
 	type BookPostResponse,
@@ -9,7 +9,7 @@ import {
 	type HoldWsServerMessage,
 	type ResourceId,
 	type TenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import { useRef, useState } from 'react';
 
 const API_BASE =

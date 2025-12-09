@@ -1,7 +1,7 @@
 'use client';
 
-import { generateDisplayedSlots } from '@tap/client';
-import type { LedgerEvent } from '@tap/core';
+import { generateDisplayedSlots } from '@open-tap/client';
+import type { LedgerEvent } from '@open-tap/core';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { format, fromDayKey } from '@/lib/timezone';

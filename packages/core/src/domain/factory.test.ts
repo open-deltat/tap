@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { ResourceId, TenantId } from '@tap/protocol';
+import type { ResourceId, TenantId } from '@open-tap/protocol';
 import { createEvent } from './factory';
 
 const TENANT_ID = 'tenant-test' as TenantId;

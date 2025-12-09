@@ -3,7 +3,7 @@ import {
 	createSlotId,
 	type ResourceId,
 	type TenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import type { Offer } from '../../domain/models';
 import {
 	expandIntervals,

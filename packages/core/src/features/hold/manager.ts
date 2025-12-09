@@ -1,4 +1,9 @@
-import type { HoldId, ResourceId, SessionId, TenantId } from '@tap/protocol';
+import type {
+	HoldId,
+	ResourceId,
+	SessionId,
+	TenantId,
+} from '@open-tap/protocol';
 import type {
 	HoldExpiredEvent,
 	HoldPlacedEvent,

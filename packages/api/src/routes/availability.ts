@@ -3,11 +3,11 @@ import {
 	createEventId,
 	DEFAULT_SLOT_DURATION_MS,
 	TapError,
-} from '@tap/core';
+} from '@open-tap/core';
 import {
 	AvailabilityPostRequestBodySchema,
 	type AvailabilityPostResponse,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import { getInventory, getOffersForResource } from '../core';
 
 export async function handleAvailability(req: Request): Promise<Response> {

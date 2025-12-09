@@ -4,7 +4,7 @@ import {
 	type AuthScope,
 	type TenantId,
 	tenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 
 const DEMO_TENANT_ID = '01AN4Z07BY79KA1307SR9X4MV3';
 const DEMO_API_KEY = 'demo_key_123';

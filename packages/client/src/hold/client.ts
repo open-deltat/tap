@@ -1,4 +1,4 @@
-import { API_ROUTES, type HoldWsServerMessage } from '@tap/protocol';
+import { API_ROUTES, type HoldWsServerMessage } from '@open-tap/protocol';
 
 export type HoldClientOptions = {
 	apiBaseUrl: string;

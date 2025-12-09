@@ -1,4 +1,7 @@
-export type { AvailabilityPostResponse, AvailabilitySlot } from '@tap/protocol';
+export type {
+	AvailabilityPostResponse,
+	AvailabilitySlot,
+} from '@open-tap/protocol';
 export * from './availability/client';
 export * from './availability/manager';
 export * from './availability/operations';

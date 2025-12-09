@@ -2,7 +2,7 @@ import {
 	calculateHoldExpiration,
 	createSessionId,
 	DEFAULT_HOLD_EXPIRATION_MS,
-} from '@tap/core';
+} from '@open-tap/core';
 import {
 	type AvailabilityDeltaPayload,
 	type AvailabilityWsServerMessage,
@@ -15,7 +15,7 @@ import {
 	type ResourceId,
 	type SlotId,
 	type TenantId,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import type { ServerWebSocket } from 'bun';
 import { getInventory } from '../../core';
 import { serverContext } from '../../server-context';

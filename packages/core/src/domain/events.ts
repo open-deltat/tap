@@ -4,7 +4,7 @@ import {
 	ResourceIdSchema,
 	TenantIdSchema,
 	ULIDSchema,
-} from '@tap/protocol';
+} from '@open-tap/protocol';
 import { z } from 'zod';
 import { ResourceSchema } from './models';
 

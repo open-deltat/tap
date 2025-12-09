@@ -1,8 +1,8 @@
 'use client';
 
-import { generateDisplayedSlots } from '@tap/client';
-import type { LedgerEvent } from '@tap/core';
-import { createSlotId } from '@tap/protocol';
+import { generateDisplayedSlots } from '@open-tap/client';
+import type { LedgerEvent } from '@open-tap/core';
+import { createSlotId } from '@open-tap/protocol';
 import { ArrowLeft, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
