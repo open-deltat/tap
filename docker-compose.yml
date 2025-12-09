@@ -1,21 +1,34 @@
+# TAP API - Self-contained with embedded SQLite
+# No external database required!
+#
+# Usage:
+#   docker compose up -d        # Start
+#   docker compose logs -f      # View logs
+#   docker compose down         # Stop
+#
+# Data persists in the tap-data volume
+
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: tap-postgres
-    environment:
-      POSTGRES_USER: tap
-      POSTGRES_PASSWORD: tap
-      POSTGRES_DB: tap
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: tap-api
     ports:
-      - "5432:5432"
+      - "3000:3000"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - tap-data:/app/data
+    environment:
+      - TAP_DB_PATH=/app/data/tap.sqlite
+      - NODE_ENV=production
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tap"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
 
 volumes:
-  postgres_data:
-
+  tap-data:
+    name: tap-data

@@ -144,13 +144,17 @@ process.on('beforeExit', () => {
 	clearInterval(expiryInterval);
 });
 
-export const ensureSeeded = async () => {
+const ensureSeededPromise = (async () => {
 	const existingTenant = await tenantRepository.getBySlug('demo');
 	if (!existingTenant) {
 		console.log('[startup] No data found, seeding database...');
 		await seedDatabase(db);
+	} else {
+		console.log('[startup] Database already seeded');
 	}
-};
+})();
+
+export const ensureSeeded = () => ensureSeededPromise;
 
 export {
 	apiKeyRepository,

@@ -277,8 +277,7 @@ const server = Bun.serve({
 
 setServer(server);
 
-if (import.meta.main) {
-	await ensureSeeded();
-	console.log(`TAP API running on http://localhost:${server.port}`);
-	console.log(`  Database: ${process.env.TAP_DB_PATH || './data/tap.sqlite'}`);
-}
+await ensureSeeded();
+console.log(`TAP API running on http://localhost:${server.port}`);
+console.log(`  Database: ${process.env.TAP_DB_PATH || './data/tap.sqlite'}`);
+console.log(`  Health: http://localhost:${server.port}/health`);
