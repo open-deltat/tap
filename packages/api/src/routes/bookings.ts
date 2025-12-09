@@ -1,17 +1,9 @@
 import { TapError } from '@open-tap/core';
-import { createBookingRepository, createDatabase } from '@open-tap/db';
 import {
 	BookingsPostRequestBodySchema,
 	createSlotId,
 } from '@open-tap/protocol';
-
-const connectionString =
-	process.env.DATABASE_URL ||
-	process.env.POSTGRES_URL ||
-	'postgresql://tap:tap@localhost:5432/tap';
-
-const db = createDatabase(connectionString);
-const bookingRepository = createBookingRepository(db);
+import { bookingRepository } from '../core';
 
 export const handleBookings = async (req: Request): Promise<Response> => {
 	const json = await req.json();
