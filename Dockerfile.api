@@ -1,27 +1,41 @@
-# Use the official Bun image
-FROM oven/bun:1 AS base
-WORKDIR /usr/src/app
+# TAP API - Lightweight SQLite-based booking server
+# No external database required!
+
+FROM oven/bun:1-alpine AS base
+WORKDIR /app
 
 # Copy root configuration files
 COPY package.json bun.lock ./
 COPY turbo.json tsconfig.json ./
 
-# Copy package.json files for all relevant workspaces
+# Copy package.json files for relevant workspaces (no @open-tap/db needed)
 COPY packages/api/package.json ./packages/api/
 COPY packages/core/package.json ./packages/core/
-COPY packages/db/package.json ./packages/db/
 COPY packages/protocol/package.json ./packages/protocol/
 
 # Install dependencies
-RUN bun install
+RUN bun install --frozen-lockfile
 
 # Copy source code
 COPY packages/api ./packages/api
 COPY packages/core ./packages/core
-COPY packages/db ./packages/db
 COPY packages/protocol ./packages/protocol
 
-WORKDIR /usr/src/app/packages/api
-EXPOSE 3000
-CMD ["bun", "run", "start"]
+# Create data directory for SQLite
+RUN mkdir -p /app/data
 
+WORKDIR /app/packages/api
+
+# Environment
+ENV TAP_DB_PATH=/app/data/tap.sqlite
+ENV NODE_ENV=production
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+# Run the server
+CMD ["bun", "run", "start"]

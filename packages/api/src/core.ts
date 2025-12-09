@@ -5,14 +5,6 @@ import {
 	type Offer,
 } from '@open-tap/core';
 import {
-	createApiKeyRepository,
-	createBookingRepository,
-	createDatabase,
-	createDbStateManager,
-	createHoldRepository,
-	createOfferRepository,
-} from '@open-tap/db';
-import {
 	type AvailabilityWsServerMessage,
 	createAvailabilityTopic,
 	createSlotId,
@@ -20,14 +12,42 @@ import {
 	type TenantId,
 } from '@open-tap/protocol';
 import { setApiKeyLookup } from './auth';
+import {
+	createApiKeyRepository,
+	createBookingRepository,
+	createDatabase,
+	createDbStateManager,
+	createHoldRepository,
+	createOfferRepository,
+	createResourceRepository,
+	createTenantRepository,
+	initializeSchema,
+	type SqliteDatabase,
+} from './db';
+import { seedDatabase } from './db/seed';
 import { serverContext } from './server-context';
 
-const connectionString =
-	process.env.DATABASE_URL ||
-	process.env.POSTGRES_URL ||
-	'postgresql://tap:tap@localhost:5432/tap';
+const DB_PATH = process.env.TAP_DB_PATH || './data/tap.sqlite';
 
-const db = createDatabase(connectionString);
+const initializeDatabase = (): SqliteDatabase => {
+	const dbDir = DB_PATH.substring(0, DB_PATH.lastIndexOf('/'));
+	if (dbDir && dbDir !== '.') {
+		try {
+			Bun.spawnSync(['mkdir', '-p', dbDir]);
+		} catch {
+			// ignore if directory exists
+		}
+	}
+
+	const db = createDatabase(DB_PATH);
+	initializeSchema(db);
+	return db;
+};
+
+const db = initializeDatabase();
+
+const tenantRepository = createTenantRepository(db);
+const resourceRepository = createResourceRepository(db);
 const offerRepository = createOfferRepository(db);
 const bookingRepository = createBookingRepository(db);
 const holdRepository = createHoldRepository(db);
@@ -124,4 +144,24 @@ process.on('beforeExit', () => {
 	clearInterval(expiryInterval);
 });
 
-export { apiKeyRepository, bookingRepository, holdRepository, offerRepository };
+const ensureSeededPromise = (async () => {
+	const existingTenant = await tenantRepository.getBySlug('demo');
+	if (!existingTenant) {
+		console.log('[startup] No data found, seeding database...');
+		await seedDatabase(db);
+	} else {
+		console.log('[startup] Database already seeded');
+	}
+})();
+
+export const ensureSeeded = () => ensureSeededPromise;
+
+export {
+	apiKeyRepository,
+	bookingRepository,
+	holdRepository,
+	offerRepository,
+	tenantRepository,
+	resourceRepository,
+	db,
+};
