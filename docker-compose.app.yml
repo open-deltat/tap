@@ -1,0 +1,26 @@
+# TAP App - Next.js Frontend
+#
+# Usage:
+#   docker compose -f docker-compose.app.yml up -d
+#
+# Requires TAP_API_URL environment variable pointing to your API
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    container_name: tap-app
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=${TAP_API_URL:-http://localhost:3000}
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
