@@ -17,13 +17,13 @@
 		"time-allocation",
 		"distributed-systems"
 	],
-	"homepage": "https://github.com/simonorzel26/tap",
+	"homepage": "https://github.com/open-tap/tap",
 	"bugs": {
-		"url": "https://github.com/simonorzel26/tap/issues"
+		"url": "https://github.com/open-tap/tap/issues"
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/simonorzel26/tap.git"
+		"url": "git+https://github.com/open-tap/tap.git"
 	},
 	"author": "simonorzel26",
 	"license": "MIT",
