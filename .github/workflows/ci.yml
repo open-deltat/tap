@@ -52,11 +52,13 @@ jobs:
 
       - name: Check for changeset (PR only)
         if: github.event_name == 'pull_request'
-        uses: changesets/action@v1
-        with:
-          comment: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$(find .changeset -name '*.md' -type f 2>/dev/null | grep -v README)" ]; then
+            echo "⚠️  No changesets found. Please add a changeset or run 'bun run changeset:auto'"
+            exit 1
+          else
+            echo "✅ Changesets found"
+          fi
 
       - name: Auto-create changesets and publish (main only)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
