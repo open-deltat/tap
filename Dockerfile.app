@@ -4,6 +4,10 @@
 FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
+# Build arg for API URL (NEXT_PUBLIC_ vars must be set at build time)
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+
 # Copy source packages
 COPY packages/app ./packages/app
 COPY packages/client ./packages/client
@@ -24,6 +28,7 @@ RUN bun install
 
 # Build Next.js app (standalone output)
 WORKDIR /app/packages/app
+RUN echo "Building with API URL: ${NEXT_PUBLIC_API_BASE_URL}"
 RUN bun run build
 
 # Stage 2: Production

@@ -10,6 +10,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.app
+      args:
+        - NEXT_PUBLIC_API_BASE_URL=${TAP_API_URL:-https://iw0osww8o0g808ggwc4swscs.sitescanner.ai}
     expose:
       - "3001"
     environment:
