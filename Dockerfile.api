@@ -14,7 +14,7 @@ COPY packages/core/package.json ./packages/core/
 COPY packages/protocol/package.json ./packages/protocol/
 
 # Install dependencies
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Copy source code
 COPY packages/api ./packages/api
