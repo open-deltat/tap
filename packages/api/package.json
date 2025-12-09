@@ -1,6 +1,7 @@
 {
 	"name": "@open-tap/api",
 	"version": "0.1.0",
+	"private": true,
 	"description": "TAP v0.1 HTTP API",
 	"type": "module",
 	"main": "./src/index.ts",
