@@ -35,9 +35,9 @@ export const seedDatabase = async (db: SqliteDatabase) => {
 		resourceId,
 		type: 'weekly',
 		config: {
-			daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-			startTime: '00:00',
-			endTime: '23:59',
+			daysOfWeek: [1, 2, 3, 4, 5],
+			startTime: '09:00',
+			endTime: '17:00',
 		},
 		currency: 'USD',
 		bufferBeforeMinutes: 0,
@@ -58,7 +58,7 @@ export const seedDatabase = async (db: SqliteDatabase) => {
 	console.log(`  Tenant ID: ${tenantId}`);
 	console.log(`  Resource ID: ${resourceId}`);
 	console.log(`  Offer ID: ${offerId}`);
-	console.log('  Offer: 7 days/week, 00:00-23:59 (all day)');
+	console.log('  Offer: Mon-Fri, 09:00-17:00');
 	console.log('  API Key: demo-api-key');
 
 	return { tenantId, resourceId, offerId, apiKeyId };
