@@ -174,7 +174,10 @@ function isHoldExpiredParams(
 	params: AllEventParams,
 ): params is Parameters<typeof createHoldExpiredEvent>[0] {
 	return (
-		'holdId' in params && !('expiresAt' in params) && !('bookingId' in params)
+		'holdId' in params &&
+		!('expiresAt' in params) &&
+		!('bookingId' in params) &&
+		!('start' in params)
 	);
 }
 
@@ -185,7 +188,7 @@ function isHoldReleasedParams(
 		'holdId' in params &&
 		!('expiresAt' in params) &&
 		!('bookingId' in params) &&
-		!('startUnix' in params || 'endUnix' in params)
+		!('start' in params)
 	);
 }
 
@@ -204,9 +207,7 @@ function isBookingCancelledParams(
 	params: AllEventParams,
 ): params is Parameters<typeof createBookingCancelledEvent>[0] {
 	return (
-		'bookingId' in params &&
-		!('holdId' in params) &&
-		!('start' in params || 'end' in params)
+		'bookingId' in params && !('holdId' in params) && !('expiresAt' in params)
 	);
 }
 

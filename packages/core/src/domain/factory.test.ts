@@ -53,6 +53,7 @@ describe('createEvent', () => {
 			tenantId: TENANT_ID,
 			resourceId: RESOURCE_ID,
 			bookingId: 'booking-1',
+			holdId: 'hold-1',
 			start: 1000,
 			end: 2000,
 		});
