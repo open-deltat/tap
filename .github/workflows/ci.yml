@@ -58,9 +58,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Auto-create changesets (main only)
+      - name: Auto-create changesets and publish (main only)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: bun run changeset:auto
+        run: |
+          bun run changeset:auto
+          if [ -n "$(git status --porcelain .changeset/)" ]; then
+            echo "Changesets created, proceeding with version and publish"
+          else
+            echo "No changesets to process"
+          fi
 
       - name: Version packages, generate changelogs, and publish (main only)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
