@@ -12,7 +12,6 @@ import type {
 import { createEvent } from '../../domain/factory';
 import type { Interval } from '../../infrastructure/intervals';
 import {
-	isIntervalAvailable,
 	mergeIntervals,
 	subtractIntervals,
 } from '../../infrastructure/intervals';
