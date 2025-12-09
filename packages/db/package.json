@@ -2,7 +2,7 @@
 	"name": "@open-tap/db",
 	"version": "0.1.0",
 	"private": true,
-	"description": "TAP Postgres persistence layer",
+	"description": "TAP Federation PostgreSQL persistence layer (for central index)",
 	"type": "module",
 	"main": "./src/index.ts",
 	"scripts": {

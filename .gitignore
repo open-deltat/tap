@@ -68,3 +68,8 @@ temp/
 
 # NPM pack output
 *.tgz
+# SQLite databases
+packages/api/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
