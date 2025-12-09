@@ -161,7 +161,6 @@ export const createInventory = (dbStateManager: DbStateManager): Inventory => {
 		getState: dbStateManager.getState,
 		getHoldById: dbStateManager.getHoldById,
 		holdRepository: dbStateManager.holdRepository,
-		bookingRepository: dbStateManager.bookingRepository,
 		withLock,
 	});
 
