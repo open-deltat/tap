@@ -22,7 +22,13 @@ services:
       timeout: 3s
       start_period: 10s
       retries: 3
+    networks:
+      - coolify
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.app.loadbalancer.server.port=3001"
+
+networks:
+  coolify:
+    external: true
 
