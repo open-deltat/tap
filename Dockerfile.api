@@ -15,6 +15,12 @@ RUN echo '{"name":"tap","private":true,"workspaces":["packages/api","packages/co
 # Install dependencies
 RUN bun install
 
+# Build protocol first (no deps)
+RUN cd packages/protocol && bun build ./src/index.ts ./src/openapi.ts --outdir ./dist --target node --format esm
+
+# Build core (depends on protocol)
+RUN cd packages/core && bun build ./src/index.ts --outdir ./dist --target node --format esm
+
 # Bundle the API into a single file
 RUN bun build packages/api/src/index.ts --outfile=server.js --target=bun
 
