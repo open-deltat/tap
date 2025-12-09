@@ -3,26 +3,28 @@
 import { AvailabilityStore } from '@open-tap/client';
 import type { LedgerEvent } from '@open-tap/core';
 import {
-	type AvailabilityPostResponse,
-	type BookPostResponse,
+	AvailabilityPostResponseSchema,
+	BookPostResponseSchema,
 	createSlotId,
-	type HoldWsServerMessage,
-	type ResourceId,
-	type TenantId,
+	HoldWsServerMessageSchema,
+	resourceId,
+	tenantId,
 } from '@open-tap/protocol';
 import { useRef, useState } from 'react';
+import type { z } from 'zod';
 
 const API_BASE =
 	process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 const WS_BASE = API_BASE.replace(/^http/, 'ws');
 
-const TENANT_ID = '01AN4Z07BY79KA1307SR9X4MV3' as TenantId;
-const RESOURCE_ID = '01AN4Z07BY79KA1307SR9X4MV4' as ResourceId;
+const TENANT_ID = tenantId('01AN4Z07BY79KA1307SR9X4MV3');
+const RESOURCE_ID = resourceId('01AN4Z07BY79KA1307SR9X4MV4');
 
 export default function DebugPage() {
 	const [logs, setLogs] = useState<string[]>([]);
-	const [availability, setAvailability] =
-		useState<AvailabilityPostResponse | null>(null);
+	const [availability, setAvailability] = useState<z.infer<
+		typeof AvailabilityPostResponseSchema
+	> | null>(null);
 	const [holdInfo, setHoldInfo] = useState<{
 		holdId: string;
 		sessionId: string;
@@ -51,7 +53,12 @@ export default function DebugPage() {
 					slotDurationMs: 60 * 60000,
 				}),
 			});
-			const data = (await res.json()) as AvailabilityPostResponse;
+			const json = await res.json();
+			const parseResult = AvailabilityPostResponseSchema.safeParse(json);
+			if (!parseResult.success) {
+				throw new Error(`Invalid response: ${parseResult.error.message}`);
+			}
+			const data = parseResult.data;
 			setAvailability(data);
 
 			// Initialize store with these slots
@@ -94,48 +101,62 @@ export default function DebugPage() {
 			if (msg.type === 'stream.delta') {
 				const delta = msg.payload;
 
-				// Construct partial event then cast
-				const coreEventBase = {
+				const baseFields = {
 					eventId: msg.eventId,
-					type: delta.kind,
 					tenantId: delta.tenantId,
 					resourceId: delta.resourceId,
 					createdAt: Date.now(),
-					version: 1,
-					payload: {},
+					version: 1 as const,
 				};
 
 				let coreEvent: LedgerEvent;
 
-				if (
-					delta.kind === 'HoldPlaced' ||
-					delta.kind === 'HoldReleased' ||
-					delta.kind === 'HoldExpired'
-				) {
+				if (delta.kind === 'HoldPlaced') {
 					coreEvent = {
-						...coreEventBase,
-						type: delta.kind,
+						...baseFields,
+						type: 'HoldPlaced',
 						payload: {
 							holdId: delta.holdId,
 							startUnix: delta.startUnix,
 							endUnix: delta.endUnix,
-							expiresAt: 0, // Not needed for merge
+							expiresAt: 0,
 						},
-					} as unknown as LedgerEvent;
-				} else if (
-					delta.kind === 'BookingConfirmed' ||
-					delta.kind === 'BookingCancelled'
-				) {
+					};
+				} else if (delta.kind === 'HoldReleased') {
 					coreEvent = {
-						...coreEventBase,
-						type: delta.kind,
+						...baseFields,
+						type: 'HoldReleased',
 						payload: {
-							bookingId: delta.bookingId,
-							start: delta.startUnix,
-							end: delta.endUnix,
 							holdId: delta.holdId,
 						},
-					} as unknown as LedgerEvent;
+					};
+				} else if (delta.kind === 'HoldExpired') {
+					coreEvent = {
+						...baseFields,
+						type: 'HoldExpired',
+						payload: {
+							holdId: delta.holdId,
+						},
+					};
+				} else if (delta.kind === 'BookingConfirmed') {
+					coreEvent = {
+						...baseFields,
+						type: 'BookingConfirmed',
+						payload: {
+							bookingId: delta.bookingId,
+							holdId: delta.holdId,
+							start: delta.startUnix,
+							end: delta.endUnix,
+						},
+					};
+				} else if (delta.kind === 'BookingCancelled') {
+					coreEvent = {
+						...baseFields,
+						type: 'BookingCancelled',
+						payload: {
+							bookingId: delta.bookingId,
+						},
+					};
 				} else {
 					return;
 				}
@@ -191,7 +212,13 @@ export default function DebugPage() {
 		};
 
 		ws.onmessage = (event) => {
-			const msg = JSON.parse(event.data) as HoldWsServerMessage;
+			const json = JSON.parse(event.data);
+			const parseResult = HoldWsServerMessageSchema.safeParse(json);
+			if (!parseResult.success) {
+				addLog(`[HoldWS] Invalid message: ${parseResult.error.message}`);
+				return;
+			}
+			const msg = parseResult.data;
 			addLog(`[HoldWS] Received: ${JSON.stringify(msg)}`);
 
 			if (msg.type === 'hold.session.hello') {
@@ -263,16 +290,19 @@ export default function DebugPage() {
 					},
 				}),
 			});
-			const data = await res.json();
+			const json = await res.json();
 			if (res.ok) {
-				addLog(
-					`Booking Confirmed! ID: ${(data as BookPostResponse).bookingId}`,
-				);
+				const parseResult = BookPostResponseSchema.safeParse(json);
+				if (parseResult.success) {
+					addLog(`Booking Confirmed! ID: ${parseResult.data.bookingId}`);
+				} else {
+					addLog(`Invalid response: ${parseResult.error.message}`);
+				}
 				if (holdWsRef.current) {
 					holdWsRef.current.close();
 				}
 			} else {
-				addLog(`Booking Failed: ${JSON.stringify(data)}`);
+				addLog(`Booking Failed: ${JSON.stringify(json)}`);
 			}
 		} catch (e) {
 			addLog(`Error booking: ${e}`);

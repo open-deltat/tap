@@ -1,4 +1,4 @@
-import { API_ROUTES, type HoldWsServerMessage } from '@open-tap/protocol';
+import { API_ROUTES, HoldWsServerMessageSchema } from '@open-tap/protocol';
 
 export type HoldClientOptions = {
 	apiBaseUrl: string;
@@ -51,7 +51,13 @@ export class HoldClient {
 
 			ws.onmessage = (event) => {
 				try {
-					const msg = JSON.parse(event.data) as HoldWsServerMessage;
+					const json = JSON.parse(event.data);
+					const parseResult = HoldWsServerMessageSchema.safeParse(json);
+					if (!parseResult.success) {
+						console.error('Invalid HoldWsServerMessage:', parseResult.error);
+						return;
+					}
+					const msg = parseResult.data;
 
 					if (msg.type === 'hold.session.hello') {
 						sessionId = msg.sessionId;

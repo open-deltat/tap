@@ -22,8 +22,12 @@ import { bookings, holds } from './schema';
 
 const BOOKING_STATUS = ['CONFIRMED', 'CANCELLED'] as const;
 type BookingStatus = (typeof BOOKING_STATUS)[number];
-const isBookingStatus = (value: string): value is BookingStatus =>
-	BOOKING_STATUS.includes(value as BookingStatus);
+const isBookingStatus = (value: string): value is BookingStatus => {
+	for (const status of BOOKING_STATUS) {
+		if (status === value) return true;
+	}
+	return false;
+};
 
 export type DbStateManager = {
 	getState: (tid: TenantId, rid: ResourceId) => Promise<InventoryState>;

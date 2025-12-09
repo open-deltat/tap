@@ -1,4 +1,10 @@
-import { type ResourceId, type TenantId, ULIDSchema } from '@open-tap/protocol';
+import {
+	type BookingId,
+	type HoldId,
+	type ResourceId,
+	type TenantId,
+	ULIDSchema,
+} from '@open-tap/protocol';
 import { z } from 'zod';
 
 export const TenantSchema = z.object({
@@ -53,10 +59,10 @@ export const OfferSchema = z.discriminatedUnion('type', [
 ]);
 
 export const BookingSchema = z.object({
-	id: ULIDSchema,
+	id: ULIDSchema.transform((v) => v as BookingId),
 	tenantId: ULIDSchema.transform((v) => v as TenantId),
 	resourceId: ULIDSchema.transform((v) => v as ResourceId),
-	holdId: ULIDSchema.optional(),
+	holdId: ULIDSchema.transform((v) => v as HoldId).optional(),
 	start: z.number(),
 	end: z.number(),
 	status: z.enum(['CONFIRMED', 'CANCELLED']).default('CONFIRMED'),
@@ -72,7 +78,7 @@ export const BookingSchema = z.object({
 });
 
 export const HoldSchema = z.object({
-	id: ULIDSchema,
+	id: ULIDSchema.transform((v) => v as HoldId),
 	tenantId: ULIDSchema.transform((v) => v as TenantId),
 	resourceId: ULIDSchema.transform((v) => v as ResourceId),
 	startUnix: z.number(),

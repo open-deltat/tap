@@ -61,10 +61,13 @@ export const OffersManager = ({
 	initialTimezone = 'Europe/Berlin',
 	apiKey,
 }: OffersManagerProps) => {
-	const authHeaders: HeadersInit = React.useMemo(
-		() => (apiKey ? { Authorization: `TAP-Key ${apiKey}` } : {}),
-		[apiKey],
-	);
+	const authHeaders = React.useMemo(() => {
+		const headers: Record<string, string> = {};
+		if (apiKey) {
+			headers.Authorization = `TAP-Key ${apiKey}`;
+		}
+		return headers;
+	}, [apiKey]);
 	const [timezone, setTimezone] = React.useState(initialTimezone);
 	const [offers, setOffers] = React.useState<OffersGetResponse['offers']>([]);
 	const [isLoading, setIsLoading] = React.useState(false);
@@ -116,6 +119,8 @@ export const OffersManager = ({
 							endTime,
 							timezone,
 							currency: 'USD',
+							bufferBeforeMinutes: 0,
+							bufferAfterMinutes: 0,
 						}
 					: {
 							type: 'range',
@@ -125,6 +130,8 @@ export const OffersManager = ({
 							end: new Date(rangeEnd).toISOString(),
 							timezone,
 							currency: 'USD',
+							bufferBeforeMinutes: 0,
+							bufferAfterMinutes: 0,
 						};
 
 			const response = await fetch(`${apiBaseUrl}${API_ROUTES.OFFERS_CREATE}`, {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { tenantId } from '@open-tap/protocol';
+import { type AuthScope, tenantId } from '@open-tap/protocol';
 import {
 	getAuthContext,
 	hasScope,
@@ -32,7 +32,7 @@ describe('parseAuthHeader', () => {
 		);
 		expect(ctx.type).toBe('api_key');
 		if (ctx.type === 'api_key') {
-			expect(ctx.tenantId).toBe(DEMO_TENANT_ID);
+			expect(ctx.tenantId).toBe(tenantId(DEMO_TENANT_ID));
 			expect(ctx.scopes).toContain('read');
 			expect(ctx.scopes).toContain('manage');
 		}
@@ -130,7 +130,7 @@ describe('hasScope', () => {
 		const fullCtx = {
 			type: 'api_key' as const,
 			tenantId: tenantId(DEMO_TENANT_ID),
-			scopes: ['read', 'hold', 'book', 'manage'] as const,
+			scopes: ['read', 'hold', 'book', 'manage'] as AuthScope[],
 		};
 
 		test('has all scopes when granted', () => {
@@ -143,7 +143,7 @@ describe('hasScope', () => {
 		const limitedCtx = {
 			type: 'api_key' as const,
 			tenantId: tenantId(DEMO_TENANT_ID),
-			scopes: ['read'] as const,
+			scopes: ['read'] as AuthScope[],
 		};
 
 		test('only has granted scopes', () => {
@@ -197,7 +197,7 @@ describe('requireScope', () => {
 		const ctx = {
 			type: 'api_key' as const,
 			tenantId: tenantId(DEMO_TENANT_ID),
-			scopes: ['manage'] as const,
+			scopes: ['manage'] as AuthScope[],
 		};
 		const result = requireScope(ctx, 'manage');
 		expect(result.authorized).toBe(true);

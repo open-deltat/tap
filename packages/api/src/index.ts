@@ -2,9 +2,9 @@ import { TapError } from '@open-tap/core';
 import {
 	API_ROUTES,
 	type HealthResponse,
-	type ResourceId,
-	type SlotId,
-	type TenantId,
+	resourceId,
+	slotId,
+	tenantId,
 } from '@open-tap/protocol';
 import type { Server, ServerWebSocket } from 'bun';
 import { getAuthContext } from './auth/context';
@@ -32,6 +32,18 @@ import { setServer } from './server-context';
 const VERSION = '0.1.0';
 
 export type WSData = AvailabilityWSData | HoldWSData;
+
+function isAvailabilityWS(
+	ws: ServerWebSocket<WSData>,
+): ws is ServerWebSocket<AvailabilityWSData> {
+	return ws.data.type === 'availability';
+}
+
+function isHoldWS(
+	ws: ServerWebSocket<WSData>,
+): ws is ServerWebSocket<HoldWSData> {
+	return ws.data.type === 'hold';
+}
 
 const CORS_HEADERS = {
 	'Access-Control-Allow-Origin': '*',
@@ -197,30 +209,28 @@ const handleHttp = (
 		}
 
 		if (pathname === API_ROUTES.AVAILABILITY_WS) {
-			const success = server.upgrade(req, {
-				data: { type: 'availability' } as AvailabilityWSData,
-			});
+			const data: AvailabilityWSData = { type: 'availability' };
+			const success = server.upgrade(req, { data });
 			if (success) return undefined;
 			return new Response('WebSocket upgrade failed', { status: 400 });
 		}
 
 		if (pathname === API_ROUTES.HOLD_WS) {
-			const tenantId = url.searchParams.get('tenantId');
-			const resourceId = url.searchParams.get('resourceId');
-			const slotId = url.searchParams.get('slotId');
+			const tenantIdParam = url.searchParams.get('tenantId');
+			const resourceIdParam = url.searchParams.get('resourceId');
+			const slotIdParam = url.searchParams.get('slotId');
 
-			if (!tenantId || !resourceId || !slotId) {
+			if (!tenantIdParam || !resourceIdParam || !slotIdParam) {
 				return new Response('Missing query params', { status: 400 });
 			}
 
-			const success = server.upgrade(req, {
-				data: {
-					type: 'hold',
-					tenantId: tenantId as TenantId,
-					resourceId: resourceId as ResourceId,
-					slotId: slotId as SlotId,
-				} as HoldWSData,
-			});
+			const data: HoldWSData = {
+				type: 'hold',
+				tenantId: tenantId(tenantIdParam),
+				resourceId: resourceId(resourceIdParam),
+				slotId: slotId(slotIdParam),
+			};
+			const success = server.upgrade(req, { data });
 
 			if (success) return undefined;
 			return new Response('WebSocket upgrade failed', { status: 400 });
@@ -241,34 +251,24 @@ const server = Bun.serve({
 	fetch: handleHttp,
 	websocket: {
 		open(ws: ServerWebSocket<WSData>) {
-			if (ws.data.type === 'availability') {
-				availabilityWebSocketHandler.open(
-					ws as ServerWebSocket<AvailabilityWSData>,
-				);
-			} else if (ws.data.type === 'hold') {
-				holdWebSocketHandler.open(ws as ServerWebSocket<HoldWSData>);
+			if (isAvailabilityWS(ws)) {
+				availabilityWebSocketHandler.open(ws);
+			} else if (isHoldWS(ws)) {
+				holdWebSocketHandler.open(ws);
 			}
 		},
 		message(ws: ServerWebSocket<WSData>, message: string | Buffer) {
-			if (ws.data.type === 'availability') {
-				availabilityWebSocketHandler.message(
-					ws as ServerWebSocket<AvailabilityWSData>,
-					message,
-				);
-			} else if (ws.data.type === 'hold') {
-				holdWebSocketHandler.message(
-					ws as ServerWebSocket<HoldWSData>,
-					message,
-				);
+			if (isAvailabilityWS(ws)) {
+				availabilityWebSocketHandler.message(ws, message);
+			} else if (isHoldWS(ws)) {
+				holdWebSocketHandler.message(ws, message);
 			}
 		},
 		close(ws: ServerWebSocket<WSData>) {
-			if (ws.data.type === 'availability') {
-				availabilityWebSocketHandler.close(
-					ws as ServerWebSocket<AvailabilityWSData>,
-				);
-			} else if (ws.data.type === 'hold') {
-				holdWebSocketHandler.close(ws as ServerWebSocket<HoldWSData>);
+			if (isAvailabilityWS(ws)) {
+				availabilityWebSocketHandler.close(ws);
+			} else if (isHoldWS(ws)) {
+				holdWebSocketHandler.close(ws);
 			}
 		},
 	},

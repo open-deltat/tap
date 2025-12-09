@@ -122,6 +122,7 @@ export type Inventory = {
 		customerPhone?: string;
 		paymentStatus?: 'NONE' | 'PENDING' | 'PAID';
 		priceCents?: number;
+		clientRef?: string;
 	}) => Promise<BookingConfirmedEvent | null>;
 	cancelBooking: (params: {
 		tenantId: TenantId;

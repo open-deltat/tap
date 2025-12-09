@@ -1,10 +1,10 @@
 import type {
 	BookingId,
-	EventId,
 	HoldId,
 	ResourceId,
 	TenantId,
 } from '@open-tap/protocol';
+import { eventId } from '@open-tap/protocol';
 import { ulid } from 'ulid';
 import type {
 	BookingCancelledEvent,
@@ -15,7 +15,7 @@ import type {
 } from './events';
 
 const createBase = (tenantId: TenantId, resourceId: ResourceId) => ({
-	eventId: ulid() as EventId,
+	eventId: eventId(ulid()),
 	tenantId,
 	resourceId,
 	version: 1 as const,
@@ -152,7 +152,64 @@ export const createBookingCancelledEvent = (params: {
 	};
 };
 
-// Unified createEvent function for backwards compatibility
+type AllEventParams =
+	| Parameters<typeof createHoldPlacedEvent>[0]
+	| Parameters<typeof createHoldExpiredEvent>[0]
+	| Parameters<typeof createHoldReleasedEvent>[0]
+	| Parameters<typeof createBookingConfirmedEvent>[0]
+	| Parameters<typeof createBookingCancelledEvent>[0];
+
+function isHoldPlacedParams(
+	params: AllEventParams,
+): params is Parameters<typeof createHoldPlacedEvent>[0] {
+	return (
+		'expiresAt' in params &&
+		'startUnix' in params &&
+		'endUnix' in params &&
+		!('bookingId' in params)
+	);
+}
+
+function isHoldExpiredParams(
+	params: AllEventParams,
+): params is Parameters<typeof createHoldExpiredEvent>[0] {
+	return (
+		'holdId' in params && !('expiresAt' in params) && !('bookingId' in params)
+	);
+}
+
+function isHoldReleasedParams(
+	params: AllEventParams,
+): params is Parameters<typeof createHoldReleasedEvent>[0] {
+	return (
+		'holdId' in params &&
+		!('expiresAt' in params) &&
+		!('bookingId' in params) &&
+		!('startUnix' in params || 'endUnix' in params)
+	);
+}
+
+function isBookingConfirmedParams(
+	params: AllEventParams,
+): params is Parameters<typeof createBookingConfirmedEvent>[0] {
+	return (
+		'bookingId' in params &&
+		'holdId' in params &&
+		'start' in params &&
+		'end' in params
+	);
+}
+
+function isBookingCancelledParams(
+	params: AllEventParams,
+): params is Parameters<typeof createBookingCancelledEvent>[0] {
+	return (
+		'bookingId' in params &&
+		!('holdId' in params) &&
+		!('start' in params || 'end' in params)
+	);
+}
+
 export function createEvent(
 	type: 'HoldPlaced',
 	params: Parameters<typeof createHoldPlacedEvent>[0],
@@ -174,39 +231,33 @@ export function createEvent(
 	params: Parameters<typeof createBookingCancelledEvent>[0],
 ): BookingCancelledEvent;
 export function createEvent(
-	type: string,
-	params: { tenantId: TenantId; resourceId: ResourceId } & Record<
-		string,
-		unknown
-	>,
+	type:
+		| 'HoldPlaced'
+		| 'HoldExpired'
+		| 'HoldReleased'
+		| 'BookingConfirmed'
+		| 'BookingCancelled',
+	params: AllEventParams,
 ):
 	| HoldPlacedEvent
 	| HoldExpiredEvent
 	| HoldReleasedEvent
 	| BookingConfirmedEvent
 	| BookingCancelledEvent {
-	switch (type) {
-		case 'HoldPlaced':
-			return createHoldPlacedEvent(
-				params as Parameters<typeof createHoldPlacedEvent>[0],
-			);
-		case 'HoldExpired':
-			return createHoldExpiredEvent(
-				params as Parameters<typeof createHoldExpiredEvent>[0],
-			);
-		case 'HoldReleased':
-			return createHoldReleasedEvent(
-				params as Parameters<typeof createHoldReleasedEvent>[0],
-			);
-		case 'BookingConfirmed':
-			return createBookingConfirmedEvent(
-				params as Parameters<typeof createBookingConfirmedEvent>[0],
-			);
-		case 'BookingCancelled':
-			return createBookingCancelledEvent(
-				params as Parameters<typeof createBookingCancelledEvent>[0],
-			);
-		default:
-			throw new Error(`Unknown event type: ${type}`);
+	if (type === 'HoldPlaced' && isHoldPlacedParams(params)) {
+		return createHoldPlacedEvent(params);
 	}
+	if (type === 'HoldExpired' && isHoldExpiredParams(params)) {
+		return createHoldExpiredEvent(params);
+	}
+	if (type === 'HoldReleased' && isHoldReleasedParams(params)) {
+		return createHoldReleasedEvent(params);
+	}
+	if (type === 'BookingConfirmed' && isBookingConfirmedParams(params)) {
+		return createBookingConfirmedEvent(params);
+	}
+	if (type === 'BookingCancelled' && isBookingCancelledParams(params)) {
+		return createBookingCancelledEvent(params);
+	}
+	throw new Error(`Invalid event type/params combination: ${type}`);
 }

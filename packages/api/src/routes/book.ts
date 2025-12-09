@@ -12,8 +12,10 @@ import {
 	type BookPostResponse,
 	createAvailabilityTopic,
 	createSlotId,
+	holdId,
 	parseSlotId,
 	type SlotId,
+	tenantId,
 } from '@open-tap/protocol';
 import type { Server } from 'bun';
 import { bookingRepository, getInventory } from '../core';
@@ -68,7 +70,9 @@ export async function handleBook(
 				start: existingBooking.start,
 				end: existingBooking.end,
 				paymentStatus: existingBooking.paymentStatus,
-				clientRef: existingBooking.clientRef,
+				...(existingBooking.clientRef !== undefined && {
+					clientRef: existingBooking.clientRef,
+				}),
 			};
 			return new Response(JSON.stringify(response), {
 				headers: { 'Content-Type': 'application/json' },
@@ -127,7 +131,7 @@ export async function handleBook(
 			end: parsed.end.getTime(),
 			customerName: body.customer.name,
 			customerEmail: body.customer.email,
-			clientRef: body.clientRef,
+			...(body.clientRef !== undefined && { clientRef: body.clientRef }),
 			...(body.customer.phone !== undefined && {
 				customerPhone: body.customer.phone,
 			}),
@@ -182,18 +186,18 @@ export async function handleBook(
 }
 
 async function findExistingBooking(
-	tenantId: string,
-	holdId?: string,
+	tenantIdStr: string,
+	holdIdStr?: string,
 	clientRef?: string,
 ) {
-	if (holdId) {
-		const byHold = await bookingRepository.getByHoldId(holdId);
+	if (holdIdStr) {
+		const byHold = await bookingRepository.getByHoldId(holdId(holdIdStr));
 		if (byHold) return byHold;
 	}
 
 	if (clientRef) {
 		const byClientRef = await bookingRepository.getByClientRef(
-			tenantId,
+			tenantId(tenantIdStr),
 			clientRef,
 		);
 		if (byClientRef) return byClientRef;

@@ -4,7 +4,6 @@ import {
 	DEFAULT_HOLD_EXPIRATION_MS,
 } from '@open-tap/core';
 import {
-	type AvailabilityDeltaPayload,
 	type AvailabilityWsServerMessage,
 	createAvailabilityTopic,
 	type HoldId,
@@ -83,10 +82,7 @@ export const holdWebSocketHandler = {
 			}
 
 			if (result.success) {
-				const successResult = result as {
-					holdId: HoldId;
-					event: { eventId: string };
-				};
+				const successResult = result;
 				ws.data.holdId = successResult.holdId;
 				ws.data.sessionId = sessionId;
 				ws.data.slotId = slotId;
@@ -126,7 +122,7 @@ export const holdWebSocketHandler = {
 						startUnix,
 						endUnix,
 						holdId: successResult.holdId,
-					} as AvailabilityDeltaPayload,
+					},
 				};
 				serverContext.server?.publish(topic, JSON.stringify(message));
 			} else {
@@ -192,7 +188,7 @@ export const holdWebSocketHandler = {
 							);
 							const broadcastMessage: AvailabilityWsServerMessage = {
 								type: 'stream.delta',
-								eventId: (res as { event: { eventId: string } }).event.eventId,
+								eventId: res.event.eventId,
 								payload: {
 									kind: 'HoldReleased',
 									slotId: ws.data.slotId,
@@ -201,7 +197,7 @@ export const holdWebSocketHandler = {
 									startUnix: parsed.start.getTime(),
 									endUnix: parsed.end.getTime(),
 									holdId: msg.holdId,
-								} as AvailabilityDeltaPayload,
+								},
 							};
 							serverContext.server?.publish(
 								topic,
@@ -249,7 +245,7 @@ export const holdWebSocketHandler = {
 						);
 						const message: AvailabilityWsServerMessage = {
 							type: 'stream.delta',
-							eventId: (res as { event: { eventId: string } }).event.eventId,
+							eventId: res.event.eventId,
 							payload: {
 								kind: 'HoldReleased',
 								slotId: ws.data.slotId,
@@ -258,7 +254,7 @@ export const holdWebSocketHandler = {
 								startUnix: parsed.start.getTime(),
 								endUnix: parsed.end.getTime(),
 								holdId: ws.data.holdId,
-							} as AvailabilityDeltaPayload,
+							},
 						};
 						serverContext.server?.publish(topic, JSON.stringify(message));
 					}

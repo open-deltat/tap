@@ -106,20 +106,32 @@ export type HoldRepository = {
 const SLOT_MINUTES = ['5', '10', '15', '30', '60'] as const;
 type SlotMinutes = (typeof SLOT_MINUTES)[number];
 
-const isSlotMinutes = (value: string): value is SlotMinutes =>
-	SLOT_MINUTES.includes(value as SlotMinutes);
+const isSlotMinutes = (value: string): value is SlotMinutes => {
+	for (const slotMinute of SLOT_MINUTES) {
+		if (slotMinute === value) return true;
+	}
+	return false;
+};
 
 const BOOKING_STATUS = ['CONFIRMED', 'CANCELLED'] as const;
 type BookingStatus = (typeof BOOKING_STATUS)[number];
 
-const isBookingStatus = (value: string): value is BookingStatus =>
-	BOOKING_STATUS.includes(value as BookingStatus);
+const isBookingStatus = (value: string): value is BookingStatus => {
+	for (const status of BOOKING_STATUS) {
+		if (status === value) return true;
+	}
+	return false;
+};
 
 const PAYMENT_STATUS = ['NONE', 'PENDING', 'PAID'] as const;
 type PaymentStatus = (typeof PAYMENT_STATUS)[number];
 
-const isPaymentStatus = (value: string): value is PaymentStatus =>
-	PAYMENT_STATUS.includes(value as PaymentStatus);
+const isPaymentStatus = (value: string): value is PaymentStatus => {
+	for (const status of PAYMENT_STATUS) {
+		if (status === value) return true;
+	}
+	return false;
+};
 
 const toTenant = (row: typeof tenants.$inferSelect): Tenant => ({
 	id: tenantId(row.id),
@@ -506,7 +518,7 @@ const toApiKey = (row: typeof apiKeys.$inferSelect): ApiKey => ({
 	name: row.name,
 	keyHash: row.keyHash,
 	keyPrefix: row.keyPrefix,
-	scopes: row.scopes as AuthScope[],
+	scopes: row.scopes,
 	expiresAt: row.expiresAt,
 	lastUsedAt: row.lastUsedAt,
 	createdAt: row.createdAt,
