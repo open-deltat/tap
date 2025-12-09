@@ -2,9 +2,12 @@ import { ulid } from 'ulid';
 import type { SqliteDatabase } from './index';
 import { apiKeys, offers, resources, tenants } from './schema';
 
+const DEMO_TENANT_ID = '01AN4Z07BY79KA1307SR9X4MV3';
+const DEMO_RESOURCE_ID = '01AN4Z07BY79KA1307SR9X4MV4';
+
 export const seedDatabase = async (db: SqliteDatabase) => {
-	const tenantId = ulid();
-	const resourceId = ulid();
+	const tenantId = DEMO_TENANT_ID;
+	const resourceId = DEMO_RESOURCE_ID;
 	const apiKeyId = ulid();
 
 	await db.insert(tenants).values({
