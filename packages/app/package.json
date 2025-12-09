@@ -6,11 +6,7 @@
 		"dev": "next dev -p 3001",
 		"build": "next build",
 		"start": "next start",
-		"lint": "eslint",
-		"typecheck": "tsc --noEmit",
-		"format": "biome format --write .",
-		"lint:fix": "biome lint --write .",
-		"check": "biome check --write ."
+		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
 		"@radix-ui/react-label": "^2.1.8",

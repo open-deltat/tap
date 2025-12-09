@@ -27,15 +27,6 @@
     "test:coverage": {
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
-    },
-    "lint": {
-      "outputs": []
-    },
-    "format": {
-      "outputs": []
-    },
-    "lint:fix": {
-      "outputs": []
     }
   }
 }
