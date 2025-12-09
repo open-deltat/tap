@@ -1,5 +1,6 @@
-# TAP App - Next.js Frontend
+# TAP App - Next.js Frontend (standalone build)
 
+# Stage 1: Build
 FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
@@ -21,23 +22,24 @@ RUN sed -i 's|"./dist/openapi.js"|"./src/openapi.ts"|g' packages/protocol/packag
 # Install dependencies
 RUN bun install
 
-# Build Next.js app
+# Build Next.js app (standalone output)
 WORKDIR /app/packages/app
 RUN bun run build
 
-# Runtime stage
-FROM oven/bun:1-alpine
+# Stage 2: Production
+FROM oven/bun:1-alpine AS runner
 WORKDIR /app
 
-# Copy built app and dependencies
-COPY --from=builder /app/packages/app/.next ./.next
-COPY --from=builder /app/packages/app/public ./public
-COPY --from=builder /app/packages/app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
-
-# Environment
 ENV NODE_ENV=production
 
+# Copy standalone build (preserves monorepo structure)
+COPY --from=builder /app/packages/app/.next/standalone ./
+COPY --from=builder /app/packages/app/.next/static ./packages/app/.next/static
+COPY --from=builder /app/packages/app/public ./packages/app/public
+
 EXPOSE 3001
-CMD ["bun", "run", "start", "-p", "3001"]
+ENV PORT=3001
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["bun", "run", "packages/app/server.js"]
 
