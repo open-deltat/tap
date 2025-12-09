@@ -16,42 +16,115 @@ permissions:
   id-token: write
 
 jobs:
-  ci:
+  lint:
+    name: Lint & Format
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+      - uses: oven-sh/setup-bun@v1
         with:
           bun-version: 'latest'
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/cache@v4
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
-
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
       - name: Lint & format
-        run: npx @biomejs/biome ci .
+        run: bun run check
 
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 'latest'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - name: Typecheck
         run: bun run typecheck
 
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tap
+          POSTGRES_PASSWORD: tap
+          POSTGRES_DB: tap
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://tap:tap@localhost:5432/tap
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 'latest'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Setup database
+        run: bun run db:migrate
       - name: Test
         run: bun run test
 
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 'latest'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
       - name: Build
         run: bun run build
+      - uses: actions/cache@v4
+        with:
+          path: |
+            packages/*/dist
+            packages/*/.next
+          key: ${{ runner.os }}-build-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-build-
 
-      - name: Check for changeset (PR only)
-        if: github.event_name == 'pull_request'
+  changesets:
+    name: Check Changesets
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for changeset
         run: |
           if [ -z "$(find .changeset -name '*.md' -type f 2>/dev/null | grep -v README)" ]; then
             echo "⚠️  No changesets found. Please add a changeset or run 'bun run changeset:auto'"
@@ -60,18 +133,33 @@ jobs:
             echo "✅ Changesets found"
           fi
 
-      - name: Auto-create changesets and publish (main only)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: |
-          bun run changeset:auto
-          if [ -n "$(git status --porcelain .changeset/)" ]; then
-            echo "Changesets created, proceeding with version and publish"
-          else
-            echo "No changesets to process"
-          fi
-
-      - name: Version packages, generate changelogs, and publish (main only)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  publish:
+    name: Version & Publish
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 'latest'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Auto-create changesets
+        run: bun run changeset:auto
+      - name: Version packages, generate changelogs, and publish
         uses: changesets/action@v1
         with:
           publish: bunx changeset publish
