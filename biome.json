@@ -3,24 +3,22 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"correctness": {
-				"noNestedComponentDefinitions": "warn"
-			}
+			"recommended": true
 		}
 	},
-	"formatter": { "enabled": true },
-	"files": {
-		"includes": [
-			"packages/*/src/**/*.ts",
-			"packages/*/src/**/*.tsx",
-			"packages/*/*.ts",
-			"packages/*/package.json"
-		]
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 80
 	},
 	"javascript": {
 		"formatter": {
 			"quoteStyle": "single",
-			"trailingCommas": "all"
+			"trailingCommas": "all",
+			"semicolons": "always"
 		}
+	},
+	"files": {
+		"includes": ["packages/*/src/**/*.ts", "packages/*/src/**/*.tsx"]
 	}
 }

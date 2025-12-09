@@ -5,6 +5,7 @@ import {
 	type Offer,
 } from '@tap/core';
 import {
+	createApiKeyRepository,
 	createBookingRepository,
 	createDatabase,
 	createDbStateManager,
@@ -18,6 +19,7 @@ import {
 	type ResourceId,
 	type TenantId,
 } from '@tap/protocol';
+import { setApiKeyLookup } from './auth';
 import { serverContext } from './server-context';
 
 const connectionString =
@@ -29,6 +31,20 @@ const db = createDatabase(connectionString);
 const offerRepository = createOfferRepository(db);
 const bookingRepository = createBookingRepository(db);
 const holdRepository = createHoldRepository(db);
+const apiKeyRepository = createApiKeyRepository(db);
+
+setApiKeyLookup({
+	getByKeyHash: async (keyHash) => {
+		const key = await apiKeyRepository.getByKeyHash(keyHash);
+		if (!key) return null;
+		return {
+			id: key.id,
+			tenantId: key.tenantId,
+			scopes: key.scopes,
+		};
+	},
+	updateLastUsed: (id) => apiKeyRepository.updateLastUsed(id),
+});
 
 const inventories = new Map<string, Inventory>();
 
@@ -108,4 +124,4 @@ process.on('beforeExit', () => {
 	clearInterval(expiryInterval);
 });
 
-export { bookingRepository, holdRepository, offerRepository };
+export { apiKeyRepository, bookingRepository, holdRepository, offerRepository };

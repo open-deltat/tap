@@ -1,6 +1,9 @@
 export { migrate } from './migrate';
 export {
+	type ApiKey,
+	type ApiKeyRepository,
 	type BookingRepository,
+	createApiKeyRepository,
 	createBookingRepository,
 	createDatabase,
 	createHoldRepository,

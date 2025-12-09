@@ -131,8 +131,10 @@ const handleHttp = (
 		}
 
 		if (pathname === API_ROUTES.DISCOVERY && method === 'GET') {
+			const serverId = process.env.TAP_SERVER_ID || 'tap-server';
 			const discovery = {
 				tap_version: VERSION,
+				server_id: serverId,
 				endpoints: {
 					availability: API_ROUTES.AVAILABILITY,
 					book: API_ROUTES.BOOK,
@@ -146,13 +148,18 @@ const handleHttp = (
 					openapi: API_ROUTES.OPENAPI,
 				},
 				capabilities: ['holds', 'bookings', 'realtime', 'offers', 'sessions'],
+				access: {
+					reads: 'free',
+					writes: 'authenticated',
+					bulk: 'subscription',
+				},
 			};
 			return addCors(Response.json(discovery));
 		}
 
 		if (pathname === API_ROUTES.OFFERS && method === 'GET') {
-			const authCtx = getAuthContext(req);
-			return handleOffersGet(req, authCtx)
+			return getAuthContext(req)
+				.then((authCtx) => handleOffersGet(req, authCtx))
 				.then(addCors)
 				.catch((e) => {
 					const error = new TapError(
@@ -164,8 +171,8 @@ const handleHttp = (
 		}
 
 		if (pathname === API_ROUTES.OFFERS_CREATE && method === 'POST') {
-			const authCtx = getAuthContext(req);
-			return handleOfferCreate(req, authCtx)
+			return getAuthContext(req)
+				.then((authCtx) => handleOfferCreate(req, authCtx))
 				.then(addCors)
 				.catch((e) => {
 					const error = new TapError(
@@ -177,8 +184,8 @@ const handleHttp = (
 		}
 
 		if (pathname === API_ROUTES.OFFERS_DELETE && method === 'POST') {
-			const authCtx = getAuthContext(req);
-			return handleOfferDelete(req, authCtx)
+			return getAuthContext(req)
+				.then((authCtx) => handleOfferDelete(req, authCtx))
 				.then(addCors)
 				.catch((e) => {
 					const error = new TapError(

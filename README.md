@@ -1,24 +1,8 @@
-# TAP: Time Allocation Protocol
+# TAP — Time Allocation Protocol
 
-**Version 0.1.0 · Draft**
+**The TCP/IP of Time**
 
-TAP is an open protocol for allocating time across distributed systems.
-
----
-
-## Abstract
-
-TAP defines three primitives for time allocation:
-
-1. **Availability** — Query open time slots
-2. **Hold** — Temporarily reserve a slot
-3. **Booking** — Permanently confirm a slot
-
-These primitives enable real-time coordination of bookable resources (calendars, rooms, seats, appointments) across untrusted parties without a central authority.
-
----
-
-## State Machine
+An open protocol for allocating time across distributed systems.
 
 ```
 OPEN  ───hold───▶  HELD  ───book───▶  BOOKED
@@ -27,36 +11,41 @@ OPEN  ───hold───▶  HELD  ───book───▶  BOOKED
   └──────────────cancel───────────────────┘
 ```
 
----
+## Packages
+
+| Package | Description |
+|---------|-------------|
+| [`@tap/protocol`](./packages/protocol) | Zod schemas, types, constants |
+| [`@tap/core`](./packages/core) | Business logic, availability calculation |
+| [`@tap/client`](./packages/client) | Browser/Node.js SDK |
+
+## Quick Start
+
+```bash
+# Install
+bun install
+
+# Development
+bun run dev          # Start API + App
+bun run dev:api      # API only (port 3000)
+bun run dev:app      # App only (port 3001)
+
+# Test
+bun run test
+
+# Build
+bun run build
+```
 
 ## Protocol
 
-### Query Availability
-
 ```http
-POST /availability
-Content-Type: application/json
-
-{ "resourceId": "...", "from": "2025-01-15T00:00:00Z", "to": "2025-01-16T00:00:00Z" }
+POST /availability    # Query open slots
+POST /book           # Confirm booking
+POST /cancel         # Cancel booking
+WS   /hold-ws        # Place/release holds
+WS   /availability-ws # Real-time updates
 ```
-
-### Place Hold
-
-```http
-WebSocket /hold-ws?resourceId=...&slotId=...
-← { "type": "hold.confirmed", "holdId": "...", "expiresAt": 1736931600000 }
-```
-
-### Confirm Booking
-
-```http
-POST /book
-Content-Type: application/json
-
-{ "resourceId": "...", "holdId": "...", "slotId": "..." }
-```
-
----
 
 ## Data Model
 
@@ -67,53 +56,12 @@ Tenant
               └── Slot → Hold → Booking
 ```
 
----
+## Specs
 
-## Design Principles
-
-1. **Reads are free** — Availability is public
-2. **Holds are ephemeral** — Auto-expire, no commitment required
-3. **Bookings need proof** — Payment, signature, or policy
-4. **Real-time sync** — WebSocket deltas for instant updates
-
----
-
-## Scale
-
-```
-100 million resources = 150 GB = One PostgreSQL server
-```
-
-TAP is not a big data problem. It's a coordination problem.
-
----
-
-## What TAP Defines
-
-- ✅ Availability queries
-- ✅ Hold/release mechanics
-- ✅ Booking confirmation
-- ✅ Real-time sync (WebSocket)
-- ✅ Event format
-
-## What TAP Does Not Define
-
-- ❌ Authentication (bring your own)
-- ❌ Payment rails (Stripe, x402, or free)
-- ❌ UI/UX
-- ❌ Pricing
-
----
-
-## Links
-
-| Document | Description |
-|----------|-------------|
-| [CORE.md](./specs/CORE.md) | Data model specification |
-| [PROTOCOL.md](./specs/PROTOCOL.md) | HTTP/WebSocket bindings |
-| [FEDERATION.md](./specs/federation/FEDERATION.md) | Network coordination |
-
----
+- [`specs/CORE.md`](./specs/CORE.md) — Data model
+- [`specs/PROTOCOL.md`](./specs/PROTOCOL.md) — HTTP/WebSocket API
+- [`specs/AUTH.md`](./specs/AUTH.md) — Authentication
+- [`specs/federation/`](./specs/federation/) — Network coordination
 
 ## License
 

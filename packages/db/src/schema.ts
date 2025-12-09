@@ -115,3 +115,21 @@ export const holds = pgTable('holds', {
 		.notNull()
 		.default(sql`now()`),
 });
+
+export type ApiKeyScope = 'read' | 'hold' | 'book' | 'cancel' | 'manage';
+
+export const apiKeys = pgTable('api_keys', {
+	id: text('id').primaryKey(),
+	tenantId: text('tenant_id')
+		.notNull()
+		.references(() => tenants.id),
+	name: text('name').notNull(),
+	keyHash: text('key_hash').notNull(),
+	keyPrefix: text('key_prefix').notNull(),
+	scopes: jsonb('scopes').notNull().$type<ApiKeyScope[]>(),
+	expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'date' }),
+	lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'date' }),
+	createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
+		.notNull()
+		.default(sql`now()`),
+});

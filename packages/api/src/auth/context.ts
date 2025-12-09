@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
 	type AuthContext,
 	type AuthScope,
@@ -5,31 +6,71 @@ import {
 	tenantId,
 } from '@tap/protocol';
 
-const API_KEYS = new Map<string, { tenantId: TenantId; scopes: AuthScope[] }>();
-
 const DEMO_TENANT_ID = '01AN4Z07BY79KA1307SR9X4MV3';
 const DEMO_API_KEY = 'demo_key_123';
 
-API_KEYS.set(`${DEMO_TENANT_ID}:${DEMO_API_KEY}`, {
+const DEMO_KEYS = new Map<
+	string,
+	{ tenantId: TenantId; scopes: AuthScope[] }
+>();
+DEMO_KEYS.set(`${DEMO_TENANT_ID}:${DEMO_API_KEY}`, {
 	tenantId: tenantId(DEMO_TENANT_ID),
 	scopes: ['read', 'hold', 'book', 'cancel', 'manage'],
 });
 
-export const parseAuthHeader = (header: string | null): AuthContext => {
+export const hashApiKey = (key: string): string => {
+	return createHash('sha256').update(key).digest('hex');
+};
+
+export type ApiKeyLookup = {
+	getByKeyHash: (keyHash: string) => Promise<{
+		id: string;
+		tenantId: TenantId;
+		scopes: AuthScope[];
+	} | null>;
+	updateLastUsed?: (id: string) => Promise<void>;
+};
+
+let apiKeyLookup: ApiKeyLookup | null = null;
+
+export const setApiKeyLookup = (lookup: ApiKeyLookup): void => {
+	apiKeyLookup = lookup;
+};
+
+export const parseAuthHeader = async (
+	header: string | null,
+): Promise<AuthContext> => {
 	if (!header) {
 		return { type: 'anonymous' };
 	}
 
 	if (header.startsWith('TAP-Key ')) {
 		const key = header.slice(8);
-		const apiKey = API_KEYS.get(key);
-		if (apiKey) {
+
+		const demoKey = DEMO_KEYS.get(key);
+		if (demoKey) {
 			return {
 				type: 'api_key',
-				tenantId: apiKey.tenantId,
-				scopes: apiKey.scopes,
+				tenantId: demoKey.tenantId,
+				scopes: demoKey.scopes,
 			};
 		}
+
+		if (apiKeyLookup) {
+			const keyHash = hashApiKey(key);
+			const dbKey = await apiKeyLookup.getByKeyHash(keyHash);
+			if (dbKey) {
+				if (apiKeyLookup.updateLastUsed) {
+					apiKeyLookup.updateLastUsed(dbKey.id).catch(() => {});
+				}
+				return {
+					type: 'api_key',
+					tenantId: dbKey.tenantId,
+					scopes: dbKey.scopes,
+				};
+			}
+		}
+
 		return { type: 'anonymous' };
 	}
 
@@ -44,7 +85,7 @@ export const parseAuthHeader = (header: string | null): AuthContext => {
 	return { type: 'anonymous' };
 };
 
-export const getAuthContext = (req: Request): AuthContext => {
+export const getAuthContext = async (req: Request): Promise<AuthContext> => {
 	const authHeader = req.headers.get('Authorization');
 	return parseAuthHeader(authHeader);
 };

@@ -1,52 +1,56 @@
 {
-  "name": "tap",
-  "version": "1.0.0",
-  "description": "TAP (Time Allocation Protocol) - A federated booking protocol for real-time availability and bookings across untrusted parties",
-  "private": true,
-  "packageManager": "bun@1.2.18",
-  "workspaces": [
-    "packages/*"
-  ],
-  "keywords": [
-    "scheduling",
-    "booking",
-    "protocol",
-    "federated",
-    "real-time",
-    "availability",
-    "time-allocation",
-    "distributed-systems"
-  ],
-  "homepage": "https://github.com/simonorzel26/tap",
-  "bugs": {
-    "url": "https://github.com/simonorzel26/tap/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/simonorzel26/tap.git"
-  },
-  "author": "simonorzel26",
-  "license": "MIT",
-  "scripts": {
-    "build": "turbo run build",
-    "dev": "bun run scripts/dev.ts",
-    "dev:api": "cd packages/api && bun run dev",
-    "dev:app": "cd packages/app && bun run dev --turbopack",
-    "clean": "turbo run clean",
-    "typecheck": "turbo run typecheck",
-    "test": "scripts/ensure-db.sh && turbo run test",
-    "test:watch": "turbo run test:watch",
-    "test:coverage": "turbo run test:coverage",
-    "db:generate": "cd packages/db && bun run migrate:generate",
-    "db:migrate": "cd packages/db && bun run migrate",
-    "db:reset": "cd packages/db && bun run reset",
-    "check": "biome check --write ."
-  },
-  "devDependencies": {
-    "@biomejs/biome": "latest",
-    "turbo": "latest"
-  },
-  "dependencies": {
-    "ulid": "^3.0.1"
-  }
+	"name": "tap",
+	"version": "0.1.0",
+	"description": "TAP (Time Allocation Protocol) - A federated booking protocol for real-time availability and bookings across untrusted parties",
+	"private": true,
+	"packageManager": "bun@1.2.18",
+	"workspaces": [
+		"packages/*"
+	],
+	"keywords": [
+		"scheduling",
+		"booking",
+		"protocol",
+		"federated",
+		"real-time",
+		"availability",
+		"time-allocation",
+		"distributed-systems"
+	],
+	"homepage": "https://github.com/simonorzel26/tap",
+	"bugs": {
+		"url": "https://github.com/simonorzel26/tap/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/simonorzel26/tap.git"
+	},
+	"author": "simonorzel26",
+	"license": "MIT",
+	"scripts": {
+		"build": "turbo run build",
+		"build:packages": "turbo run build --filter=@tap/protocol --filter=@tap/core --filter=@tap/client",
+		"dev": "bun run scripts/dev.ts",
+		"dev:api": "cd packages/api && bun run dev",
+		"dev:app": "cd packages/app && bun run dev --turbopack",
+		"clean": "turbo run clean",
+		"typecheck": "turbo run typecheck",
+		"test": "scripts/ensure-db.sh && turbo run test",
+		"test:watch": "turbo run test:watch",
+		"test:coverage": "turbo run test:coverage",
+		"db:generate": "cd packages/db && bun run migrate:generate",
+		"db:migrate": "cd packages/db && bun run migrate",
+		"db:reset": "cd packages/db && bun run reset",
+		"check": "biome check --write .",
+		"release": "release-it"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "latest",
+		"release-it": "latest",
+		"turbo": "latest",
+		"typescript": "latest"
+	},
+	"dependencies": {
+		"ulid": "^3.0.1"
+	}
 }

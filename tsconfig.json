@@ -18,11 +18,7 @@
     "noPropertyAccessFromIndexSignature": false,
     "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": ".",
+    "noEmit": true,
     "baseUrl": ".",
     "paths": {
       "@tap/*": ["packages/*/src"]
@@ -35,7 +31,7 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
+    "**/dist",
     "**/*.test.ts",
     "**/*.spec.ts",
     "packages/app"

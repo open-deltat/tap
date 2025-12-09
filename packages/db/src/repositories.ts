@@ -1,5 +1,6 @@
 import type { Booking, Hold, Offer, Resource, Tenant } from '@tap/core';
 import {
+	type AuthScope,
 	type BookingId,
 	bookingId,
 	type HoldId,
@@ -10,15 +11,15 @@ import {
 	type TenantId,
 	tenantId,
 } from '@tap/protocol';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { bookings, holds, offers, resources, tenants } from './schema';
+import { apiKeys, bookings, holds, offers, resources, tenants } from './schema';
 
 export const createDatabase = (connectionString: string) => {
 	const client = postgres(connectionString);
 	return drizzle(client, {
-		schema: { tenants, resources, offers, bookings, holds },
+		schema: { tenants, resources, offers, bookings, holds, apiKeys },
 	});
 };
 
@@ -475,5 +476,90 @@ export const createHoldRepository = (db: Database): HoldRepository => ({
 	},
 	delete: async (id) => {
 		await db.delete(holds).where(eq(holds.id, id));
+	},
+});
+
+export type ApiKey = {
+	id: string;
+	tenantId: TenantId;
+	name: string;
+	keyHash: string;
+	keyPrefix: string;
+	scopes: AuthScope[];
+	expiresAt: Date | null;
+	lastUsedAt: Date | null;
+	createdAt: Date;
+};
+
+export type ApiKeyRepository = {
+	getById: (id: string) => Promise<ApiKey | null>;
+	getByKeyHash: (keyHash: string) => Promise<ApiKey | null>;
+	getByTenantId: (tenantId: TenantId) => Promise<ApiKey[]>;
+	create: (apiKey: Omit<ApiKey, 'createdAt' | 'lastUsedAt'>) => Promise<void>;
+	updateLastUsed: (id: string) => Promise<void>;
+	delete: (id: string) => Promise<void>;
+};
+
+const toApiKey = (row: typeof apiKeys.$inferSelect): ApiKey => ({
+	id: row.id,
+	tenantId: tenantId(row.tenantId),
+	name: row.name,
+	keyHash: row.keyHash,
+	keyPrefix: row.keyPrefix,
+	scopes: row.scopes as AuthScope[],
+	expiresAt: row.expiresAt,
+	lastUsedAt: row.lastUsedAt,
+	createdAt: row.createdAt,
+});
+
+export const createApiKeyRepository = (db: Database): ApiKeyRepository => ({
+	getById: async (id) => {
+		const [row] = await db
+			.select()
+			.from(apiKeys)
+			.where(eq(apiKeys.id, id))
+			.limit(1);
+		return row ? toApiKey(row) : null;
+	},
+	getByKeyHash: async (keyHash) => {
+		const now = new Date();
+		const [row] = await db
+			.select()
+			.from(apiKeys)
+			.where(
+				and(
+					eq(apiKeys.keyHash, keyHash),
+					or(isNull(apiKeys.expiresAt), gte(apiKeys.expiresAt, now)),
+				),
+			)
+			.limit(1);
+		return row ? toApiKey(row) : null;
+	},
+	getByTenantId: async (tid) => {
+		const rows = await db
+			.select()
+			.from(apiKeys)
+			.where(eq(apiKeys.tenantId, tid));
+		return rows.map(toApiKey);
+	},
+	create: async (apiKey) => {
+		await db.insert(apiKeys).values({
+			id: apiKey.id,
+			tenantId: apiKey.tenantId,
+			name: apiKey.name,
+			keyHash: apiKey.keyHash,
+			keyPrefix: apiKey.keyPrefix,
+			scopes: apiKey.scopes,
+			expiresAt: apiKey.expiresAt,
+		});
+	},
+	updateLastUsed: async (id) => {
+		await db
+			.update(apiKeys)
+			.set({ lastUsedAt: new Date() })
+			.where(eq(apiKeys.id, id));
+	},
+	delete: async (id) => {
+		await db.delete(apiKeys).where(eq(apiKeys.id, id));
 	},
 });

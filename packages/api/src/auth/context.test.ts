@@ -11,23 +11,25 @@ const DEMO_TENANT_ID = '01AN4Z07BY79KA1307SR9X4MV3';
 const DEMO_API_KEY = 'demo_key_123';
 
 describe('parseAuthHeader', () => {
-	test('returns anonymous for null header', () => {
-		const ctx = parseAuthHeader(null);
+	test('returns anonymous for null header', async () => {
+		const ctx = await parseAuthHeader(null);
 		expect(ctx.type).toBe('anonymous');
 	});
 
-	test('returns anonymous for empty header', () => {
-		const ctx = parseAuthHeader('');
+	test('returns anonymous for empty header', async () => {
+		const ctx = await parseAuthHeader('');
 		expect(ctx.type).toBe('anonymous');
 	});
 
-	test('returns anonymous for invalid format', () => {
-		const ctx = parseAuthHeader('InvalidFormat token123');
+	test('returns anonymous for invalid format', async () => {
+		const ctx = await parseAuthHeader('InvalidFormat token123');
 		expect(ctx.type).toBe('anonymous');
 	});
 
-	test('parses valid TAP-Key header', () => {
-		const ctx = parseAuthHeader(`TAP-Key ${DEMO_TENANT_ID}:${DEMO_API_KEY}`);
+	test('parses valid TAP-Key header', async () => {
+		const ctx = await parseAuthHeader(
+			`TAP-Key ${DEMO_TENANT_ID}:${DEMO_API_KEY}`,
+		);
 		expect(ctx.type).toBe('api_key');
 		if (ctx.type === 'api_key') {
 			expect(ctx.tenantId).toBe(DEMO_TENANT_ID);
@@ -36,31 +38,31 @@ describe('parseAuthHeader', () => {
 		}
 	});
 
-	test('returns anonymous for invalid API key', () => {
-		const ctx = parseAuthHeader('TAP-Key invalid:key');
+	test('returns anonymous for invalid API key', async () => {
+		const ctx = await parseAuthHeader('TAP-Key invalid:key');
 		expect(ctx.type).toBe('anonymous');
 	});
 
-	test('parses session Bearer token', () => {
-		const ctx = parseAuthHeader('Bearer sess_01HXYZ123');
+	test('parses session Bearer token', async () => {
+		const ctx = await parseAuthHeader('Bearer sess_01HXYZ123');
 		expect(ctx.type).toBe('session');
 		if (ctx.type === 'session') {
 			expect(ctx.sessionId).toBe('sess_01HXYZ123');
 		}
 	});
 
-	test('returns anonymous for non-session Bearer token', () => {
-		const ctx = parseAuthHeader('Bearer some_jwt_token');
+	test('returns anonymous for non-session Bearer token', async () => {
+		const ctx = await parseAuthHeader('Bearer some_jwt_token');
 		expect(ctx.type).toBe('anonymous');
 	});
 
-	test('handles malformed TAP-Key (missing colon)', () => {
-		const ctx = parseAuthHeader('TAP-Key noColonHere');
+	test('handles malformed TAP-Key (missing colon)', async () => {
+		const ctx = await parseAuthHeader('TAP-Key noColonHere');
 		expect(ctx.type).toBe('anonymous');
 	});
 
-	test('handles TAP-Key with extra colons', () => {
-		const ctx = parseAuthHeader(
+	test('handles TAP-Key with extra colons', async () => {
+		const ctx = await parseAuthHeader(
 			`TAP-Key ${DEMO_TENANT_ID}:${DEMO_API_KEY}:extra`,
 		);
 		expect(ctx.type).toBe('anonymous');
@@ -68,17 +70,17 @@ describe('parseAuthHeader', () => {
 });
 
 describe('getAuthContext', () => {
-	test('extracts auth from request headers', () => {
+	test('extracts auth from request headers', async () => {
 		const req = new Request('http://localhost/test', {
 			headers: { Authorization: `TAP-Key ${DEMO_TENANT_ID}:${DEMO_API_KEY}` },
 		});
-		const ctx = getAuthContext(req);
+		const ctx = await getAuthContext(req);
 		expect(ctx.type).toBe('api_key');
 	});
 
-	test('returns anonymous when no auth header', () => {
+	test('returns anonymous when no auth header', async () => {
 		const req = new Request('http://localhost/test');
-		const ctx = getAuthContext(req);
+		const ctx = await getAuthContext(req);
 		expect(ctx.type).toBe('anonymous');
 	});
 });

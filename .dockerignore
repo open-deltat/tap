@@ -2,17 +2,16 @@ node_modules
 .turbo
 dist
 .git
-.env
-packages/app/.next
-packages/app/out
-packages/app/build
+.env*
 .DS_Store
 
+# App specific
+packages/app/.next
+packages/app/out
 
+# IDE
+.vscode
+.idea
 
-
-
-
-
-
-
+# Logs
+*.log
