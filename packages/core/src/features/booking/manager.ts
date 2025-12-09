@@ -120,7 +120,10 @@ export const createBookingManager = (deps: {
 				};
 
 				const updatedHeld = subtractIntervals(state.held, [holdInterval]);
-				const updatedBooked = mergeIntervals([...state.booked, bookingInterval]);
+				const updatedBooked = mergeIntervals([
+					...state.booked,
+					bookingInterval,
+				]);
 
 				state.held = updatedHeld;
 				state.booked = updatedBooked;
@@ -197,7 +200,9 @@ export const createBookingManager = (deps: {
 					value: 1,
 				};
 
-				const updatedBooked = subtractIntervals(state.booked, [bookingInterval]);
+				const updatedBooked = subtractIntervals(state.booked, [
+					bookingInterval,
+				]);
 
 				state.booked = updatedBooked;
 
