@@ -4,14 +4,15 @@
 FROM oven/bun:1-alpine AS base
 WORKDIR /app
 
-# Copy everything needed for workspaces
-COPY package.json bun.lock ./
-COPY turbo.json tsconfig.json ./
+# Copy source packages first
 COPY packages/api ./packages/api
 COPY packages/core ./packages/core
 COPY packages/protocol ./packages/protocol
 
-# Install dependencies (after source so workspace links work)
+# Create a minimal package.json with explicit workspaces (not wildcard)
+RUN echo '{"name":"tap","private":true,"workspaces":["packages/api","packages/core","packages/protocol"]}' > package.json
+
+# Install dependencies
 RUN bun install
 
 # Create data directory for SQLite
