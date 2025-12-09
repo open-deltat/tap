@@ -1,6 +1,6 @@
 {
 	"name": "@open-tap/core",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "TAP Core - Time Allocation Protocol business logic and availability calculation",
 	"keywords": [
 		"tap",

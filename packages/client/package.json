@@ -1,6 +1,6 @@
 {
 	"name": "@open-tap/client",
-	"version": "0.2.0",
+	"version": "0.2.1",
 	"description": "TAP Client SDK - Browser and Node.js client for TAP availability and bookings",
 	"keywords": [
 		"tap",
