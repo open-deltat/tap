@@ -58,6 +58,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Auto-create changesets (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: bun run changeset:auto
+
       - name: Version packages, generate changelogs, and publish (main only)
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: changesets/action@v1

@@ -43,6 +43,7 @@
 		"db:reset": "cd packages/db && bun run reset",
 		"check": "biome check --write .",
 		"changeset": "changeset",
+		"changeset:auto": "bun run scripts/create-changesets.ts",
 		"changeset:version": "changeset version",
 		"changeset:publish": "changeset publish"
 	},
