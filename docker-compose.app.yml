@@ -10,8 +10,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.app
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     environment:
       - NEXT_PUBLIC_API_BASE_URL=${TAP_API_URL:-http://localhost:3000}
       - NODE_ENV=production
