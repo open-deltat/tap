@@ -25,15 +25,16 @@ export const seedDatabase = async (db: SqliteDatabase) => {
 		disabled: false,
 	});
 
+	const offerId = ulid();
 	await db.insert(offers).values({
-		id: ulid(),
+		id: offerId,
 		tenantId,
 		resourceId,
 		type: 'weekly',
 		config: {
-			daysOfWeek: [1, 2, 3, 4, 5],
-			startTime: '09:00',
-			endTime: '17:00',
+			daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+			startTime: '00:00',
+			endTime: '23:59',
 		},
 		currency: 'USD',
 		bufferBeforeMinutes: 0,
@@ -53,7 +54,9 @@ export const seedDatabase = async (db: SqliteDatabase) => {
 	console.log('Database seeded successfully');
 	console.log(`  Tenant ID: ${tenantId}`);
 	console.log(`  Resource ID: ${resourceId}`);
+	console.log(`  Offer ID: ${offerId}`);
+	console.log('  Offer: 7 days/week, 00:00-23:59 (all day)');
 	console.log('  API Key: demo-api-key');
 
-	return { tenantId, resourceId, apiKeyId };
+	return { tenantId, resourceId, offerId, apiKeyId };
 };
