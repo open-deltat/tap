@@ -10,7 +10,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.app
-    container_name: tap-app
     ports:
       - "3001:3001"
     environment:
