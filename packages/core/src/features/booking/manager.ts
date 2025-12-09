@@ -11,7 +11,11 @@ import type {
 } from '../../domain/events';
 import { createEvent } from '../../domain/factory';
 import type { Interval } from '../../infrastructure/intervals';
-import { mergeIntervals, subtractIntervals } from '../../infrastructure/intervals';
+import {
+	isIntervalAvailable,
+	mergeIntervals,
+	subtractIntervals,
+} from '../../infrastructure/intervals';
 import type { HoldMetadata, InventoryState } from '../inventory-types';
 
 export type BookingManager = {
@@ -48,6 +52,25 @@ export const createBookingManager = (deps: {
 	holdRepository: {
 		delete: (id: HoldId) => Promise<void>;
 	};
+	bookingRepository: {
+		create: (booking: {
+			id: BookingId;
+			tenantId: TenantId;
+			resourceId: ResourceId;
+			holdId?: HoldId;
+			start: number;
+			end: number;
+			status: 'CONFIRMED' | 'CANCELLED';
+			paymentStatus?: 'NONE' | 'PENDING' | 'PAID';
+			customerName?: string;
+			customerEmail?: string;
+			customerPhone?: string;
+		}) => Promise<void>;
+		update: (
+			id: BookingId,
+			updates: Partial<{ status: 'CONFIRMED' | 'CANCELLED' }>,
+		) => Promise<void>;
+	};
 	withLock: (key: string) => Promise<() => void>;
 }): BookingManager => {
 	return {
@@ -80,6 +103,16 @@ export const createBookingManager = (deps: {
 					value: 1,
 				};
 
+				const hasOverlap = state.booked.some(
+					(booked) =>
+						Math.max(booked.start, bookingInterval.start) <
+						Math.min(booked.end, bookingInterval.end),
+				);
+
+				if (hasOverlap) {
+					return null;
+				}
+
 				const holdInterval: Interval = {
 					start: hold.startUnix,
 					end: hold.endUnix,
@@ -93,6 +126,26 @@ export const createBookingManager = (deps: {
 				state.booked = updatedBooked;
 
 				await deps.holdRepository.delete(holdId);
+
+				await deps.bookingRepository.create({
+					id: params.bookingId,
+					tenantId,
+					resourceId,
+					holdId,
+					start: params.start,
+					end: params.end,
+					status: 'CONFIRMED',
+					paymentStatus: params.paymentStatus ?? 'NONE',
+					...(params.customerName !== undefined && {
+						customerName: params.customerName,
+					}),
+					...(params.customerEmail !== undefined && {
+						customerEmail: params.customerEmail,
+					}),
+					...(params.customerPhone !== undefined && {
+						customerPhone: params.customerPhone,
+					}),
+				});
 
 				return createEvent('BookingConfirmed', {
 					tenantId,
@@ -142,6 +195,10 @@ export const createBookingManager = (deps: {
 				const updatedBooked = subtractIntervals(state.booked, [bookingInterval]);
 
 				state.booked = updatedBooked;
+
+				await deps.bookingRepository.update(bookingId, {
+					status: 'CANCELLED',
+				});
 
 				return createEvent('BookingCancelled', {
 					tenantId,
