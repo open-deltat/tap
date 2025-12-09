@@ -35,7 +35,7 @@
 		"dev:app": "cd packages/app && bun run dev --turbopack",
 		"clean": "turbo run clean",
 		"typecheck": "turbo run typecheck",
-		"test": "scripts/ensure-db.sh && turbo run test",
+		"test": "turbo run test",
 		"test:watch": "turbo run test:watch",
 		"test:coverage": "turbo run test:coverage",
 		"db:generate": "cd packages/db && bun run migrate:generate",

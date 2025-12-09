@@ -104,22 +104,6 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: tap
-          POSTGRES_PASSWORD: tap
-          POSTGRES_DB: tap
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-    env:
-      DATABASE_URL: postgresql://tap:tap@localhost:5432/tap
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v1
@@ -134,18 +118,8 @@ jobs:
           key: ${{ runner.os }}-deps-${{ hashFiles('**/bun.lockb', '**/package.json') }}
           restore-keys: |
             ${{ runner.os }}-deps-
-      - uses: actions/cache@v4
-        with:
-          path: |
-            packages/*/dist
-            .turbo
-          key: ${{ runner.os }}-build-${{ hashFiles('**/tsconfig.json', '**/*.ts', '**/*.tsx') }}
-          restore-keys: |
-            ${{ runner.os }}-build-
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Setup database
-        run: bun run db:migrate
       - name: Test
         run: bun run test
       - uses: actions/cache@v4
