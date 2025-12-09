@@ -1,19 +1,29 @@
 # TAP API - Lightweight SQLite-based booking server
 # No external database required!
 
-FROM oven/bun:1-alpine AS base
+FROM oven/bun:1-alpine AS builder
 WORKDIR /app
 
-# Copy source packages first
+# Copy source packages
 COPY packages/api ./packages/api
 COPY packages/core ./packages/core
 COPY packages/protocol ./packages/protocol
 
-# Create a minimal package.json with explicit workspaces (not wildcard)
+# Create minimal workspace package.json
 RUN echo '{"name":"tap","private":true,"workspaces":["packages/api","packages/core","packages/protocol"]}' > package.json
 
 # Install dependencies
 RUN bun install
+
+# Bundle the API into a single file
+RUN bun build packages/api/src/index.ts --outfile=server.js --target=bun
+
+# Runtime stage
+FROM oven/bun:1-alpine
+WORKDIR /app
+
+# Copy bundled server
+COPY --from=builder /app/server.js ./server.js
 
 # Create data directory for SQLite
 RUN mkdir -p /app/data
@@ -29,5 +39,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
-# Run from root so workspace resolution works
-CMD ["bun", "run", "packages/api/src/index.ts"]
+# Run bundled server
+CMD ["bun", "run", "server.js"]
