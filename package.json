@@ -42,6 +42,7 @@
 		"db:migrate": "cd packages/db && bun run migrate",
 		"db:reset": "cd packages/db && bun run reset",
 		"check": "biome check --write .",
+		"check:changed": "bun run scripts/check-changed.ts",
 		"changeset": "changeset",
 		"changeset:auto": "bun run scripts/create-changesets.ts",
 		"changeset:version": "changeset version",
