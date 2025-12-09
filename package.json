@@ -50,6 +50,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "latest",
 		"@changesets/cli": "^2.29.8",
+		"baseline-browser-mapping": "^2.9.5",
 		"turbo": "latest",
 		"typescript": "latest"
 	},
