@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useTransition } from "react";
+import { useEffect, useState, useCallback, useTransition, useRef } from "react";
 import { toast } from "sonner";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { CreateResourceDialog } from "@/components/create-resource-dialog";
 import { AddRuleDialog } from "@/components/add-rule-dialog";
 import { ResourceSettingsDialog } from "@/components/resource-settings-dialog";
 import type { Resource, Hold } from "@/lib/schemas";
+import { useResourceEvents } from "@/hooks/use-resource-events";
 
 import { seed } from "@/app/actions/seed";
 import {
@@ -134,12 +135,10 @@ export default function HoldsPage() {
     }
   }, [selectedId, loadHolds]);
 
-  // Poll holds every 10s
-  useEffect(() => {
-    if (!selectedId) return;
-    const interval = setInterval(() => loadHolds(selectedId), 10_000);
-    return () => clearInterval(interval);
-  }, [selectedId, loadHolds]);
+  // Real-time updates via SSE
+  useResourceEvents(selectedId, useCallback(() => {
+    if (selectedId) loadHolds(selectedId);
+  }, [selectedId, loadHolds]));
 
   // Tick countdown every second
   useEffect(() => {

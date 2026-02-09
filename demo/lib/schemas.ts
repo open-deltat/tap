@@ -1,43 +1,25 @@
 import { z } from "zod";
+import type { Resource as DeltaTResource } from "@open-tap/client";
 
-export const ResourceSchema = z.object({
-  id: z.string(),
-  parentId: z.string().nullable(),
-  name: z.string().min(1),
-  slotMinutes: z.number().default(60),
-  bufferMinutes: z.number().default(0),
-  price: z.number().nullable().default(null),
-});
+// Re-export SDK types used by pages/components
+export type {
+  Rule,
+  Booking,
+  Hold,
+  AvailabilitySlot,
+} from "@open-tap/client";
 
-export type Resource = z.infer<typeof ResourceSchema>;
+// App-level metadata not stored in deltat
+export interface ResourceMeta {
+  slotMinutes: number;
+  bufferMinutes: number;
+  price: number | null;
+}
 
-export const RuleSchema = z.object({
-  id: z.string(),
-  resourceId: z.string(),
-  start: z.number(),
-  end: z.number(),
-  blocking: z.boolean(),
-});
+// The demo's Resource = deltat Resource + app metadata
+export type Resource = DeltaTResource & ResourceMeta;
 
-export type Rule = z.infer<typeof RuleSchema>;
-
-export const BookingSchema = z.object({
-  id: z.string(),
-  resourceId: z.string(),
-  start: z.number(),
-  end: z.number(),
-  label: z.string().default(""),
-});
-
-export type Booking = z.infer<typeof BookingSchema>;
-
-export const AvailabilitySlotSchema = z.object({
-  resourceId: z.string(),
-  start: z.number(),
-  end: z.number(),
-});
-
-export type AvailabilitySlot = z.infer<typeof AvailabilitySlotSchema>;
+// ── Input schemas (form validation) ──────────────────────────
 
 export const CreateResourcesInput = z.object({
   names: z.array(z.string().min(1)).min(1, "At least one name is required"),
@@ -73,13 +55,3 @@ export const RecurringRuleInput = z.object({
 });
 
 export type BookSlotInput = z.infer<typeof BookSlotInput>;
-
-export const HoldSchema = z.object({
-  id: z.string(),
-  resourceId: z.string(),
-  start: z.number(),
-  end: z.number(),
-  expiresAt: z.number(),
-});
-
-export type Hold = z.infer<typeof HoldSchema>;

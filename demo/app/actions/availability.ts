@@ -1,14 +1,14 @@
 "use server";
 
-import * as db from "@/lib/db";
-import type { AvailabilitySlot } from "@/lib/schemas";
+import { dt } from "@/lib/deltat";
+import type { AvailabilitySlot } from "@open-tap/client";
 
 export async function getAvailability(
   resourceId: string,
   start: number,
   end: number
 ): Promise<AvailabilitySlot[]> {
-  return db.getAvailability(resourceId, start, end);
+  return dt.getAvailability({ resourceId, start, end });
 }
 
 export async function getMultiResourceAvailability(
@@ -17,7 +17,7 @@ export async function getMultiResourceAvailability(
   end: number
 ): Promise<Record<string, AvailabilitySlot[]>> {
   const results = await Promise.all(
-    resourceIds.map(async (id) => [id, await db.getAvailability(id, start, end)] as const)
+    resourceIds.map(async (id) => [id, await dt.getAvailability({ resourceId: id, start, end })] as const)
   );
   return Object.fromEntries(results);
 }
@@ -30,5 +30,5 @@ export async function getCombinedAvailability(
   end: number,
   minAvailable?: number
 ): Promise<{ start: number; end: number }[]> {
-  return db.getMultiResourceAvailabilityIntersection(resourceIds, start, end, minAvailable);
+  return dt.getCombinedAvailability({ resourceIds, start, end, minAvailable });
 }

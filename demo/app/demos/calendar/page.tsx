@@ -13,6 +13,7 @@ import { ResourceSettingsDialog } from "@/components/resource-settings-dialog";
 import { RulesPanel } from "@/components/rules-panel";
 import { weekStart } from "@/lib/utils";
 import type { Resource, Rule, AvailabilitySlot, Booking } from "@/lib/schemas";
+import { useResourceEvents } from "@/hooks/use-resource-events";
 
 import { seed } from "@/app/actions/seed";
 import { createResources, deleteResource, getResources, updateResourceSettings } from "@/app/actions/resources";
@@ -109,6 +110,11 @@ export default function CalendarPage() {
       setRules([]);
     }
   }, [selectedId, weekOf, loadCalendarData]);
+
+  // Real-time updates via SSE
+  useResourceEvents(selectedId, useCallback(() => {
+    if (selectedId) loadCalendarData(selectedId, weekOf);
+  }, [selectedId, weekOf, loadCalendarData]));
 
   function handleCreateChildren(parentId: string | null) {
     setCreateParentId(parentId);
@@ -364,7 +370,7 @@ export default function CalendarPage() {
         {selectedResource && (
           <div className="max-h-[40%] overflow-auto">
             <RulesPanel
-              resourceName={selectedResource.name}
+              resourceName={selectedResource.name ?? "Resource"}
               rules={rules}
               onDelete={handleDeleteRule}
               onEdit={handleEditRule}
@@ -380,7 +386,7 @@ export default function CalendarPage() {
           <DayCalendar
             date={dayDate}
             onDateChange={setDayDate}
-            resources={childResources.map((r) => ({ id: r.id, name: r.name }))}
+            resources={childResources.map((r) => ({ id: r.id, name: r.name ?? r.id }))}
             availabilityByResource={dayAvailability}
             bookingsByResource={dayBookings}
             slotMinutes={selectedResource?.slotMinutes ?? 60}
