@@ -1,4 +1,7 @@
 {
   "private": true,
-  "workspaces": ["packages/*", "demo"]
+  "workspaces": ["packages/*", "demo"],
+  "scripts": {
+    "dev": "cd demo && ./dev.sh"
+  }
 }
