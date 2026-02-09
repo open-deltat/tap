@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { Resource } from "@/lib/schemas";
 
-import { seed } from "@/app/actions/seed";
 import { getResources } from "@/app/actions/resources";
 import { getCombinedAvailability } from "@/app/actions/availability";
 import { batchBookSlots } from "@/app/actions/bookings";
@@ -177,15 +176,14 @@ export default function SchedulingPage() {
     setHasSearched(false);
   }
 
-  // Seed on mount
+  // Load resources on mount
   useEffect(() => {
     async function init() {
       try {
-        await seed();
         const all = await getResources();
         setResources(all);
       } catch (err) {
-        console.error("Failed to seed:", err);
+        console.error("Failed to load resources:", err);
         toast.error("Failed to connect to deltat. Is it running?");
       } finally {
         setLoading(false);

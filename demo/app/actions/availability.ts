@@ -8,7 +8,7 @@ export async function getAvailability(
   start: number,
   end: number
 ): Promise<AvailabilitySlot[]> {
-  return dt.getAvailability({ resourceId, start, end });
+  return dt.availability.get({ resourceId, start, end });
 }
 
 export async function getMultiResourceAvailability(
@@ -17,18 +17,16 @@ export async function getMultiResourceAvailability(
   end: number
 ): Promise<Record<string, AvailabilitySlot[]>> {
   const results = await Promise.all(
-    resourceIds.map(async (id) => [id, await dt.getAvailability({ resourceId: id, start, end })] as const)
+    resourceIds.map(async (id) => [id, await dt.availability.get({ resourceId: id, start, end })] as const)
   );
   return Object.fromEntries(results);
 }
 
-/** Combined availability across multiple resources.
- *  Returns time spans where at least `minAvailable` of the resources are free. */
 export async function getCombinedAvailability(
   resourceIds: string[],
   start: number,
   end: number,
   minAvailable?: number
 ): Promise<{ start: number; end: number }[]> {
-  return dt.getCombinedAvailability({ resourceIds, start, end, minAvailable });
+  return dt.availability.getCombined({ resourceIds, start, end, minAvailable });
 }

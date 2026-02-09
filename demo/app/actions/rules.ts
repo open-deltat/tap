@@ -11,7 +11,7 @@ export async function addRule(input: {
   blocking: boolean;
 }): Promise<Rule> {
   const parsed = AddRuleInput.parse(input);
-  return dt.addRule({
+  return dt.rules.add({
     resourceId: parsed.resourceId,
     start: parsed.start,
     end: parsed.end,
@@ -50,7 +50,7 @@ export async function addRecurringRules(input: {
       const startMs = dayStart.getTime();
       const endMs = dayEnd.getTime();
       if (endMs > startMs) {
-        const rule = await dt.addRule({
+        const rule = await dt.rules.add({
           resourceId: parsed.resourceId,
           start: startMs,
           end: endMs,
@@ -69,15 +69,15 @@ export async function editRule(
   id: string,
   data: { start: number; end: number; blocking: boolean }
 ): Promise<void> {
-  await dt.updateRule(id, data);
+  await dt.rules.update(id, data);
 }
 
 export async function deleteRule(id: string): Promise<void> {
-  await dt.deleteRule(id);
+  await dt.rules.delete(id);
 }
 
 export async function getRulesForResource(
   resourceId: string
 ): Promise<Rule[]> {
-  return dt.getRules(resourceId);
+  return dt.rules.get(resourceId);
 }
