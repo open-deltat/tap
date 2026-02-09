@@ -19,7 +19,7 @@ export async function GET(
       // Send initial heartbeat
       send(JSON.stringify({ type: "connected" }));
 
-      const unlisten = await dt.listen(resourceId, (event) => {
+      const unlisten = await dt.events.listen(resourceId, (event) => {
         try {
           send(JSON.stringify(event));
         } catch {

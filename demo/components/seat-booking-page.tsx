@@ -11,9 +11,7 @@ import { SeatMap, type SeatSection } from "@/components/seat-map";
 import { CancelBookingDialog } from "@/components/booking-dialog";
 import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
 
-import { seed } from "@/app/actions/seed";
 import { getResources } from "@/app/actions/resources";
-import { getDemoVenueIds } from "@/app/actions/demos";
 import { getAvailability, getMultiResourceAvailability } from "@/app/actions/availability";
 import { getMultiResourceBookings, batchBookSlots, cancelBooking } from "@/app/actions/bookings";
 
@@ -67,7 +65,7 @@ function allSeatIds(sections: SeatSection[]): string[] {
   return sections.flatMap((s) => s.seats.map((seat) => seat.id));
 }
 
-export function SeatBookingPage({ demo }: { demo: string }) {
+export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> }) {
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -144,8 +142,8 @@ export function SeatBookingPage({ demo }: { demo: string }) {
   useEffect(() => {
     async function init() {
       try {
-        await seed();
-        const [all, ids] = await Promise.all([getResources(), getDemoVenueIds(demo)]);
+        const ids = await seedFn();
+        const all = await getResources();
         setResources(all);
         setVenueIds(ids);
         if (ids.length > 0) setVenueId(ids[0]);

@@ -15,7 +15,6 @@ import { weekStart } from "@/lib/utils";
 import type { Resource, Rule, AvailabilitySlot, Booking } from "@/lib/schemas";
 import { useResourceEvents } from "@/hooks/use-resource-events";
 
-import { seed } from "@/app/actions/seed";
 import { createResources, deleteResource, getResources, updateResourceSettings } from "@/app/actions/resources";
 import { addRule, addRecurringRules, editRule, deleteRule, getRulesForResource } from "@/app/actions/rules";
 import { bookSlot, cancelBooking, getBookingsForResource, getMultiResourceBookings } from "@/app/actions/bookings";
@@ -76,22 +75,22 @@ export default function CalendarPage() {
     []
   );
 
-  // Seed on mount
+  // Load resources on mount
   useEffect(() => {
     async function init() {
       try {
-        const { resources: seeded } = await seed();
-        setResources(seeded);
-        if (seeded.length > 0) {
-          const leaves = seeded.filter(
-            (r) => !seeded.some((c) => c.parentId === r.id)
+        const all = await getResources();
+        setResources(all);
+        if (all.length > 0) {
+          const leaves = all.filter(
+            (r) => !all.some((c) => c.parentId === r.id)
           );
           if (leaves.length > 0) {
             setSelectedId(leaves[0].id);
           }
         }
       } catch (err) {
-        console.error("Failed to seed:", err);
+        console.error("Failed to load resources:", err);
         toast.error("Failed to connect to deltat. Is it running?");
       } finally {
         setLoading(false);

@@ -10,7 +10,7 @@ export async function placeHold(input: {
   durationMinutes: number;
 }): Promise<Hold> {
   const expiresAt = Date.now() + input.durationMinutes * 60_000;
-  return dt.placeHold({
+  return dt.holds.place({
     resourceId: input.resourceId,
     start: input.start,
     end: input.end,
@@ -19,11 +19,11 @@ export async function placeHold(input: {
 }
 
 export async function releaseHold(id: string): Promise<void> {
-  await dt.releaseHold(id);
+  await dt.holds.release(id);
 }
 
 export async function getHoldsForResource(
   resourceId: string
 ): Promise<Hold[]> {
-  return dt.getHolds(resourceId);
+  return dt.holds.get(resourceId);
 }
