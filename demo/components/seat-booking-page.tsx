@@ -43,9 +43,9 @@ function buildSections(venueId: string, resources: Resource[]): SeatSection[] {
     if (grandchildren.length > 0) {
       sections.push({
         id: child.id,
-        name: child.name,
+        name: child.name ?? "",
         price: child.price,
-        seats: grandchildren.map((s) => ({ id: s.id, name: s.name })),
+        seats: grandchildren.map((s) => ({ id: s.id, name: s.name ?? s.id })),
       });
     }
   }
@@ -56,7 +56,7 @@ function buildSections(venueId: string, resources: Resource[]): SeatSection[] {
       id: venueId,
       name: venue?.name ?? "Seats",
       price: venue?.price ?? null,
-      seats: children.map((s) => ({ id: s.id, name: s.name })),
+      seats: children.map((s) => ({ id: s.id, name: s.name ?? s.id })),
     });
   }
 
