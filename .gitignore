@@ -1,70 +1,19 @@
-# Dependencies
 node_modules/
-
-# Build outputs
+.next/
 dist/
-build/
 *.tsbuildinfo
-
-# Generated files in source directories (should only exist in dist/)
-**/src/**/*.js
-**/src/**/*.js.map
-**/src/**/*.d.ts
-**/src/**/*.d.ts.map
-
-# Turborepo
 .turbo/
-
-# Environment
 .env
 .env.*
 !.env.example
-
-# Logs
 *.log
-npm-debug.log*
-yarn-debug.log*
-pnpm-debug.log*
-
-# Test coverage
 coverage/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
 .DS_Store
-Thumbs.db
-
-# Package managers
 bun.lockb
-.pnp
-.pnp.js
-
-# Cache
 .cache/
-.parcel-cache/
-.eslintcache
-.rpt2_cache/
-.rts2_cache_*/
-
-# Next.js
-.next/
 out/
-
-# Runtime
-*.pid
-*.pid.lock
-*.seed
-
-# Temp
 tmp/
-temp/
-*.tmp
-*.temp
-
-# NPM pack output
 *.tgz
+
+# Runtime data
+demo/data/
