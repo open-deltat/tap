@@ -8,7 +8,6 @@ import { cn, weekStart, weekDays } from "@/lib/utils";
 import { CancelBookingDialog } from "@/components/booking-dialog";
 import type { Resource, Booking } from "@/lib/schemas";
 
-import { seed } from "@/app/actions/seed";
 import { getResources } from "@/app/actions/resources";
 import { getAllBookings, cancelBooking } from "@/app/actions/bookings";
 
@@ -122,7 +121,6 @@ export default function BookingsPage() {
   useEffect(() => {
     async function init() {
       try {
-        await seed();
         const [res, bk] = await Promise.all([getResources(), getAllBookings()]);
         setResources(res);
         setBookings(bk);

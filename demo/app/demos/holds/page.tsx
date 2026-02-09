@@ -13,7 +13,6 @@ import { ResourceSettingsDialog } from "@/components/resource-settings-dialog";
 import type { Resource, Hold } from "@/lib/schemas";
 import { useResourceEvents } from "@/hooks/use-resource-events";
 
-import { seed } from "@/app/actions/seed";
 import {
   createResources,
   deleteResource,
@@ -104,20 +103,20 @@ export default function HoldsPage() {
     }
   }, []);
 
-  // Seed on mount
+  // Load resources on mount
   useEffect(() => {
     async function init() {
       try {
-        const { resources: seeded } = await seed();
-        setResources(seeded);
-        if (seeded.length > 0) {
-          const leaves = seeded.filter(
-            (r) => !seeded.some((c) => c.parentId === r.id)
+        const all = await getResources();
+        setResources(all);
+        if (all.length > 0) {
+          const leaves = all.filter(
+            (r) => !all.some((c) => c.parentId === r.id)
           );
           if (leaves.length > 0) setSelectedId(leaves[0].id);
         }
       } catch (err) {
-        console.error("Failed to seed:", err);
+        console.error("Failed to load resources:", err);
         toast.error("Failed to connect to deltat. Is it running?");
       } finally {
         setLoading(false);

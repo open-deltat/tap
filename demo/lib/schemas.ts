@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { Resource as DeltaTResource } from "@open-tap/client";
 
-// Re-export SDK types used by pages/components
 export type {
   Rule,
   Booking,
@@ -9,15 +8,13 @@ export type {
   AvailabilitySlot,
 } from "@open-tap/client";
 
-// App-level metadata not stored in deltat
 export interface ResourceMeta {
   slotMinutes: number;
-  bufferMinutes: number;
   price: number | null;
 }
 
-// The demo's Resource = deltat Resource + app metadata
-export type Resource = DeltaTResource & ResourceMeta;
+// The demo's Resource = deltat Resource + app metadata + derived bufferMinutes
+export type Resource = DeltaTResource & ResourceMeta & { bufferMinutes: number };
 
 // ── Input schemas (form validation) ──────────────────────────
 
