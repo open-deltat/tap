@@ -50,27 +50,27 @@ function enrichBooking(b: Booking, resources: Resource[]): EnrichedBooking {
 
   const parent = seat.parentId ? resources.find((r) => r.id === seat.parentId) : null;
   if (!parent)
-    return { ...b, seatName: seat.name, sectionName: "", sectionPrice: null, venueName: seat.name, venueId: seat.id };
+    return { ...b, seatName: seat.name ?? "?", sectionName: "", sectionPrice: null, venueName: seat.name ?? "?", venueId: seat.id };
 
   const grandparent = parent.parentId ? resources.find((r) => r.id === parent.parentId) : null;
   if (grandparent) {
     // 3-level: seat → section → venue
     return {
       ...b,
-      seatName: seat.name,
-      sectionName: parent.name,
+      seatName: seat.name ?? "?",
+      sectionName: parent.name ?? "",
       sectionPrice: parent.price,
-      venueName: grandparent.name,
+      venueName: grandparent.name ?? "?",
       venueId: grandparent.id,
     };
   }
   // 2-level: seat → venue
   return {
     ...b,
-    seatName: seat.name,
+    seatName: seat.name ?? "?",
     sectionName: "",
     sectionPrice: parent.price,
-    venueName: parent.name,
+    venueName: parent.name ?? "?",
     venueId: parent.id,
   };
 }

@@ -1,8 +1,20 @@
 "use server";
 
-import * as db from "@/lib/db";
+import { dt } from "@/lib/deltat";
 import * as store from "@/lib/store";
-import { CreateResourcesInput, type Resource } from "@/lib/schemas";
+import { CreateResourcesInput, type Resource, type ResourceMeta } from "@/lib/schemas";
+
+function toResource(
+  r: { id: string; parentId: string | null; name: string | null; capacity: number; bufferAfter: number | null },
+  meta?: ResourceMeta
+): Resource {
+  return {
+    ...r,
+    slotMinutes: meta?.slotMinutes ?? 60,
+    bufferMinutes: meta?.bufferMinutes ?? 0,
+    price: meta?.price ?? null,
+  };
+}
 
 export async function createResources(input: {
   names: string[];
@@ -11,44 +23,43 @@ export async function createResources(input: {
   const parsed = CreateResourcesInput.parse(input);
   const created: Resource[] = [];
   for (const name of parsed.names) {
-    const id = await db.createResource(parsed.parentId);
-    const resource: Resource = {
-      id,
-      name,
-      parentId: parsed.parentId,
-      slotMinutes: 60,
-      bufferMinutes: 0,
-      price: null,
-    };
-    store.setResource(resource);
-    created.push(resource);
+    const r = await dt.createResource({ parentId: parsed.parentId, name });
+    const meta: ResourceMeta = { slotMinutes: 60, bufferMinutes: 0, price: null };
+    store.setMeta(r.id, meta);
+    created.push(toResource(r, meta));
   }
   return created;
 }
 
 export async function deleteResource(id: string): Promise<void> {
   // Delete children first (depth-first)
-  const children = store
-    .getResources()
-    .filter((r) => r.parentId === id);
+  const children = await dt.getResources({ parentId: id });
   for (const child of children) {
     await deleteResource(child.id);
   }
-  await db.deleteResource(id);
-  store.removeResource(id);
+  await dt.deleteResource(id);
+  store.removeMeta(id);
 }
 
 export async function updateResourceSettings(
   id: string,
   settings: { slotMinutes: number; bufferMinutes: number }
 ): Promise<Resource> {
-  const resource = store.getResource(id);
-  if (!resource) throw new Error("Resource not found");
-  const updated = { ...resource, ...settings };
-  store.setResource(updated);
-  return updated;
+  const meta = store.getMeta(id);
+  if (!meta) throw new Error("Resource not found");
+  const updated = { ...meta, ...settings };
+  store.setMeta(id, updated);
+  // Sync buffer to deltat
+  await dt.updateResource(id, { bufferAfter: settings.bufferMinutes * 60_000 });
+  // Return full resource
+  const resources = await dt.getResources();
+  const r = resources.find((r) => r.id === id);
+  if (!r) throw new Error("Resource not found in deltat");
+  return toResource(r, updated);
 }
 
 export async function getResources(): Promise<Resource[]> {
-  return store.getResources();
+  const dtResources = await dt.getResources();
+  const allMeta = store.getAllMeta();
+  return dtResources.map((r) => toResource(r, allMeta.get(r.id)));
 }
