@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { AvailabilitySlot, Booking } from "@/lib/schemas";
+import type { Hold } from "@open-tap/client";
 
 interface SeatInfo {
   id: string;
@@ -16,15 +17,19 @@ export interface SeatSection {
   seats: SeatInfo[];
 }
 
+type SeatStatus = "available" | "booked" | "held" | "unavailable";
+
 interface SeatMapProps {
   sections: SeatSection[];
   availabilityByResource: Map<string, AvailabilitySlot[]>;
   bookingsByResource: Map<string, Booking[]>;
+  holdsByResource?: Map<string, Hold[]>;
   slotStart: number;
   slotEnd: number;
   selectedIds: Set<string>;
   onToggle: (seatId: string) => void;
   onBookingClick: (booking: Booking) => void;
+  onHoldClick?: (hold: Hold) => void;
 }
 
 /** Parse seat name like "1A" or "A1" into { row, col }.
@@ -101,20 +106,24 @@ function SectionGrid({
   seatStatus,
   selectedIds,
   bookingsByResource,
+  holdsByResource,
   slotStart,
   slotEnd,
   onToggle,
   onBookingClick,
+  onHoldClick,
 }: {
   section: SeatSection;
   grid: Grid;
-  seatStatus: Map<string, "available" | "booked" | "unavailable">;
+  seatStatus: Map<string, SeatStatus>;
   selectedIds: Set<string>;
   bookingsByResource: Map<string, Booking[]>;
+  holdsByResource?: Map<string, Hold[]>;
   slotStart: number;
   slotEnd: number;
   onToggle: (seatId: string) => void;
   onBookingClick: (booking: Booking) => void;
+  onHoldClick?: (hold: Hold) => void;
 }) {
   const aisleAfter = getAisleAfter(grid.columns);
 
@@ -122,13 +131,14 @@ function SectionGrid({
   const stats = useMemo(() => {
     let available = 0;
     let booked = 0;
-    let total = section.seats.length;
+    let held = 0;
     for (const seat of section.seats) {
       const st = seatStatus.get(seat.id);
       if (st === "available") available++;
       else if (st === "booked") booked++;
+      else if (st === "held") held++;
     }
-    return { available, booked, total };
+    return { available, booked, held };
   }, [section.seats, seatStatus]);
 
   return (
@@ -141,7 +151,7 @@ function SectionGrid({
             <span className="font-medium text-foreground">{formatPrice(section.price)}</span>
           )}
           {section.price !== null && " · "}
-          {stats.available} available · {stats.booked} booked
+          {stats.available} available{stats.held > 0 && ` · ${stats.held} held`} · {stats.booked} booked
         </div>
       </div>
 
@@ -182,6 +192,10 @@ function SectionGrid({
             const booking = (bookingsByResource.get(seat.id) ?? []).find(
               (b) => b.start < slotEnd && b.end > slotStart
             );
+            const now = Date.now();
+            const hold = (holdsByResource?.get(seat.id) ?? []).find(
+              (h) => h.start < slotEnd && h.end > slotStart && h.expiresAt > now
+            );
 
             return (
               <button
@@ -196,6 +210,8 @@ function SectionGrid({
                   st === "available" &&
                     isSelected &&
                     "bg-emerald-500 text-white border-emerald-600 ring-2 ring-emerald-300 cursor-pointer",
+                  st === "held" &&
+                    "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200 cursor-pointer",
                   st === "booked" &&
                     "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200 cursor-pointer",
                   ci === aisleAfter && "mr-4"
@@ -204,6 +220,8 @@ function SectionGrid({
                 onClick={() => {
                   if (st === "booked" && booking) {
                     onBookingClick(booking);
+                  } else if (st === "held" && hold && onHoldClick) {
+                    onHoldClick(hold);
                   } else if (st === "available") {
                     onToggle(seat.id);
                   }
@@ -211,9 +229,11 @@ function SectionGrid({
                 title={
                   st === "booked"
                     ? `${seat.name} — ${booking?.label || "Booked"}`
-                    : st === "available"
-                      ? `${seat.name} — Available`
-                      : `${seat.name} — Unavailable`
+                    : st === "held"
+                      ? `${seat.name} — Held`
+                      : st === "available"
+                        ? `${seat.name} — Available`
+                        : `${seat.name} — Unavailable`
                 }
               >
                 {seat.name}
@@ -230,11 +250,13 @@ export function SeatMap({
   sections,
   availabilityByResource,
   bookingsByResource,
+  holdsByResource,
   slotStart,
   slotEnd,
   selectedIds,
   onToggle,
   onBookingClick,
+  onHoldClick,
 }: SeatMapProps) {
   // Build grids for each section
   const grids = useMemo(
@@ -244,7 +266,8 @@ export function SeatMap({
 
   // Compute per-seat status across all sections
   const seatStatus = useMemo(() => {
-    const status = new Map<string, "available" | "booked" | "unavailable">();
+    const now = Date.now();
+    const status = new Map<string, SeatStatus>();
     for (const section of sections) {
       for (const seat of section.seats) {
         const avail = availabilityByResource.get(seat.id) ?? [];
@@ -256,12 +279,19 @@ export function SeatMap({
           continue;
         }
 
+        const holds = holdsByResource?.get(seat.id) ?? [];
+        const hasHold = holds.some((h) => h.start < slotEnd && h.end > slotStart && h.expiresAt > now);
+        if (hasHold) {
+          status.set(seat.id, "held");
+          continue;
+        }
+
         const isAvailable = avail.some((a) => a.start <= slotStart && a.end >= slotEnd);
         status.set(seat.id, isAvailable ? "available" : "unavailable");
       }
     }
     return status;
-  }, [sections, availabilityByResource, bookingsByResource, slotStart, slotEnd]);
+  }, [sections, availabilityByResource, bookingsByResource, holdsByResource, slotStart, slotEnd]);
 
   return (
     <div className="flex flex-col items-center gap-6">
@@ -273,10 +303,12 @@ export function SeatMap({
           seatStatus={seatStatus}
           selectedIds={selectedIds}
           bookingsByResource={bookingsByResource}
+          holdsByResource={holdsByResource}
           slotStart={slotStart}
           slotEnd={slotEnd}
           onToggle={onToggle}
           onBookingClick={onBookingClick}
+          onHoldClick={onHoldClick}
         />
       ))}
 
@@ -289,6 +321,10 @@ export function SeatMap({
         <div className="flex items-center gap-1">
           <div className="w-3.5 h-3.5 rounded bg-emerald-500 border border-emerald-600" />
           <span>Selected</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3.5 h-3.5 rounded bg-amber-100 border border-amber-300" />
+          <span>Held</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3.5 h-3.5 rounded bg-blue-100 border border-blue-200" />
