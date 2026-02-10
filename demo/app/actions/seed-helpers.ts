@@ -66,7 +66,7 @@ export async function addSchedule(
   days: number,
   schedule: Record<number, { h: number; m: number; dur: number }[]>
 ): Promise<Rule[]> {
-  const rules: Rule[] = [];
+  const items: { resourceId: string; start: number; end: number; blocking: boolean }[] = [];
   for (let i = 0; i < days; i++) {
     const dayMs = baseMs + i * DAY;
     const dow = new Date(dayMs).getDay();
@@ -75,11 +75,11 @@ export async function addSchedule(
     for (const { h, m, dur } of shows) {
       const start = dayMs + h * 3_600_000 + m * 60_000;
       const end = start + dur * 60_000;
-      const rule = await dt.rules.add({ resourceId, start, end, blocking: false });
-      rules.push(rule);
+      items.push({ resourceId, start, end, blocking: false });
     }
   }
-  return rules;
+  if (items.length === 0) return [];
+  return dt.rules.create(items);
 }
 
 export function daily(

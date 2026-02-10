@@ -29,7 +29,17 @@ export class Holds {
     await this.sql`DELETE FROM holds WHERE id = ${id}`;
   }
 
-  async get(resourceId: string): Promise<Hold[]> {
+  async get(
+    resourceId: string,
+    filter?: { start?: number; end?: number }
+  ): Promise<Hold[]> {
+    if (filter?.start != null && filter?.end != null) {
+      const rows = await this.sql.unsafe(
+        `SELECT * FROM holds WHERE resource_id = $1 AND start < $2 AND "end" > $3`,
+        [resourceId, filter.end, filter.start]
+      );
+      return rows.map(mapHold);
+    }
     const rows = await this
       .sql`SELECT * FROM holds WHERE resource_id = ${resourceId}`;
     return rows.map(mapHold);

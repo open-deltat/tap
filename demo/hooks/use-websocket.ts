@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import type { DeltaTEvent } from "@open-tap/client";
+import { useEffect, useRef, useState, useCallback } from "react";
+import type { DeltaTEvent, Booking } from "@open-tap/client";
 
 interface SubscribeOptions {
   type: "subscribe";
@@ -35,4 +35,88 @@ export function useWebSocket(options: SubscribeOptions | null): void {
 
     return () => { ws.close(); };
   }, [options?.resourceId]);
+}
+
+interface HoldWebSocketOptions {
+  resourceId: string;
+  start: number;
+  end: number;
+  onEvent?: (event: DeltaTEvent) => void;
+}
+
+interface HoldWebSocketResult {
+  connected: boolean;
+  confirm: (label?: string) => Promise<Booking>;
+}
+
+export function useHoldWebSocket(
+  options: HoldWebSocketOptions | null
+): HoldWebSocketResult {
+  const wsRef = useRef<WebSocket | null>(null);
+  const [connected, setConnected] = useState(false);
+  const resolveRef = useRef<{ resolve: (b: Booking) => void; reject: (e: Error) => void } | null>(null);
+  const onEventRef = useRef(options?.onEvent);
+  onEventRef.current = options?.onEvent;
+
+  useEffect(() => {
+    if (!options) {
+      setConnected(false);
+      return;
+    }
+
+    const ws = new WebSocket(wsUrl());
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: "hold",
+        resourceId: options.resourceId,
+        start: options.start,
+        end: options.end,
+      }));
+      setConnected(true);
+    };
+
+    ws.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === "confirmed") {
+          resolveRef.current?.resolve(data.booking);
+          resolveRef.current = null;
+          return;
+        }
+        if (data.type === "error") {
+          resolveRef.current?.reject(new Error(data.message));
+          resolveRef.current = null;
+          return;
+        }
+        onEventRef.current?.(data as DeltaTEvent);
+      } catch {}
+    };
+
+    ws.onclose = () => {
+      setConnected(false);
+      resolveRef.current?.reject(new Error("Connection closed"));
+      resolveRef.current = null;
+    };
+
+    return () => {
+      ws.close();
+      wsRef.current = null;
+    };
+  }, [options?.resourceId, options?.start, options?.end]);
+
+  const confirm = useCallback((label?: string): Promise<Booking> => {
+    return new Promise((resolve, reject) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        reject(new Error("Not connected"));
+        return;
+      }
+      resolveRef.current = { resolve, reject };
+      ws.send(JSON.stringify({ type: "confirm", label }));
+    });
+  }, []);
+
+  return { connected, confirm };
 }

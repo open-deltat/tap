@@ -9,6 +9,9 @@ import {
   Calendar,
   CalendarClock,
   BookOpen,
+  Clock,
+  UtensilsCrossed,
+  Car,
   Sun,
   Moon,
 } from "lucide-react";
@@ -21,6 +24,9 @@ const NAV_ITEMS = [
   { href: "/demos/stadium", label: "Stadium", icon: LandPlot },
   { href: "/demos/calendar", label: "Calendar", icon: Calendar },
   { href: "/demos/scheduling", label: "Scheduling", icon: CalendarClock },
+  { href: "/demos/availability", label: "Availability", icon: Clock },
+  { href: "/demos/restaurant", label: "Restaurant", icon: UtensilsCrossed },
+  { href: "/demos/parking", label: "Parking", icon: Car },
   { href: "/bookings", label: "Bookings", icon: BookOpen },
 ];
 
