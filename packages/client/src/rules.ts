@@ -5,25 +5,42 @@ import type { Rule } from "./types.js";
 export class Rules {
   constructor(private readonly sql: Sql) {}
 
-  async add(opts: {
-    resourceId: string;
-    start: number;
-    end: number;
-    blocking?: boolean;
-  }): Promise<Rule> {
-    const id = ulid();
-    const blocking = opts.blocking ?? false;
+  async create(
+    items: {
+      resourceId: string;
+      start: number;
+      end: number;
+      blocking?: boolean;
+    }[]
+  ): Promise<Rule[]> {
+    if (items.length === 0) return [];
 
-    await this
-      .sql`INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES (${id}, ${opts.resourceId}, ${opts.start}, ${opts.end}, ${blocking})`;
+    const rules: Rule[] = items.map((item) => ({
+      id: ulid(),
+      resourceId: item.resourceId,
+      start: item.start,
+      end: item.end,
+      blocking: item.blocking ?? false,
+    }));
 
-    return {
-      id,
-      resourceId: opts.resourceId,
-      start: opts.start,
-      end: opts.end,
-      blocking,
-    };
+    if (rules.length === 1) {
+      const r = rules[0];
+      await this
+        .sql`INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES (${r.id}, ${r.resourceId}, ${r.start}, ${r.end}, ${r.blocking})`;
+    } else {
+      const valuesList = rules
+        .map(
+          (r) =>
+            `('${r.id}', '${r.resourceId}', ${r.start}, ${r.end}, ${r.blocking})`
+        )
+        .join(", ");
+
+      await this.sql.unsafe(
+        `INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES ${valuesList}`
+      );
+    }
+
+    return rules;
   }
 
   async update(

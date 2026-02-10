@@ -5,27 +5,7 @@ import type { Booking } from "./types.js";
 export class Bookings {
   constructor(private readonly sql: Sql) {}
 
-  async create(opts: {
-    resourceId: string;
-    start: number;
-    end: number;
-    label?: string;
-  }): Promise<Booking> {
-    const id = ulid();
-    const label = opts.label ?? null;
-
-    if (label) {
-      await this
-        .sql`INSERT INTO bookings (id, resource_id, start, "end", label) VALUES (${id}, ${opts.resourceId}, ${opts.start}, ${opts.end}, ${label})`;
-    } else {
-      await this
-        .sql`INSERT INTO bookings (id, resource_id, start, "end") VALUES (${id}, ${opts.resourceId}, ${opts.start}, ${opts.end})`;
-    }
-
-    return { id, resourceId: opts.resourceId, start: opts.start, end: opts.end, label };
-  }
-
-  async createMany(
+  async create(
     items: {
       resourceId: string;
       start: number;
@@ -34,7 +14,6 @@ export class Bookings {
     }[]
   ): Promise<Booking[]> {
     if (items.length === 0) return [];
-    if (items.length === 1) return [await this.create(items[0])];
 
     const bookings: Booking[] = items.map((item) => ({
       id: ulid(),
@@ -44,16 +23,27 @@ export class Bookings {
       label: item.label ?? null,
     }));
 
-    const valuesList = bookings
-      .map(
-        (b) =>
-          `('${b.id}', '${b.resourceId}', ${b.start}, ${b.end}, ${b.label === null ? "NULL" : `'${b.label.replace(/'/g, "''")}'`})`
-      )
-      .join(", ");
+    if (bookings.length === 1) {
+      const b = bookings[0];
+      if (b.label) {
+        await this
+          .sql`INSERT INTO bookings (id, resource_id, start, "end", label) VALUES (${b.id}, ${b.resourceId}, ${b.start}, ${b.end}, ${b.label})`;
+      } else {
+        await this
+          .sql`INSERT INTO bookings (id, resource_id, start, "end") VALUES (${b.id}, ${b.resourceId}, ${b.start}, ${b.end})`;
+      }
+    } else {
+      const valuesList = bookings
+        .map(
+          (b) =>
+            `('${b.id}', '${b.resourceId}', ${b.start}, ${b.end}, ${b.label === null ? "NULL" : `'${b.label.replace(/'/g, "''")}'`})`
+        )
+        .join(", ");
 
-    await this.sql.unsafe(
-      `INSERT INTO bookings (id, resource_id, start, "end", label) VALUES ${valuesList}`
-    );
+      await this.sql.unsafe(
+        `INSERT INTO bookings (id, resource_id, start, "end", label) VALUES ${valuesList}`
+      );
+    }
 
     return bookings;
   }
@@ -62,7 +52,17 @@ export class Bookings {
     await this.sql`DELETE FROM bookings WHERE id = ${id}`;
   }
 
-  async get(resourceId: string): Promise<Booking[]> {
+  async get(
+    resourceId: string,
+    filter?: { start?: number; end?: number }
+  ): Promise<Booking[]> {
+    if (filter?.start != null && filter?.end != null) {
+      const rows = await this.sql.unsafe(
+        `SELECT * FROM bookings WHERE resource_id = $1 AND start < $2 AND "end" > $3`,
+        [resourceId, filter.end, filter.start]
+      );
+      return rows.map(mapBooking);
+    }
     const rows = await this
       .sql`SELECT * FROM bookings WHERE resource_id = ${resourceId}`;
     return rows.map(mapBooking);

@@ -11,19 +11,20 @@ export async function bookSlot(input: {
   label?: string;
 }): Promise<Booking> {
   const parsed = BookSlotInput.parse(input);
-  return dt.bookings.create({
+  const [booking] = await dt.bookings.create([{
     resourceId: parsed.resourceId,
     start: parsed.start,
     end: parsed.end,
     label: parsed.label || undefined,
-  });
+  }]);
+  return booking;
 }
 
 export async function batchBookSlots(
   slots: { resourceId: string; start: number; end: number; label?: string }[]
 ): Promise<Booking[]> {
   if (slots.length === 0) return [];
-  return dt.bookings.createMany(slots);
+  return dt.bookings.create(slots);
 }
 
 export async function cancelBooking(id: string): Promise<void> {
