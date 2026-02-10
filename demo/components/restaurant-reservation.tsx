@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { toLocalDateString, formatTime, dayBounds } from "@/lib/time";
 import { formatError } from "@/lib/format-error";
 import { getTablesForPartySize } from "@/app/actions/restaurant";
-import { getAvailability } from "@/app/actions/availability";
+import { getAvailability, getMultiResourceAvailability } from "@/app/actions/availability";
 import { RestaurantFloorPlan } from "@/components/restaurant-floor-plan";
 import { RestaurantTimePicker } from "@/components/restaurant-time-picker";
 import { useHoldWebSocket, useWebSocket } from "@/hooks/use-websocket";
@@ -56,14 +56,14 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
     if (tables.length === 0) return;
     const d = new Date(date + "T00:00:00");
     const { dayStart, dayEnd } = dayBounds(d);
+    const tableIds = tables.map((t) => t.id);
 
-    Promise.all(
-      tables.map(async (t) => {
-        const slots = await getAvailability(t.id, dayStart, dayEnd);
-        return { id: t.id, available: slots.length > 0 };
-      })
-    ).then((results) => {
-      setAvailableTableIds(new Set(results.filter((r) => r.available).map((r) => r.id)));
+    getMultiResourceAvailability(tableIds, dayStart, dayEnd).then((availMap) => {
+      const available = new Set<string>();
+      for (const [id, slots] of Object.entries(availMap)) {
+        if (slots.length > 0) available.add(id);
+      }
+      setAvailableTableIds(available);
     });
   }, [tables, date]);
 
