@@ -5,17 +5,25 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 export DELTAT_PASSWORD="${DELTAT_PASSWORD:-secret}"
 
+DELTAT_REPO="https://github.com/open-tap/deltat"
+DELTAT_VERSION_CACHE="$HOME/.cache/deltat-version"
+
 # Find deltat binary: $DELTAT_BIN, PATH, or cargo install location
 DELTAT_BIN="${DELTAT_BIN:-$(command -v deltat 2>/dev/null || echo "")}"
 if [ -z "$DELTAT_BIN" ] && [ -f "$HOME/.cargo/bin/deltat" ]; then
     DELTAT_BIN="$HOME/.cargo/bin/deltat"
 fi
 
-if [ -z "$DELTAT_BIN" ]; then
-    echo "Error: deltat binary not found."
-    echo "Install it: cargo install --git https://github.com/open-tap/deltat.git"
-    echo "Or set DELTAT_BIN=/path/to/deltat"
-    exit 1
+# Check if installed version matches remote
+REMOTE_VERSION=$(curl -sf "https://raw.githubusercontent.com/open-tap/deltat/main/VERSION" || echo "")
+LOCAL_VERSION=$(cat "$DELTAT_VERSION_CACHE" 2>/dev/null || echo "")
+
+if [ -z "$DELTAT_BIN" ] || { [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; }; then
+    echo "Installing deltat${REMOTE_VERSION:+ v${REMOTE_VERSION}}..."
+    cargo install --git "$DELTAT_REPO" --force
+    DELTAT_BIN="$HOME/.cargo/bin/deltat"
+    mkdir -p "$(dirname "$DELTAT_VERSION_CACHE")"
+    echo "$REMOTE_VERSION" > "$DELTAT_VERSION_CACHE"
 fi
 
 # Start deltat server in background
