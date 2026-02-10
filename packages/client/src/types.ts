@@ -37,6 +37,17 @@ export interface AvailabilitySlot {
   end: number;
 }
 
+export type DayName = "sun" | "mon" | "tue" | "wed" | "thu" | "fri" | "sat";
+
+export interface Schedule {
+  id: string;
+  resourceId: string;
+  days: DayName[];
+  startTime: string;
+  endTime: string;
+  utcOffsetMinutes: number;
+}
+
 /**
  * Notification events from deltat's LISTEN/NOTIFY.
  * Matches deltat's Rust `Event` enum serialized via serde_json (externally tagged).
@@ -95,4 +106,15 @@ export type DeltaTEvent =
         label: string | null;
       };
     }
-  | { BookingCancelled: { id: string; resource_id: string } };
+  | { BookingCancelled: { id: string; resource_id: string } }
+  | {
+      ScheduleSet: {
+        id: string;
+        resource_id: string;
+        days_of_week: number;
+        start_minutes: number;
+        end_minutes: number;
+        utc_offset_minutes: number;
+      };
+    }
+  | { ScheduleRemoved: { resource_id: string } };

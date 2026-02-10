@@ -1,9 +1,8 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
-import { expandRecurrence } from "@open-tap/client";
 import * as store from "@/lib/store";
-import { findRootByName, seedDateRange } from "./seed-helpers";
+import { findRootByName } from "./seed-helpers";
 
 const NAME = "Downtown Garage";
 
@@ -42,30 +41,16 @@ export async function seedParking(): Promise<string> {
   const existing = await findRootByName(NAME);
   if (existing) return existing;
 
-  const { fromDate, toDate } = seedDateRange(30);
-
   const garage = await dt.resources.create({ name: NAME });
   store.set(garage.id, { slotMinutes: 60, price: null });
 
-  const segments = expandRecurrence({
-    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+  await dt.schedules.set({
+    resourceId: garage.id,
+    days: ["sun", "mon", "tue", "wed", "thu", "fri", "sat"],
     startTime: "00:00",
     endTime: "23:59",
-    fromDate,
-    toDate,
-    blocking: false,
+    utcOffsetMinutes: -new Date().getTimezoneOffset(),
   });
-
-  if (segments.length > 0) {
-    await dt.rules.create(
-      segments.map((s) => ({
-        resourceId: garage.id,
-        start: s.start,
-        end: s.end,
-        blocking: false,
-      }))
-    );
-  }
 
   for (const floor of FLOORS) {
     const f = await dt.resources.create({ parentId: garage.id, name: floor.name });

@@ -6,15 +6,22 @@ import { toast } from "sonner";
 import { AvailabilityOwnerPanel } from "@/components/availability-owner-panel";
 import { AvailabilityBookerPanel } from "@/components/availability-booker-panel";
 import { seedAvailabilityScheduler } from "@/app/actions/seed-availability-scheduler";
+import { getSchedule } from "@/app/actions/schedules";
+import type { Schedule } from "@open-tap/client";
 
 export default function AvailabilityPage() {
   const [resourceId, setResourceId] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [loading, setLoading] = useState(true);
   const [blockedDates, setBlockedDates] = useState<string[]>([]);
 
   useEffect(() => {
     seedAvailabilityScheduler()
-      .then(setResourceId)
+      .then(async (id) => {
+        setResourceId(id);
+        const s = await getSchedule(id);
+        setSchedule(s);
+      })
       .catch(() => toast.error("Failed to connect to deltat. Is it running?"))
       .finally(() => setLoading(false));
   }, []);
@@ -43,6 +50,7 @@ export default function AvailabilityPage() {
         <div className="p-5">
           <AvailabilityOwnerPanel
             resourceId={resourceId}
+            initialSchedule={schedule}
             blockedDates={blockedDates}
             onBlockedDatesChange={setBlockedDates}
           />
