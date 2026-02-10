@@ -5,41 +5,11 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { RealtimeSeatClient } from "@/components/realtime-seat-client";
 import type { Resource } from "@/lib/schemas";
-import type { SeatSection } from "@/components/seat-map";
+import { toLocalDateString, formatTime } from "@/lib/time";
+import { buildSections, allSeatIds } from "@/lib/seat-sections";
 import { seedAirline } from "@/app/actions/seed-airline";
 import { getResources } from "@/app/actions/resources";
 import { getAvailability } from "@/app/actions/availability";
-
-function toLocalDateString(date: Date): string {
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60000);
-  return local.toISOString().slice(0, 10);
-}
-
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
-
-function buildSections(venueId: string, resources: Resource[]): SeatSection[] {
-  const children = resources.filter((r) => r.parentId === venueId);
-  const sections: SeatSection[] = [];
-  for (const child of children) {
-    const grandchildren = resources.filter((r) => r.parentId === child.id);
-    if (grandchildren.length > 0) {
-      sections.push({
-        id: child.id,
-        name: child.name ?? "",
-        price: child.price,
-        seats: grandchildren.map((s) => ({ id: s.id, name: s.name ?? s.id })),
-      });
-    }
-  }
-  return sections;
-}
-
-function allSeatIds(sections: SeatSection[]): string[] {
-  return sections.flatMap((s) => s.seats.map((seat) => seat.id));
-}
 
 export default function RealtimePage() {
   const [loading, setLoading] = useState(true);
