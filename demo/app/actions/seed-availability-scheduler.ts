@@ -1,9 +1,8 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
-import { expandRecurrence } from "@open-tap/client";
 import * as store from "@/lib/store";
-import { findRootByName, baseMs, toDateStr, seedDateRange } from "./seed-helpers";
+import { findRootByName, baseMs } from "./seed-helpers";
 
 const NAME = "Dr. Sarah Chen";
 
@@ -14,32 +13,22 @@ export async function seedAvailabilityScheduler(): Promise<string> {
   const r = await dt.resources.create({ name: NAME });
   store.set(r.id, { slotMinutes: 30, price: null });
 
-  const { fromDate, toDate } = seedDateRange(60);
-  const base = new Date(baseMs());
-
-  const segments = expandRecurrence({
-    daysOfWeek: [1, 2, 3, 4, 5],
+  await dt.schedules.set({
+    resourceId: r.id,
+    days: ["mon", "tue", "wed", "thu", "fri"],
     startTime: "09:00",
     endTime: "17:00",
-    fromDate,
-    toDate,
-    blocking: false,
-    excludeDates: [
-      toDateStr(new Date(base.getTime() + 7 * 86_400_000)),
-      toDateStr(new Date(base.getTime() + 14 * 86_400_000)),
-    ],
+    utcOffsetMinutes: -new Date().getTimezoneOffset(),
   });
 
-  if (segments.length > 0) {
-    await dt.rules.create(
-      segments.map((s) => ({
-        resourceId: r.id,
-        start: s.start,
-        end: s.end,
-        blocking: s.blocking,
-      }))
-    );
-  }
+  const base = new Date(baseMs());
+  const excludeOffsets = [7, 14];
+  await dt.rules.create(
+    excludeOffsets.map((offset) => {
+      const startMs = base.getTime() + offset * 86_400_000;
+      return { resourceId: r.id, start: startMs, end: startMs + 86_400_000, blocking: true };
+    })
+  );
 
   return r.id;
 }

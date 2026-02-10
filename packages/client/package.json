@@ -13,7 +13,8 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "bun test"
   },
   "dependencies": {
     "postgres": "^3.4.8",

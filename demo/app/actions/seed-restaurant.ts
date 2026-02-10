@@ -1,9 +1,8 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
-import { expandRecurrence } from "@open-tap/client";
 import * as store from "@/lib/store";
-import { findRootByName, seedDateRange } from "./seed-helpers";
+import { findRootByName } from "./seed-helpers";
 
 const NAME = "Bella Cucina";
 
@@ -46,30 +45,16 @@ export async function seedRestaurant(): Promise<string> {
   const existing = await findRootByName(NAME);
   if (existing) return existing;
 
-  const { fromDate, toDate } = seedDateRange(30);
-
   const restaurant = await dt.resources.create({ name: NAME, bufferAfter: 30 * 60_000 });
   store.set(restaurant.id, { slotMinutes: 90, price: null });
 
-  const segments = expandRecurrence({
-    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+  await dt.schedules.set({
+    resourceId: restaurant.id,
+    days: ["sun", "mon", "tue", "wed", "thu", "fri", "sat"],
     startTime: "11:00",
     endTime: "22:00",
-    fromDate,
-    toDate,
-    blocking: false,
+    utcOffsetMinutes: -new Date().getTimezoneOffset(),
   });
-
-  if (segments.length > 0) {
-    await dt.rules.create(
-      segments.map((s) => ({
-        resourceId: restaurant.id,
-        start: s.start,
-        end: s.end,
-        blocking: false,
-      }))
-    );
-  }
 
   for (const section of SECTIONS) {
     const sec = await dt.resources.create({ parentId: restaurant.id, name: section.name });
