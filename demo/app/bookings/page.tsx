@@ -11,6 +11,7 @@ import { formatTime } from "@/lib/time";
 
 import { getResources } from "@/app/actions/resources";
 import { getAllBookings, cancelBooking } from "@/app/actions/bookings";
+import { formatError } from "@/lib/format-error";
 
 // ── Color palette for venues ─────────────────────────────────
 
@@ -144,7 +145,7 @@ export default function BookingsPage() {
         setBookings((prev) => prev.filter((b) => b.id !== cancelTarget.id));
         toast.success("Booking cancelled");
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to cancel");
+        toast.error(formatError(err.message) ?? "Failed to cancel");
       }
     });
   }

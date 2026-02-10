@@ -13,6 +13,8 @@ import { toLocalDateString } from "@/lib/time";
 import { getResources } from "@/app/actions/resources";
 import { getCombinedAvailability } from "@/app/actions/availability";
 import { batchBookSlots } from "@/app/actions/bookings";
+import { usePersonalCalendar } from "@/components/personal-calendar-provider";
+import { formatError } from "@/lib/format-error";
 
 function formatTime(ms: number): string {
   const d = new Date(ms);
@@ -30,6 +32,7 @@ function formatDuration(ms: number): string {
 type ThresholdMode = "all" | "any" | "custom";
 
 export default function SchedulingPage() {
+  const { calendarId } = usePersonalCalendar();
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -128,7 +131,7 @@ export default function SchedulingPage() {
         }
       } catch (err: any) {
         console.error(err);
-        toast.error(err.message ?? "Failed to compute availability");
+        toast.error(formatError(err.message) ?? "Failed to compute availability");
       }
     });
   }
@@ -143,6 +146,17 @@ export default function SchedulingPage() {
           end: bookingSlot.end,
           label: bookingLabel,
         }));
+        if (calendarId) {
+          const names = Array.from(selectedIds)
+            .map((id) => resources.find((r) => r.id === id)?.name ?? id)
+            .join(", ");
+          bookSlots.push({
+            resourceId: calendarId,
+            start: bookingSlot.start,
+            end: bookingSlot.end,
+            label: `Schedule: ${names}`,
+          });
+        }
         await batchBookSlots(bookSlots);
         toast.success(
           `Booked ${bookSlots.length} resource${bookSlots.length > 1 ? "s" : ""} atomically`
@@ -152,7 +166,7 @@ export default function SchedulingPage() {
         // Refresh
         handleSearch();
       } catch (err: any) {
-        toast.error(err.message ?? "Booking failed — conflict detected");
+        toast.error(formatError(err.message) ?? "Booking failed — conflict detected");
       }
     });
   }
