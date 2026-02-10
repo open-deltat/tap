@@ -100,3 +100,13 @@ export function baseMs(): number {
   base.setHours(0, 0, 0, 0);
   return base.getTime();
 }
+
+export function toDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function seedDateRange(days: number): { fromDate: string; toDate: string } {
+  const base = new Date(baseMs());
+  const end = new Date(base.getTime() + days * 86_400_000);
+  return { fromDate: toDateStr(base), toDate: toDateStr(end) };
+}

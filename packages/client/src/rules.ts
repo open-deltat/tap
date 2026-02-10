@@ -28,15 +28,17 @@ export class Rules {
       await this
         .sql`INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES (${r.id}, ${r.resourceId}, ${r.start}, ${r.end}, ${r.blocking})`;
     } else {
-      const valuesList = rules
-        .map(
-          (r) =>
-            `('${r.id}', '${r.resourceId}', ${r.start}, ${r.end}, ${r.blocking})`
-        )
-        .join(", ");
+      const params: (string | number | boolean)[] = [];
+      const rows: string[] = [];
+      for (const r of rules) {
+        const i = params.length;
+        params.push(r.id, r.resourceId, r.start, r.end, r.blocking);
+        rows.push(`($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}, $${i + 5})`);
+      }
 
       await this.sql.unsafe(
-        `INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES ${valuesList}`
+        `INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES ${rows.join(", ")}`,
+        params
       );
     }
 

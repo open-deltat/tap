@@ -36,9 +36,10 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
   const [duration, setDuration] = useState(120);
   const [startTime, setStartTime] = useState(() => {
     const now = new Date();
-    const h = now.getHours();
-    const m = Math.ceil(now.getMinutes() / 15) * 15;
-    return `${String(h).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    const totalMin = now.getHours() * 60 + Math.ceil(now.getMinutes() / 15) * 15;
+    const h = Math.floor(totalMin / 60) % 24;
+    const m = totalMin % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
   });
 
   const [availableIds, setAvailableIds] = useState<Set<string>>(new Set());
@@ -96,7 +97,7 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
 
       const avail = new Set<string>();
       for (const [id, slots] of Object.entries(availMap)) {
-        const totalAvail = (slots as any[]).reduce((sum: number, s: any) => {
+        const totalAvail = slots.reduce((sum, s) => {
           const overlapStart = Math.max(s.start, start);
           const overlapEnd = Math.min(s.end, end);
           return sum + Math.max(0, overlapEnd - overlapStart);
@@ -107,14 +108,14 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
 
       const booked = new Set<string>();
       for (const [id, bks] of Object.entries(bookMap)) {
-        if ((bks as any[]).some((b: any) => b.start < end && b.end > start)) booked.add(id);
+        if (bks.some((b) => b.start < end && b.end > start)) booked.add(id);
       }
       setBookedIds(booked);
 
       const held = new Set<string>();
       const now = Date.now();
       for (const [id, hs] of Object.entries(holdMap)) {
-        if ((hs as any[]).some((h: any) => h.start < end && h.end > start && h.expiresAt > now)) held.add(id);
+        if (hs.some((h) => h.start < end && h.end > start && h.expiresAt > now)) held.add(id);
       }
       setHeldIds(held);
     } catch {
