@@ -41,14 +41,17 @@ export function AvailabilityBookerPanel({ resourceId }: BookerPanelProps) {
         }
       }
       setSlots(expanded);
-      setSelectedSlot(null);
-      setConfirmed(false);
     } catch {
       setSlots([]);
     }
   }, [resourceId, date]);
 
   useEffect(() => { loadSlots(); }, [loadSlots]);
+
+  useEffect(() => {
+    setSelectedSlot(null);
+    setConfirmed(false);
+  }, [date]);
 
   const onWsEvent = useCallback(() => { loadSlots(); }, [loadSlots]);
   useWebSocket(resourceId ? { type: "subscribe", resourceId, onEvent: onWsEvent } : null);
