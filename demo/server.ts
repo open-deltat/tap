@@ -49,7 +49,6 @@ async function handleConfirm(ws: WebSocket, state: WsState, msg: any) {
   try {
     const holdId = state.holdId;
     state.holdId = null;
-    await dt.holds.release(holdId);
 
     const [booking] = await dt.bookings.create([{
       resourceId: state.resourceId,
@@ -57,6 +56,9 @@ async function handleConfirm(ws: WebSocket, state: WsState, msg: any) {
       end: state.end,
       label: msg.label || undefined,
     }]);
+
+    try { await dt.holds.release(holdId); } catch {}
+
     ws.send(JSON.stringify({ type: "confirmed", booking }));
   } catch (err) {
     ws.send(JSON.stringify({ type: "error", message: String(err) }));

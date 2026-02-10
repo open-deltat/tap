@@ -74,7 +74,6 @@ export function useHoldWebSocket(
         start: options.start,
         end: options.end,
       }));
-      setConnected(true);
     };
 
     ws.onmessage = (e) => {
@@ -86,9 +85,13 @@ export function useHoldWebSocket(
           return;
         }
         if (data.type === "error") {
+          setConnected(false);
           resolveRef.current?.reject(new Error(data.message));
           resolveRef.current = null;
           return;
+        }
+        if ("HoldPlaced" in data) {
+          setConnected(true);
         }
         onEventRef.current?.(data as DeltaTEvent);
       } catch {}

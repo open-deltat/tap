@@ -33,15 +33,17 @@ export class Bookings {
           .sql`INSERT INTO bookings (id, resource_id, start, "end") VALUES (${b.id}, ${b.resourceId}, ${b.start}, ${b.end})`;
       }
     } else {
-      const valuesList = bookings
-        .map(
-          (b) =>
-            `('${b.id}', '${b.resourceId}', ${b.start}, ${b.end}, ${b.label === null ? "NULL" : `'${b.label.replace(/'/g, "''")}'`})`
-        )
-        .join(", ");
+      const params: (string | number | boolean | null)[] = [];
+      const rows: string[] = [];
+      for (const b of bookings) {
+        const i = params.length;
+        params.push(b.id, b.resourceId, b.start, b.end, b.label);
+        rows.push(`($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}, $${i + 5})`);
+      }
 
       await this.sql.unsafe(
-        `INSERT INTO bookings (id, resource_id, start, "end", label) VALUES ${valuesList}`
+        `INSERT INTO bookings (id, resource_id, start, "end", label) VALUES ${rows.join(", ")}`,
+        params
       );
     }
 

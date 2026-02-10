@@ -12,7 +12,7 @@ const DURATIONS = [
   { label: "2h", minutes: 120 },
   { label: "4h", minutes: 240 },
   { label: "8h", minutes: 480 },
-  { label: "All Day", minutes: 1440 },
+  { label: "All Day", minutes: 1439 },
 ];
 
 interface ParkingControlsProps {

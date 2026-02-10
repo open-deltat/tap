@@ -3,7 +3,7 @@
 import { dt } from "@/lib/deltat";
 import { expandRecurrence } from "@open-tap/client";
 import * as store from "@/lib/store";
-import { findRootByName, baseMs } from "./seed-helpers";
+import { findRootByName, seedDateRange } from "./seed-helpers";
 
 const NAME = "Downtown Garage";
 
@@ -42,10 +42,7 @@ export async function seedParking(): Promise<string> {
   const existing = await findRootByName(NAME);
   if (existing) return existing;
 
-  const base = new Date(baseMs());
-  const fromDate = toDateStr(base);
-  const endDate = new Date(base.getTime() + 30 * 86_400_000);
-  const toDate = toDateStr(endDate);
+  const { fromDate, toDate } = seedDateRange(30);
 
   const garage = await dt.resources.create({ name: NAME });
   store.set(garage.id, { slotMinutes: 60, price: null });
@@ -86,8 +83,4 @@ export async function seedParking(): Promise<string> {
   }
 
   return garage.id;
-}
-
-function toDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
