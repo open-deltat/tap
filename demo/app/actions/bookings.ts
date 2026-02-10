@@ -30,6 +30,20 @@ export async function cancelBooking(id: string): Promise<void> {
   await dt.bookings.cancel(id);
 }
 
+export async function cancelBookingWithMirror(
+  bookingId: string,
+  calendarResourceId: string,
+  start: number,
+  end: number
+): Promise<void> {
+  await dt.bookings.cancel(bookingId);
+  const calBookings = await dt.bookings.get(calendarResourceId);
+  const match = calBookings.find((b) => b.start === start && b.end === end);
+  if (match) {
+    await dt.bookings.cancel(match.id);
+  }
+}
+
 export async function getBookingsForResource(
   resourceId: string
 ): Promise<Booking[]> {
@@ -51,4 +65,10 @@ export async function getMultiResourceBookings(
     resourceIds.map(async (id) => [id, await dt.bookings.get(id)] as const)
   );
   return Object.fromEntries(results);
+}
+
+export async function clearBookingsForResource(resourceId: string): Promise<number> {
+  const bookings = await dt.bookings.get(resourceId);
+  await Promise.all(bookings.map((b) => dt.bookings.cancel(b.id)));
+  return bookings.length;
 }

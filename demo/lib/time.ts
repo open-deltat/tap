@@ -7,3 +7,10 @@ export function toLocalDateString(date: Date): string {
 export function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
+
+export function dayBounds(date: Date): { dayStart: number; dayEnd: number } {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const dayStart = d.getTime();
+  return { dayStart, dayEnd: dayStart + 86_400_000 };
+}

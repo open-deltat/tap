@@ -10,57 +10,37 @@ const port = parseInt(process.env.PORT || "3000", 10);
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
-interface SubscribeMessage {
-  type: "subscribe";
-  resourceId: string;
-}
-
-interface HoldMessage {
-  type: "hold";
-  resourceId: string;
-  start: number;
-  end: number;
-  durationMinutes: number;
-}
-
-type InitMessage = SubscribeMessage | HoldMessage;
-
 interface WsState {
-  holdId: string | null;
   unlisten: (() => Promise<void>) | null;
+  holdId: string | null;
 }
 
-async function handleInit(ws: WebSocket, state: WsState, msg: InitMessage) {
-  if (msg.type === "hold") {
-    const hold = await dt.holds.place({
-      resourceId: msg.resourceId,
-      start: msg.start,
-      end: msg.end,
-      expiresAt: Date.now() + msg.durationMinutes * 60_000,
-    });
-    state.holdId = hold.id;
-    ws.send(JSON.stringify({ type: "hold_placed", hold }));
-  }
-
+async function handleInit(ws: WebSocket, state: WsState, msg: any) {
   state.unlisten = await dt.events.listen(msg.resourceId, (event) => {
     if (ws.readyState === ws.OPEN) {
       ws.send(JSON.stringify(event));
     }
   });
+
+  if (msg.type === "hold") {
+    const hold = await dt.holds.place({
+      resourceId: msg.resourceId,
+      start: msg.start,
+      end: msg.end,
+      expiresAt: Date.now() + 300_000,
+    });
+    state.holdId = hold.id;
+  }
 }
 
 async function handleClose(state: WsState) {
+  if (state.holdId) {
+    try { await dt.holds.release(state.holdId); } catch {}
+    state.holdId = null;
+  }
   if (state.unlisten) {
     await state.unlisten();
     state.unlisten = null;
-  }
-  if (state.holdId) {
-    try {
-      await dt.holds.release(state.holdId);
-    } catch {
-      // Hold may have already expired
-    }
-    state.holdId = null;
   }
 }
 
@@ -79,11 +59,10 @@ server.on("upgrade", (req, socket, head) => {
       wss.emit("connection", ws);
     });
   }
-  // Non-/ws upgrades (e.g. Next.js HMR) fall through to Next.js's own listener
 });
 
 wss.on("connection", (ws) => {
-  const state: WsState = { holdId: null, unlisten: null };
+  const state: WsState = { unlisten: null, holdId: null };
   let initialized = false;
 
   ws.on("message", async (raw) => {
@@ -91,7 +70,7 @@ wss.on("connection", (ws) => {
     initialized = true;
 
     try {
-      const msg: InitMessage = JSON.parse(String(raw));
+      const msg = JSON.parse(String(raw));
       await handleInit(ws, state, msg);
     } catch (err) {
       ws.send(JSON.stringify({ type: "error", message: String(err) }));

@@ -3,14 +3,11 @@
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import {
-  Home,
   Plane,
   Theater,
   LandPlot,
   Calendar,
   CalendarClock,
-  Clock,
-  Radio,
   BookOpen,
   Sun,
   Moon,
@@ -19,14 +16,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Home", icon: Home },
   { href: "/demos/airline", label: "Airline", icon: Plane },
   { href: "/demos/theater", label: "Theater", icon: Theater },
   { href: "/demos/stadium", label: "Stadium", icon: LandPlot },
   { href: "/demos/calendar", label: "Calendar", icon: Calendar },
   { href: "/demos/scheduling", label: "Scheduling", icon: CalendarClock },
-  { href: "/demos/holds", label: "Holds", icon: Clock },
-  { href: "/demos/realtime", label: "Realtime", icon: Radio },
   { href: "/bookings", label: "Bookings", icon: BookOpen },
 ];
 
@@ -44,8 +38,7 @@ export function NavHeader() {
       {/* Navigation */}
       <nav className="flex items-center gap-1">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active =
-            href === "/" ? pathname === "/" : pathname.startsWith(href);
+          const active = pathname.startsWith(href);
           return (
             <a
               key={href}
