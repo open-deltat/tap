@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useTransition } from "react";
+import { useEffect, useState, useCallback, useTransition, useRef } from "react";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,12 +10,17 @@ import { cn } from "@/lib/utils";
 import { SeatMap, type SeatSection } from "@/components/seat-map";
 import { CancelBookingDialog } from "@/components/booking-dialog";
 import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
+import type { Hold } from "@open-tap/client";
 import { toLocalDateString, formatTime } from "@/lib/time";
 import { buildSections, allSeatIds } from "@/lib/seat-sections";
+import { usePersonalCalendar } from "@/components/personal-calendar-provider";
+import { useWebSocket, wsUrl } from "@/hooks/use-websocket";
 
 import { getResources } from "@/app/actions/resources";
 import { getAvailability, getMultiResourceAvailability } from "@/app/actions/availability";
-import { getMultiResourceBookings, batchBookSlots, cancelBooking } from "@/app/actions/bookings";
+import { getMultiResourceBookings, batchBookSlots, cancelBooking, cancelBookingWithMirror } from "@/app/actions/bookings";
+import { getMultiResourceHolds } from "@/app/actions/holds";
+import { formatError } from "@/lib/format-error";
 
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -25,6 +30,7 @@ function formatDuration(minutes: number): string {
 }
 
 export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> }) {
+  const { calendarId } = usePersonalCalendar();
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -38,16 +44,26 @@ export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> })
 
   const [availability, setAvailability] = useState<Map<string, AvailabilitySlot[]>>(new Map());
   const [bookings, setBookings] = useState<Map<string, Booking[]>>(new Map());
+  const [holds, setHolds] = useState<Map<string, Hold[]>>(new Map());
   const [selectedSeats, setSelectedSeats] = useState<Set<string>>(new Set());
   const [bookingLabel, setBookingLabel] = useState("");
 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
 
+  // Per-seat hold WS connections: open WS = hold active, close WS = hold released
+  const holdWsRef = useRef(new Map<string, WebSocket>());
+
   const venue = resources.find((r) => r.id === venueId) ?? null;
   const sections = venueId ? buildSections(venueId, resources) : [];
   const venues = resources.filter((r) => venueIds.includes(r.id));
 
+  function closeAllHolds() {
+    for (const ws of holdWsRef.current.values()) ws.close();
+    holdWsRef.current.clear();
+  }
+
+  // Load venue availability when venue/date changes
   useEffect(() => {
     if (!venueId || !date) return;
     const dayStart = new Date(`${date}T00:00`).getTime();
@@ -57,9 +73,11 @@ export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> })
     getAvailability(venueId, dayStart, dayEnd)
       .then((slots) => {
         setVenueSlots(slots);
-        setSelectedSlot(null);
+        setSelectedSlot(slots.length > 0 ? { start: slots[0].start, end: slots[0].end } : null);
         setAvailability(new Map());
         setBookings(new Map());
+        setHolds(new Map());
+        closeAllHolds();
         setSelectedSeats(new Set());
       })
       .catch((err) => {
@@ -68,20 +86,31 @@ export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> })
       });
   }, [venueId, date, resources]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load seat data (availability, bookings, holds) for a time range
   const loadSeatData = useCallback(
     async (seatIds: string[], start: number, end: number) => {
       if (seatIds.length === 0) return;
       try {
-        const [availMap, bookMap] = await Promise.all([
+        const [availMap, bookMap, holdMap] = await Promise.all([
           getMultiResourceAvailability(seatIds, start, end),
           getMultiResourceBookings(seatIds),
+          getMultiResourceHolds(seatIds),
         ]);
         setAvailability(new Map(Object.entries(availMap)));
-        const filtered = new Map<string, Booking[]>();
+        const filteredBookings = new Map<string, Booking[]>();
         for (const [id, bks] of Object.entries(bookMap)) {
-          filtered.set(id, (bks as Booking[]).filter((b) => b.start < end && b.end > start));
+          filteredBookings.set(id, (bks as Booking[]).filter((b) => b.start < end && b.end > start));
         }
-        setBookings(filtered);
+        setBookings(filteredBookings);
+        const now = Date.now();
+        const filteredHolds = new Map<string, Hold[]>();
+        for (const [id, hs] of Object.entries(holdMap)) {
+          filteredHolds.set(
+            id,
+            (hs as Hold[]).filter((h) => h.start < end && h.end > start && h.expiresAt > now)
+          );
+        }
+        setHolds(filteredHolds);
       } catch (err) {
         console.error("Failed to load seat data:", err);
         toast.error("Failed to load seat data");
@@ -90,14 +119,31 @@ export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> })
     []
   );
 
+  // Reload seat data when slot changes
   useEffect(() => {
     if (!selectedSlot || !venueId) return;
     const seatIds = allSeatIds(buildSections(venueId, resources));
     if (seatIds.length === 0) return;
     loadSeatData(seatIds, selectedSlot.start, selectedSlot.end);
+    closeAllHolds();
     setSelectedSeats(new Set());
   }, [selectedSlot]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Cleanup hold connections on unmount
+  useEffect(() => {
+    return () => closeAllHolds();
+  }, []);
+
+  // Real-time updates via WebSocket (venue-level subscription)
+  const onWsEvent = useCallback(() => {
+    if (selectedSlot && venueId) {
+      const seatIds = allSeatIds(buildSections(venueId, resources));
+      if (seatIds.length > 0) loadSeatData(seatIds, selectedSlot.start, selectedSlot.end);
+    }
+  }, [selectedSlot, venueId, resources, loadSeatData]);
+  useWebSocket(venueId ? { type: "subscribe", resourceId: venueId, onEvent: onWsEvent } : null);
+
+  // Seed on mount
   useEffect(() => {
     async function init() {
       try {
@@ -117,12 +163,39 @@ export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> })
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleToggleSeat(seatId: string) {
-    setSelectedSeats((prev) => {
-      const next = new Set(prev);
-      if (next.has(seatId)) next.delete(seatId);
-      else next.add(seatId);
-      return next;
-    });
+    if (!selectedSlot) return;
+
+    if (selectedSeats.has(seatId)) {
+      // Deselect: close WS → server releases hold
+      const ws = holdWsRef.current.get(seatId);
+      if (ws) { ws.close(); holdWsRef.current.delete(seatId); }
+      setSelectedSeats((prev) => {
+        const next = new Set(prev);
+        next.delete(seatId);
+        return next;
+      });
+    } else {
+      // Select: open WS → server places hold
+      const ws = new WebSocket(wsUrl());
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          type: "hold",
+          resourceId: seatId,
+          start: selectedSlot.start,
+          end: selectedSlot.end,
+        }));
+      };
+      ws.onerror = () => {
+        holdWsRef.current.delete(seatId);
+        setSelectedSeats((prev) => {
+          const next = new Set(prev);
+          next.delete(seatId);
+          return next;
+        });
+      };
+      holdWsRef.current.set(seatId, ws);
+      setSelectedSeats((prev) => new Set(prev).add(seatId));
+    }
   }
 
   function getSeatSection(seatId: string): SeatSection | undefined {
@@ -138,20 +211,33 @@ export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> })
     if (selectedSeats.size === 0 || !selectedSlot) return;
     startTransition(async () => {
       try {
-        const slots = Array.from(selectedSeats).map((seatId) => ({
+        // Close hold connections → releases holds on server
+        closeAllHolds();
+
+        const seatList = Array.from(selectedSeats);
+        const slots = seatList.map((seatId) => ({
           resourceId: seatId,
           start: selectedSlot.start,
           end: selectedSlot.end,
           label: bookingLabel,
         }));
+        if (calendarId) {
+          const names = seatList.map(seatName).sort().join(", ");
+          slots.push({
+            resourceId: calendarId,
+            start: selectedSlot.start,
+            end: selectedSlot.end,
+            label: `${venue?.name ?? "Booking"} ${names}`.trim(),
+          });
+        }
         await batchBookSlots(slots);
-        toast.success(`Booked ${slots.length} seat${slots.length > 1 ? "s" : ""}`);
+        toast.success(`Booked ${seatList.length} seat${seatList.length > 1 ? "s" : ""}`);
         setSelectedSeats(new Set());
         setBookingLabel("");
         const seatIds = allSeatIds(sections);
         await loadSeatData(seatIds, selectedSlot.start, selectedSlot.end);
       } catch (err: any) {
-        toast.error(err.message ?? "Booking failed — seats may be taken");
+        toast.error(formatError(err.message) ?? "Booking failed — seats may be taken");
       }
     });
   }
@@ -166,12 +252,16 @@ export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> })
     setCancelDialogOpen(false);
     startTransition(async () => {
       try {
-        await cancelBooking(cancelTarget.id);
+        if (calendarId) {
+          await cancelBookingWithMirror(cancelTarget.id, calendarId, cancelTarget.start, cancelTarget.end);
+        } else {
+          await cancelBooking(cancelTarget.id);
+        }
         toast.success("Booking cancelled");
         const seatIds = allSeatIds(sections);
         await loadSeatData(seatIds, selectedSlot.start, selectedSlot.end);
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to cancel booking");
+        toast.error(formatError(err.message) ?? "Failed to cancel booking");
       }
     });
   }
@@ -194,6 +284,15 @@ export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> })
       if (seat) return seat.name;
     }
     return seatId;
+  }
+
+  // Filter out my holds so they show as selected (green) not held (amber)
+  const myHeldSeatIds = new Set(holdWsRef.current.keys());
+  const otherHolds = new Map<string, Hold[]>();
+  for (const [seatId, seatHolds] of holds) {
+    if (!myHeldSeatIds.has(seatId)) {
+      otherHolds.set(seatId, seatHolds);
+    }
   }
 
   if (loading) {
@@ -379,6 +478,7 @@ export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> })
               sections={sections}
               availabilityByResource={availability}
               bookingsByResource={bookings}
+              holdsByResource={otherHolds}
               slotStart={selectedSlot.start}
               slotEnd={selectedSlot.end}
               selectedIds={selectedSeats}

@@ -17,10 +17,13 @@ import { useWebSocket } from "@/hooks/use-websocket";
 
 import { createResources, deleteResource, getResources, updateResourceSettings } from "@/app/actions/resources";
 import { addRule, addRecurringRules, editRule, deleteRule, getRulesForResource } from "@/app/actions/rules";
-import { bookSlot, cancelBooking, getBookingsForResource, getMultiResourceBookings } from "@/app/actions/bookings";
+import { batchBookSlots, cancelBooking, cancelBookingWithMirror, getBookingsForResource, getMultiResourceBookings } from "@/app/actions/bookings";
+import { usePersonalCalendar } from "@/components/personal-calendar-provider";
 import { getAvailability, getMultiResourceAvailability } from "@/app/actions/availability";
+import { formatError } from "@/lib/format-error";
 
 export default function CalendarPage() {
+  const { calendarId } = usePersonalCalendar();
   const [resources, setResources] = useState<Resource[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [weekOf, setWeekOf] = useState(() => weekStart(new Date()));
@@ -111,13 +114,10 @@ export default function CalendarPage() {
   }, [selectedId, weekOf, loadCalendarData]);
 
   // Real-time updates via WebSocket
-  useWebSocket(selectedId ? {
-    type: "subscribe",
-    resourceId: selectedId,
-    onEvent: useCallback(() => {
-      if (selectedId) loadCalendarData(selectedId, weekOf);
-    }, [selectedId, weekOf, loadCalendarData]),
-  } : null);
+  const wsOnEvent = useCallback(() => {
+    if (selectedId) loadCalendarData(selectedId, weekOf);
+  }, [selectedId, weekOf, loadCalendarData]);
+  useWebSocket(selectedId ? { type: "subscribe", resourceId: selectedId, onEvent: wsOnEvent } : null);
 
   function handleCreateChildren(parentId: string | null) {
     setCreateParentId(parentId);
@@ -139,7 +139,7 @@ export default function CalendarPage() {
         const count = created.length;
         toast.success(`Created ${count} resource${count > 1 ? "s" : ""}`);
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to create resources");
+        toast.error(formatError(err.message) ?? "Failed to create resources");
       }
     });
   }
@@ -155,7 +155,7 @@ export default function CalendarPage() {
         if (selectedId === id) setSelectedId(null);
         toast.success(`Deleted "${resource.name}"`);
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to delete resource");
+        toast.error(formatError(err.message) ?? "Failed to delete resource");
       }
     });
   }
@@ -177,7 +177,7 @@ export default function CalendarPage() {
         setResources(updated);
         toast.success("Settings updated");
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to update settings");
+        toast.error(formatError(err.message) ?? "Failed to update settings");
       }
     });
   }
@@ -201,7 +201,7 @@ export default function CalendarPage() {
           await loadCalendarData(selectedId, weekOf);
         }
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to add rule");
+        toast.error(formatError(err.message) ?? "Failed to add rule");
       }
     });
   }
@@ -223,7 +223,7 @@ export default function CalendarPage() {
           await loadCalendarData(selectedId, weekOf);
         }
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to add recurring rules");
+        toast.error(formatError(err.message) ?? "Failed to add recurring rules");
       }
     });
   }
@@ -240,7 +240,7 @@ export default function CalendarPage() {
           await loadCalendarData(selectedId, weekOf);
         }
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to update rule");
+        toast.error(formatError(err.message) ?? "Failed to update rule");
       }
     });
   }
@@ -254,7 +254,7 @@ export default function CalendarPage() {
           await loadCalendarData(selectedId, weekOf);
         }
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to delete rule");
+        toast.error(formatError(err.message) ?? "Failed to delete rule");
       }
     });
   }
@@ -270,16 +270,22 @@ export default function CalendarPage() {
     setBookingDialogOpen(false);
     startTransition(async () => {
       try {
-        await bookSlot({
-          resourceId: selectedId,
-          start: bookingSlot.start,
-          end: bookingSlot.end,
-          label: bookingLabel,
-        });
+        const slots = [
+          { resourceId: selectedId, start: bookingSlot.start, end: bookingSlot.end, label: bookingLabel },
+        ];
+        if (calendarId) {
+          slots.push({
+            resourceId: calendarId,
+            start: bookingSlot.start,
+            end: bookingSlot.end,
+            label: `${selectedResource?.name ?? "Calendar"} ${bookingLabel}`.trim(),
+          });
+        }
+        await batchBookSlots(slots);
         toast.success("Slot booked!");
         await loadCalendarData(selectedId, weekOf);
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to book slot");
+        toast.error(formatError(err.message) ?? "Failed to book slot");
       }
     });
   }
@@ -294,11 +300,15 @@ export default function CalendarPage() {
     setCancelDialogOpen(false);
     startTransition(async () => {
       try {
-        await cancelBooking(cancelTarget.id);
+        if (calendarId) {
+          await cancelBookingWithMirror(cancelTarget.id, calendarId, cancelTarget.start, cancelTarget.end);
+        } else {
+          await cancelBooking(cancelTarget.id);
+        }
         toast.success("Booking cancelled");
         await loadCalendarData(selectedId, weekOf);
       } catch (err: any) {
-        toast.error(err.message ?? "Failed to cancel booking");
+        toast.error(formatError(err.message) ?? "Failed to cancel booking");
       }
     });
   }
