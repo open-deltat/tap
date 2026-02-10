@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn, weekStart, weekDays } from "@/lib/utils";
 import { CancelBookingDialog } from "@/components/booking-dialog";
 import type { Resource, Booking } from "@/lib/schemas";
+import { formatTime } from "@/lib/time";
 
 import { getResources } from "@/app/actions/resources";
 import { getAllBookings, cancelBooking } from "@/app/actions/bookings";
@@ -82,10 +83,6 @@ function formatDate(ms: number): string {
     month: "short",
     day: "numeric",
   });
-}
-
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 function formatDuration(ms: number): string {

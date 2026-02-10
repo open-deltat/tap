@@ -40,6 +40,6 @@ for i in $(seq 1 30); do
     sleep 0.1
 done
 
-# Start Next.js dev server (foreground)
+# Start custom server (foreground)
 cd "$SCRIPT_DIR"
-exec bunx next dev
+exec bun run server.ts

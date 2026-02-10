@@ -10,59 +10,18 @@ import { cn } from "@/lib/utils";
 import { SeatMap, type SeatSection } from "@/components/seat-map";
 import { CancelBookingDialog } from "@/components/booking-dialog";
 import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
+import { toLocalDateString, formatTime } from "@/lib/time";
+import { buildSections, allSeatIds } from "@/lib/seat-sections";
 
 import { getResources } from "@/app/actions/resources";
 import { getAvailability, getMultiResourceAvailability } from "@/app/actions/availability";
 import { getMultiResourceBookings, batchBookSlots, cancelBooking } from "@/app/actions/bookings";
-
-function toLocalDateString(date: Date): string {
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60000);
-  return local.toISOString().slice(0, 10);
-}
-
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-}
 
 function formatDuration(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
-
-function buildSections(venueId: string, resources: Resource[]): SeatSection[] {
-  const children = resources.filter((r) => r.parentId === venueId);
-  const sections: SeatSection[] = [];
-
-  for (const child of children) {
-    const grandchildren = resources.filter((r) => r.parentId === child.id);
-    if (grandchildren.length > 0) {
-      sections.push({
-        id: child.id,
-        name: child.name ?? "",
-        price: child.price,
-        seats: grandchildren.map((s) => ({ id: s.id, name: s.name ?? s.id })),
-      });
-    }
-  }
-
-  if (sections.length === 0 && children.length > 0) {
-    const venue = resources.find((r) => r.id === venueId);
-    sections.push({
-      id: venueId,
-      name: venue?.name ?? "Seats",
-      price: venue?.price ?? null,
-      seats: children.map((s) => ({ id: s.id, name: s.name ?? s.id })),
-    });
-  }
-
-  return sections;
-}
-
-function allSeatIds(sections: SeatSection[]): string[] {
-  return sections.flatMap((s) => s.seats.map((seat) => seat.id));
 }
 
 export function SeatBookingPage({ seedFn }: { seedFn: () => Promise<string[]> }) {

@@ -11,7 +11,8 @@ import { CreateResourceDialog } from "@/components/create-resource-dialog";
 import { AddRuleDialog } from "@/components/add-rule-dialog";
 import { ResourceSettingsDialog } from "@/components/resource-settings-dialog";
 import type { Resource, Hold } from "@/lib/schemas";
-import { useResourceEvents } from "@/hooks/use-resource-events";
+import { formatTime } from "@/lib/time";
+import { useWebSocket } from "@/hooks/use-websocket";
 
 import {
   createResources,
@@ -46,13 +47,6 @@ function formatCountdown(ms: number): string {
   const s = totalSec % 60;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
-}
-
-function formatTime(ms: number): string {
-  return new Date(ms).toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
 
 function formatDate(ms: number): string {
@@ -134,10 +128,14 @@ export default function HoldsPage() {
     }
   }, [selectedId, loadHolds]);
 
-  // Real-time updates via SSE
-  useResourceEvents(selectedId, useCallback(() => {
-    if (selectedId) loadHolds(selectedId);
-  }, [selectedId, loadHolds]));
+  // Real-time updates via WebSocket
+  useWebSocket(selectedId ? {
+    type: "subscribe",
+    resourceId: selectedId,
+    onEvent: useCallback(() => {
+      if (selectedId) loadHolds(selectedId);
+    }, [selectedId, loadHolds]),
+  } : null);
 
   // Tick countdown every second
   useEffect(() => {

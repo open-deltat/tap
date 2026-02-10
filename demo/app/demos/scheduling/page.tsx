@@ -8,16 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import type { Resource } from "@/lib/schemas";
+import { toLocalDateString } from "@/lib/time";
 
 import { getResources } from "@/app/actions/resources";
 import { getCombinedAvailability } from "@/app/actions/availability";
 import { batchBookSlots } from "@/app/actions/bookings";
-
-function toLocalDateString(date: Date): string {
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60000);
-  return local.toISOString().slice(0, 10);
-}
 
 function formatTime(ms: number): string {
   const d = new Date(ms);
