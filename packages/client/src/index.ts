@@ -6,6 +6,12 @@ export { Bookings } from "./bookings.js";
 export { Holds } from "./holds.js";
 export { Availability } from "./availability.js";
 export { Events } from "./events.js";
+export { expandRecurrence } from "./recurrence.js";
+export type {
+  RecurrencePattern,
+  ExplicitSegment,
+  RuleSegment,
+} from "./recurrence.js";
 export type {
   Resource,
   Rule,

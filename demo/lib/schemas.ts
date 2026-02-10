@@ -11,6 +11,7 @@ export type {
 export interface ResourceMeta {
   slotMinutes: number;
   price: number | null;
+  maxGuests?: number;
 }
 
 // The demo's Resource = deltat Resource + app metadata + derived bufferMinutes

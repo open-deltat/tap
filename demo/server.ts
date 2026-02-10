@@ -13,9 +13,14 @@ const handle = app.getRequestHandler();
 interface WsState {
   unlisten: (() => Promise<void>) | null;
   holdId: string | null;
+  resourceId: string | null;
+  start: number | null;
+  end: number | null;
 }
 
 async function handleInit(ws: WebSocket, state: WsState, msg: any) {
+  state.resourceId = msg.resourceId;
+
   state.unlisten = await dt.events.listen(msg.resourceId, (event) => {
     if (ws.readyState === ws.OPEN) {
       ws.send(JSON.stringify(event));
@@ -23,6 +28,8 @@ async function handleInit(ws: WebSocket, state: WsState, msg: any) {
   });
 
   if (msg.type === "hold") {
+    state.start = msg.start;
+    state.end = msg.end;
     const hold = await dt.holds.place({
       resourceId: msg.resourceId,
       start: msg.start,
@@ -30,6 +37,29 @@ async function handleInit(ws: WebSocket, state: WsState, msg: any) {
       expiresAt: Date.now() + 300_000,
     });
     state.holdId = hold.id;
+  }
+}
+
+async function handleConfirm(ws: WebSocket, state: WsState, msg: any) {
+  if (!state.holdId || !state.resourceId || state.start == null || state.end == null) {
+    ws.send(JSON.stringify({ type: "error", message: "No active hold to confirm" }));
+    return;
+  }
+
+  try {
+    const holdId = state.holdId;
+    state.holdId = null;
+    await dt.holds.release(holdId);
+
+    const [booking] = await dt.bookings.create([{
+      resourceId: state.resourceId,
+      start: state.start,
+      end: state.end,
+      label: msg.label || undefined,
+    }]);
+    ws.send(JSON.stringify({ type: "confirmed", booking }));
+  } catch (err) {
+    ws.send(JSON.stringify({ type: "error", message: String(err) }));
   }
 }
 
@@ -62,19 +92,26 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 wss.on("connection", (ws) => {
-  const state: WsState = { unlisten: null, holdId: null };
+  const state: WsState = { unlisten: null, holdId: null, resourceId: null, start: null, end: null };
   let initialized = false;
 
   ws.on("message", async (raw) => {
-    if (initialized) return;
-    initialized = true;
-
     try {
       const msg = JSON.parse(String(raw));
-      await handleInit(ws, state, msg);
+
+      if (!initialized) {
+        initialized = true;
+        await handleInit(ws, state, msg);
+        return;
+      }
+
+      if (msg.type === "confirm") {
+        await handleConfirm(ws, state, msg);
+        return;
+      }
     } catch (err) {
       ws.send(JSON.stringify({ type: "error", message: String(err) }));
-      ws.close();
+      if (!initialized) ws.close();
     }
   });
 
