@@ -1,6 +1,7 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
+import { localUtcOffsetMinutes } from "@open-tap/client";
 import * as store from "@/lib/store";
 import { findRootByName, baseMs } from "./seed-helpers";
 
@@ -18,7 +19,7 @@ export async function seedAvailabilityScheduler(): Promise<string> {
     days: ["mon", "tue", "wed", "thu", "fri"],
     startTime: "09:00",
     endTime: "17:00",
-    utcOffsetMinutes: -new Date().getTimezoneOffset(),
+    utcOffsetMinutes: localUtcOffsetMinutes(),
   });
 
   const base = new Date(baseMs());

@@ -3,11 +3,12 @@
   "configVersion": 1,
   "workspaces": {
     "": {},
-    "cal": {
-      "name": "cal",
+    "calendar": {
+      "name": "calendar",
       "version": "0.1.0",
       "dependencies": {
         "@open-tap/client": "workspace:*",
+        "@open-tap/shared": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lucide-react": "^0.563.0",
@@ -39,6 +40,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@open-tap/client": "workspace:*",
+        "@open-tap/shared": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lucide-react": "^0.563.0",
@@ -76,6 +78,14 @@
       },
       "devDependencies": {
         "typescript": "^5",
+      },
+    },
+    "packages/shared": {
+      "name": "@open-tap/shared",
+      "version": "0.1.0",
+      "dependencies": {
+        "clsx": "^2.1.1",
+        "tailwind-merge": "^3.4.0",
       },
     },
   },
@@ -311,6 +321,8 @@
     "@open-draft/until": ["@open-draft/until@2.1.0", "", {}, "sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg=="],
 
     "@open-tap/client": ["@open-tap/client@workspace:packages/client"],
+
+    "@open-tap/shared": ["@open-tap/shared@workspace:packages/shared"],
 
     "@radix-ui/number": ["@radix-ui/number@1.1.1", "", {}, "sha512-MkKCwxlXTgz6CFoJx3pCwn07GKp36+aZyu/u2Ln2VrA5DcdyCZkASEDBTd8x5whTQQL5CiYf4prXKLcgQdv29g=="],
 
@@ -622,7 +634,7 @@
 
     "bytes": ["bytes@3.1.2", "", {}, "sha512-/Nf7TyzTx6S3yRJObOAV7956r8cr2+Oj8AC5dt8wSP3BQAoeX58NoHyCU8P8zGkNXStjTSi6fzO6F0pBdcYbEg=="],
 
-    "cal": ["cal@workspace:cal"],
+    "calendar": ["calendar@workspace:calendar"],
 
     "call-bind": ["call-bind@1.0.8", "", { "dependencies": { "call-bind-apply-helpers": "^1.0.0", "es-define-property": "^1.0.0", "get-intrinsic": "^1.2.4", "set-function-length": "^1.2.2" } }, "sha512-oKlSFMcMwpUg2ednkhQ454wfWiU/ul3CkJe/PEHcTKuiX6RpbehUiFMXu13HalGZxfUwCQzZG747YXBn1im9ww=="],
 
