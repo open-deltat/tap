@@ -1,0 +1,14 @@
+{
+  "name": "@open-tap/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./utils": "./src/utils.ts",
+    "./time": "./src/time.ts"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.4.0"
+  }
+}
