@@ -34,6 +34,11 @@ export function minutesToTime(minutes: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/** Server-side local UTC offset in minutes (e.g. EST = -300, UTC = 0). */
+export function localUtcOffsetMinutes(): number {
+  return -new Date().getTimezoneOffset();
+}
+
 export class Schedules {
   constructor(private readonly sql: Sql) {}
 

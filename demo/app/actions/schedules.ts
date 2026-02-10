@@ -1,6 +1,7 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
+import { localUtcOffsetMinutes } from "@open-tap/client";
 import type { Schedule, DayName } from "@open-tap/client";
 
 export async function setSchedule(input: {
@@ -11,7 +12,7 @@ export async function setSchedule(input: {
 }): Promise<Schedule> {
   return dt.schedules.set({
     ...input,
-    utcOffsetMinutes: -new Date().getTimezoneOffset(),
+    utcOffsetMinutes: localUtcOffsetMinutes(),
   });
 }
 

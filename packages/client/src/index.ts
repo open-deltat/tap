@@ -12,6 +12,7 @@ export {
   daysFromMask,
   timeToMinutes,
   minutesToTime,
+  localUtcOffsetMinutes,
 } from "./schedules.js";
 export { expandRecurrence } from "./recurrence.js";
 export type {

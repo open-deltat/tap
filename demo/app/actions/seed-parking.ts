@@ -1,6 +1,7 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
+import { localUtcOffsetMinutes } from "@open-tap/client";
 import * as store from "@/lib/store";
 import { findRootByName } from "./seed-helpers";
 
@@ -49,7 +50,7 @@ export async function seedParking(): Promise<string> {
     days: ["sun", "mon", "tue", "wed", "thu", "fri", "sat"],
     startTime: "00:00",
     endTime: "23:59",
-    utcOffsetMinutes: -new Date().getTimezoneOffset(),
+    utcOffsetMinutes: localUtcOffsetMinutes(),
   });
 
   for (const floor of FLOORS) {

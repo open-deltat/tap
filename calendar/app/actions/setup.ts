@@ -2,6 +2,7 @@
 
 import { dt } from "@/lib/deltat";
 import { config } from "@/lib/config";
+import { localUtcOffsetMinutes } from "@open-tap/client";
 import type { DayName, Schedule } from "@open-tap/client";
 
 const resourceName = `cal:${config.slug}`;
@@ -26,7 +27,7 @@ export async function saveSchedule(input: {
     days: input.days,
     startTime: input.startTime,
     endTime: input.endTime,
-    utcOffsetMinutes: -new Date().getTimezoneOffset(),
+    utcOffsetMinutes: localUtcOffsetMinutes(),
   });
 }
 
