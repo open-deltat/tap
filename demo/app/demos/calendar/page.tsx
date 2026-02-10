@@ -13,7 +13,7 @@ import { ResourceSettingsDialog } from "@/components/resource-settings-dialog";
 import { RulesPanel } from "@/components/rules-panel";
 import { weekStart } from "@/lib/utils";
 import type { Resource, Rule, AvailabilitySlot, Booking } from "@/lib/schemas";
-import { useResourceEvents } from "@/hooks/use-resource-events";
+import { useWebSocket } from "@/hooks/use-websocket";
 
 import { createResources, deleteResource, getResources, updateResourceSettings } from "@/app/actions/resources";
 import { addRule, addRecurringRules, editRule, deleteRule, getRulesForResource } from "@/app/actions/rules";
@@ -110,10 +110,14 @@ export default function CalendarPage() {
     }
   }, [selectedId, weekOf, loadCalendarData]);
 
-  // Real-time updates via SSE
-  useResourceEvents(selectedId, useCallback(() => {
-    if (selectedId) loadCalendarData(selectedId, weekOf);
-  }, [selectedId, weekOf, loadCalendarData]));
+  // Real-time updates via WebSocket
+  useWebSocket(selectedId ? {
+    type: "subscribe",
+    resourceId: selectedId,
+    onEvent: useCallback(() => {
+      if (selectedId) loadCalendarData(selectedId, weekOf);
+    }, [selectedId, weekOf, loadCalendarData]),
+  } : null);
 
   function handleCreateChildren(parentId: string | null) {
     setCreateParentId(parentId);

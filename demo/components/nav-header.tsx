@@ -10,6 +10,7 @@ import {
   Calendar,
   CalendarClock,
   Clock,
+  Radio,
   BookOpen,
   Sun,
   Moon,
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { href: "/demos/calendar", label: "Calendar", icon: Calendar },
   { href: "/demos/scheduling", label: "Scheduling", icon: CalendarClock },
   { href: "/demos/holds", label: "Holds", icon: Clock },
+  { href: "/demos/realtime", label: "Realtime", icon: Radio },
   { href: "/bookings", label: "Bookings", icon: BookOpen },
 ];
 
