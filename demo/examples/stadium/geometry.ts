@@ -18,18 +18,21 @@ export interface Transform {
 //   L0 Overview   — whole stadium fits, sections as blocks, no seats
 //   L1 Close-up   — one step in, bigger blocks, still no seats
 //   L2 Seats      — seats appear (this is SEAT_THRESHOLD)
-//   L3 Seats wide — one more step, seats large/clear
+//   L3 Individual — one more step, seats large/clear
+//   L4 Seat IDs   — deepest step: seats big enough to carry a row/seat label
 export const SEAT_LEVEL = 2;
 
 // Build the scale ladder for the current canvas size. L0 fits WORLD into the canvas;
-// L2 is the seat threshold; L1 sits geometrically between them; L3 is a step past seats.
+// L2 is the seat threshold; L1 sits geometrically between them; L3/L4 step past seats so
+// individual seats grow large enough to read a label.
 export function zoomLevels(viewW: number, viewH: number): number[] {
   const fit = fitScale(viewW, viewH);
   const l0 = Math.min(fit, SEAT_THRESHOLD * 0.5); // never start already near seats
   const l2 = SEAT_THRESHOLD;
   const l1 = Math.sqrt(l0 * l2); // geometric midpoint feels even between steps
   const l3 = SEAT_THRESHOLD * 1.6;
-  return [l0, l1, l2, l3];
+  const l4 = SEAT_THRESHOLD * 3.5; // individual seats — large enough for an ID label
+  return [l0, l1, l2, l3, l4];
 }
 
 // Largest scale that still fits the whole WORLD in the canvas, with a small margin.
@@ -50,7 +53,7 @@ export function transformCenteredOn(
 }
 
 // Human-readable name for each ladder level, indexed to match `zoomLevels`.
-const LEVEL_NAMES = ["Overview", "Close-up", "Seats", "Individual"] as const;
+const LEVEL_NAMES = ["Overview", "Close-up", "Seats", "Individual", "Seat IDs"] as const;
 
 export function levelName(level: number): string {
   return LEVEL_NAMES[Math.max(0, Math.min(LEVEL_NAMES.length - 1, level))];
@@ -169,4 +172,55 @@ export function gridDims(capacity: number, w: number, h: number): { cols: number
   const cols = Math.max(1, Math.round(Math.sqrt(capacity * aspect)));
   const rows = Math.max(1, Math.ceil(capacity / cols));
   return { cols, rows };
+}
+
+// Column count for a section's seat grid. Deterministic from the section's layout, so the
+// canvas (drawing), the booking label (which seat was taken) and the loader (parsing it back)
+// all agree on the same grid without passing geometry around.
+export function sectionCols(
+  ring: number,
+  idx: number,
+  ringCount: number,
+  assigned: boolean,
+  capacity: number
+): number {
+  const r = localRect(sectionFrame(ring, idx, ringCount, assigned));
+  return gridDims(capacity, r.w, r.h).cols;
+}
+
+// Cell index ⇄ human seat id (row letter + seat number), e.g. cell 0 → "A1". Used for the
+// on-canvas seat labels AND to record which exact seat a booking took, so booked seats render
+// where they were picked instead of collapsing to the first N cells.
+function rowLabel(row: number): string {
+  let s = "";
+  let n = row + 1; // bijective base-26: 1→A, 26→Z, 27→AA
+  while (n > 0) {
+    n -= 1;
+    s = String.fromCharCode(65 + (n % 26)) + s;
+    n = Math.floor(n / 26);
+  }
+  return s;
+}
+
+export function seatId(cell: number, cols: number): string {
+  const row = Math.floor(cell / cols);
+  const col = cell % cols;
+  return `${rowLabel(row)}${col + 1}`;
+}
+
+export function cellFromSeatId(id: string, cols: number): number | null {
+  const s = id.trim();
+  let i = 0;
+  while (i < s.length && s[i] >= "A" && s[i] <= "Z") i++;
+  const letters = s.slice(0, i);
+  const digits = s.slice(i);
+  if (!letters || !digits) return null;
+  const num = Number(digits);
+  if (!Number.isInteger(num) || num < 1) return null;
+  let row = 0;
+  for (const ch of letters) row = row * 26 + (ch.charCodeAt(0) - 64);
+  row -= 1;
+  const col = num - 1;
+  if (col >= cols) return null;
+  return row * cols + col;
 }

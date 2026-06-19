@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useTransition, useRef } from "react";
+import { useEffect, useState, useCallback, useTransition, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { Loader2, ZoomIn, ZoomOut, Maximize, Locate } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,9 @@ import {
   zoomLevels,
   transformCenteredOn,
   sectionFrame,
+  sectionCols,
+  seatId,
+  cellFromSeatId,
   nearestLevel,
   levelName,
 } from "./geometry";
@@ -36,6 +39,28 @@ interface Section extends CanvasSection {
   res: Resource;
   price: number;
   tier: string;
+}
+
+// Booking labels carry the exact seat after this marker, e.g. "Lower Bowl · Sec 305 · Seat B5".
+const SEAT_MARKER = " · Seat ";
+
+// Recover which exact cells are booked from their booking labels. Falls back to a deterministic
+// first-N when a booking lacks a parseable seat (premium boxes, legacy, or a duplicate cell),
+// so the count of dark cells always equals the number of bookings.
+function computeTakenCells(bookings: Booking[], cols: number, capacity: number): Set<number> {
+  const taken = Math.min(bookings.length, capacity);
+  const cells = new Set<number>();
+  for (const b of bookings) {
+    const label = b.label ?? "";
+    const at = label.lastIndexOf(SEAT_MARKER);
+    const cell = at >= 0 ? cellFromSeatId(label.slice(at + SEAT_MARKER.length), cols) : null;
+    if (cell != null && cell >= 0 && cell < capacity) cells.add(cell);
+  }
+  if (cells.size !== taken) {
+    cells.clear();
+    for (let i = 0; i < taken; i++) cells.add(i);
+  }
+  return cells;
 }
 
 // Fallback canvas size before the host element has measured (first render / SSR).
@@ -78,25 +103,34 @@ export default function StadiumExample() {
   // intermediate interpolated scale and get stuck.
   const targetLevelRef = useRef<number | null>(null);
 
-  const sections: Section[] = resources
-    .filter((r) => r.section != null)
-    .map((r) => {
-      const layout = r.section!;
-      const taken = (bookingsBySection.get(r.id) ?? []).length;
-      return {
-        id: r.id,
-        name: r.name ?? "",
-        res: r,
-        price: r.price ?? 0,
-        tier: layout.tier,
-        capacity: r.capacity,
-        remaining: Math.max(0, r.capacity - taken),
-        ring: layout.ring,
-        idx: layout.idx,
-        ringCount: layout.ringCount,
-        assigned: layout.assigned,
-      };
-    });
+  // Memoized on the data only (not transform), so panning/zooming doesn't re-parse seat labels
+  // or hand the canvas a new array every frame.
+  const sections: Section[] = useMemo(
+    () =>
+      resources
+        .filter((r) => r.section != null)
+        .map((r) => {
+          const layout = r.section!;
+          const bks = bookingsBySection.get(r.id) ?? [];
+          const cols = sectionCols(layout.ring, layout.idx, layout.ringCount, layout.assigned, r.capacity);
+          const taken = bks.length;
+          return {
+            id: r.id,
+            name: r.name ?? "",
+            res: r,
+            price: r.price ?? 0,
+            tier: layout.tier,
+            capacity: r.capacity,
+            remaining: Math.max(0, r.capacity - taken),
+            takenCells: computeTakenCells(bks, cols, r.capacity),
+            ring: layout.ring,
+            idx: layout.idx,
+            ringCount: layout.ringCount,
+            assigned: layout.assigned,
+          };
+        }),
+    [resources, bookingsBySection]
+  );
 
   const selected = sections.find((s) => s.id === selectedId) ?? null;
   const totalCapacity = sections.reduce((n, s) => n + s.capacity, 0);
@@ -217,8 +251,7 @@ export default function StadiumExample() {
     (hit: CanvasHit) => {
       // Zoomed in: toggle a free seat cell in the selection set. Clicks never change zoom.
       const s = hit.section;
-      const taken = s.capacity - s.remaining;
-      if (hit.cell < taken) return; // already booked
+      if (s.takenCells.has(hit.cell)) return; // already booked
       setSelectedId(s.id);
       setSelectedCells((prev) => {
         // Switching sections resets the selection.
@@ -268,15 +301,21 @@ export default function StadiumExample() {
 
   function book() {
     if (!selected || !slot) return;
-    const n = selected.assigned ? 1 : selectedCells.size;
-    if (n < 1) return;
     const sl = slot;
     const sec = selected;
-    const rows = Array.from({ length: n }, () => ({
+    // One booking per chosen cell, each labelled with its exact seat so it renders back where it
+    // was picked. A premium box is a single unit (cell 0) and needs no seat suffix.
+    const cells = sec.assigned ? [0] : Array.from(selectedCells);
+    const n = cells.length;
+    if (n < 1) return;
+    const cols = sectionCols(sec.ring, sec.idx, sec.ringCount, sec.assigned, sec.capacity);
+    const rows = cells.map((cell) => ({
       resourceId: sec.res.id,
       start: sl.start,
       end: sl.end,
-      label: `${sec.tier} · ${sec.res.name}`,
+      label: sec.assigned
+        ? `${sec.tier} · ${sec.res.name}`
+        : `${sec.tier} · ${sec.res.name}${SEAT_MARKER}${seatId(cell, cols)}`,
     }));
     startTransition(async () => {
       try {
