@@ -83,7 +83,7 @@ export const STEP_CAPTIONS: StepCaption[] = [
   {
     title: "Open windows",
     caption:
-      "availability() step 1 — non-blocking rules define the open band. Bob and Dora are both open 09:00–17:00.",
+      "availability() step 1 — non-blocking rules define the open band. Bob and Jane are both open 09:00–17:00.",
     layers: ["open"],
   },
   {
@@ -95,7 +95,7 @@ export const STEP_CAPTIONS: StepCaption[] = [
   {
     title: "Subtract bookings",
     caption:
-      "subtract_intervals(free, bookings) — Bob loses 09:00–10:00; Dora loses 09:00–12:00 (three appointments).",
+      "subtract_intervals(free, bookings) — Bob loses 09:00–10:00; Jane loses 09:00–12:00 (three appointments).",
     layers: ["open", "blocking", "booking"],
   },
   {
@@ -107,7 +107,7 @@ export const STEP_CAPTIONS: StepCaption[] = [
   {
     title: "Net availability",
     caption:
-      "The engine returns Bob [10:00, 17:00), Dora [12:00, 17:00) — dt.availability.get per resource.",
+      "The engine returns Bob [10:00, 17:00), Jane [12:00, 17:00) — dt.availability.get per resource.",
     layers: ["open", "blocking", "booking", "hold", "net"],
   },
   {

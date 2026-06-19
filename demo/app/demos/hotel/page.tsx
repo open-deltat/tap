@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition, useCallback } from "react";
+import { useEffect, useMemo, useState, useTransition, useCallback } from "react";
 import { toast } from "sonner";
-import { Loader2, X, DoorClosed } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { BookingConfirmedModal, type BookingResult } from "@/components/booking-
 import { ensureHotel, type HotelRoomType } from "@/app/actions/seed-hotel";
 import { batchBookSlots, getBookingsForResource, cancelBooking } from "@/app/actions/bookings";
 import { formatError } from "@/lib/format-error";
+import { bookedNightSets } from "./occupancy";
 
 const DAY = 86_400_000;
 
@@ -35,8 +36,8 @@ function rangeMs(range: DateRange | undefined): { start: number; end: number } |
 }
 
 interface TypeState {
-  reservations: Booking[]; // bookings overlapping the selected window
-  remaining: number;
+  all: Booking[]; // every booking for this type (drives the occupancy calendar)
+  remaining: number; // units free for the selected window (drives the book pane)
 }
 
 // Construct the minimal demo Resource the shared modal needs to render capacity.
@@ -69,6 +70,8 @@ export default function HotelPage() {
 
   const win = rangeMs(range);
   const nights = win ? Math.round((win.end - win.start) / DAY) : 0;
+  // The occupancy calendars open on the month the manager is currently booking into.
+  const defaultMonth = useMemo(() => new Date(win?.start ?? Date.now()), [win?.start]);
 
   const refresh = useCallback(
     async (rooms: HotelRoomType[], start: number, end: number) => {
@@ -76,9 +79,9 @@ export default function HotelPage() {
         rooms.map(async (rt) => {
           const all = await getBookingsForResource(rt.id);
           // A unit is consumed for this window if its booking overlaps [check-in, check-out).
-          const reservations = all.filter((b) => b.start < end && b.end > start);
-          const remaining = Math.max(0, rt.capacity - reservations.length);
-          return [rt.id, { reservations, remaining }] as const;
+          const used = all.filter((b) => b.start < end && b.end > start).length;
+          const remaining = Math.max(0, rt.capacity - used);
+          return [rt.id, { all, remaining }] as const;
         })
       );
       setState(Object.fromEntries(entries));
@@ -168,77 +171,30 @@ export default function HotelPage() {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-px overflow-hidden bg-white/[0.06] lg:grid-cols-2">
-        {/* Manage pane — visual floor plan */}
+        {/* Manage pane — per-type occupancy calendars */}
         <section className="flex min-h-0 flex-col overflow-auto bg-[#0a0a0c] p-6">
-          <h2 className="mb-1 text-xs font-semibold uppercase tracking-wider text-zinc-400">Front desk</h2>
-          <p className="mb-4 text-xs text-zinc-500">
-            Floor plan for {windowLabel}. Each door is one room of that type; the engine&apos;s
-            sweep blocks the (N+1)th overlapping stay.
-          </p>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                Occupancy
+              </h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                Booked nights per room type. Gaps are open inventory.
+              </p>
+            </div>
+            <OccupancyLegend />
+          </div>
           <div className="space-y-5">
-            {types.map((rt) => {
-              const s = state[rt.id];
-              const reservations = s?.reservations ?? [];
-              const used = reservations.length;
-              // One door per unit of capacity: booked doors first (carrying their label),
-              // then the free remainder.
-              return (
-                <div key={rt.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className="text-sm font-medium text-zinc-200">{rt.name}</div>
-                    <div className="font-mono text-xs text-zinc-400">
-                      {used}/{rt.capacity} booked
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {Array.from({ length: rt.capacity }).map((_, i) => {
-                      const res = reservations[i];
-                      const occupied = res != null;
-                      return (
-                        <div
-                          key={i}
-                          className={cn(
-                            "relative flex h-20 w-24 flex-col justify-between rounded-md border p-2 transition-colors",
-                            occupied
-                              ? "border-rose-500/40 bg-rose-500/10"
-                              : "border-emerald-500/40 bg-emerald-500/10"
-                          )}
-                        >
-                          <div className="flex items-center justify-between">
-                            <DoorClosed
-                              className={cn(
-                                "h-4 w-4",
-                                occupied ? "text-rose-300" : "text-emerald-300"
-                              )}
-                            />
-                            {occupied && (
-                              <button
-                                type="button"
-                                onClick={() => release(res)}
-                                disabled={isPending}
-                                className="text-rose-300/70 transition-colors hover:text-rose-200"
-                                aria-label="Cancel reservation"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            )}
-                          </div>
-                          <div
-                            className={cn(
-                              "truncate text-[10px] leading-tight",
-                              occupied ? "text-rose-200" : "text-emerald-300/80"
-                            )}
-                            title={occupied ? res.label ?? "Reserved" : "Available"}
-                          >
-                            {occupied ? res.label || "Reserved" : "Available"}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+            {types.map((rt) => (
+              <TypeOccupancyCalendar
+                key={rt.id}
+                type={rt}
+                bookings={state[rt.id]?.all ?? []}
+                defaultMonth={defaultMonth}
+                onCancel={release}
+                canceling={isPending}
+              />
+            ))}
           </div>
         </section>
 
@@ -317,6 +273,117 @@ export default function HotelPage() {
         onClose={() => setBookingResult(null)}
         onBookAnother={() => setBookingResult(null)}
       />
+    </div>
+  );
+}
+
+function OccupancyLegend() {
+  const items = [
+    { cls: "border-white/15 bg-white/[0.04]", label: "Free" },
+    { cls: "border-amber-500/40 bg-amber-500/25", label: "Partial" },
+    { cls: "border-rose-500/50 bg-rose-500/30", label: "Full" },
+  ];
+  return (
+    <div className="flex shrink-0 items-center gap-3 text-[10px] text-zinc-500">
+      {items.map((it) => (
+        <span key={it.label} className="flex items-center gap-1.5">
+          <span className={cn("h-3 w-3 rounded-sm border", it.cls)} />
+          {it.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// A fully-disabled calendar never renders DayButton, so modifier classNames land on the
+// day <td> alongside the disabled slot's opacity-50. Force opacity-100 (and !text) back so
+// highlighted nights stay legible.
+const occupancyModifierClasses = {
+  full: "bg-rose-500/30 !text-rose-100 rounded-md !opacity-100",
+  partial: "bg-amber-500/25 !text-amber-100 rounded-md !opacity-100",
+};
+
+function TypeOccupancyCalendar({
+  type,
+  bookings,
+  defaultMonth,
+  onCancel,
+  canceling,
+}: {
+  type: HotelRoomType;
+  bookings: Booking[];
+  defaultMonth: Date;
+  onCancel: (b: Booking) => void;
+  canceling: boolean;
+}) {
+  const { full, partial } = useMemo(
+    () => bookedNightSets(bookings, type.capacity),
+    [bookings, type.capacity]
+  );
+  const bookedNights = full.length + partial.length;
+  const sorted = useMemo(
+    () => [...bookings].sort((a, b) => a.start - b.start),
+    [bookings]
+  );
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-sm font-medium text-zinc-200">{type.name}</div>
+        <div className="font-mono text-xs text-zinc-400">
+          {type.capacity} room{type.capacity > 1 ? "s" : ""}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="rounded-md border border-white/10 bg-white/[0.02] p-2 [color-scheme:dark]">
+          <Calendar
+            defaultMonth={defaultMonth}
+            numberOfMonths={1}
+            disabled
+            modifiers={{ full, partial }}
+            modifiersClassNames={occupancyModifierClasses}
+            className="text-zinc-100"
+          />
+        </div>
+
+        <div className="flex flex-1 flex-col gap-2">
+          <div className="text-[11px] text-zinc-500">
+            {bookedNights === 0
+              ? "No nights booked"
+              : `${bookedNights} night${bookedNights > 1 ? "s" : ""} booked` +
+                (full.length > 0 ? ` · ${full.length} full` : "")}
+          </div>
+          {sorted.length > 0 && (
+            <ul className="flex flex-col gap-1">
+              {sorted.map((b) => (
+                <li
+                  key={b.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/[0.02] px-2.5 py-1.5 text-xs"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-zinc-300" title={b.label ?? "Reserved"}>
+                      {b.label || "Reserved"}
+                    </span>
+                    <span className="block text-[10px] text-zinc-500">
+                      {fmtDate(b.start)} → {fmtDate(b.end)}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onCancel(b)}
+                    disabled={canceling}
+                    className="shrink-0 text-rose-300/70 transition-colors hover:text-rose-200 disabled:opacity-40"
+                    aria-label="Cancel reservation"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

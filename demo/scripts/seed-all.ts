@@ -1,44 +1,27 @@
 /**
- * Pre-seed the database with every demo's boilerplate data in one shot.
+ * Pre-seed the database with the ENABLED examples' boilerplate in one shot.
  *
- *   DELTAT_PORT=5434 DELTAT_PASSWORD=deltat bun scripts/seed-all.ts
+ *   DELTAT_PORT=5434 DELTAT_PASSWORD=deltat bun scripts/seed-all.ts          # full catalog
+ *   DEMO_EXAMPLES=cinema DELTAT_PORT=5434 bun scripts/seed-all.ts            # cinema only
  *
- * Each seed is idempotent (it no-ops if its root already exists), so this is safe to re-run.
- * Useful for tests and for populating a fresh node so every example works immediately.
+ * Each seed is idempotent (no-ops if its root already exists), so this is safe to re-run.
+ * Which examples run is governed entirely by DEMO_EXAMPLES (see examples/config.ts).
  */
-import { seedAirline } from "@/app/actions/seed-airline";
-import { seedTheater } from "@/app/actions/seed-theater";
-import { seedStadium } from "@/app/actions/seed-stadium";
-import { seedCinema } from "@/app/actions/seed-cinema";
-import { seedRestaurant } from "@/app/actions/seed-restaurant";
-import { seedParking } from "@/app/actions/seed-parking";
-import { seedAvailabilityScheduler } from "@/app/actions/seed-availability-scheduler";
-import { ensurePersonalCalendar } from "@/app/actions/seed-personal-calendar";
-import { ensureMeetCalendars } from "@/app/actions/seed-meet";
-import { ensureHotel } from "@/app/actions/seed-hotel";
+import { enabledExampleIds } from "@/examples/config";
+import { SEEDS } from "@/examples/seeds";
 import { getResources } from "@/app/actions/resources";
 
-const SEEDS: [string, () => Promise<unknown>][] = [
-  ["Airline (2 flights, cabins, seats — some sold)", seedAirline],
-  ["Theater (Hamilton — sections, seats, showtimes)", seedTheater],
-  ["Stadium (sections, seats, events)", seedStadium],
-  ["Cinema (4 screens, films, showtimes — some sold)", seedCinema],
-  ["Restaurant (sections, tables)", seedRestaurant],
-  ["Parking (floors, zones, spots)", seedParking],
-  ["Availability scheduler", seedAvailabilityScheduler],
-  ["Personal calendar (availability windows)", ensurePersonalCalendar],
-  ["Meet (Alice & Bob calendars)", ensureMeetCalendars],
-  ["Hotel (room types with capacity)", ensureHotel],
-];
-
-console.log("Seeding all demo data…\n");
-for (const [label, fn] of SEEDS) {
-  await fn();
-  console.log(`  ✓ ${label}`);
+const ids = enabledExampleIds();
+console.log(`Seeding ${ids.length} example(s): ${ids.join(", ")}\n`);
+for (const id of ids) {
+  await SEEDS[id]();
+  console.log(`  ✓ ${id}`);
 }
 
 const all = await getResources();
 const roots = all.filter((r) => r.parentId === null);
-console.log(`\nDone. ${all.length} resources across ${roots.length} venues/calendars:`);
-for (const r of roots) console.log(`  · ${r.name} (${all.filter((c) => c.parentId === r.id).length} children)`);
+console.log(`\nDone. ${all.length} resources across ${roots.length} roots:`);
+for (const r of roots) {
+  console.log(`  · ${r.name} (${all.filter((c) => c.parentId === r.id).length} children)`);
+}
 process.exit(0);
