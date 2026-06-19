@@ -99,7 +99,6 @@ export function StadiumCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number>(0);
-  const drawScheduledRef = useRef(false);
 
   // Mutable mirrors so the rAF draw + pointer handlers read current values without
   // re-binding listeners on every render.
@@ -123,7 +122,6 @@ export function StadiumCanvas({
   }, [sections]);
 
   const draw = useCallback(() => {
-    drawScheduledRef.current = false;
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
@@ -209,9 +207,11 @@ export function StadiumCanvas({
     ctx.restore();
   }, []);
 
+  // Coalesce to one pending frame by cancel-and-reschedule. A boolean "already scheduled" guard
+  // can get stranded true if the frame is cancelled by an effect cleanup (StrictMode mount→
+  // cleanup→mount), after which every schedule no-ops and the canvas never paints.
   const scheduleDraw = useCallback(() => {
-    if (drawScheduledRef.current) return;
-    drawScheduledRef.current = true;
+    cancelAnimationFrame(frameRef.current);
     frameRef.current = requestAnimationFrame(draw);
   }, [draw]);
 
