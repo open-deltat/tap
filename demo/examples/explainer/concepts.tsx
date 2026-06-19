@@ -55,26 +55,28 @@ export function DataModelTopic() {
       <p className="mt-1 text-sm text-emerald-300/90">Three nested ideas, and one timeline that holds the rest.</p>
 
       <div className="mt-5 space-y-3">
-        <ConceptRow term="The database">
-          The whole thing, the one you run or rent. Everything inside it is private to you. One
-          company, one event company, one app. They never see each other&apos;s data.
+        <ConceptRow term="Tenant">
+          Your own private database, the one you run or rent. We call it a tenant. Everything inside
+          it is private to you. One company, one event company, one app. They never see each
+          other&apos;s data.
         </ConceptRow>
-        <ConceptRow term="A resource">
+        <ConceptRow term="Resource">
           Anything you can book. A seat, a hotel room, a restaurant table, a doctor, a whole venue.
-          Resources can sit inside each other, like a stadium that holds sections that hold seats,
-          and there can be a huge number of them.
+          A resource can sit inside another, like a stadium that holds sections that hold seats, and
+          there can be a huge number of them.
           <br />
           <span className="text-zinc-500">A stadium is about 80,000 seats, each one a resource.</span>
         </ConceptRow>
-        <ConceptRow term="A timeline">
-          Every resource has its own line of time. Bookings and closures are stretches on that line.
-          When you ask &quot;is this free at 8pm?&quot;, deltat looks at that one line and checks for overlap.
+        <ConceptRow term="Timeline">
+          Every resource has its own line of time, its timeline. Rules and bookings are stretches on
+          that timeline. When you ask &quot;is this free at 8pm?&quot;, deltat looks at that one timeline and
+          checks for overlap.
         </ConceptRow>
       </div>
 
       <h3 className="mt-7 text-base font-semibold text-zinc-100">How time is stored on a timeline</h3>
       <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">
-        Everything is just labelled stretches on the one line. There are only three kinds you store,
+        Everything is just labelled stretches on the timeline. There are only three kinds you store,
         and a fourth that deltat works out for you.
       </p>
 
@@ -84,23 +86,23 @@ export function DataModelTopic() {
 
       <div className="mt-4 space-y-3 text-[13px] leading-relaxed text-zinc-400">
         <p>
-          <span className="font-medium text-zinc-200">Open hours.</span> When a resource can be
-          booked at all, like a clinic open 9am to 5pm. You store these as stretches that say &quot;you
-          may book here&quot;.
+          <span className="font-medium text-zinc-200">Open hours</span> are stored as rules: stretches
+          that mark a resource open, like a clinic from 9am to 5pm.
         </p>
         <p>
-          <span className="font-medium text-zinc-200">Closed time.</span> Holidays, lunch, a day off,
-          maintenance. Stored as stretches that say &quot;you may not book here&quot;, punched out of the open
-          hours.
+          <span className="font-medium text-zinc-200">Closed time</span> is stored as blocking rules:
+          holidays, lunch, a day off, maintenance. They punch holes in the open hours.
         </p>
         <p>
-          <span className="font-medium text-zinc-200">Booked time.</span> Someone&apos;s actual schedule.
-          Each reservation is one stretch on the line, the slice of time it took.
+          <span className="font-medium text-zinc-200">Booked time</span> is stored as bookings. Each
+          reservation is one stretch on the timeline, the slice of time it took. A hold is the same
+          thing with a timer that frees it if nobody confirms.
         </p>
         <p>
-          <span className="font-medium text-zinc-200">Free time.</span> This one is not stored at all.
-          deltat takes the open hours, removes the closed time, removes the bookings, and what is left
-          is free. It works this out the instant you ask, so it can never go stale.
+          <span className="font-medium text-zinc-200">Free time</span> is the availability, and it is
+          not stored at all. deltat takes the open hours, removes the blocking rules, removes the
+          bookings and holds, and what is left is free. It works this out the instant you ask, so it
+          can never go stale.
         </p>
       </div>
     </div>

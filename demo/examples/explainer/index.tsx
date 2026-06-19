@@ -9,6 +9,7 @@ import { StepScrubber } from "./algebra/step-scrubber";
 import { HoldsStatic } from "./holds/holds-static";
 import { OverviewTopic } from "./overview";
 import { DataModelTopic } from "./concepts";
+import { RecurringTopic } from "./recurring";
 import { FlowTopic } from "./flow";
 import { StableTopic } from "./stable";
 import {
@@ -42,6 +43,7 @@ interface Ids {
 const NAV: { id: string; label: string }[] = [
   { id: "overview", label: "Why deltat" },
   { id: "model", label: "Data model" },
+  { id: "recurring", label: "Repeating times" },
   { id: "algebra", label: "Availability" },
   { id: "holds", label: "Holds and races" },
   { id: "flow", label: "Flow of a booking" },
@@ -221,6 +223,8 @@ export default function ExplainerExample() {
     content = <OverviewTopic />;
   } else if (topic === "model") {
     content = <DataModelTopic />;
+  } else if (topic === "recurring") {
+    content = <RecurringTopic />;
   } else if (topic === "holds") {
     content = <HoldsStatic />;
   } else if (topic === "flow") {
