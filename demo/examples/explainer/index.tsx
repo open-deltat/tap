@@ -6,10 +6,11 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AlgebraExplainer, type PersonData } from "./algebra/algebra-explainer";
 import { StepScrubber } from "./algebra/step-scrubber";
-import { HoldsNarrative } from "./holds/holds-narrative";
+import { HoldsStatic } from "./holds/holds-static";
 import { OverviewTopic } from "./overview";
-import { DataModelTopic, GlossaryTopic } from "./concepts";
-import { FEATURE_TOPICS, TopicCard } from "./topics";
+import { DataModelTopic } from "./concepts";
+import { FlowTopic } from "./flow";
+import { StableTopic } from "./stable";
 import {
   AXIS_START_HOUR,
   AXIS_END_HOUR,
@@ -41,10 +42,10 @@ interface Ids {
 const NAV: { id: string; label: string }[] = [
   { id: "overview", label: "Why deltat" },
   { id: "model", label: "Data model" },
-  { id: "glossary", label: "Glossary" },
-  { id: "algebra", label: "Availability algebra" },
-  { id: "holds", label: "Holds & races" },
-  ...FEATURE_TOPICS.map((t) => ({ id: t.id, label: t.label })),
+  { id: "algebra", label: "Availability" },
+  { id: "holds", label: "Holds and races" },
+  { id: "flow", label: "Flow of a booking" },
+  { id: "stable", label: "Same room, several nights" },
 ];
 
 const emptyPerson = (name: string): PersonData => ({
@@ -214,19 +215,18 @@ export default function ExplainerExample() {
   }
 
   const firstJointMs = combined.length > 0 ? combined[0].start : null;
-  const featureTopic = FEATURE_TOPICS.find((t) => t.id === topic);
 
   let content: ReactNode;
   if (topic === "overview") {
     content = <OverviewTopic />;
   } else if (topic === "model") {
     content = <DataModelTopic />;
-  } else if (topic === "glossary") {
-    content = <GlossaryTopic />;
   } else if (topic === "holds") {
-    content = <HoldsNarrative />;
-  } else if (featureTopic) {
-    content = <TopicCard topic={featureTopic} />;
+    content = <HoldsStatic />;
+  } else if (topic === "flow") {
+    content = <FlowTopic />;
+  } else if (topic === "stable") {
+    content = <StableTopic />;
   } else if (loading) {
     content = (
       <div className="flex h-full items-center justify-center text-zinc-400">
@@ -245,9 +245,9 @@ export default function ExplainerExample() {
             AVAIL-01
           </span>
         </div>
-        <h2 className="mt-2 text-2xl font-semibold text-zinc-100">How deltat computes availability</h2>
+        <h2 className="mt-2 text-2xl font-semibold text-zinc-100">How deltat works out free time</h2>
         <p className="mt-1 text-sm text-emerald-300/90">
-          Open hours minus blocks minus bookings minus holds — then the intersection of two people.
+          Start with open hours, take away the busy time, and what is left is free. Then find when two people are free at once.
         </p>
 
         <div className="mt-6">
@@ -287,10 +287,8 @@ export default function ExplainerExample() {
         </div>
 
         <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
-          Every band is a real deltat read: rules give the open band,{" "}
-          <span className="text-zinc-300">getAvailability</span> gives each net, and{" "}
-          <span className="text-emerald-300">getCombinedAvailability(min_available = 2)</span> gives the
-          intersection — which starts at {firstJointMs ? formatTime(firstJointMs) : "—"}.
+          Every band here is read live from deltat. The bottom one is the time Bob and Jane are both
+          free. It starts at {firstJointMs ? formatTime(firstJointMs) : "no shared time today"}.
         </p>
       </div>
     );
