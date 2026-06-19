@@ -8,6 +8,7 @@ import { AlgebraExplainer, type PersonData } from "./algebra/algebra-explainer";
 import { StepScrubber } from "./algebra/step-scrubber";
 import { HoldsNarrative } from "./holds/holds-narrative";
 import { OverviewTopic } from "./overview";
+import { DataModelTopic, GlossaryTopic } from "./concepts";
 import { FEATURE_TOPICS, TopicCard } from "./topics";
 import {
   AXIS_START_HOUR,
@@ -39,6 +40,8 @@ interface Ids {
 // Sidebar: the first-principles overview, two interactive walkthroughs, then the feature explainers.
 const NAV: { id: string; label: string }[] = [
   { id: "overview", label: "Why deltat" },
+  { id: "model", label: "Data model" },
+  { id: "glossary", label: "Glossary" },
   { id: "algebra", label: "Availability algebra" },
   { id: "holds", label: "Holds & races" },
   ...FEATURE_TOPICS.map((t) => ({ id: t.id, label: t.label })),
@@ -216,6 +219,10 @@ export default function ExplainerExample() {
   let content: ReactNode;
   if (topic === "overview") {
     content = <OverviewTopic />;
+  } else if (topic === "model") {
+    content = <DataModelTopic />;
+  } else if (topic === "glossary") {
+    content = <GlossaryTopic />;
   } else if (topic === "holds") {
     content = <HoldsNarrative />;
   } else if (featureTopic) {
