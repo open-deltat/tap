@@ -83,37 +83,37 @@ export const STEP_CAPTIONS: StepCaption[] = [
   {
     title: "Open hours",
     caption:
-      "Start with when each person works — their open band. Bob and Jane are both open 09:00–17:00. That's the most they could ever be free. (rules → open band)",
+      "Start with when each person works. Bob and Jane are both open from 9am to 5pm. That is the most they could ever be free.",
     layers: ["open"],
   },
   {
-    title: "Cut out closures",
+    title: "Take out closed time",
     caption:
-      "Remove any blocked-off time — holidays, lunch blocks, closures. Neither has one today, so the band is unchanged. (subtract blocking rules)",
+      "Take away any blocked time, like a holiday or a lunch break. Neither has one today, so nothing changes yet.",
     layers: ["open", "blocking"],
   },
   {
-    title: "Cut out what's booked",
+    title: "Take out what is booked",
     caption:
-      "Now remove what's already on the calendar. Bob has a 09:00–10:00 meeting; Jane has back-to-back meetings 09:00–12:00. Those exact spans are punched out of the band.",
+      "Take away what is already on the calendar. Bob has a meeting from 9 to 10. Jane has back to back meetings from 9 to 12. Those exact slices are removed.",
     layers: ["open", "blocking", "booking"],
   },
   {
-    title: "Cut out live holds",
+    title: "Take out live holds",
     caption:
-      "Pending holds (someone mid-booking) subtract too, while their timer is alive — then reappear when it expires. Click the Both-free lane to place one and watch both bands shrink in real time.",
+      "Holds count too while their timer is alive, then come back when it runs out. Click the Both free lane to place one and watch both bands shrink.",
     layers: ["open", "blocking", "booking", "hold"],
   },
   {
-    title: "What's left = availability",
+    title: "What is left is free",
     caption:
-      "Open hours minus closures minus bookings minus holds = each person's real free time: Bob 10:00–17:00, Jane 12:00–17:00. That subtraction is the whole availability query.",
+      "Open hours, then take away closed time, bookings, and holds. What is left is each person's free time. Bob is free from 10 to 5, Jane from 12 to 5. That subtraction is the whole idea.",
     layers: ["open", "blocking", "booking", "hold", "net"],
   },
   {
-    title: "When are BOTH free?",
+    title: "When are both free?",
     caption:
-      "Overlap the two free bands to find shared time — it starts at the later of the two starts, 12:00. One query does this across both people at once. (getCombined, min_available = 2)",
+      "Lay the two free bands on top of each other to find shared time. It starts at the later of the two, which is 12. One question answers this for both people at once.",
     layers: ["open", "blocking", "booking", "hold", "net", "combined"],
   },
 ];
