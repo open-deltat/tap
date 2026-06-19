@@ -19,7 +19,7 @@ const TYPES = [
 
 export type HotelRoomType = { id: string; name: string; capacity: number };
 
-export async function ensureHotel(): Promise<HotelRoomType[]> {
+export async function ensureHotel(): Promise<{ rootId: string; rooms: HotelRoomType[] }> {
   let hotelId = await findRootByName(NAME);
 
   if (!hotelId) {
@@ -71,9 +71,12 @@ export async function ensureHotel(): Promise<HotelRoomType[]> {
     ]);
     // Suite (1 room): each stay fully blocks it.
     await bookStays(byName("Suite").id, [[1, 2], [7, 2], [12, 2], [20, 5]]);
-    return created;
+    return { rootId: hotelId, rooms: created };
   }
 
   const children = await dt.resources.get({ parentId: hotelId });
-  return children.map((c) => ({ id: c.id, name: c.name ?? "Room", capacity: c.capacity }));
+  return {
+    rootId: hotelId,
+    rooms: children.map((c) => ({ id: c.id, name: c.name ?? "Room", capacity: c.capacity })),
+  };
 }

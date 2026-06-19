@@ -18,7 +18,7 @@ export function HoldsNarrative() {
 
   useEffect(() => {
     if (paused) return;
-    timer.current = setTimeout(() => setStep((s) => (s + 1) % HOLDS_STEP_COUNT), 2400);
+    timer.current = setTimeout(() => setStep((s) => (s + 1) % HOLDS_STEP_COUNT), 2000);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
