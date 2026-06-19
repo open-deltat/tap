@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState, useTransition, useCallback } from "react";
+import { useEffect, useState, useTransition, useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { Loader2, X, Minus, Plus } from "lucide-react";
+import { Loader2, X, CalendarRange, Wand2 } from "lucide-react";
+import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 import type { Booking, Resource } from "@/lib/schemas";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 
@@ -13,11 +16,24 @@ import { CHECK_IN_HOUR, CHECK_OUT_HOUR } from "./policy";
 import { batchBookSlots, getBookingsForResource, cancelBooking } from "@/app/actions/bookings";
 import { formatError } from "@/lib/format-error";
 import { AvailabilityStrip } from "./availability-strip";
+import { occupancyByNight, bookedNightSets, stableOpenings } from "./occupancy";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
+const HORIZON = 30; // nights bookable from today
 const fmt = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 const hourLabel = (h: number) => `${((h + 11) % 12) + 1} ${h < 12 ? "AM" : "PM"}`;
+const midnight = (d: Date) => {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x.getTime();
+};
+const addDays = (ms: number, n: number) => {
+  const x = new Date(ms);
+  x.setDate(x.getDate() + n);
+  x.setHours(0, 0, 0, 0);
+  return x;
+};
 
 function asResource(rt: HotelRoomType): Resource {
   return {
@@ -35,17 +51,14 @@ function asResource(rt: HotelRoomType): Resource {
 export default function HotelPage() {
   const [types, setTypes] = useState<HotelRoomType[]>([]);
   const [bookingsByType, setBookingsByType] = useState<Record<string, Booking[]>>({});
-  const [nights, setNights] = useState(2);
+  const [selTypeId, setSelTypeId] = useState<string | null>(null);
+  const [range, setRange] = useState<DateRange | undefined>();
   const [guest, setGuest] = useState("");
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<BookingResult | null>(null);
 
-  const today = (() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d.getTime();
-  })();
+  const todayMs = useMemo(() => midnight(new Date()), []);
 
   const refresh = useCallback(async (rooms: HotelRoomType[]) => {
     const entries = await Promise.all(
@@ -59,6 +72,7 @@ export default function HotelPage() {
       try {
         const rooms = await ensureHotel();
         setTypes(rooms);
+        setSelTypeId(rooms[0]?.id ?? null);
         await refresh(rooms);
       } catch {
         toast.error("Failed to connect to deltat. Is it running?");
@@ -69,21 +83,68 @@ export default function HotelPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function book(rt: HotelRoomType, startMidnight: number, n: number) {
-    // Check-in 3 PM on the first day → check-out 11 AM on the (start + n) day.
-    const start = startMidnight + CHECK_IN_HOUR * HOUR;
-    const end = startMidnight + n * DAY + CHECK_OUT_HOUR * HOUR;
-    const label = guest.trim() ? `${guest.trim()} · ${n}-night stay` : `${n}-night stay`;
+  const selType = types.find((t) => t.id === selTypeId) ?? types[0] ?? null;
+  const selBookings = useMemo(
+    () => (selType ? bookingsByType[selType.id] ?? [] : []),
+    [selType, bookingsByType]
+  );
+
+  // Per-night occupancy for the chosen type — validates the picked range and marks full nights.
+  const occ = useMemo(() => occupancyByNight(selBookings), [selBookings]);
+  const fullNights = useMemo(
+    () => (selType ? bookedNightSets(selBookings, selType.capacity).full : []),
+    [selBookings, selType]
+  );
+
+  const fromMs = range?.from ? midnight(range.from) : null;
+  const toMs = range?.to ? midnight(range.to) : null;
+
+  // Nights actually slept: check-in date .. the night before check-out (DST-safe date cursor).
+  const nightTs = useMemo(() => {
+    if (fromMs == null || toMs == null || toMs <= fromMs) return [];
+    const out: number[] = [];
+    const c = new Date(fromMs);
+    while (c.getTime() < toMs) {
+      out.push(c.getTime());
+      c.setDate(c.getDate() + 1);
+    }
+    return out;
+  }, [fromMs, toMs]);
+
+  const nights = nightTs.length;
+  const spanValid =
+    selType != null && nights > 0 && nightTs.every((t) => (occ.get(t)?.taken ?? 0) < selType.capacity);
+
+  function applyOpening(kind: "soonest" | "longest") {
+    if (!selType) return;
+    const ops = stableOpenings(selBookings, selType.capacity, 1, todayMs, HORIZON);
+    if (ops.length === 0) {
+      toast.error("No openings in the next 30 nights");
+      return;
+    }
+    const pick = kind === "longest" ? ops.reduce((a, b) => (b.nights > a.nights ? b : a)) : ops[0];
+    // Soonest defaults to a 2-night stay (capped to the opening); longest takes the whole run.
+    const n = kind === "longest" ? pick.nights : Math.min(2, pick.nights);
+    setRange({ from: new Date(pick.start), to: addDays(pick.start, n) });
+  }
+
+  function book() {
+    if (!selType || fromMs == null || nights < 1 || !spanValid) return;
+    const rt = selType;
+    const start = fromMs + CHECK_IN_HOUR * HOUR;
+    const end = fromMs + nights * DAY + CHECK_OUT_HOUR * HOUR;
+    const label = guest.trim() ? `${guest.trim()} · ${nights}-night stay` : `${nights}-night stay`;
     startTransition(async () => {
       try {
         const created = await batchBookSlots([{ resourceId: rt.id, start, end, label }]);
         setResult({
-          title: `${rt.name} · ${n} night${n > 1 ? "s" : ""}`,
+          title: `${rt.name} · ${nights} night${nights > 1 ? "s" : ""}`,
           subtitle: `${fmt(start)} ${hourLabel(CHECK_IN_HOUR)} → ${fmt(end)} ${hourLabel(CHECK_OUT_HOUR)}`,
           bookings: created,
           resources: [asResource(rt)],
         });
         setGuest("");
+        setRange(undefined);
         await refresh(types);
       } catch (err) {
         toast.error(formatError((err as Error).message) ?? "Those dates just filled up");
@@ -127,12 +188,12 @@ export default function HotelPage() {
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-px overflow-hidden bg-white/[0.06] lg:grid-cols-2">
-        {/* Front desk — what's open + manage reservations */}
+        {/* Front desk — read-only occupancy overview + manage reservations */}
         <section className="flex min-h-0 flex-col overflow-auto bg-[#0a0a0c] p-6">
           <header className="mb-4">
             <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Front desk</h2>
             <p className="mt-1 text-xs text-zinc-500">
-              What&apos;s open over the next 30 nights, and for how long. <Legend />
+              Rooms taken per night over the next 30 nights. <Legend />
             </p>
           </header>
           <div className="space-y-5">
@@ -143,7 +204,7 @@ export default function HotelPage() {
                 <div key={rt.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
                   <RoomHeader rt={rt} />
                   <div className="mt-3">
-                    <AvailabilityStrip capacity={rt.capacity} bookings={all} fromMs={today} />
+                    <AvailabilityStrip capacity={rt.capacity} bookings={all} fromMs={todayMs} />
                   </div>
                   {sorted.length > 0 && (
                     <ul className="mt-3 space-y-1">
@@ -177,53 +238,110 @@ export default function HotelPage() {
           </div>
         </section>
 
-        {/* Book a stay — pick a length, click an opening */}
+        {/* Book a stay — pick a room, pick your dates, we validate against availability */}
         <section className="flex min-h-0 flex-col overflow-auto bg-[#0a0a0c] p-6">
-          <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Book a stay</h2>
-              <p className="mt-1 text-xs text-zinc-500">
-                Pick a length, then click an opening — same room, no switching. Check-in{" "}
-                {hourLabel(CHECK_IN_HOUR)} · check-out {hourLabel(CHECK_OUT_HOUR)}.
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-zinc-500">nights</span>
-              <Button size="icon" variant="ghost" className="h-6 w-6 text-zinc-300" onClick={() => setNights((n) => Math.max(1, n - 1))}>
-                <Minus className="h-3 w-3" />
-              </Button>
-              <span className="w-4 text-center font-mono text-sm text-zinc-100">{nights}</span>
-              <Button size="icon" variant="ghost" className="h-6 w-6 text-zinc-300" onClick={() => setNights((n) => Math.min(14, n + 1))}>
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
+          <header className="mb-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Book a stay</h2>
+            <p className="mt-1 text-xs text-zinc-500">
+              Pick a room and your dates — deltat checks every night is open. Check-in{" "}
+              {hourLabel(CHECK_IN_HOUR)} · check-out {hourLabel(CHECK_OUT_HOUR)}.
+            </p>
           </header>
 
-          <label className="mb-4 flex flex-col gap-1 text-xs text-zinc-400">
-            Guest (optional)
-            <Input
-              value={guest}
-              onChange={(e) => setGuest(e.target.value)}
-              placeholder="Name on the reservation"
-              className="border-white/10 bg-white/5 text-sm text-zinc-100 placeholder:text-zinc-600"
-            />
-          </label>
+          {/* Room type */}
+          <div className="mb-4 flex flex-wrap gap-2">
+            {types.map((rt) => {
+              const active = rt.id === selType?.id;
+              return (
+                <button
+                  key={rt.id}
+                  type="button"
+                  onClick={() => {
+                    setSelTypeId(rt.id);
+                    setRange(undefined);
+                  }}
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+                    active
+                      ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-200"
+                      : "border-white/10 text-zinc-400 hover:text-zinc-200"
+                  )}
+                >
+                  {rt.name}
+                  <span className="ml-1.5 font-mono text-[10px] text-zinc-500">×{rt.capacity}</span>
+                </button>
+              );
+            })}
+          </div>
 
-          <div className="space-y-5">
-            {types.map((rt) => (
-              <div key={rt.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-                <RoomHeader rt={rt} />
-                <div className="mt-3">
-                  <AvailabilityStrip
-                    capacity={rt.capacity}
-                    bookings={bookingsByType[rt.id] ?? []}
-                    fromMs={today}
-                    minNights={nights}
-                    onPick={(start, n) => book(rt, start, n)}
+          {/* Instant finders — the SYNC-01 capability surfaced as one-tap helpers */}
+          <div className="mb-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => applyOpening("soonest")}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-zinc-300 transition-colors hover:border-emerald-400/30 hover:text-emerald-200"
+            >
+              <CalendarRange className="h-3.5 w-3.5" /> Soonest opening
+            </button>
+            <button
+              type="button"
+              onClick={() => applyOpening("longest")}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-zinc-300 transition-colors hover:border-emerald-400/30 hover:text-emerald-200"
+            >
+              <Wand2 className="h-3.5 w-3.5" /> Longest stay available
+            </button>
+          </div>
+
+          {/* Range picker — full nights are marked, past is disabled */}
+          <div className="flex justify-center rounded-lg border border-white/10 bg-white/[0.02] p-2 [color-scheme:dark]">
+            <Calendar
+              mode="range"
+              required={false}
+              selected={range}
+              onSelect={setRange}
+              defaultMonth={new Date(todayMs)}
+              startMonth={new Date(todayMs)}
+              disabled={{ before: new Date(todayMs), after: addDays(todayMs, HORIZON) }}
+              modifiers={{ full: fullNights }}
+              modifiersClassNames={{ full: "text-rose-300/80 line-through" }}
+              className="bg-transparent text-zinc-100"
+            />
+          </div>
+
+          {/* Summary + book */}
+          <div className="mt-4 border-t border-white/[0.06] pt-4">
+            {nights > 0 ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-zinc-300">
+                    {fmt(fromMs!)} → {fmt(toMs!)} ·{" "}
+                    <span className="font-mono">{nights} night{nights > 1 ? "s" : ""}</span>
+                  </span>
+                  <span className={spanValid ? "text-emerald-300" : "text-rose-300"}>
+                    {spanValid ? "all nights open" : "includes a full night"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={guest}
+                    onChange={(e) => setGuest(e.target.value)}
+                    placeholder="Name on the reservation (optional)"
+                    className="h-9 flex-1 border-white/10 bg-white/5 text-sm text-zinc-100 placeholder:text-zinc-600"
                   />
+                  <Button
+                    onClick={book}
+                    disabled={isPending || !spanValid}
+                    className="h-9 bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-40"
+                  >
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Book ${nights}n`}
+                  </Button>
                 </div>
               </div>
-            ))}
+            ) : (
+              <p className="text-center text-xs text-zinc-500">
+                Pick a check-in and check-out date, or use an instant finder above.
+              </p>
+            )}
           </div>
         </section>
       </div>
@@ -260,7 +378,7 @@ function RoomHeader({ rt }: { rt: HotelRoomType }) {
 function Legend() {
   const items = [
     { cls: "bg-emerald-500/70", label: "open room" },
-    { cls: "bg-rose-500/50", label: "booked room" },
+    { cls: "bg-rose-500/55", label: "booked room" },
   ];
   return (
     <span className="ml-1 inline-flex items-center gap-2 align-middle">

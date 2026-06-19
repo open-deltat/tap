@@ -1,7 +1,5 @@
 import type { Booking } from "@/lib/schemas";
 
-const DAY = 86_400_000;
-
 /** A night, keyed by its 00:00 local timestamp, with how many rooms are taken. */
 export interface NightOccupancy {
   date: Date;
