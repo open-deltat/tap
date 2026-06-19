@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Eye, Loader2, Shuffle, Wifi } from "lucide-react";
+import { Loader2, Shuffle, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Stage } from "@/components/stage";
@@ -17,13 +17,65 @@ import { getResources } from "@/app/actions/resources";
 import { getAvailability } from "@/app/actions/availability";
 import { getMultiResourceBookings, bookSlot } from "@/app/actions/bookings";
 
+// Which client booked a seat. Purely a client-side hint — deltat stores one identical booking
+// no matter who acted; the color just lets you SEE the cross-client NOTIFY arrive.
+type Origin = "A" | "B" | "sim";
+
+interface ClientAccent {
+  key: Origin;
+  name: string;
+  /** Tailwind classes for a seat this client booked. */
+  seat: string;
+  /** Tailwind classes for the pane chrome + live pulse. */
+  pane: string;
+  paneLive: string;
+  screen: string;
+  dot: string;
+  badge: string;
+  badgeLive: string;
+  hover: string;
+}
+
+const ACCENTS: Record<"A" | "B", ClientAccent> = {
+  A: {
+    key: "A",
+    name: "Client A",
+    seat: "border-emerald-400/50 bg-emerald-500/30 text-emerald-100",
+    pane: "border-emerald-400/20",
+    paneLive: "border-emerald-400/50 ring-1 ring-emerald-400/30",
+    screen: "bg-emerald-400/70 shadow-[0_0_18px_4px_rgba(52,211,153,0.45)]",
+    dot: "bg-emerald-400",
+    badge: "border-white/10 text-zinc-500",
+    badgeLive: "border-emerald-400/40 bg-emerald-400/15 text-emerald-200",
+    hover:
+      "hover:border-emerald-400/50 hover:bg-emerald-400/15 hover:text-emerald-100",
+  },
+  B: {
+    key: "B",
+    name: "Client B",
+    seat: "border-sky-400/50 bg-sky-500/30 text-sky-100",
+    pane: "border-sky-400/20",
+    paneLive: "border-sky-400/50 ring-1 ring-sky-400/30",
+    screen: "bg-sky-400/70 shadow-[0_0_18px_4px_rgba(56,189,248,0.45)]",
+    dot: "bg-sky-400",
+    badge: "border-white/10 text-zinc-500",
+    badgeLive: "border-sky-400/40 bg-sky-400/15 text-sky-200",
+    hover: "hover:border-sky-400/50 hover:bg-sky-400/15 hover:text-sky-100",
+  },
+};
+
+// A booking made by the "simulate" button = a third visitor. Rendered amber so it's clearly
+// neither pane's own click.
+const SIM_SEAT = "border-amber-400/50 bg-amber-500/30 text-amber-100";
+
 interface Seat {
   res: Resource;
   booking: Booking | null;
+  origin: Origin | null;
 }
 
-// "A3" → { row: "A", col: 3 }. The seed names seats letter-first; anything that doesn't parse
-// falls into a trailing catch-all row so a seat is never silently dropped from the grid.
+// "A3" → { row: "A", col: 3 }. Anything that doesn't parse falls into a trailing catch-all row
+// so a seat is never silently dropped from the grid.
 function parseSeat(name: string): { row: string; col: number } | null {
   const m = name.match(/^([A-Za-z]+)(\d+)$/);
   if (!m) return null;
@@ -51,7 +103,6 @@ function buildGrid(seats: Seat[]): CinemaGrid {
     seats: cols.map((col) => byPos.get(`${label}-${col}`) ?? null),
   }));
 
-  // Anything unparsable goes in one extra row so it stays visible.
   const orphans = parsed.filter((p) => !p.pos).map((p) => p.seat);
   if (orphans.length > 0) {
     rows.push({ label: "·", seats: orphans });
@@ -68,9 +119,9 @@ export function LiveRoom() {
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  // Bumped on every NOTIFY so the mirror pane can flash a "live" pulse — that's the whole point:
-  // the other client repaints without anyone touching it.
-  const [pulse, setPulse] = useState(0);
+  // Server is the source of truth for WHICH seats are booked. This map is a client-side hint of
+  // WHO booked each seat — set locally at click time, read back when a NOTIFY repaints both panes.
+  const originRef = useRef<Map<string, Origin>>(new Map());
 
   const loadBookings = useCallback(
     async (seatIds: string[], start: number, end: number) => {
@@ -111,47 +162,48 @@ export function LiveRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // One venue subscription drives the shared bookings map. Both panes render from it, so the
-  // mirror repaints the moment deltat NOTIFYs — no second booking surface, no polling.
-  const onEvent = useCallback(
-    (_event: DeltaTEvent) => {
-      setPulse(Date.now());
-      if (slot) loadBookings(seats.map((s) => s.id), slot.start, slot.end);
+  // Both panes book onto the SAME venue/slot. The only difference is the origin hint we record so
+  // the seat colors which client acted.
+  const book = useCallback(
+    (seat: Resource, origin: Origin, label: string) => {
+      if (!slot || bookings.has(seat.id)) return;
+      originRef.current.set(seat.id, origin);
+      startTransition(async () => {
+        try {
+          const booking = await bookSlot({
+            resourceId: seat.id,
+            start: slot.start,
+            end: slot.end,
+            label,
+          });
+          // Optimistic on the acting client; the NOTIFY repaints both panes from the server.
+          setBookings((prev) => new Map(prev).set(seat.id, booking));
+        } catch (err) {
+          originRef.current.delete(seat.id);
+          toast.error(formatError(err instanceof Error ? err.message : String(err)));
+        }
+      });
     },
-    [seats, slot, loadBookings]
+    [slot, bookings]
   );
-  useWebSocket(venueId ? { type: "subscribe", resourceId: venueId, onEvent } : null);
 
-  function bookSeat(seat: Resource, label?: string) {
-    if (!slot || bookings.has(seat.id)) return;
-    startTransition(async () => {
-      try {
-        const booking = await bookSlot({
-          resourceId: seat.id,
-          start: slot.start,
-          end: slot.end,
-          label,
-        });
-        // Optimistic on this client; the WS event repaints both panes from the server.
-        setBookings((prev) => new Map(prev).set(seat.id, booking));
-      } catch (err) {
-        toast.error(formatError(err instanceof Error ? err.message : String(err)));
-      }
-    });
-  }
-
-  function simulateOther() {
+  const simulateOther = useCallback(() => {
     const free = seats.filter((s) => !bookings.has(s.id));
     if (free.length === 0) {
       toast.info("Every seat is taken — cancel one server-side to reset.");
       return;
     }
     const pick = free[Math.floor(Math.random() * free.length)];
-    bookSeat(pick, "Another visitor");
-  }
+    book(pick, "sim", "Another visitor");
+  }, [seats, bookings, book]);
 
   const seatData: Seat[] = useMemo(
-    () => seats.map((res) => ({ res, booking: bookings.get(res.id) ?? null })),
+    () =>
+      seats.map((res) => ({
+        res,
+        booking: bookings.get(res.id) ?? null,
+        origin: bookings.has(res.id) ? originRef.current.get(res.id) ?? null : null,
+      })),
     [seats, bookings]
   );
   const grid = useMemo(() => buildGrid(seatData), [seatData]);
@@ -182,7 +234,7 @@ export function LiveRoom() {
         className="h-7 gap-1.5 border border-white/10 bg-white/5 text-xs text-zinc-200 hover:bg-white/10"
       >
         <Shuffle className="h-3.5 w-3.5" />
-        Simulate another booking
+        Simulate another visitor
       </Button>
     </div>
   );
@@ -195,16 +247,29 @@ export function LiveRoom() {
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <CinemaPane grid={grid} mode="you" onBook={(s) => bookSeat(s)} disabled={isPending} />
-          <CinemaPane grid={grid} mode="mirror" pulse={pulse} />
+          <CinemaPane
+            accent={ACCENTS.A}
+            grid={grid}
+            venueId={venueId}
+            disabled={isPending}
+            onBook={(s) => book(s, "A", "Client A")}
+          />
+          <CinemaPane
+            accent={ACCENTS.B}
+            grid={grid}
+            venueId={venueId}
+            disabled={isPending}
+            onBook={(s) => book(s, "B", "Client B")}
+          />
         </div>
 
         <p className="text-center text-[11.5px] leading-relaxed text-zinc-500">
-          Two clients, one deltat — no polling. Each pane holds its own WebSocket{" "}
-          <code className="rounded bg-white/5 px-1 text-zinc-400">LISTEN</code> on the venue. Book a
-          seat on the left and deltat{" "}
-          <code className="rounded bg-white/5 px-1 text-zinc-400">NOTIFY</code>s the mirror on the
-          right the instant it lands.
+          Two clients, one deltat — book on either side, no polling. Each pane holds its own
+          WebSocket{" "}
+          <code className="rounded bg-white/5 px-1 text-zinc-400">LISTEN</code> on the venue, so
+          booking a seat in <span className="text-emerald-300/80">Client A</span> makes deltat{" "}
+          <code className="rounded bg-white/5 px-1 text-zinc-400">NOTIFY</code>{" "}
+          <span className="text-sky-300/80">Client B</span> the instant it lands.
         </p>
       </div>
     </Stage>
@@ -212,79 +277,60 @@ export function LiveRoom() {
 }
 
 function CinemaPane({
+  accent,
   grid,
-  mode,
-  onBook,
+  venueId,
   disabled,
-  pulse,
+  onBook,
 }: {
+  accent: ClientAccent;
   grid: CinemaGrid;
-  mode: "you" | "mirror";
-  onBook?: (seat: Resource) => void;
-  disabled?: boolean;
-  pulse?: number;
+  venueId: string | null;
+  disabled: boolean;
+  onBook: (seat: Resource) => void;
 }) {
-  const mirror = mode === "mirror";
+  // Each pane is its own client: its own WebSocket subscription, its own live pulse. The data it
+  // renders is the shared server-truth bookings map (passed down via grid), so when the OTHER
+  // pane books, this pane's socket receives the NOTIFY and the grid repaints under it.
   const [live, setLive] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Flash a "received" pulse for ~700ms each time a NOTIFY lands on the mirror.
-  useEffect(() => {
-    if (!pulse) return;
+  const onEvent = useCallback((_event: DeltaTEvent) => {
     setLive(true);
-    const t = setTimeout(() => setLive(false), 700);
-    return () => clearTimeout(t);
-  }, [pulse]);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setLive(false), 700);
+  }, []);
+  useWebSocket(venueId ? { type: "subscribe", resourceId: venueId, onEvent } : null);
+
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   return (
     <div
       className={cn(
         "relative overflow-hidden rounded-xl border bg-white/[0.02] p-4 transition-colors",
-        mirror
-          ? "border-white/10"
-          : "border-emerald-400/25 ring-1 ring-emerald-400/10",
-        mirror && live && "border-emerald-400/40 ring-1 ring-emerald-400/30"
+        accent.pane,
+        live && accent.paneLive
       )}
     >
       <div className="mb-3 flex items-center justify-between">
-        <span className="flex items-center gap-1.5 text-sm font-medium text-zinc-200">
-          {mirror ? (
-            <>
-              <Eye className="h-3.5 w-3.5 text-zinc-400" />
-              Another visitor
-            </>
-          ) : (
-            "You"
-          )}
+        <span className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+          <span className={cn("h-2 w-2 rounded-full", accent.dot)} />
+          {accent.name}
         </span>
         <span
           className={cn(
             "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider transition-colors",
-            mirror && live
-              ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-200"
-              : "border-white/10 text-zinc-500"
+            live ? accent.badgeLive : accent.badge
           )}
         >
           <Wifi className="h-3 w-3" />
-          {mirror ? (live ? "notify" : "live") : "bookable"}
+          {live ? "notify" : "live"}
         </span>
       </div>
 
-      {mirror && (
-        <div className="mb-3 flex items-center gap-1.5 rounded-md border border-white/10 bg-black/30 px-2.5 py-1.5 text-[10.5px] text-zinc-400">
-          <Eye className="h-3 w-3 shrink-0 text-zinc-500" />
-          What another visitor sees — updates in real time
-        </div>
-      )}
+      <Screen className={accent.screen} />
 
-      <Screen />
-
-      <div
-        className={cn(
-          "mt-4 flex flex-col items-center gap-1.5",
-          // The mirror is a viewport, not a booking surface: dim it and swallow clicks.
-          mirror && "pointer-events-none opacity-80"
-        )}
-      >
+      <div className="mt-4 flex flex-col items-center gap-1.5">
         {grid.rows.map((row) => (
           <div key={row.label} className="flex items-center gap-1.5">
             <span className="w-3 text-right text-[9px] font-medium text-zinc-600">
@@ -296,34 +342,26 @@ function CinemaPane({
                   <SeatButton
                     key={seat.res.id}
                     seat={seat}
-                    mirror={mirror}
-                    disabled={!!disabled}
+                    accent={accent}
+                    disabled={disabled}
                     onBook={onBook}
                   />
                 ) : (
-                  <div key={`gap-${row.label}-${ci}`} className="h-8 w-8" />
+                  <div key={`gap-${row.label}-${ci}`} className="h-9 w-9" />
                 )
               )}
             </div>
           </div>
         ))}
       </div>
-
-      {/* Subtle scrim over the mirror to read it as a reflected viewport. */}
-      {mirror && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20"
-        />
-      )}
     </div>
   );
 }
 
-function Screen() {
+function Screen({ className }: { className: string }) {
   return (
     <div className="flex flex-col items-center">
-      <div className="relative h-1.5 w-[78%] rounded-full bg-emerald-400/70 shadow-[0_0_18px_4px_rgba(52,211,153,0.45)]" />
+      <div className={cn("relative h-1.5 w-[78%] rounded-full", className)} />
       <span className="mt-1.5 text-[9px] uppercase tracking-[0.35em] text-zinc-500">
         Screen
       </span>
@@ -333,40 +371,44 @@ function Screen() {
 
 function SeatButton({
   seat,
-  mirror,
+  accent,
   disabled,
   onBook,
 }: {
   seat: Seat;
-  mirror: boolean;
+  accent: ClientAccent;
   disabled: boolean;
-  onBook?: (seat: Resource) => void;
+  onBook: (seat: Resource) => void;
 }) {
-  const { res, booking } = seat;
-  const byOther = booking?.label === "Another visitor";
+  const { res, booking, origin } = seat;
+
+  // A booked seat is colored by WHO booked it (the origin hint), not by which pane is rendering —
+  // that's how you see, in this pane, a seat the OTHER client just took.
+  const bookedClass =
+    origin === "sim"
+      ? SIM_SEAT
+      : origin === "B"
+        ? ACCENTS.B.seat
+        : origin === "A"
+          ? ACCENTS.A.seat
+          : // Booked but no local origin (e.g. a pre-existing booking) — fall back to this pane's accent.
+            accent.seat;
 
   return (
     <button
       type="button"
-      disabled={mirror || disabled || booking != null}
-      onClick={() => onBook?.(res)}
+      disabled={disabled || booking != null}
+      onClick={() => onBook(res)}
       title={
         booking
           ? `${res.name} — ${booking.label ?? "Booked"}`
-          : mirror
-            ? `${res.name} — open`
-            : `Book ${res.name}`
+          : `Book ${res.name} from ${accent.name}`
       }
       className={cn(
-        "h-8 w-8 rounded-md rounded-b-lg border text-[10px] font-medium transition-colors",
+        "h-9 w-9 rounded-md rounded-b-lg border text-[10px] font-medium transition-colors",
         booking == null &&
-          !mirror &&
-          "border-white/10 bg-white/[0.04] text-zinc-400 hover:border-emerald-400/50 hover:bg-emerald-400/15 hover:text-emerald-100",
-        booking == null &&
-          mirror &&
-          "border-white/10 bg-white/[0.04] text-zinc-500",
-        booking != null && !byOther && "border-emerald-400/40 bg-emerald-500/25 text-emerald-100",
-        byOther && "border-sky-400/40 bg-sky-500/25 text-sky-100"
+          cn("border-white/10 bg-white/[0.04] text-zinc-400", accent.hover),
+        booking != null && bookedClass
       )}
     >
       {res.name}
