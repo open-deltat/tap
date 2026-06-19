@@ -3,261 +3,84 @@
 import { useEffect, useState, useCallback, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { ResourceTree } from "@/components/resource-tree";
+import { Stage } from "@/components/stage";
 import { WeekCalendar } from "@/components/week-calendar";
-import { DayCalendar } from "@/components/day-calendar";
-import { CreateResourceDialog } from "@/components/create-resource-dialog";
-import { AddRuleDialog } from "@/components/add-rule-dialog";
 import { BookingDialog, CancelBookingDialog } from "@/components/booking-dialog";
-import { ResourceSettingsDialog } from "@/components/resource-settings-dialog";
-import { RulesPanel } from "@/components/rules-panel";
+import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 import { weekStart } from "@/lib/utils";
-import type { Resource, Rule, AvailabilitySlot, Booking } from "@/lib/schemas";
+import { formatTime } from "@/lib/time";
+import type { AvailabilitySlot, Booking, Resource } from "@/lib/schemas";
 import { useWebSocket } from "@/hooks/use-websocket";
 
-import { createResources, deleteResource, getResources, updateResourceSettings } from "@/app/actions/resources";
-import { addRule, addRecurringRules, editRule, deleteRule, getRulesForResource } from "@/app/actions/rules";
-import { batchBookSlots, cancelBooking, cancelBookingWithMirror, getBookingsForResource, getMultiResourceBookings } from "@/app/actions/bookings";
-import { usePersonalCalendar } from "@/components/personal-calendar-provider";
-import { getAvailability, getMultiResourceAvailability } from "@/app/actions/availability";
+import { ensurePersonalCalendar } from "@/app/actions/seed-personal-calendar";
+import { getAvailability } from "@/app/actions/availability";
+import { bookSlot, cancelBooking, getBookingsForResource } from "@/app/actions/bookings";
 import { formatError } from "@/lib/format-error";
 
+const NAME = "My Calendar";
+
+function asResource(id: string): Resource {
+  return {
+    id,
+    parentId: null,
+    name: NAME,
+    capacity: 1,
+    bufferAfter: null,
+    slotMinutes: 15,
+    price: null,
+    bufferMinutes: 0,
+  };
+}
+
 export default function CalendarPage() {
-  const { calendarId } = usePersonalCalendar();
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [resourceId, setResourceId] = useState<string | null>(null);
   const [weekOf, setWeekOf] = useState(() => weekStart(new Date()));
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  // Dialog state
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createParentId, setCreateParentId] = useState<string | null>(null);
-  const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
-  const [ruleResourceId, setRuleResourceId] = useState<string>("");
-  const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [bookingSlot, setBookingSlot] = useState<{ start: number; end: number } | null>(null);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
-  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
-  const [settingsResourceId, setSettingsResourceId] = useState<string>("");
-  const [viewMode, setViewMode] = useState<"week" | "day">("week");
-  const [dayDate, setDayDate] = useState(() => new Date());
-  const [dayAvailability, setDayAvailability] = useState<Map<string, AvailabilitySlot[]>>(new Map());
-  const [dayBookings, setDayBookings] = useState<Map<string, Booking[]>>(new Map());
   const [bookingLabel, setBookingLabel] = useState("");
+  const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [result, setResult] = useState<BookingResult | null>(null);
 
-  const selectedResource = resources.find((r) => r.id === selectedId) ?? null;
-  const childResources = selectedResource
-    ? resources.filter((r) => r.parentId === selectedResource.id)
-    : [];
-  const hasChildren = childResources.length > 0;
-
-  // Load availability + bookings + rules for selected resource
-  const loadCalendarData = useCallback(
-    async (resourceId: string, week: Date) => {
-      const start = week.getTime();
-      const end = start + 7 * 86_400_000;
-      try {
-        const [avail, bk, rl] = await Promise.all([
-          getAvailability(resourceId, start, end),
-          getBookingsForResource(resourceId),
-          getRulesForResource(resourceId),
-        ]);
-        setAvailability(avail);
-        setBookings(bk.filter((b) => b.start < end && b.end > start));
-        setRules(rl);
-      } catch (err) {
-        console.error("Failed to load calendar data:", err);
-        toast.error("Failed to load calendar data");
-      }
-    },
-    []
-  );
-
-  // Load resources on mount
-  useEffect(() => {
-    async function init() {
-      try {
-        const all = await getResources();
-        setResources(all);
-        if (all.length > 0) {
-          const leaves = all.filter(
-            (r) => !all.some((c) => c.parentId === r.id)
-          );
-          if (leaves.length > 0) {
-            setSelectedId(leaves[0].id);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to load resources:", err);
-        toast.error("Failed to connect to deltat. Is it running?");
-      } finally {
-        setLoading(false);
-      }
+  const loadData = useCallback(async (id: string, week: Date) => {
+    const start = week.getTime();
+    const end = start + 7 * 86_400_000;
+    try {
+      const [avail, bk] = await Promise.all([
+        getAvailability(id, start, end),
+        getBookingsForResource(id),
+      ]);
+      setAvailability(avail);
+      setBookings(bk.filter((b) => b.start < end && b.end > start));
+    } catch {
+      toast.error("Failed to load calendar data");
     }
-    init();
   }, []);
 
-  // Reload calendar when selection or week changes
   useEffect(() => {
-    if (selectedId) {
-      loadCalendarData(selectedId, weekOf);
-    } else {
-      setAvailability([]);
-      setBookings([]);
-      setRules([]);
-    }
-  }, [selectedId, weekOf, loadCalendarData]);
+    ensurePersonalCalendar()
+      .then(async (id) => {
+        setResourceId(id);
+        await loadData(id, weekOf);
+      })
+      .catch(() => toast.error("Failed to connect to deltat. Is it running?"))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Real-time updates via WebSocket
-  const wsOnEvent = useCallback(() => {
-    if (selectedId) loadCalendarData(selectedId, weekOf);
-  }, [selectedId, weekOf, loadCalendarData]);
-  useWebSocket(selectedId ? { type: "subscribe", resourceId: selectedId, onEvent: wsOnEvent } : null);
+  useEffect(() => {
+    if (resourceId) loadData(resourceId, weekOf);
+  }, [weekOf, resourceId, loadData]);
 
-  function handleCreateChildren(parentId: string | null) {
-    setCreateParentId(parentId);
-    setCreateDialogOpen(true);
-  }
-
-  async function handleCreateResources(data: {
-    names: string[];
-    parentId: string | null;
-  }) {
-    startTransition(async () => {
-      try {
-        const created = await createResources(data);
-        const updated = await getResources();
-        setResources(updated);
-        if (created.length === 1) {
-          setSelectedId(created[0].id);
-        }
-        const count = created.length;
-        toast.success(`Created ${count} resource${count > 1 ? "s" : ""}`);
-      } catch (err: any) {
-        toast.error(formatError(err.message) ?? "Failed to create resources");
-      }
-    });
-  }
-
-  async function handleDeleteResource(id: string) {
-    const resource = resources.find((r) => r.id === id);
-    if (!resource) return;
-    startTransition(async () => {
-      try {
-        await deleteResource(id);
-        const updated = await getResources();
-        setResources(updated);
-        if (selectedId === id) setSelectedId(null);
-        toast.success(`Deleted "${resource.name}"`);
-      } catch (err: any) {
-        toast.error(formatError(err.message) ?? "Failed to delete resource");
-      }
-    });
-  }
-
-  function handleSettings(resourceId: string) {
-    setSettingsResourceId(resourceId);
-    setSettingsDialogOpen(true);
-  }
-
-  async function handleUpdateSettings(settings: {
-    slotMinutes: number;
-    bufferMinutes: number;
-  }) {
-    if (!settingsResourceId) return;
-    startTransition(async () => {
-      try {
-        await updateResourceSettings(settingsResourceId, settings);
-        const updated = await getResources();
-        setResources(updated);
-        toast.success("Settings updated");
-      } catch (err: any) {
-        toast.error(formatError(err.message) ?? "Failed to update settings");
-      }
-    });
-  }
-
-  function handleAddRule(resourceId: string) {
-    setRuleResourceId(resourceId);
-    setRuleDialogOpen(true);
-  }
-
-  async function handleAddRuleSubmit(data: {
-    resourceId: string;
-    start: number;
-    end: number;
-    blocking: boolean;
-  }) {
-    startTransition(async () => {
-      try {
-        await addRule(data);
-        toast.success(data.blocking ? "Blocking rule added" : "Availability rule added");
-        if (selectedId) {
-          await loadCalendarData(selectedId, weekOf);
-        }
-      } catch (err: any) {
-        toast.error(formatError(err.message) ?? "Failed to add rule");
-      }
-    });
-  }
-
-  async function handleAddRecurringRules(data: {
-    resourceId: string;
-    daysOfWeek: number[];
-    startTime: string;
-    endTime: string;
-    fromDate: string;
-    toDate: string;
-    blocking: boolean;
-  }) {
-    startTransition(async () => {
-      try {
-        const created = await addRecurringRules(data);
-        toast.success(`Created ${created.length} rules`);
-        if (selectedId) {
-          await loadCalendarData(selectedId, weekOf);
-        }
-      } catch (err: any) {
-        toast.error(formatError(err.message) ?? "Failed to add recurring rules");
-      }
-    });
-  }
-
-  async function handleEditRule(
-    id: string,
-    data: { start: number; end: number; blocking: boolean }
-  ) {
-    startTransition(async () => {
-      try {
-        await editRule(id, data);
-        toast.success("Rule updated");
-        if (selectedId) {
-          await loadCalendarData(selectedId, weekOf);
-        }
-      } catch (err: any) {
-        toast.error(formatError(err.message) ?? "Failed to update rule");
-      }
-    });
-  }
-
-  async function handleDeleteRule(id: string) {
-    startTransition(async () => {
-      try {
-        await deleteRule(id);
-        toast.success("Rule deleted");
-        if (selectedId) {
-          await loadCalendarData(selectedId, weekOf);
-        }
-      } catch (err: any) {
-        toast.error(formatError(err.message) ?? "Failed to delete rule");
-      }
-    });
-  }
+  const onWsEvent = useCallback(() => {
+    if (resourceId) loadData(resourceId, weekOf);
+  }, [resourceId, weekOf, loadData]);
+  useWebSocket(resourceId ? { type: "subscribe", resourceId, onEvent: onWsEvent } : null);
 
   function handleSlotClick(start: number, end: number) {
     setBookingSlot({ start, end });
@@ -265,27 +88,27 @@ export default function CalendarPage() {
     setBookingDialogOpen(true);
   }
 
-  async function handleBookConfirm() {
-    if (!selectedId || !bookingSlot) return;
+  function handleBookConfirm() {
+    if (!resourceId || !bookingSlot) return;
     setBookingDialogOpen(false);
+    const slot = bookingSlot;
     startTransition(async () => {
       try {
-        const slots = [
-          { resourceId: selectedId, start: bookingSlot.start, end: bookingSlot.end, label: bookingLabel },
-        ];
-        if (calendarId) {
-          slots.push({
-            resourceId: calendarId,
-            start: bookingSlot.start,
-            end: bookingSlot.end,
-            label: `${selectedResource?.name ?? "Calendar"} ${bookingLabel}`.trim(),
-          });
-        }
-        await batchBookSlots(slots);
-        toast.success("Slot booked!");
-        await loadCalendarData(selectedId, weekOf);
-      } catch (err: any) {
-        toast.error(formatError(err.message) ?? "Failed to book slot");
+        const booking = await bookSlot({
+          resourceId,
+          start: slot.start,
+          end: slot.end,
+          label: bookingLabel.trim() || "Busy",
+        });
+        setResult({
+          title: `${NAME} · booked`,
+          subtitle: `${formatTime(slot.start)} – ${formatTime(slot.end)}`,
+          bookings: [booking],
+          resources: [asResource(resourceId)],
+        });
+        await loadData(resourceId, weekOf);
+      } catch (err) {
+        toast.error(formatError(err instanceof Error ? err.message : String(err)));
       }
     });
   }
@@ -295,162 +118,56 @@ export default function CalendarPage() {
     setCancelDialogOpen(true);
   }
 
-  async function handleCancelConfirm() {
-    if (!cancelTarget || !selectedId) return;
+  function handleCancelConfirm() {
+    if (!cancelTarget || !resourceId) return;
     setCancelDialogOpen(false);
     startTransition(async () => {
       try {
-        if (calendarId) {
-          await cancelBookingWithMirror(cancelTarget.id, calendarId, cancelTarget.start, cancelTarget.end);
-        } else {
-          await cancelBooking(cancelTarget.id);
-        }
-        toast.success("Booking cancelled");
-        await loadCalendarData(selectedId, weekOf);
-      } catch (err: any) {
-        toast.error(formatError(err.message) ?? "Failed to cancel booking");
+        await cancelBooking(cancelTarget.id);
+        await loadData(resourceId, weekOf);
+      } catch (err) {
+        toast.error(formatError(err instanceof Error ? err.message : String(err)));
       }
     });
   }
 
-  // Load day view data for multi-resource
-  const loadDayData = useCallback(
-    async (children: Resource[], date: Date) => {
-      const dayStart = new Date(date);
-      dayStart.setHours(0, 0, 0, 0);
-      const start = dayStart.getTime();
-      const end = start + 86_400_000;
-      const ids = children.map((r) => r.id);
-      try {
-        const [availMap, bookMap] = await Promise.all([
-          getMultiResourceAvailability(ids, start, end),
-          getMultiResourceBookings(ids),
-        ]);
-        setDayAvailability(new Map(Object.entries(availMap)));
-        // Filter bookings to day range
-        const filtered = new Map<string, Booking[]>();
-        for (const [id, bks] of Object.entries(bookMap)) {
-          filtered.set(id, (bks as Booking[]).filter((b) => b.start < end && b.end > start));
-        }
-        setDayBookings(filtered);
-      } catch (err) {
-        console.error("Failed to load day data:", err);
-      }
-    },
-    []
-  );
-
-  // Reload day data when in day mode
-  useEffect(() => {
-    if (viewMode === "day" && hasChildren) {
-      loadDayData(childResources, dayDate);
-    }
-  }, [viewMode, dayDate, selectedId, hasChildren]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function handleDaySlotClick(resourceId: string, start: number, end: number) {
-    setSelectedId(resourceId);
-    setBookingSlot({ start, end });
-    setBookingLabel("");
-    setBookingDialogOpen(true);
-  }
-
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+        <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to deltat...
+          Connecting to deltat…
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full">
-      {/* Left sidebar: resource tree + rules panel */}
-      <div className="w-72 shrink-0 border-r flex flex-col">
-        <div className="flex-1 min-h-0">
-          <ResourceTree
-            resources={resources}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onCreateChildren={handleCreateChildren}
-            onDelete={handleDeleteResource}
-            onAddRule={handleAddRule}
-            onSettings={handleSettings}
-          />
-        </div>
-        {selectedResource && (
-          <div className="max-h-[40%] overflow-auto">
-            <RulesPanel
-              resourceName={selectedResource.name ?? "Resource"}
-              rules={rules}
-              onDelete={handleDeleteRule}
-              onEdit={handleEditRule}
-              onAdd={() => handleAddRule(selectedResource.id)}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Right: Calendar */}
-      <div className="flex-1 min-w-0">
-        {viewMode === "day" && hasChildren ? (
-          <DayCalendar
-            date={dayDate}
-            onDateChange={setDayDate}
-            resources={childResources.map((r) => ({ id: r.id, name: r.name ?? r.id }))}
-            availabilityByResource={dayAvailability}
-            bookingsByResource={dayBookings}
-            slotMinutes={selectedResource?.slotMinutes ?? 60}
-            onSlotClick={handleDaySlotClick}
-            onBookingClick={handleBookingClick}
-            onViewChange={() => setViewMode("week")}
-          />
-        ) : (
+    <>
+      <Stage
+        primitive={{ label: "Week grid · single-resource booker", specId: "AVAIL-01" }}
+        title={NAME}
+      >
+        <div className="h-[62vh]">
           <WeekCalendar
             weekOf={weekOf}
             onWeekChange={setWeekOf}
             availability={availability}
             bookings={bookings}
-            resourceName={selectedResource?.name ?? null}
-            slotMinutes={selectedResource?.slotMinutes ?? 60}
+            slotMinutes={15}
+            startHour={8}
+            endHour={20}
             onSlotClick={handleSlotClick}
             onBookingClick={handleBookingClick}
-            hasChildren={hasChildren}
-            onDayView={() => {
-              setDayDate(new Date());
-              setViewMode("day");
-            }}
           />
-        )}
-      </div>
-
-      {/* Dialogs */}
-      <CreateResourceDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        parentId={createParentId}
-        resources={resources}
-        onSubmit={handleCreateResources}
-      />
-
-      {ruleResourceId && (
-        <AddRuleDialog
-          open={ruleDialogOpen}
-          onOpenChange={setRuleDialogOpen}
-          resourceId={ruleResourceId}
-          resources={resources}
-          onSubmit={handleAddRuleSubmit}
-          onRecurringSubmit={handleAddRecurringRules}
-        />
-      )}
+        </div>
+      </Stage>
 
       {bookingSlot && (
         <BookingDialog
           open={bookingDialogOpen}
           onOpenChange={setBookingDialogOpen}
-          resourceName={selectedResource?.name ?? ""}
+          resourceName={NAME}
           start={bookingSlot.start}
           end={bookingSlot.end}
           label={bookingLabel}
@@ -463,32 +180,27 @@ export default function CalendarPage() {
         <CancelBookingDialog
           open={cancelDialogOpen}
           onOpenChange={setCancelDialogOpen}
-          resourceName={selectedResource?.name ?? ""}
+          resourceName={NAME}
           start={cancelTarget.start}
           end={cancelTarget.end}
           onConfirm={handleCancelConfirm}
         />
       )}
 
-      {settingsResourceId && (
-        <ResourceSettingsDialog
-          open={settingsDialogOpen}
-          onOpenChange={setSettingsDialogOpen}
-          resourceName={resources.find((r) => r.id === settingsResourceId)?.name ?? ""}
-          slotMinutes={resources.find((r) => r.id === settingsResourceId)?.slotMinutes ?? 60}
-          bufferMinutes={resources.find((r) => r.id === settingsResourceId)?.bufferMinutes ?? 0}
-          onSubmit={handleUpdateSettings}
-        />
-      )}
+      <BookingConfirmedModal
+        result={result}
+        onClose={() => setResult(null)}
+        onBookAnother={() => setResult(null)}
+      />
 
       {isPending && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/50">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="flex items-center gap-2 text-sm text-zinc-300">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Working...
+            Working…
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

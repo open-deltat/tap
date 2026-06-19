@@ -8,10 +8,20 @@ export type {
   AvailabilitySlot,
 } from "@open-tap/client";
 
+/** Oval-layout descriptor for stadium sections (a UI concern deltat doesn't track). */
+export interface SectionLayout {
+  tier: string; // e.g. "Lower Bowl"
+  ring: number; // 0 = innermost ring
+  idx: number; // position within the ring
+  ringCount: number; // sections in this ring
+  assigned: boolean; // true = capacity-1 premium box, false = capacity-N pool
+}
+
 export interface ResourceMeta {
   slotMinutes: number;
   price: number | null;
   maxGuests?: number;
+  section?: SectionLayout;
 }
 
 // The demo's Resource = deltat Resource + app metadata + derived bufferMinutes

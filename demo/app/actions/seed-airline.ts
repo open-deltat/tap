@@ -1,6 +1,6 @@
 "use server";
 
-import { createVenue, createSection, createSeats, addSchedule, daily, findRootByName, baseMs } from "./seed-helpers";
+import { createVenue, createSection, createSeats, addSchedule, daily, prebookSeats, findRootByName, baseMs } from "./seed-helpers";
 
 const W_NAME = "AA-100 JFK → LAX";
 const E_NAME = "AA-205 LAX → JFK";
@@ -17,39 +17,50 @@ export async function seedAirline(): Promise<string[]> {
     price,
   });
 
+  // A wide-body layout per flight: First (2-2), Business (2-2), Economy (3-3) ≈ 150 seats,
+  // so the two flights total ~300 assigned (capacity-1) seats — the scale the spec calls for.
+  const ECON_ROWS = Array.from({ length: 21 }, (_, i) => 10 + i); // rows 10–30
+
   // AA-100 JFK → LAX (westward, 6h)
   const w = await createVenue(W_NAME, { slotMinutes: 360, bufferMinutes: 45 });
 
   const wFc = await createSection(w.id, "First Class", flightOpts(360, 1200));
-  await createSeats(wFc.id, [1], ["A", "B"], flightOpts(360, 1200));
+  const wFcSeats = await createSeats(wFc.id, [1, 2], ["A", "B", "E", "F"], flightOpts(360, 1200));
 
   const wBiz = await createSection(w.id, "Business", flightOpts(360, 650));
-  await createSeats(wBiz.id, [2, 3], ["A", "B", "C", "D"], flightOpts(360, 650));
+  await createSeats(wBiz.id, [3, 4, 5, 6], ["A", "B", "E", "F"], flightOpts(360, 650));
 
   const wEcon = await createSection(w.id, "Economy", flightOpts(360, 220));
-  await createSeats(wEcon.id, [4, 5, 6, 7, 8], ["A", "B", "C", "D", "E", "F"], flightOpts(360, 220));
+  const wEconSeats = await createSeats(wEcon.id, ECON_ROWS, ["A", "B", "C", "D", "E", "F"], flightOpts(360, 220));
 
   await addSchedule(w.id, base, 14, daily([
     { h: 6, m: 0, dur: 360 },
     { h: 14, m: 30, dur: 360 },
   ]));
 
+  // The 06:00 departure opens partly full — a first-class window seat and several economy seats taken.
+  await prebookSeats(wFcSeats, 2, base + 6 * 3_600_000, 360, "Booked");
+  await prebookSeats(wEconSeats, 28, base + 6 * 3_600_000, 360, "Booked");
+
   // AA-205 LAX → JFK (eastward, 5h)
   const e = await createVenue(E_NAME, { slotMinutes: 300, bufferMinutes: 45 });
 
   const eFc = await createSection(e.id, "First Class", flightOpts(300, 1100));
-  await createSeats(eFc.id, [1], ["A", "B"], flightOpts(300, 1100));
+  await createSeats(eFc.id, [1, 2], ["A", "B", "E", "F"], flightOpts(300, 1100));
 
   const eBiz = await createSection(e.id, "Business", flightOpts(300, 580));
-  await createSeats(eBiz.id, [2, 3], ["A", "B", "C", "D"], flightOpts(300, 580));
+  await createSeats(eBiz.id, [3, 4, 5, 6], ["A", "B", "E", "F"], flightOpts(300, 580));
 
   const eEcon = await createSection(e.id, "Economy", flightOpts(300, 189));
-  await createSeats(eEcon.id, [4, 5, 6, 7, 8], ["A", "B", "C", "D", "E", "F"], flightOpts(300, 189));
+  const eEconSeats = await createSeats(eEcon.id, ECON_ROWS, ["A", "B", "C", "D", "E", "F"], flightOpts(300, 189));
 
   await addSchedule(e.id, base, 14, daily([
     { h: 8, m: 0, dur: 300 },
     { h: 16, m: 0, dur: 300 },
   ]));
+
+  // The 08:00 departure opens lightly booked.
+  await prebookSeats(eEconSeats, 14, base + 8 * 3_600_000, 300, "Booked");
 
   return [w.id, e.id];
 }

@@ -1,9 +1,8 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
-import { localUtcOffsetMinutes } from "@open-tap/client";
 import * as store from "@/lib/store";
-import { findRootByName, baseMs } from "./seed-helpers";
+import { addSchedule, findRootByName, baseMs } from "./seed-helpers";
 
 const NAME = "Dr. Sarah Chen";
 
@@ -14,13 +13,9 @@ export async function seedAvailabilityScheduler(): Promise<string> {
   const r = await dt.resources.create({ name: NAME });
   store.set(r.id, { slotMinutes: 30, price: null });
 
-  await dt.schedules.set({
-    resourceId: r.id,
-    days: ["mon", "tue", "wed", "thu", "fri"],
-    startTime: "09:00",
-    endTime: "17:00",
-    utcOffsetMinutes: localUtcOffsetMinutes(),
-  });
+  // Mon–Fri 09:00–17:00, expanded into rules at the edge (no kernel Schedule primitive).
+  const weekday = [{ h: 9, m: 0, dur: 480 }];
+  await addSchedule(r.id, baseMs(), 21, { 1: weekday, 2: weekday, 3: weekday, 4: weekday, 5: weekday });
 
   const base = new Date(baseMs());
   const excludeOffsets = [7, 14];

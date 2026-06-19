@@ -5,29 +5,37 @@ import { useTheme } from "next-themes";
 import {
   Plane,
   Theater,
+  Film,
   LandPlot,
   Calendar,
-  CalendarClock,
-  BookOpen,
   Clock,
+  Users,
   UtensilsCrossed,
+  Hotel,
   Car,
+  Radio,
+  Sigma,
   Sun,
   Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// The booking catalog (Scheduling + the global Bookings list are dropped; Scheduling's
+// multi-resource intersection is shown more legibly by Meet).
 const NAV_ITEMS = [
   { href: "/demos/airline", label: "Airline", icon: Plane },
   { href: "/demos/theater", label: "Theater", icon: Theater },
+  { href: "/demos/cinema", label: "Cinema", icon: Film },
   { href: "/demos/stadium", label: "Stadium", icon: LandPlot },
-  { href: "/demos/calendar", label: "Calendar", icon: Calendar },
-  { href: "/demos/scheduling", label: "Scheduling", icon: CalendarClock },
-  { href: "/demos/availability", label: "Availability", icon: Clock },
+  { href: "/demos/hotel", label: "Hotel", icon: Hotel },
   { href: "/demos/restaurant", label: "Restaurant", icon: UtensilsCrossed },
   { href: "/demos/parking", label: "Parking", icon: Car },
-  { href: "/bookings", label: "Bookings", icon: BookOpen },
+  { href: "/demos/calendar", label: "Calendar", icon: Calendar },
+  { href: "/demos/availability", label: "Availability", icon: Clock },
+  { href: "/demos/meet", label: "Meet", icon: Users },
+  { href: "/demos/live", label: "Live", icon: Radio },
+  { href: "/demos/explainer", label: "How it works", icon: Sigma },
 ];
 
 export function NavHeader() {
