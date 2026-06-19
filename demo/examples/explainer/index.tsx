@@ -4,8 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Stage } from "@/components/stage";
+import { cn } from "@/lib/utils";
 import { AlgebraExplainer, type PersonData } from "./algebra/algebra-explainer";
 import { StepScrubber } from "./algebra/step-scrubber";
+import { HoldsExplainer } from "./holds/holds-explainer";
+import { HoldsScrubber } from "./holds/holds-scrubber";
+import { HOLDS_STEP_COUNT } from "./holds/script";
 import {
   AXIS_START_HOUR,
   AXIS_END_HOUR,
@@ -49,7 +53,12 @@ function splitRules(rules: Rule[], ds: number, de: number): { open: Span[]; bloc
   return { open, blocking };
 }
 
+type Chapter = "algebra" | "holds";
+
 export default function ExplainerExample() {
+  const [chapter, setChapter] = useState<Chapter>("algebra");
+  const [holdsStep, setHoldsStep] = useState(0);
+  const [holdsPlaying, setHoldsPlaying] = useState(true);
   const [ids, setIds] = useState<Ids | null>(null);
   const [date] = useState(toLocalDateString(new Date()));
   const [bob, setBob] = useState<PersonData>(emptyPerson("Bob"));
@@ -201,6 +210,69 @@ export default function ExplainerExample() {
     });
   }
 
+  const firstJointMs = combined.length > 0 ? combined[0].start : null;
+
+  const tabs = (
+    <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1 text-[12px]">
+      {(
+        [
+          ["algebra", "Availability algebra"],
+          ["holds", "Holds & race conditions"],
+        ] as const
+      ).map(([key, label]) => (
+        <button
+          key={key}
+          type="button"
+          onClick={() => setChapter(key)}
+          className={cn(
+            "rounded-md px-3 py-1.5 font-medium transition-colors",
+            chapter === key
+              ? "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30"
+              : "text-zinc-400 hover:text-zinc-200"
+          )}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (chapter === "holds") {
+    const holdsTray = (
+      <HoldsScrubber
+        step={holdsStep}
+        playing={holdsPlaying}
+        onStep={(n) => {
+          setHoldsPlaying(false);
+          setHoldsStep(n);
+        }}
+        onPlayToggle={() => {
+          if (!holdsPlaying && holdsStep >= HOLDS_STEP_COUNT - 1) {
+            setHoldsStep(0);
+            setHoldsPlaying(true);
+          } else {
+            setHoldsPlaying((p) => !p);
+          }
+        }}
+      />
+    );
+
+    return (
+      <Stage
+        primitive={{ label: "Hold + race resolution", specId: "HOLD-01" }}
+        title="How deltat handles holds & races"
+        ribbon={tabs}
+        tray={holdsTray}
+      >
+        <HoldsExplainer step={holdsStep} />
+        <p className="mt-4 text-center text-[11px] text-zinc-500">
+          A scripted walkthrough — no live deltat needed. Two clients, one seat row, one contested
+          seat. The engine resolves the race so exactly one hold wins.
+        </p>
+      </Stage>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
@@ -211,8 +283,6 @@ export default function ExplainerExample() {
       </div>
     );
   }
-
-  const firstJointMs = combined.length > 0 ? combined[0].start : null;
 
   const tray = (
     <StepScrubber
@@ -238,6 +308,7 @@ export default function ExplainerExample() {
     <Stage
       primitive={{ label: "Availability algebra", specId: "AVAIL-01" }}
       title="How deltat computes availability"
+      ribbon={tabs}
       tray={tray}
     >
       <AlgebraExplainer

@@ -26,10 +26,9 @@ export interface CanvasSection {
   remaining: number;
 }
 
-// Result of clicking the canvas: either a section (zoomed out) or a seat cell (zoomed in).
-export type CanvasHit =
-  | { kind: "section"; section: CanvasSection; worldX: number; worldY: number }
-  | { kind: "cell"; section: CanvasSection; cell: number };
+// Result of clicking the canvas while zoomed into seats: a single seat cell to toggle.
+// Clicks while zoomed out (Overview/Close-up) are ignored — zoom changes only via wheel/buttons.
+export type CanvasHit = { kind: "cell"; section: CanvasSection; cell: number };
 
 const COLORS = {
   bg: "#08080a",
@@ -272,8 +271,9 @@ export function StadiumCanvas({
     const sx = clientX - rect.left;
     const sy = clientY - rect.top;
     const t = tRef.current;
+    // Clicks only do something at the seat LOD — they never change zoom.
+    if (t.scale < SEAT_THRESHOLD) return;
     const [wx, wy] = screenToWorld(t, sx, sy);
-    const seatLOD = t.scale >= SEAT_THRESHOLD;
 
     for (const s of sectionsRef.current) {
       const f = framesRef.current.get(s.id);
@@ -282,10 +282,6 @@ export function StadiumCanvas({
       const r = localRect(f);
       if (!pointInRect(r, lx, ly)) continue;
 
-      if (!seatLOD) {
-        onHit({ kind: "section", section: s, worldX: f.cx, worldY: f.cy });
-        return;
-      }
       // Map local point → cell index.
       const { cols, rows } = gridDims(s.capacity, r.w, r.h);
       const col = clamp(Math.floor(((lx - r.x) / r.w) * cols), 0, cols - 1);
