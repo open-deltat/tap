@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition, useCallback } from "react";
 import { toast } from "sonner";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, Minus, Plus } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,7 @@ import { BookingConfirmedModal, type BookingResult } from "@/components/booking-
 import { ensureHotel, type HotelRoomType } from "./seed";
 import { batchBookSlots, getBookingsForResource, cancelBooking } from "@/app/actions/bookings";
 import { formatError } from "@/lib/format-error";
-import { bookedNightSets } from "./occupancy";
+import { bookedNightSets, stableOpenings } from "./occupancy";
 
 const DAY = 86_400_000;
 
@@ -64,6 +64,7 @@ export default function HotelPage() {
     to: new Date(today.getTime() + 2 * DAY),
   });
   const [guest, setGuest] = useState("");
+  const [findNights, setFindNights] = useState(3);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
@@ -108,6 +109,11 @@ export default function HotelPage() {
     setRange(next);
     const w = rangeMs(next);
     if (w && types.length) startTransition(() => void refresh(types, w.start, w.end));
+  }
+
+  // SYNC-01: jump the booking range to a stable N-night opening (same room, no switching).
+  function jumpTo(start: number) {
+    pickRange({ from: new Date(start), to: new Date(start + findNights * DAY) });
   }
 
   function book(rt: HotelRoomType) {
@@ -232,6 +238,64 @@ export default function HotelPage() {
                   className="border-white/10 bg-white/5 text-sm text-zinc-100 placeholder:text-zinc-600 [color-scheme:dark]"
                 />
               </label>
+            </div>
+          </div>
+
+          {/* SYNC-01 finder: stable multi-night openings per room type (same room, no switching). */}
+          <div className="mb-5 rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <div className="mb-1 flex items-center justify-between">
+              <div className="text-xs font-medium text-zinc-300">Find a stable stay</div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-zinc-500">nights</span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 text-zinc-300"
+                  onClick={() => setFindNights((n) => Math.max(1, n - 1))}
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <span className="w-4 text-center font-mono text-sm text-zinc-100">{findNights}</span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 text-zinc-300"
+                  onClick={() => setFindNights((n) => Math.min(14, n + 1))}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+            <p className="mb-2 text-[11px] text-zinc-500">
+              {findNights} consecutive nights in the <span className="text-zinc-300">same room</span> — the engine&apos;s
+              capacity sweep guarantees a single room covers each opening.
+            </p>
+            <div className="space-y-1.5">
+              {types.map((rt) => {
+                const opens = stableOpenings(state[rt.id]?.all ?? [], rt.capacity, findNights, today.getTime(), 30);
+                return (
+                  <div key={rt.id} className="flex items-start gap-2 text-xs">
+                    <span className="w-28 shrink-0 pt-0.5 text-zinc-400">{rt.name}</span>
+                    <div className="flex flex-wrap gap-1">
+                      {opens.length === 0 ? (
+                        <span className="text-zinc-600">no {findNights}-night opening in 30 days</span>
+                      ) : (
+                        opens.slice(0, 4).map((o) => (
+                          <button
+                            key={o.start}
+                            type="button"
+                            onClick={() => jumpTo(o.start)}
+                            title={`${o.nights} open nights from ${fmtDate(o.start)}`}
+                            className="rounded border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-200 transition-colors hover:bg-emerald-400/20"
+                          >
+                            {fmtDate(o.start)} → {fmtDate(o.start + findNights * DAY)}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
