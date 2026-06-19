@@ -1,30 +1,5 @@
 // The first page: what deltat is, in plain language, using everyday examples.
 
-import { TimelineTrack } from "@/components/timeline-track";
-
-// Same three bookings, drawn with the generic TimelineTrack (one track each) so the overlap shows
-// as the Flight and Hotel tracks covering the same stretch. Shown alongside the bespoke picture.
-function CollisionVizGeneric() {
-  const items = [
-    { name: "Flight", start: 8, end: 42 },
-    { name: "Hotel", start: 30, end: 66 },
-    { name: "Dinner", start: 72, end: 92 },
-  ];
-  return (
-    <div className="space-y-1.5 rounded-lg border border-white/10 bg-white/[0.02] p-3">
-      {items.map((it) => (
-        <div key={it.name} className="flex items-center gap-2">
-          <span className="w-12 shrink-0 text-right text-[10px] text-zinc-400">{it.name}</span>
-          <div className="flex-1">
-            <TimelineTrack axisStart={0} axisEnd={100} height={14} bands={[{ start: it.start, end: it.end, tone: "neutral" }]} />
-          </div>
-        </div>
-      ))}
-      <div className="pt-1 text-center text-[9px] text-zinc-500">Flight and Hotel cover the same stretch, so they clash</div>
-    </div>
-  );
-}
-
 // Three things booked on one line of time; two of them clash, one sits clear.
 function CollisionViz() {
   const segs = [
@@ -83,11 +58,6 @@ export function OverviewTopic() {
 
       <div className="mt-5">
         <CollisionViz />
-      </div>
-
-      <div className="mt-3">
-        <div className="mb-1.5 text-[10px] uppercase tracking-[0.18em] text-zinc-500">Same idea, on the generic timeline</div>
-        <CollisionVizGeneric />
       </div>
 
       <div className="mt-5 space-y-3 text-[13.5px] leading-relaxed text-zinc-400">

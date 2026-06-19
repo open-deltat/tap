@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AlgebraExplainer, type PersonData } from "./algebra/algebra-explainer";
-import { StepScrubber } from "./algebra/step-scrubber";
+import { LabeledTimeline, type TimelineBox } from "@/components/labeled-timeline";
 import { HoldsStatic } from "./holds/holds-static";
 import { OverviewTopic } from "./overview";
 import { DataModelTopic } from "./concepts";
@@ -75,8 +75,8 @@ export default function ExplainerExample() {
   const [combined, setCombined] = useState<AvailabilitySlot[]>([]);
   // Open on the END RESULT (the full picture is clean enough to read at a glance); the play
   // button then walks through the algebra from step 1.
-  const [step, setStep] = useState(STEP_COUNT - 1);
-  const [playing, setPlaying] = useState(false);
+  // Show the full picture (all layers) at once — no step-through slideshow.
+  const step = STEP_COUNT - 1;
   const [collapsed, setCollapsed] = useState<Set<"bob" | "dora">>(new Set());
   const [myHold, setMyHold] = useState<{ start: number; end: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -179,7 +179,6 @@ export default function ExplainerExample() {
     }
     closeAllHolds();
     setMyHold({ start, end });
-    if (step < 3) setStep(3); // surface the holds layer so the subtraction is visible
 
     const pending = new Set([ids.bobId, ids.doraId]);
     for (const resourceId of [ids.bobId, ids.doraId]) {
@@ -271,29 +270,23 @@ export default function ExplainerExample() {
           />
         </div>
 
-        <div className="mt-5">
-          <StepScrubber
-            step={step}
-            playing={playing}
-            onStep={(n) => {
-              setPlaying(false);
-              setStep(n);
-            }}
-            onPlayToggle={() => {
-              if (!playing && step >= STEP_COUNT - 1) {
-                setStep(0);
-                setPlaying(true);
-              } else {
-                setPlaying((p) => !p);
-              }
-            }}
-          />
-        </div>
-
         <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
           Every band here is read live from deltat. The bottom one is the time Bob and Jane are both
           free. It starts at {firstJointMs ? formatTime(firstJointMs) : "no shared time today"}.
         </p>
+
+        <div className="mt-5">
+          <div className="mb-1.5 text-[10px] uppercase tracking-[0.18em] text-zinc-500">Labeled-box style</div>
+          <LabeledTimeline
+            axisStart={axisStart}
+            axisEnd={axisEnd}
+            rows={[
+              { label: "Bob free", boxes: bob.net.map((s): TimelineBox => ({ start: s.start, end: s.end, color: "emerald", text: "free" })) },
+              { label: "Jane free", boxes: dora.net.map((s): TimelineBox => ({ start: s.start, end: s.end, color: "emerald", text: "free" })) },
+              { label: "Both free", boxes: combined.map((s): TimelineBox => ({ start: s.start, end: s.end, color: "emerald", text: "both" })) },
+            ]}
+          />
+        </div>
       </div>
     );
   }

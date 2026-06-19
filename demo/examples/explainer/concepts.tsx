@@ -2,6 +2,22 @@
 // on a timeline. Plain language, everyday examples, no jargon.
 
 import { TimelineTrack } from "@/components/timeline-track";
+import { LabeledTimeline, type TimelineRow } from "@/components/labeled-timeline";
+
+// The same storage diagram in the richer "Why deltat" style (labeled, coloured boxes).
+const STORAGE_ROWS: TimelineRow[] = [
+  { label: "Open hours", boxes: [{ start: 6, end: 94, color: "zinc", text: "open" }] },
+  { label: "Closed", boxes: [{ start: 44, end: 54, color: "rose", text: "Closed" }] },
+  { label: "Booked", boxes: [{ start: 14, end: 28, color: "rose", text: "Booked" }, { start: 66, end: 78, color: "rose", text: "Booked" }] },
+  {
+    label: "Free",
+    boxes: [
+      { start: 28, end: 44, color: "emerald", text: "free" },
+      { start: 54, end: 66, color: "emerald", text: "free" },
+      { start: 78, end: 94, color: "emerald", text: "free" },
+    ],
+  },
+];
 
 function ConceptRow({ term, children }: { term: string; children: React.ReactNode }) {
   return (
@@ -88,6 +104,11 @@ export function DataModelTopic() {
 
       <div className="mt-4">
         <StorageViz />
+      </div>
+
+      <div className="mt-3">
+        <div className="mb-1.5 text-[10px] uppercase tracking-[0.18em] text-zinc-500">Labeled-box style</div>
+        <LabeledTimeline axisStart={0} axisEnd={100} rows={STORAGE_ROWS} />
       </div>
 
       <div className="mt-4 space-y-3 text-[13px] leading-relaxed text-zinc-400">
