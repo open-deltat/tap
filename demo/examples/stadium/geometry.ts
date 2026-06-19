@@ -49,6 +49,13 @@ export function transformCenteredOn(
   return { scale, offsetX: viewW / 2 - wx * scale, offsetY: viewH / 2 - wy * scale };
 }
 
+// Human-readable name for each ladder level, indexed to match `zoomLevels`.
+const LEVEL_NAMES = ["Overview", "Close-up", "Seats", "Individual"] as const;
+
+export function levelName(level: number): string {
+  return LEVEL_NAMES[Math.max(0, Math.min(LEVEL_NAMES.length - 1, level))];
+}
+
 // Index of the ladder level nearest to a given scale (log space, so steps read evenly).
 export function nearestLevel(levels: number[], scale: number): number {
   let best = 0;

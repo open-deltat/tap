@@ -20,11 +20,11 @@ import { StadiumCanvas, type CanvasSection, type CanvasHit } from "./stadium-can
 import {
   WORLD,
   SEAT_THRESHOLD,
-  SEAT_LEVEL,
   type Transform,
   zoomLevels,
   transformCenteredOn,
   nearestLevel,
+  levelName,
 } from "./geometry";
 
 const MAX_QTY = 8;
@@ -67,6 +67,10 @@ export default function StadiumExample() {
     return transformCenteredOn(levels[0], WORLD.w / 2, WORLD.h / 2, FALLBACK_VIEW.w, FALLBACK_VIEW.h);
   });
   const easeRef = useRef<number>(0);
+  // The ladder level we're currently easing toward (null when idle). Stepping is always
+  // computed relative to this when set, so a fast wheel reversal mid-ease can't read an
+  // intermediate interpolated scale and get stuck.
+  const targetLevelRef = useRef<number | null>(null);
 
   const sections: Section[] = resources
     .filter((r) => r.section != null)
@@ -157,11 +161,19 @@ export default function StadiumExample() {
         offsetY: from.offsetY + (target.offsetY - from.offsetY) * e,
       });
       if (k < 1) easeRef.current = requestAnimationFrame(step);
+      else targetLevelRef.current = null;
     };
     easeRef.current = requestAnimationFrame(step);
   }, [transform]);
 
   useEffect(() => () => cancelAnimationFrame(easeRef.current), []);
+
+  // Current ladder level. Always derived from the live scale (so panning, which never
+  // touches scale, can't desync it). While an ease is in flight we trust the target it's
+  // heading to, so a fast wheel reversal steps relative to the destination, not a midpoint.
+  const currentLevel = useCallback((levels: number[]) => {
+    return targetLevelRef.current ?? nearestLevel(levels, transform.scale);
+  }, [transform.scale]);
 
   // Ease to a discrete ladder level, keeping a world focus point at the canvas center.
   // Default focus is whatever's currently centered, so wheel/buttons zoom toward center.
@@ -170,6 +182,7 @@ export default function StadiumExample() {
       const { w, h } = canvasSize();
       const levels = zoomLevels(w, h);
       const clamped = Math.max(0, Math.min(levels.length - 1, level));
+      targetLevelRef.current = clamped;
       const scale = levels[clamped];
       const fx = focus?.x ?? (w / 2 - transform.offsetX) / transform.scale;
       const fy = focus?.y ?? (h / 2 - transform.offsetY) / transform.scale;
@@ -178,31 +191,23 @@ export default function StadiumExample() {
     [easeTo, transform]
   );
 
-  // Wheel step: derive the current level from the live scale (drag-pan never changes scale,
-  // but this keeps us robust if the two ever drift) and move one step toward the cursor.
+  // Wheel step: move exactly one ladder level toward the cursor. Clamped to [0..3] and
+  // always reversible — wheel-out from any level/state steps back toward Overview.
   const onZoomStep = useCallback(
     (direction: 1 | -1, focusX: number, focusY: number) => {
       const { w, h } = canvasSize();
       const levels = zoomLevels(w, h);
-      const current = nearestLevel(levels, transform.scale);
+      const current = currentLevel(levels);
       const next = Math.max(0, Math.min(levels.length - 1, current + direction));
       if (next === current) return;
       goToLevel(next, { x: focusX, y: focusY });
     },
-    [goToLevel, transform.scale]
+    [goToLevel, currentLevel]
   );
 
   const onHit = useCallback(
     (hit: CanvasHit) => {
-      if (hit.kind === "section") {
-        // Below the seats level: ease to the seats level (L2) and center this section.
-        const s = hit.section;
-        setSelectedId(s.id);
-        setSelectedCells(new Set());
-        goToLevel(SEAT_LEVEL, { x: hit.worldX, y: hit.worldY });
-        return;
-      }
-      // Zoomed in: toggle a free seat cell in the selection set.
+      // Zoomed in: toggle a free seat cell in the selection set. Clicks never change zoom.
       const s = hit.section;
       const taken = s.capacity - s.remaining;
       if (hit.cell < taken) return; // already booked
@@ -225,7 +230,7 @@ export default function StadiumExample() {
         return base;
       });
     },
-    [goToLevel, selectedId]
+    [selectedId]
   );
 
   function book() {
@@ -258,12 +263,12 @@ export default function StadiumExample() {
     });
   }
 
-  // +/- buttons step one ladder level toward the canvas center.
+  // +/- buttons step one ladder level toward the canvas center. Same derivation as the
+  // wheel, so the − button always steps out from any level/state.
   function stepZoom(direction: 1 | -1) {
     const { w, h } = canvasSize();
     const levels = zoomLevels(w, h);
-    const current = nearestLevel(levels, transform.scale);
-    goToLevel(current + direction);
+    goToLevel(currentLevel(levels) + direction);
   }
 
   if (loading) {
@@ -278,6 +283,8 @@ export default function StadiumExample() {
   }
 
   const seatLOD = transform.scale >= SEAT_THRESHOLD;
+  const { w: viewW, h: viewH } = canvasSize();
+  const levelLabel = levelName(nearestLevel(zoomLevels(viewW, viewH), transform.scale));
 
   const ribbon = (
     <div className="flex flex-col items-center gap-2">
@@ -305,27 +312,6 @@ export default function StadiumExample() {
       <div className="text-[11px] text-zinc-500">
         {totalRemaining.toLocaleString()} of {totalCapacity.toLocaleString()} seats open across{" "}
         {sections.length} sections
-      </div>
-      <div className="flex items-center gap-2">
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          className="bg-white/5 text-zinc-300"
-          onClick={() => stepZoom(-1)}
-          aria-label="Zoom out one level"
-        >
-          <ZoomOut className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          className="bg-white/5 text-zinc-300"
-          onClick={() => stepZoom(1)}
-          aria-label="Zoom in one level"
-        >
-          <ZoomIn className="h-3.5 w-3.5" />
-        </Button>
-        <span className="text-[11px] text-zinc-600">scroll to step zoom · drag to pan</span>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
         <Legend color="#10b981" label="plenty" />
@@ -377,11 +363,42 @@ export default function StadiumExample() {
             onZoomStep={onZoomStep}
             onHit={onHit}
           />
-          <div className="pointer-events-none mt-2 text-center text-[11px] text-zinc-600">
-            {seatLOD
-              ? "Tap a free seat to select · book the batch below"
-              : "Tap a section to zoom into its seats"}
+
+          {/* Zoom control pinned bottom-right: current-level label above a vertical +/- stack. */}
+          <div className="pointer-events-none absolute bottom-3 right-3 flex flex-col items-end gap-1.5">
+            <span className="rounded-md border border-white/15 bg-zinc-900/80 px-2 py-0.5 text-[11px] font-medium text-zinc-200 shadow-sm backdrop-blur-sm">
+              {levelLabel}
+            </span>
+            <div className="pointer-events-auto flex flex-col overflow-hidden rounded-lg border border-white/15 bg-zinc-900/80 shadow-md backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => stepZoom(1)}
+                aria-label="Zoom in one level"
+                className="flex h-9 w-9 items-center justify-center text-zinc-200 transition-colors hover:bg-white/10 active:bg-white/20"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+              <div className="h-px w-full bg-white/10" />
+              <button
+                type="button"
+                onClick={() => stepZoom(-1)}
+                aria-label="Zoom out one level"
+                className="flex h-9 w-9 items-center justify-center text-zinc-200 transition-colors hover:bg-white/10 active:bg-white/20"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+            </div>
           </div>
+
+          <div className="pointer-events-none absolute bottom-3 left-3 text-[11px] text-zinc-500/80">
+            scroll to zoom · drag to pan
+          </div>
+
+          {seatLOD && (
+            <div className="pointer-events-none mt-2 text-center text-[11px] text-zinc-600">
+              Tap a free seat to select · book the batch below
+            </div>
+          )}
         </div>
       </Stage>
 
