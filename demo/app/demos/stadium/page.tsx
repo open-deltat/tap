@@ -1,6 +1,5 @@
-import { SeatBookingPage } from "@/components/seat-booking-page";
-import { seedStadium } from "@/app/actions/seed-stadium";
+import { StadiumBowl } from "@/components/stadium-bowl";
 
 export default function StadiumPage() {
-  return <SeatBookingPage seedFn={seedStadium} />;
+  return <StadiumBowl />;
 }

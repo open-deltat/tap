@@ -11,15 +11,23 @@ function toMeta(opts: { slotMinutes: number; price: number | null }): ResourceMe
 
 export async function createVenue(
   name: string,
-  opts: { slotMinutes: number; bufferMinutes: number }
+  opts: { slotMinutes: number; bufferMinutes: number },
+  parentId?: string
 ): Promise<Resource> {
   const r = await dt.resources.create({
+    parentId,
     name,
     bufferAfter: opts.bufferMinutes * 60_000 || undefined,
   });
   const m = toMeta({ slotMinutes: opts.slotMinutes, price: null });
   store.set(r.id, m);
   return { ...r, ...m, bufferMinutes: opts.bufferMinutes };
+}
+
+/** Idempotency within a visitor subtree: find a direct child of `parentId` by name. */
+export async function findChildByName(parentId: string, name: string): Promise<string | null> {
+  const children = await dt.resources.get({ parentId });
+  return children.find((c) => c.name === name)?.id ?? null;
 }
 
 export async function createSection(
@@ -58,6 +66,19 @@ export async function createSeats(
     }
   }
   return seats;
+}
+
+export async function prebookSeats(
+  seats: Resource[],
+  count: number,
+  start: number,
+  durMinutes: number,
+  label = "Sold"
+): Promise<void> {
+  const end = start + durMinutes * 60_000;
+  for (const seat of seats.slice(0, count)) {
+    await dt.bookings.create([{ resourceId: seat.id, start, end, label }]);
+  }
 }
 
 export async function addSchedule(

@@ -12,17 +12,17 @@ export default function ParkingPage() {
 
   useEffect(() => {
     seedParking()
-      .then(setGarageId)
+      .then(([id]) => setGarageId(id))
       .catch(() => toast.error("Failed to connect to deltat. Is it running?"))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+        <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to deltat...
+          Connecting to deltat…
         </div>
       </div>
     );

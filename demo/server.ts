@@ -50,14 +50,17 @@ async function handleConfirm(ws: WebSocket, state: WsState, msg: any) {
     const holdId = state.holdId;
     state.holdId = null;
 
+    // Release the hold BEFORE booking: deltat treats an active hold as a conflict, so
+    // booking the same span while the hold is still live rejects the booking against the
+    // client's own hold (same root cause as the seat-batch path).
+    try { await dt.holds.release(holdId); } catch {}
+
     const [booking] = await dt.bookings.create([{
       resourceId: state.resourceId,
       start: state.start,
       end: state.end,
       label: msg.label || undefined,
     }]);
-
-    try { await dt.holds.release(holdId); } catch {}
 
     ws.send(JSON.stringify({ type: "confirmed", booking }));
   } catch (err) {
