@@ -81,39 +81,39 @@ export interface StepCaption {
 /** Six steps, 0-indexed — each reveals one more layer across BOTH calendars at once. */
 export const STEP_CAPTIONS: StepCaption[] = [
   {
-    title: "Open windows",
+    title: "Open hours",
     caption:
-      "availability() step 1 — non-blocking rules define the open band. Bob and Jane are both open 09:00–17:00.",
+      "Start with when each person works — their open band. Bob and Jane are both open 09:00–17:00. That's the most they could ever be free. (rules → open band)",
     layers: ["open"],
   },
   {
-    title: "Subtract blocking rules",
+    title: "Cut out closures",
     caption:
-      "subtract_intervals(open, blocking) — own + inherited, ACCUMULATE. None here, so nothing changes.",
+      "Remove any blocked-off time — holidays, lunch blocks, closures. Neither has one today, so the band is unchanged. (subtract blocking rules)",
     layers: ["open", "blocking"],
   },
   {
-    title: "Subtract bookings",
+    title: "Cut out what's booked",
     caption:
-      "subtract_intervals(free, bookings) — Bob loses 09:00–10:00; Jane loses 09:00–12:00 (three appointments).",
+      "Now remove what's already on the calendar. Bob has a 09:00–10:00 meeting; Jane has back-to-back meetings 09:00–12:00. Those exact spans are punched out of the band.",
     layers: ["open", "blocking", "booking"],
   },
   {
-    title: "Subtract holds",
+    title: "Cut out live holds",
     caption:
-      "Live holds where expires_at > now subtract too — click the Both-free lane to place one and watch both shrink.",
+      "Pending holds (someone mid-booking) subtract too, while their timer is alive — then reappear when it expires. Click the Both-free lane to place one and watch both bands shrink in real time.",
     layers: ["open", "blocking", "booking", "hold"],
   },
   {
-    title: "Net availability",
+    title: "What's left = availability",
     caption:
-      "The engine returns Bob [10:00, 17:00), Jane [12:00, 17:00) — dt.availability.get per resource.",
+      "Open hours minus closures minus bookings minus holds = each person's real free time: Bob 10:00–17:00, Jane 12:00–17:00. That subtraction is the whole availability query.",
     layers: ["open", "blocking", "booking", "hold", "net"],
   },
   {
-    title: "Intersection (both free)",
+    title: "When are BOTH free?",
     caption:
-      "dt.availability.getCombined(…, min_available = 2) — overlap starts at max(10:00, 12:00) = 12:00.",
+      "Overlap the two free bands to find shared time — it starts at the later of the two starts, 12:00. One query does this across both people at once. (getCombined, min_available = 2)",
     layers: ["open", "blocking", "booking", "hold", "net", "combined"],
   },
 ];
