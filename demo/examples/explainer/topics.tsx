@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export interface FeatureTopic {
   id: string;
@@ -93,6 +95,126 @@ export const FEATURE_TOPICS: FeatureTopic[] = [
   },
 ];
 
+function Track({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-10 shrink-0 text-right text-[9px] uppercase tracking-wider text-zinc-500">{label}</span>
+      <div className="relative h-3 flex-1 rounded bg-white/[0.04]">{children}</div>
+    </div>
+  );
+}
+
+function Seg({ left, width, cls }: { left: number; width: number; cls: string }) {
+  return <div className={cn("absolute inset-y-0 rounded", cls)} style={{ left: `${left}%`, width: `${width}%` }} />;
+}
+
+const VizBox = ({ children }: { children: ReactNode }) => (
+  <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">{children}</div>
+);
+
+// A compact diagram per primitive — the picture, not just the API.
+function TopicVisual({ id }: { id: string }) {
+  switch (id) {
+    case "intersection":
+      return (
+        <VizBox>
+          <div className="space-y-1.5">
+            <Track label="Alice">
+              <Seg left={10} width={45} cls="bg-zinc-500/40" />
+              <Seg left={62} width={28} cls="bg-zinc-500/40" />
+            </Track>
+            <Track label="Bob">
+              <Seg left={28} width={50} cls="bg-zinc-500/40" />
+            </Track>
+            <Track label="both">
+              <Seg left={28} width={27} cls="bg-emerald-500/60" />
+              <Seg left={62} width={16} cls="bg-emerald-500/60" />
+            </Track>
+          </div>
+          <p className="mt-2 text-center text-[10px] text-zinc-500">the green band is where both are free</p>
+        </VizBox>
+      );
+    case "capacity":
+      return (
+        <VizBox>
+          <div className="flex gap-1">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className={cn("h-7 flex-1 rounded", i < 3 ? "bg-emerald-500/50" : "bg-white/[0.06]")} />
+            ))}
+          </div>
+          <p className="mt-2 text-center text-[10px] text-zinc-500">3 of 5 booked · accepted while load &lt; capacity</p>
+        </VizBox>
+      );
+    case "atomic":
+      return (
+        <VizBox>
+          <div className="flex items-center justify-center gap-2">
+            {["A", "B", "C"].map((s) => (
+              <div key={s} className="grid h-9 w-9 place-items-center rounded bg-emerald-500/40 text-[11px] font-medium text-emerald-100">
+                {s}
+              </div>
+            ))}
+            <span className="mx-1 text-zinc-600">or</span>
+            {["A", "B", "C"].map((s) => (
+              <div key={s} className="grid h-9 w-9 place-items-center rounded border border-white/10 text-[11px] text-zinc-600">
+                {s}
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-center text-[10px] text-zinc-500">all three commit — or none do</p>
+        </VizBox>
+      );
+    case "hierarchy":
+      return (
+        <VizBox>
+          <div className="flex flex-col items-center gap-1 text-[9px] text-zinc-400">
+            <div className="animate-pulse rounded bg-emerald-500/30 px-2 py-0.5 text-emerald-200">stadium ▲</div>
+            <div className="h-2 w-px bg-white/15" />
+            <div className="flex gap-6">
+              <div className="rounded bg-white/[0.06] px-2 py-0.5">tier</div>
+              <div className="rounded bg-white/[0.06] px-2 py-0.5">tier</div>
+            </div>
+            <div className="h-2 w-px bg-white/15" />
+            <div className="rounded bg-sky-500/30 px-2 py-0.5 text-sky-200">seat booked</div>
+          </div>
+          <p className="mt-2 text-center text-[10px] text-zinc-500">a leaf event bubbles up to the root</p>
+        </VizBox>
+      );
+    case "stable-unit":
+      return (
+        <VizBox>
+          <div className="flex gap-1">
+            {Array.from({ length: 10 }).map((_, i) => {
+              const stay = i >= 2 && i <= 6;
+              return <div key={i} className={cn("h-7 flex-1 rounded", stay ? "bg-emerald-500/55" : "bg-white/[0.06]")} />;
+            })}
+          </div>
+          <p className="mt-2 text-center text-[10px] text-zinc-500">5 consecutive nights · one stable room</p>
+        </VizBox>
+      );
+    case "streaming":
+      return (
+        <VizBox>
+          <div className="flex items-center justify-between">
+            <div className="relative grid h-9 w-16 place-items-center rounded bg-emerald-500/30 text-[10px] text-emerald-200">
+              deltat
+              <span className="absolute -right-1 -top-1 h-2 w-2 animate-ping rounded-full bg-emerald-400" />
+            </div>
+            <div className="mx-2 flex-1 border-t border-dashed border-emerald-400/30" />
+            <div className="flex flex-col gap-1">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-2.5 w-10 rounded-full bg-sky-500/40" />
+              ))}
+            </div>
+          </div>
+          <p className="mt-2 text-center text-[10px] text-zinc-500">one NOTIFY → every subscriber repaints</p>
+        </VizBox>
+      );
+    default:
+      return null;
+  }
+}
+
 export function TopicCard({ topic }: { topic: FeatureTopic }) {
   return (
     <div className="mx-auto max-w-2xl">
@@ -106,6 +228,10 @@ export function TopicCard({ topic }: { topic: FeatureTopic }) {
       </div>
       <h2 className="mt-2 text-2xl font-semibold text-zinc-100">{topic.title}</h2>
       <p className="mt-1 text-sm text-emerald-300/90">{topic.tagline}</p>
+
+      <div className="mt-5">
+        <TopicVisual id={topic.id} />
+      </div>
 
       <div className="mt-5 space-y-3">
         {topic.body.map((p, i) => (

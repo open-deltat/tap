@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,10 @@ import { toLocalDateString, formatTime } from "@/lib/time";
 import { ensureMeetCalendars } from "./seed";
 import { getAvailability, getCombinedAvailability } from "@/app/actions/availability";
 import { batchBookSlots } from "@/app/actions/bookings";
+import { useWebSocket } from "@/hooks/use-websocket";
 import { formatError } from "@/lib/format-error";
+
+const SLOT_STEP_MS = 30 * 60_000;
 
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
@@ -54,6 +57,18 @@ export default function MeetExample() {
   const axisStart = dayStart + AXIS_START_HOUR * HOUR_MS;
   const axisEnd = dayStart + AXIS_END_HOUR * HOUR_MS;
   const durationMs = duration * 60_000;
+
+  // Discrete start times across the both-free windows, at 30-min steps — so you can pick a specific
+  // meeting time, not just the first opening of the day.
+  const slotOptions = useMemo<{ start: number; end: number }[]>(() => {
+    const out: { start: number; end: number }[] = [];
+    for (const w of bothFree) {
+      for (let c = w.start; c + durationMs <= w.end; c += SLOT_STEP_MS) {
+        out.push({ start: c, end: c + durationMs });
+      }
+    }
+    return out;
+  }, [bothFree, durationMs]);
 
   const refresh = useCallback(async (calendars: MeetIds, day: string) => {
     const ds = new Date(`${day}T00:00`).getTime();
@@ -103,6 +118,17 @@ export default function MeetExample() {
     const first = bothFree.map((s) => snapToWindow(s, durationMs)).find(Boolean);
     if (first) setSelected(first);
   }, [bothFree, durationMs, selected]);
+
+  // Live: re-read both calendars on any booking/cancel from either side.
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const onWsEvent = useCallback(() => {
+    if (!ids) return;
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => void refresh(ids, date), 200);
+  }, [ids, date, refresh]);
+  useEffect(() => () => clearTimeout(refreshTimer.current), []);
+  useWebSocket(ids ? { type: "subscribe", resourceId: ids.aliceId, onEvent: onWsEvent } : null);
+  useWebSocket(ids ? { type: "subscribe", resourceId: ids.bobId, onEvent: onWsEvent } : null);
 
   function pickDuration(d: Duration) {
     setDuration(d);
@@ -253,6 +279,33 @@ export default function MeetExample() {
             { label: "Both free", slots: bothFree, intersection: true },
           ]}
         />
+
+        {slotOptions.length > 0 && (
+          <div className="mt-4">
+            <div className="mb-1.5 text-center text-[11px] text-zinc-500">Pick a time</div>
+            <div className="flex max-h-24 flex-wrap justify-center gap-1.5 overflow-y-auto px-1">
+              {slotOptions.map((s) => {
+                const active = selected?.start === s.start;
+                return (
+                  <button
+                    key={s.start}
+                    type="button"
+                    onClick={() => setSelected({ start: s.start, end: s.end })}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                      active
+                        ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200"
+                        : "border-white/10 text-zinc-400 hover:text-zinc-200"
+                    )}
+                  >
+                    {formatTime(s.start)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <p className="mt-5 text-center text-[11px] text-zinc-500">
           Alice and Bob keep independent timelines. The bottom lane is{" "}
           <span className="text-emerald-300">min_available = 2</span> across both — the intersection,
