@@ -44,46 +44,46 @@ const row = (overrides: Array<[seat: number, state: SeatState]> = []): SeatState
 
 export const HOLDS_STEPS: HoldsStep[] = [
   {
-    title: "Streamed, not polled",
+    title: "Both see the same seats",
     caption:
-      "Both clients see the same free seats — streamed over LISTEN/NOTIFY, not polled. No refresh, no stale view.",
+      "Two people open the same screen. They both see the live seat map at once. Nobody has to refresh.",
     a: { seats: allFree() },
     b: { seats: allFree() },
   },
   {
-    title: "Client A holds seat 4",
+    title: "One person holds a seat",
     caption:
-      "Client A selects seat 4 → deltat places a HOLD: a short-TTL reservation that subtracts from availability immediately.",
+      "The first person taps seat 4. deltat puts a short hold on it, so it counts as taken straight away.",
     a: { seats: row([[FOCUS_SEAT, "hold"]]), acting: true },
     b: { seats: allFree() },
   },
   {
-    title: "Hold broadcast as a delta",
+    title: "The other person sees it",
     caption:
-      "The hold is broadcast as a delta — Client B sees seat 4 go amber within a moment, no poll required.",
+      "That hold is pushed to the second person right away, so seat 4 turns amber on their screen within a moment.",
     a: { seats: row([[FOCUS_SEAT, "hold"]]) },
     b: { seats: row([[FOCUS_SEAT, "hold"]]) },
     delta: true,
   },
   {
-    title: "Race → first hold wins",
+    title: "They both grab it",
     caption:
-      "Race: Client B taps seat 4 at the same moment → rejected. First hold wins; the engine refuses the second. No double-booking.",
+      "The second person taps seat 4 at the same time. deltat says no. The first hold wins, the second is turned away, and the seat is never given to two people.",
     a: { seats: row([[FOCUS_SEAT, "hold"]]) },
     b: { seats: row([[FOCUS_SEAT, "reject"]]), acting: true },
   },
   {
-    title: "Hold → booking, atomically",
+    title: "The hold becomes a booking",
     caption:
-      "Client A confirms → the hold becomes a booking, atomically. One state transition, no window where the seat is double-claimable.",
+      "The first person confirms. The hold turns into a real booking in one step, with no gap where someone else could slip in.",
     a: { seats: row([[FOCUS_SEAT, "booked"]]), acting: true },
     b: { seats: row([[FOCUS_SEAT, "booked"]]) },
     delta: true,
   },
   {
-    title: "TTL expiry frees the seat",
+    title: "Or the hold expires",
     caption:
-      "If A had walked away, the hold's TTL expires and the seat frees itself — no orphaned locks, no manual cleanup.",
+      "If the first person had wandered off instead, the hold runs out on its own and the seat goes back to free. Nothing to clean up.",
     a: { seats: allFree() },
     b: { seats: allFree() },
     delta: true,
