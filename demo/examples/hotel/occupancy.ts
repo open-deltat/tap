@@ -16,17 +16,23 @@ function nightStart(ms: number): number {
 }
 
 /**
- * Expand each booking's half-open [check-in, check-out) range into the nights it covers and
- * tally how many rooms are taken per night. The night a stay checks out is NOT occupied.
+ * Tally rooms taken per NIGHT. A stay [check-in, check-out) sleeps the nights of its check-in day
+ * through the day before check-out — independent of the actual check-in/out clock times (3 PM /
+ * 11 AM), because we key by the check-in DATE and stop before the check-out date. So the nights
+ * occupied are [date(check-in) .. date(check-out)), and the checkout morning never consumes a night.
+ * (Date-cursor iteration, so it's DST-safe.)
  */
 export function occupancyByNight(bookings: Booking[]): Map<number, NightOccupancy> {
   const nights = new Map<number, NightOccupancy>();
   for (const b of bookings) {
-    const last = nightStart(b.end - 1); // exclusive checkout: last occupied night
-    for (let t = nightStart(b.start); t <= last; t += DAY) {
+    const endNight = nightStart(b.end); // check-out date — NOT slept
+    const cursor = new Date(nightStart(b.start));
+    while (cursor.getTime() < endNight) {
+      const t = cursor.getTime();
       const existing = nights.get(t);
       if (existing) existing.taken += 1;
       else nights.set(t, { date: new Date(t), taken: 1 });
+      cursor.setDate(cursor.getDate() + 1);
     }
   }
   return nights;

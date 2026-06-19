@@ -61,6 +61,7 @@ export function StadiumCanvas({
   selectedSectionId,
   selectedCells,
   onTransformChange,
+  onZoomStep,
   onHit,
 }: {
   sections: CanvasSection[];
@@ -68,6 +69,9 @@ export function StadiumCanvas({
   selectedSectionId: string | null;
   selectedCells: Set<number>;
   onTransformChange: (t: Transform) => void;
+  // One wheel gesture (debounced) = one level step. `focusX/Y` are the world point under
+  // the cursor to keep stable across the zoom; the parent decides the target level + offset.
+  onZoomStep: (direction: 1 | -1, focusX: number, focusY: number) => void;
   onHit: (hit: CanvasHit) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -203,25 +207,34 @@ export function StadiumCanvas({
     };
   }, [scheduleDraw]);
 
-  // Wheel zoom toward cursor (keep the world point under the cursor fixed).
+  // Wheel zoom: discrete levels. Debounce so one scroll gesture steps exactly one level,
+  // zooming toward the cursor (the world point under it stays put across the eased step).
+  const wheelLockRef = useRef(false);
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    let releaseTimer: ReturnType<typeof setTimeout> | undefined;
     const handler = (e: WheelEvent) => {
       e.preventDefault();
+      // Trailing wheel events from the same gesture keep resetting the release timer.
+      if (releaseTimer) clearTimeout(releaseTimer);
+      releaseTimer = setTimeout(() => {
+        wheelLockRef.current = false;
+      }, 140);
+      if (wheelLockRef.current) return;
+      wheelLockRef.current = true;
       const rect = el.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
-      const t = tRef.current;
-      const [wx, wy] = screenToWorld(t, sx, sy);
-      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-      const scale = clamp(t.scale * factor, 0.4, 30);
-      // Solve offset so (wx,wy) stays under (sx,sy): sx = wx*scale + offsetX.
-      onTransformChange({ scale, offsetX: sx - wx * scale, offsetY: sy - wy * scale });
+      const [wx, wy] = screenToWorld(tRef.current, sx, sy);
+      onZoomStep(e.deltaY < 0 ? 1 : -1, wx, wy);
     };
     el.addEventListener("wheel", handler, { passive: false });
-    return () => el.removeEventListener("wheel", handler);
-  }, [onTransformChange]);
+    return () => {
+      el.removeEventListener("wheel", handler);
+      if (releaseTimer) clearTimeout(releaseTimer);
+    };
+  }, [onZoomStep]);
 
   // Pointer drag-pan + click hit-testing (distinguish a click from a drag).
   const dragRef = useRef<{

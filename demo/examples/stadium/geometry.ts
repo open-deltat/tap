@@ -14,6 +14,55 @@ export interface Transform {
   offsetY: number;
 }
 
+// Discrete zoom ladder. Index into LEVELS, not a free scale.
+//   L0 Overview   — whole stadium fits, sections as blocks, no seats
+//   L1 Close-up   — one step in, bigger blocks, still no seats
+//   L2 Seats      — seats appear (this is SEAT_THRESHOLD)
+//   L3 Seats wide — one more step, seats large/clear
+export const SEAT_LEVEL = 2;
+
+// Build the scale ladder for the current canvas size. L0 fits WORLD into the canvas;
+// L2 is the seat threshold; L1 sits geometrically between them; L3 is a step past seats.
+export function zoomLevels(viewW: number, viewH: number): number[] {
+  const fit = fitScale(viewW, viewH);
+  const l0 = Math.min(fit, SEAT_THRESHOLD * 0.5); // never start already near seats
+  const l2 = SEAT_THRESHOLD;
+  const l1 = Math.sqrt(l0 * l2); // geometric midpoint feels even between steps
+  const l3 = SEAT_THRESHOLD * 1.6;
+  return [l0, l1, l2, l3];
+}
+
+// Largest scale that still fits the whole WORLD in the canvas, with a small margin.
+export function fitScale(viewW: number, viewH: number): number {
+  const margin = 0.92;
+  return Math.min(viewW / WORLD.w, viewH / WORLD.h) * margin;
+}
+
+// Transform that places world point (wx, wy) at the canvas center for a given scale.
+export function transformCenteredOn(
+  scale: number,
+  wx: number,
+  wy: number,
+  viewW: number,
+  viewH: number
+): Transform {
+  return { scale, offsetX: viewW / 2 - wx * scale, offsetY: viewH / 2 - wy * scale };
+}
+
+// Index of the ladder level nearest to a given scale (log space, so steps read evenly).
+export function nearestLevel(levels: number[], scale: number): number {
+  let best = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < levels.length; i++) {
+    const d = Math.abs(Math.log(scale) - Math.log(levels[i]));
+    if (d < bestDist) {
+      bestDist = d;
+      best = i;
+    }
+  }
+  return best;
+}
+
 export interface Rect {
   x: number;
   y: number;
