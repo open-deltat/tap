@@ -23,23 +23,12 @@ export class Rules {
       blocking: item.blocking ?? false,
     }));
 
-    if (rules.length === 1) {
-      const r = rules[0];
+    // deltat honors only single-row rule inserts — a multi-row VALUES(...) silently keeps
+    // just the first row. Rules are independent (no all-or-nothing semantics), so insert
+    // them one at a time. (Becomes a native batch op when the framed protocol replaces SQL.)
+    for (const r of rules) {
       await this
         .sql`INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES (${r.id}, ${r.resourceId}, ${r.start}, ${r.end}, ${r.blocking})`;
-    } else {
-      const params: (string | number | boolean)[] = [];
-      const rows: string[] = [];
-      for (const r of rules) {
-        const i = params.length;
-        params.push(r.id, r.resourceId, r.start, r.end, r.blocking);
-        rows.push(`($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}, $${i + 5})`);
-      }
-
-      await this.sql.unsafe(
-        `INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES ${rows.join(", ")}`,
-        params
-      );
     }
 
     return rules;
