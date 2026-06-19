@@ -1,15 +1,17 @@
-import { seedAirline } from "@/app/actions/seed-airline";
-import { seedTheater } from "@/app/actions/seed-theater";
-import { seedCinema } from "@/app/actions/seed-cinema";
-import { seedStadium } from "@/app/actions/seed-stadium";
-import { ensureHotel } from "@/app/actions/seed-hotel";
-import { seedRestaurant } from "@/app/actions/seed-restaurant";
-import { seedParking } from "@/app/actions/seed-parking";
+import { seedAirline } from "@/examples/airline/seed";
+import { seedTheater } from "@/examples/theater/seed";
+import { seedCinema } from "@/examples/cinema/seed";
+import { seedStadium } from "@/examples/stadium/seed";
+import { ensureHotel } from "@/examples/hotel/seed";
+import { seedRestaurant } from "@/examples/restaurant/seed";
+import { seedParking } from "@/examples/parking/seed";
+import { seedAvailabilityScheduler } from "@/examples/availability/seed";
+import { ensureMeetCalendars } from "@/examples/meet/seed";
+import { seedLive } from "@/examples/live/seed";
+import { ensureExplainerCalendars } from "@/examples/explainer/seed";
+// Calendar's seed is the SHARED personal calendar (also the mirror target for the provider),
+// so it stays in app/actions rather than moving into examples/calendar/.
 import { ensurePersonalCalendar } from "@/app/actions/seed-personal-calendar";
-import { seedAvailabilityScheduler } from "@/app/actions/seed-availability-scheduler";
-import { ensureMeetCalendars } from "@/app/actions/seed-meet";
-import { seedLive } from "@/app/actions/seed-live";
-import { ensureExplainerCalendars } from "@/app/actions/seed-explainer";
 import type { ExampleId } from "./config";
 
 // Maps each example to its (idempotent) seed action. Seeding a deployment = run the seeds for

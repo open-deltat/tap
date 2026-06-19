@@ -1,11 +1,8 @@
-import { SeatBookingPage } from "@/components/seat-booking-page";
-import { seedTheater } from "@/app/actions/seed-theater";
+import { notFound } from "next/navigation";
+import { isExampleEnabled } from "@/examples/config";
+import Example from "@/examples/theater";
 
-export default function TheaterPage() {
-  return (
-    <SeatBookingPage
-      seedFn={seedTheater}
-      primitive={{ label: "Collision + Hold · assigned seating", specId: "AVAIL-02" }}
-    />
-  );
+export default function Page() {
+  if (!isExampleEnabled("theater")) notFound();
+  return <Example />;
 }
