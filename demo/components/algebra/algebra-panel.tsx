@@ -32,8 +32,8 @@ export function AlgebraPanel({
     ["− Bob.blocking", fmtSpans(bobBlocking), "blocking rules"],
     ["− Bob.bookings", fmtSpans(bobBookings), "allocations, +buffer"],
     ["= Bob.net", fmtSpans(bobNet), "dt.availability.get(bob)"],
-    ["Dora.net", fmtSpans(doraNet), "dt.availability.get(dora)"],
-    ["Bob ∩ Dora", fmtSpans(combined), "getCombined(…, min_available = 2)"],
+    ["Jane.net", fmtSpans(doraNet), "dt.availability.get(dora)"],
+    ["Bob ∩ Jane", fmtSpans(combined), "getCombined(…, min_available = 2)"],
   ];
 
   return (

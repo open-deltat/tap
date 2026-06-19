@@ -7,12 +7,12 @@ import { createVenue, createSeats, addSchedule, daily, findRootByName, baseMs } 
 const NAME = "Live Room";
 const SLOT = 1440; // one always-open all-day slot
 
-export const LIVE_ROWS = ["A", "B", "C", "D"] as const;
-export const LIVE_COLS = [1, 2, 3, 4, 5, 6] as const;
+export const LIVE_ROWS = ["A", "B", "C", "D", "E"] as const;
+export const LIVE_COLS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
 
 /**
- * A tiny 4x6 grid of capacity-1 seats under one root, open all day today. Booking any seat
- * emits a deltat BookingConfirmed event the venue subscription broadcasts to every client —
+ * A cinema-shaped 5x8 grid of capacity-1 seats under one root, open all day today. Booking any
+ * seat emits a deltat BookingConfirmed event the venue subscription broadcasts to every client —
  * which is the whole point of the realtime demo. Returns the venue (root) id.
  */
 export async function seedLive(): Promise<string> {
