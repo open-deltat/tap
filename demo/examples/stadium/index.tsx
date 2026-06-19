@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useCallback, useTransition, useRef } from "react";
 import { toast } from "sonner";
-import { Loader2, ZoomIn, ZoomOut } from "lucide-react";
+import { Loader2, ZoomIn, ZoomOut, Maximize, Locate } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Stage } from "@/components/stage";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
 import { toLocalDateString, formatTime } from "@/lib/time";
+import { useWebSocket } from "@/hooks/use-websocket";
 
 import { seedStadium } from "./seed";
 import { getResources } from "@/app/actions/resources";
@@ -16,13 +17,15 @@ import { getAvailability } from "@/app/actions/availability";
 import { getMultiResourceBookings, batchBookSlots } from "@/app/actions/bookings";
 import { formatError } from "@/lib/format-error";
 
-import { StadiumCanvas, type CanvasSection, type CanvasHit } from "./stadium-canvas";
+import { StadiumCanvas, LEGEND_COLORS, type CanvasSection, type CanvasHit } from "./stadium-canvas";
 import {
   WORLD,
   SEAT_THRESHOLD,
+  SEAT_LEVEL,
   type Transform,
   zoomLevels,
   transformCenteredOn,
+  sectionFrame,
   nearestLevel,
   levelName,
 } from "./geometry";
@@ -57,6 +60,9 @@ export default function StadiumExample() {
   const [slot, setSlot] = useState<{ start: number; end: number } | null>(null);
 
   const [bookingsBySection, setBookingsBySection] = useState<Map<string, Booking[]>>(new Map());
+  // The stadium root id. Bookings on any section bubble up to it (event bubbling), so one
+  // subscription here streams every section's changes — the basis for live seat-flips.
+  const [rootId, setRootId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<number>>(new Set());
   const [result, setResult] = useState<BookingResult | null>(null);
@@ -79,6 +85,7 @@ export default function StadiumExample() {
       const taken = (bookingsBySection.get(r.id) ?? []).length;
       return {
         id: r.id,
+        name: r.name ?? "",
         res: r,
         price: r.price ?? 0,
         tier: layout.tier,
@@ -110,6 +117,7 @@ export default function StadiumExample() {
     (async () => {
       try {
         const [id] = await seedStadium();
+        setRootId(id);
         const all = await getResources();
         setResources(all);
         const dayStart = new Date(`${date}T00:00`).getTime();
@@ -233,6 +241,31 @@ export default function StadiumExample() {
     [selectedId]
   );
 
+  // Live seat-flips: any booking on any section bubbles to the root, so this one subscription
+  // re-reads the current slot whenever anyone books. Debounced + ref-read so a burst (our own
+  // batch, or several concurrent bookers) coalesces into one reload using the latest slot and
+  // section list. Not gated on isPending: a full re-read is idempotent, so re-reading our own
+  // just-booked change is harmless, and gating it would silently drop others' concurrent events.
+  const slotRef = useRef(slot);
+  slotRef.current = slot;
+  const resourcesRef = useRef(resources);
+  resourcesRef.current = resources;
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const liveReload = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => {
+      const s = slotRef.current;
+      if (!s) return;
+      const ids = resourcesRef.current.filter((r) => r.section != null).map((r) => r.id);
+      loadBookings(ids, s.start, s.end);
+    }, 200);
+  }, [loadBookings]);
+
+  useEffect(() => () => clearTimeout(reloadTimerRef.current), []);
+
+  useWebSocket(rootId ? { type: "subscribe", resourceId: rootId, onEvent: liveReload } : null);
+
   function book() {
     if (!selected || !slot) return;
     const n = selected.assigned ? 1 : selectedCells.size;
@@ -269,6 +302,28 @@ export default function StadiumExample() {
     const { w, h } = canvasSize();
     const levels = zoomLevels(w, h);
     goToLevel(currentLevel(levels) + direction);
+  }
+
+  // Fly to the section with the most open seats and zoom to seat level, so a visitor lands
+  // on bookable seats instead of hunting the bowl. goToLevel centers on the section frame.
+  function findOpenSeats() {
+    const open = sections.filter((s) => s.remaining > 0);
+    if (open.length === 0) return;
+    const best = open.reduce((a, b) => (b.remaining > a.remaining ? b : a));
+    const f = sectionFrame(best.ring, best.idx, best.ringCount, best.assigned);
+    setSelectedId(best.id);
+    // A premium box is one assignable unit (cell 0): pre-select it so the canvas highlight
+    // matches the "box selected" tray. GA sections land unselected — pick seats by tapping.
+    setSelectedCells(best.assigned ? new Set([0]) : new Set());
+    goToLevel(SEAT_LEVEL, { x: f.cx, y: f.cy });
+  }
+
+  // Escape hatch: ease back to the whole-stadium overview, recentered on the field. Passing an
+  // explicit world-center focus (not a bare goToLevel(0)) recenters instead of only rescaling.
+  function resetView() {
+    setSelectedId(null);
+    setSelectedCells(new Set());
+    goToLevel(0, { x: WORLD.w / 2, y: WORLD.h / 2 });
   }
 
   if (loading) {
@@ -314,11 +369,11 @@ export default function StadiumExample() {
         {sections.length} sections
       </div>
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
-        <Legend color="#10b981" label="plenty" />
-        <Legend color="#f59e0b" label="filling" />
-        <Legend color="#fb7185" label="nearly full" />
-        <Legend color="#d4a843" label="premium box" />
-        <Legend color="#27272a" label="sold out" />
+        <Legend color={LEGEND_COLORS.plenty} label="plenty" />
+        <Legend color={LEGEND_COLORS.filling} label="filling" />
+        <Legend color={LEGEND_COLORS.nearlyFull} label="nearly full" />
+        <Legend color={LEGEND_COLORS.premium} label="premium box" />
+        <Legend color={LEGEND_COLORS.soldOut} label="sold out" />
       </div>
     </div>
   );
@@ -364,12 +419,34 @@ export default function StadiumExample() {
             onHit={onHit}
           />
 
-          {/* Zoom control pinned bottom-right: current-level label above a vertical +/- stack. */}
+          {/* Find open seats: jump straight to the emptiest section + zoom to its seats. */}
+          <div className="pointer-events-none absolute left-3 top-3">
+            <button
+              type="button"
+              onClick={findOpenSeats}
+              disabled={totalRemaining === 0}
+              className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-[12px] font-medium text-emerald-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Locate className="h-3.5 w-3.5" />
+              Find open seats
+            </button>
+          </div>
+
+          {/* Zoom control pinned bottom-right: current-level label above reset + a vertical +/- stack. */}
           <div className="pointer-events-none absolute bottom-3 right-3 flex flex-col items-end gap-1.5">
             <span className="rounded-md border border-white/15 bg-zinc-900/80 px-2 py-0.5 text-[11px] font-medium text-zinc-200 shadow-sm backdrop-blur-sm">
               {levelLabel}
             </span>
             <div className="pointer-events-auto flex flex-col overflow-hidden rounded-lg border border-white/15 bg-zinc-900/80 shadow-md backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={resetView}
+                aria-label="Reset view to the whole stadium"
+                className="flex h-9 w-9 items-center justify-center text-zinc-200 transition-colors hover:bg-white/10 active:bg-white/20"
+              >
+                <Maximize className="h-4 w-4" />
+              </button>
+              <div className="h-px w-full bg-white/10" />
               <button
                 type="button"
                 onClick={() => stepZoom(1)}
