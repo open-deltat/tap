@@ -31,12 +31,35 @@ export async function ensureHotel(): Promise<HotelRoomType[]> {
       const r = await dt.resources.create({ parentId: hotelId, name: t.name, capacity: t.capacity });
       created.push({ id: r.id, name: t.name, capacity: t.capacity });
     }
-    // Make the Suite (capacity 1) sold out tomorrow night, so "sold out" is demonstrable.
-    const suite = created.find((c) => c.name === "Suite");
-    if (suite) {
-      const t0 = baseMs() + DAY;
-      await dt.bookings.create([{ resourceId: suite.id, start: t0, end: t0 + DAY, label: "Existing reservation" }]);
-    }
+    // Intermittent multi-night stays so the "find N consecutive nights in the same room" finder
+    // has real gaps to thread. Each [startOffset, nights]; enough overlap to fully book some
+    // stretches (so a stable run must route around them) while leaving openings elsewhere.
+    const base = baseMs();
+    const bookStays = async (id: string, stays: [number, number][]) => {
+      // Sequential single bookings — the capacity sweep accepts overlaps up to N per type.
+      for (const [off, nights] of stays) {
+        await dt.bookings.create([
+          { resourceId: id, start: base + off * DAY, end: base + (off + nights) * DAY, label: "Reservation" },
+        ]);
+      }
+    };
+    const byName = (n: string) => created.find((c) => c.name === n)!;
+    // Standard (5 rooms): nights [6,10) and [20,24) fully booked; partials elsewhere.
+    await bookStays(byName("Standard Room").id, [
+      [6, 4], [6, 4], [6, 4], [6, 4], [6, 4],
+      [2, 3], [2, 3], [3, 2],
+      [12, 3], [12, 3], [13, 4], [16, 2],
+      [20, 4], [20, 4], [20, 4], [20, 4], [20, 4],
+    ]);
+    // Deluxe (3 rooms): nights [3,6) and [14,18) fully booked.
+    await bookStays(byName("Deluxe Room").id, [
+      [3, 3], [3, 3], [3, 3],
+      [8, 3], [9, 2],
+      [14, 4], [14, 4], [14, 4],
+      [22, 2],
+    ]);
+    // Suite (1 room): each stay fully blocks it.
+    await bookStays(byName("Suite").id, [[1, 2], [7, 2], [12, 2], [20, 5]]);
     return created;
   }
 
