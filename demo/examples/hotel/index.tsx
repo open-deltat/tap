@@ -96,8 +96,70 @@ export default function HotelPage() {
     [selBookings, selType]
   );
 
+  const cap = selType?.capacity ?? 1;
+  const isFull = useCallback((t: number) => (occ.get(t)?.taken ?? 0) >= cap, [occ, cap]);
+  // First fully-booked night at or after `anchor` — the night you can't sleep, so it's the latest
+  // possible check-OUT (you leave that morning). null = no full night within the horizon.
+  const firstFullFrom = useCallback(
+    (anchor: number): number | null => {
+      const c = new Date(anchor);
+      for (let i = 0; i <= HORIZON; i++) {
+        if (isFull(c.getTime())) return c.getTime();
+        c.setDate(c.getDate() + 1);
+      }
+      return null;
+    },
+    [isFull]
+  );
+  const firstOpenFrom = useCallback(
+    (anchor: number): number => {
+      const c = new Date(anchor);
+      for (let i = 0; i < HORIZON; i++) {
+        if (!isFull(c.getTime())) return c.getTime();
+        c.setDate(c.getDate() + 1);
+      }
+      return anchor;
+    },
+    [isFull]
+  );
+
   const fromMs = range?.from ? midnight(range.from) : null;
   const toMs = range?.to ? midnight(range.to) : null;
+  // The amber check-out boundary for the current check-in: the first booked night after it.
+  const checkoutMs = fromMs != null ? firstFullFrom(fromMs) : null;
+
+  // Default check-in to the first open night for the chosen room (today, usually).
+  useEffect(() => {
+    if (!selType) return;
+    setRange({ from: new Date(firstOpenFrom(todayMs)) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selTypeId, types.length]);
+
+  // Clamp every selection to a stable, bookable stay: check-in must be an open night, and the
+  // stay can run up to and including the first booked night (check-out that morning) — never past.
+  function onSelectRange(r: DateRange | undefined) {
+    if (!r?.from) {
+      setRange(undefined);
+      return;
+    }
+    const from = midnight(r.from);
+    if (isFull(from)) {
+      toast.error("That night is booked — pick an open night to check in");
+      return;
+    }
+    if (!r.to) {
+      setRange({ from: new Date(from) });
+      return;
+    }
+    let to = midnight(r.to);
+    if (to <= from) {
+      setRange({ from: new Date(from) });
+      return;
+    }
+    const ff = firstFullFrom(from);
+    if (ff != null && to > ff) to = ff; // you leave the morning of the first booked night
+    setRange({ from: new Date(from), to: new Date(to) });
+  }
 
   // Nights actually slept: check-in date .. the night before check-out (DST-safe date cursor).
   const nightTs = useMemo(() => {
@@ -256,10 +318,7 @@ export default function HotelPage() {
                 <button
                   key={rt.id}
                   type="button"
-                  onClick={() => {
-                    setSelTypeId(rt.id);
-                    setRange(undefined);
-                  }}
+                  onClick={() => setSelTypeId(rt.id)}
                   className={cn(
                     "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
                     active
@@ -292,21 +351,31 @@ export default function HotelPage() {
             </button>
           </div>
 
-          {/* Range picker — full nights are marked, past is disabled */}
+          {/* Range picker — two months; booked nights struck through, the check-out boundary amber */}
           <div className="flex justify-center rounded-lg border border-white/10 bg-white/[0.02] p-2 [color-scheme:dark]">
             <Calendar
               mode="range"
-              required={false}
+              numberOfMonths={2}
               selected={range}
-              onSelect={setRange}
+              onSelect={onSelectRange}
               defaultMonth={new Date(todayMs)}
               startMonth={new Date(todayMs)}
               disabled={{ before: new Date(todayMs), after: addDays(todayMs, HORIZON) }}
-              modifiers={{ full: fullNights }}
-              modifiersClassNames={{ full: "text-rose-300/80 line-through" }}
+              modifiers={{
+                booked: fullNights.filter((d) => checkoutMs == null || midnight(d) !== checkoutMs),
+                checkout: checkoutMs != null ? [new Date(checkoutMs)] : [],
+              }}
+              modifiersClassNames={{
+                booked: "text-rose-300/60 line-through",
+                checkout: "rounded-md text-amber-300 ring-1 ring-amber-400/60",
+              }}
               className="bg-transparent text-zinc-100"
             />
           </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+            Struck-through nights are booked. The <span className="text-amber-300">amber</span> night is
+            bookable only as your check-out — you sleep the night before and leave that morning.
+          </p>
 
           {/* Summary + book */}
           <div className="mt-4 border-t border-white/[0.06] pt-4">
@@ -317,9 +386,7 @@ export default function HotelPage() {
                     {fmt(fromMs!)} → {fmt(toMs!)} ·{" "}
                     <span className="font-mono">{nights} night{nights > 1 ? "s" : ""}</span>
                   </span>
-                  <span className={spanValid ? "text-emerald-300" : "text-rose-300"}>
-                    {spanValid ? "all nights open" : "includes a full night"}
-                  </span>
+                  <span className="text-emerald-300">stable room · all nights open</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Input
