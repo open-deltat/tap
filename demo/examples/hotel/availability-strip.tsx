@@ -49,22 +49,24 @@ export function AvailabilityStrip({
 
   return (
     <div>
-      <div className="flex h-5 gap-px overflow-hidden rounded-sm">
-        {nights.map(({ t, taken }) => {
-          const cls =
-            taken === 0
-              ? "bg-emerald-500/70"
-              : taken >= capacity
-                ? "bg-rose-500/45"
-                : "bg-amber-500/45";
-          return (
-            <div
-              key={t}
-              className={cn("flex-1", cls)}
-              title={`${fmt(t)} · ${Math.max(0, capacity - taken)}/${capacity} free`}
-            />
-          );
-        })}
+      {/* One column per night; each column is a stack of `capacity` pips (one per room) — booked
+          rooms (rose) fill from the bottom, open rooms (emerald) on top. So you SEE "3 of 5 taken"
+          without needing the word "partial". */}
+      <div className="flex h-8 items-stretch gap-px">
+        {nights.map(({ t, taken }) => (
+          <div
+            key={t}
+            className="flex flex-1 flex-col-reverse gap-px"
+            title={`${fmt(t)} · ${Math.max(0, capacity - taken)} of ${capacity} free`}
+          >
+            {Array.from({ length: capacity }).map((_, i) => (
+              <div
+                key={i}
+                className={cn("flex-1 rounded-[1px]", i < taken ? "bg-rose-500/55" : "bg-emerald-500/70")}
+              />
+            ))}
+          </div>
+        ))}
       </div>
 
       <div className="mt-2 flex flex-wrap gap-1">

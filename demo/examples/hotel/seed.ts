@@ -3,7 +3,10 @@
 import { dt } from "@/lib/deltat";
 import { findRootByName, baseMs } from "@/app/actions/seed-helpers";
 
+import { CHECK_IN_HOUR, CHECK_OUT_HOUR } from "./policy";
+
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
 const NAME = "Grand Hotel";
 
 // Room TYPES, not individual rooms: capacity = how many rooms of that type exist.
@@ -35,11 +38,19 @@ export async function ensureHotel(): Promise<HotelRoomType[]> {
     // has real gaps to thread. Each [startOffset, nights]; enough overlap to fully book some
     // stretches (so a stable run must route around them) while leaving openings elsewhere.
     const base = baseMs();
+    // A stay runs check-in 3 PM → check-out 11 AM (the hotel's policy), so a booking spans
+    // [day 15:00, (day+nights) 11:00). occupancyByNight keys by date, so it still counts exactly
+    // `nights` nights and the checkout morning frees the room.
     const bookStays = async (id: string, stays: [number, number][]) => {
       // Sequential single bookings — the capacity sweep accepts overlaps up to N per type.
       for (const [off, nights] of stays) {
         await dt.bookings.create([
-          { resourceId: id, start: base + off * DAY, end: base + (off + nights) * DAY, label: "Reservation" },
+          {
+            resourceId: id,
+            start: base + off * DAY + CHECK_IN_HOUR * HOUR,
+            end: base + (off + nights) * DAY + CHECK_OUT_HOUR * HOUR,
+            label: "Reservation",
+          },
         ]);
       }
     };
