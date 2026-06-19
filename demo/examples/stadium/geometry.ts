@@ -18,21 +18,23 @@ export interface Transform {
 //   L0 Overview   — whole stadium fits, sections as blocks, no seats
 //   L1 Close-up   — one step in, bigger blocks, still no seats
 //   L2 Seats      — seats appear (this is SEAT_THRESHOLD)
-//   L3 Individual — one more step, seats large/clear
-//   L4 Seat IDs   — deepest step: seats big enough to carry a row/seat label
-export const SEAT_LEVEL = 2;
+//   L3 Seats      — seats appear (this is SEAT_THRESHOLD)
+//   L4 Individual — one more step, seats large/clear
+//   L5 Seat IDs   — deepest step: seats big enough to carry a row/seat label
+// The default (level 0) is the most zoomed-out "Stadium" view, centered with margin.
+export const SEAT_LEVEL = 3;
 
-// Build the scale ladder for the current canvas size. L0 fits WORLD into the canvas;
-// L2 is the seat threshold; L1 sits geometrically between them; L3/L4 step past seats so
-// individual seats grow large enough to read a label.
+// Build the scale ladder for the current canvas size. lWide is a step further out than fit (so the
+// whole bowl sits centered with margin and reads as one shape); the seat threshold is L3.
 export function zoomLevels(viewW: number, viewH: number): number[] {
   const fit = fitScale(viewW, viewH);
   const l0 = Math.min(fit, SEAT_THRESHOLD * 0.5); // never start already near seats
+  const lWide = l0 * 0.72; // one more step out — the default, centered with margin
   const l2 = SEAT_THRESHOLD;
   const l1 = Math.sqrt(l0 * l2); // geometric midpoint feels even between steps
   const l3 = SEAT_THRESHOLD * 1.6;
   const l4 = SEAT_THRESHOLD * 3.5; // individual seats — large enough for an ID label
-  return [l0, l1, l2, l3, l4];
+  return [lWide, l0, l1, l2, l3, l4];
 }
 
 // Largest scale that still fits the whole WORLD in the canvas, with a small margin.
@@ -53,7 +55,7 @@ export function transformCenteredOn(
 }
 
 // Human-readable name for each ladder level, indexed to match `zoomLevels`.
-const LEVEL_NAMES = ["Overview", "Close-up", "Seats", "Individual", "Seat IDs"] as const;
+const LEVEL_NAMES = ["Stadium", "Overview", "Close-up", "Seats", "Individual", "Seat IDs"] as const;
 
 export function levelName(level: number): string {
   return LEVEL_NAMES[Math.max(0, Math.min(LEVEL_NAMES.length - 1, level))];

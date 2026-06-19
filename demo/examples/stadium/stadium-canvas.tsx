@@ -320,7 +320,7 @@ export function StadiumCanvas({
   return (
     <div
       ref={containerRef}
-      className="h-[58vh] w-full cursor-grab touch-none overflow-hidden rounded-xl bg-[#08080a] active:cursor-grabbing"
+      className="h-[58vh] w-full cursor-pointer touch-none overflow-hidden rounded-xl bg-[#08080a] active:cursor-grabbing"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -410,23 +410,23 @@ function drawSectionLabel(
   f: ReturnType<typeof sectionFrame>
 ) {
   if (!s.name) return;
+  // Show labels from the close-up level up, so EVERY section is labelled at once (not just the big
+  // ones) — below that they'd be unreadable. Each label is scaled to fit its section's width.
+  if (t.scale < SEAT_THRESHOLD * 0.34) return;
   const screenW = r.w * t.scale;
-  if (screenW < 42) return;
-  const alpha = Math.min(1, (screenW - 42) / 30);
+  const fitPx = (screenW * 0.84) / Math.max(1, s.name.length * 0.58);
+  const fontPx = Math.max(7, Math.min(14, fitPx));
   ctx.save();
   ctx.rotate(-f.angle); // we're already translated to (cx, cy); undo the frame's rotation
-  const fontPx = 13 / t.scale;
-  ctx.font = `600 ${fontPx}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.font = `600 ${fontPx / t.scale}px ui-sans-serif, system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
-  ctx.globalAlpha = alpha;
-  ctx.lineWidth = 3 / t.scale;
+  ctx.lineWidth = Math.max(2, fontPx * 0.2) / t.scale;
   ctx.strokeStyle = COLORS.labelHalo;
   ctx.strokeText(s.name, 0, 0);
   ctx.fillStyle = COLORS.label;
   ctx.fillText(s.name, 0, 0);
-  ctx.globalAlpha = 1;
   ctx.restore();
 }
 

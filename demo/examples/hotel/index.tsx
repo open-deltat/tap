@@ -368,6 +368,7 @@ export default function HotelPage() {
             <Calendar
               mode="range"
               numberOfMonths={2}
+              showOutsideDays={false}
               selected={range}
               onSelect={onSelectRange}
               defaultMonth={new Date(todayMs)}
