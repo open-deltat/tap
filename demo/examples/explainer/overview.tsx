@@ -14,7 +14,12 @@ function CollisionViz() {
           they clash
         </div>
       </div>
-      <div className="absolute inset-x-3 top-1/2 h-px bg-white/15" />
+      {/* the time axis: past on the left, future on the right */}
+      <div className="absolute inset-x-3 top-1/2 flex -translate-y-1/2 items-center gap-1 text-zinc-500">
+        <span className="text-[11px] leading-none">◀</span>
+        <div className="h-px flex-1 bg-white/20" />
+        <span className="text-[11px] leading-none">▶</span>
+      </div>
       {segs.map((s) => (
         <div
           key={s.label}
@@ -24,7 +29,9 @@ function CollisionViz() {
           {s.label}
         </div>
       ))}
-      <div className="absolute inset-x-0 bottom-1 text-center text-[9px] text-zinc-500">time, left to right</div>
+      <div className="absolute bottom-1 left-3 text-[9px] text-zinc-500">past</div>
+      <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-zinc-500">time</div>
+      <div className="absolute bottom-1 right-3 text-[9px] text-zinc-500">future</div>
     </div>
   );
 }

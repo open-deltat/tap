@@ -37,8 +37,9 @@ export function HoldsStatic() {
             </div>
             <div className="flex-1 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
               <div className="text-[13px] font-medium text-zinc-100">{step.title}</div>
-              <div className="mt-2 space-y-1">
+              <div className="mt-2">
                 <SeatRow label="Person A" lane={step.a} />
+                <div className="my-1.5 h-px bg-white/10" />
                 <SeatRow label="Person B" lane={step.b} />
               </div>
               <p className="mt-2 text-[12px] leading-relaxed text-zinc-400">{step.caption}</p>

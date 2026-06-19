@@ -46,46 +46,53 @@ export const HOLDS_STEPS: HoldsStep[] = [
   {
     title: "Both see the same seats",
     caption:
-      "Two people open the same screen. They both see the live seat map at once. Nobody has to refresh.",
+      "Person A and Person B open the same screen. They both see the live seat map at once. Nobody has to refresh.",
     a: { seats: allFree() },
     b: { seats: allFree() },
   },
   {
-    title: "One person holds a seat",
+    title: "Person A holds a seat",
     caption:
-      "The first person taps seat 4. deltat puts a short hold on it, so it counts as taken straight away.",
+      "Person A taps seat 4. deltat puts a hold on it, so it counts as taken straight away.",
     a: { seats: row([[FOCUS_SEAT, "hold"]]), acting: true },
     b: { seats: allFree() },
   },
   {
-    title: "The other person sees it",
+    title: "Person B sees the hold",
     caption:
-      "That hold is pushed to the second person right away, so seat 4 turns amber on their screen within a moment.",
+      "The hold is streamed to Person B right away, so seat 4 turns amber on their screen within a moment.",
     a: { seats: row([[FOCUS_SEAT, "hold"]]) },
     b: { seats: row([[FOCUS_SEAT, "hold"]]) },
     delta: true,
   },
   {
-    title: "They both grab it",
+    title: "Person B can't take it",
     caption:
-      "The second person taps seat 4 at the same time. deltat says no. The first hold wins, the second is turned away, and the seat is never given to two people.",
+      "Person B taps seat 4, but it is already held by Person A, so deltat refuses. Person B cannot take it until the hold clears.",
     a: { seats: row([[FOCUS_SEAT, "hold"]]) },
     b: { seats: row([[FOCUS_SEAT, "reject"]]), acting: true },
   },
   {
-    title: "The hold becomes a booking",
+    title: "The hold is temporary",
     caption:
-      "The first person confirms. The hold turns into a real booking in one step, with no gap where someone else could slip in.",
-    a: { seats: row([[FOCUS_SEAT, "booked"]]), acting: true },
-    b: { seats: row([[FOCUS_SEAT, "booked"]]) },
+      "A hold does not last forever. It has a short timer, and it stays alive only while Person A's live connection is open.",
+    a: { seats: row([[FOCUS_SEAT, "hold"]]) },
+    b: { seats: row([[FOCUS_SEAT, "hold"]]) },
+  },
+  {
+    title: "If A leaves, it frees up",
+    caption:
+      "If that timer runs out, or Person A's connection drops, the hold is released on its own and seat 4 turns green again. There is nothing to clean up.",
+    a: { seats: allFree() },
+    b: { seats: allFree() },
     delta: true,
   },
   {
-    title: "Or the hold expires",
+    title: "Or A confirms, and it's booked",
     caption:
-      "If the first person had wandered off instead, the hold runs out on its own and the seat goes back to free. Nothing to clean up.",
-    a: { seats: allFree() },
-    b: { seats: allFree() },
+      "If Person A confirms instead, the hold becomes a real booking in one step, with no gap where anyone could slip in.",
+    a: { seats: row([[FOCUS_SEAT, "booked"]]), acting: true },
+    b: { seats: row([[FOCUS_SEAT, "booked"]]) },
     delta: true,
   },
 ];
