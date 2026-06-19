@@ -196,7 +196,7 @@ export default function AvailabilityExample() {
                   defaultMonth={date}
                   startMonth={windowStart}
                   disabled={{ before: windowStart, after: windowEnd }}
-                  className="text-zinc-100"
+                  className="bg-transparent text-zinc-100"
                 />
               </div>
             </div>
