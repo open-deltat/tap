@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { AlgebraExplainer, type PersonData } from "./algebra/algebra-explainer";
 import { StepScrubber } from "./algebra/step-scrubber";
 import { HoldsNarrative } from "./holds/holds-narrative";
+import { OverviewTopic } from "./overview";
 import { FEATURE_TOPICS, TopicCard } from "./topics";
 import {
   AXIS_START_HOUR,
@@ -35,8 +36,9 @@ interface Ids {
   doraId: string;
 }
 
-// Sidebar: two interactive walkthroughs, then the feature explainers.
+// Sidebar: the first-principles overview, two interactive walkthroughs, then the feature explainers.
 const NAV: { id: string; label: string }[] = [
+  { id: "overview", label: "Why deltat" },
   { id: "algebra", label: "Availability algebra" },
   { id: "holds", label: "Holds & races" },
   ...FEATURE_TOPICS.map((t) => ({ id: t.id, label: t.label })),
@@ -59,7 +61,7 @@ function splitRules(rules: Rule[], ds: number, de: number): { open: Span[]; bloc
 }
 
 export default function ExplainerExample() {
-  const [topic, setTopic] = useState<string>("algebra");
+  const [topic, setTopic] = useState<string>("overview");
   const [ids, setIds] = useState<Ids | null>(null);
   const [date] = useState(toLocalDateString(new Date()));
   const [bob, setBob] = useState<PersonData>(emptyPerson("Bob"));
@@ -212,7 +214,9 @@ export default function ExplainerExample() {
   const featureTopic = FEATURE_TOPICS.find((t) => t.id === topic);
 
   let content: ReactNode;
-  if (topic === "holds") {
+  if (topic === "overview") {
+    content = <OverviewTopic />;
+  } else if (topic === "holds") {
     content = <HoldsNarrative />;
   } else if (featureTopic) {
     content = <TopicCard topic={featureTopic} />;
