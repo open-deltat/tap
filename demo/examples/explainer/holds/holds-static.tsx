@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { HOLDS_STEPS } from "./script";
 import { SeatRow } from "./seat-row";
+import { HoldsFlow } from "./holds-flow";
 
 const LEGEND: { label: string; cls: string }[] = [
   { label: "free", cls: "border-emerald-400/40 bg-emerald-500/20" },
@@ -29,7 +30,13 @@ export function HoldsStatic() {
         ))}
       </div>
 
-      <ol className="mt-5 space-y-2.5">
+      <div className="mt-6">
+        <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">The lifecycle</div>
+        <HoldsFlow />
+      </div>
+
+      <div className="mb-2 mt-8 text-[11px] uppercase tracking-[0.18em] text-zinc-500">Step by step</div>
+      <ol className="space-y-2.5">
         {HOLDS_STEPS.map((step, i) => (
           <li key={i} className="flex gap-3">
             <div className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-white/15 bg-white/[0.03] text-[11px] font-medium text-zinc-300">
