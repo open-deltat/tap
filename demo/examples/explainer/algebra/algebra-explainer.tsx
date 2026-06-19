@@ -35,11 +35,11 @@ interface AlgebraExplainerProps {
 }
 
 const LEGEND: { label: string; cls: string }[] = [
-  { label: "open", cls: "bg-zinc-400/30 ring-1 ring-white/10" },
-  { label: "blocking", cls: "bg-red-500/40" },
-  { label: "booking", cls: "bg-red-600/60" },
+  { label: "open hours", cls: "bg-zinc-400/30 ring-1 ring-white/10" },
+  { label: "closed", cls: "bg-red-500/40" },
+  { label: "booked", cls: "bg-red-600/60" },
   { label: "hold", cls: "bg-amber-400/70" },
-  { label: "net", cls: "bg-emerald-500/60" },
+  { label: "free", cls: "bg-emerald-500/60" },
 ];
 
 export function AlgebraExplainer({
