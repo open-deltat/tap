@@ -1,13 +1,8 @@
-"use client";
+import { notFound } from "next/navigation";
+import { isExampleEnabled } from "@/examples/config";
+import Example from "@/examples/airline";
 
-import { SeatBookingPage } from "@/components/seat-booking-page";
-import { seedAirline } from "@/app/actions/seed-airline";
-
-export default function AirlinePage() {
-  return (
-    <SeatBookingPage
-      seedFn={seedAirline}
-      primitive={{ label: "Collision + Hold · seat timeline", specId: "AVAIL-02" }}
-    />
-  );
+export default function Page() {
+  if (!isExampleEnabled("airline")) notFound();
+  return <Example />;
 }

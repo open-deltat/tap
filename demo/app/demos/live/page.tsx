@@ -1,5 +1,8 @@
-import { LiveRoom } from "@/components/live-room";
+import { notFound } from "next/navigation";
+import { isExampleEnabled } from "@/examples/config";
+import Example from "@/examples/live";
 
-export default function LivePage() {
-  return <LiveRoom />;
+export default function Page() {
+  if (!isExampleEnabled("live")) notFound();
+  return <Example />;
 }
