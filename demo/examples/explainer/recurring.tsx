@@ -1,6 +1,8 @@
 // "Repeating times": how a pattern like "every Monday at 9" is handled. deltat stores each real
 // occurrence as a stretch on the line; the pattern itself is expanded outside the database.
 
+import { LabeledTimeline } from "@/components/labeled-timeline";
+
 function RecurringViz() {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
@@ -32,6 +34,25 @@ export function RecurringTopic() {
 
       <div className="mt-5">
         <RecurringViz />
+      </div>
+
+      <div className="mt-3">
+        <div className="mb-1.5 text-[10px] uppercase tracking-[0.18em] text-zinc-500">Labeled-box style</div>
+        <LabeledTimeline
+          axisStart={0}
+          axisEnd={100}
+          labelWidth={0}
+          rows={[
+            {
+              boxes: [
+                { start: 8, end: 20, color: "emerald", text: "Mon" },
+                { start: 32, end: 44, color: "emerald", text: "Mon" },
+                { start: 56, end: 68, color: "emerald", text: "Mon" },
+                { start: 80, end: 92, color: "emerald", text: "Mon" },
+              ],
+            },
+          ]}
+        />
       </div>
 
       <div className="mt-5 space-y-3 text-[13.5px] leading-relaxed text-zinc-400">
