@@ -19,12 +19,15 @@ export function Stage({
   ribbon,
   tray,
   children,
+  contentMax = "max-w-5xl",
 }: {
   primitive?: StagePrimitive;
   title?: string;
   ribbon?: ReactNode;
   tray?: ReactNode;
   children: ReactNode;
+  /** Tailwind max-width for the panel. Widen it for multi-column demos (e.g. the live mirrors). */
+  contentMax?: string;
 }) {
   return (
     <div className="relative h-full overflow-hidden bg-[#0a0a0c] text-zinc-100">
@@ -52,7 +55,7 @@ export function Stage({
 
         {/* m-auto (not items-center) so a panel taller than the viewport top-anchors and stays
             fully scrollable — items-center would clip the top out of reach. */}
-        <div className="flex w-full max-w-5xl flex-1 justify-center overflow-auto px-6 pb-28">
+        <div className={`flex w-full flex-1 justify-center overflow-auto px-6 pb-28 ${contentMax}`}>
           <div className="m-auto w-full rounded-2xl border border-white/[0.06] bg-white/[0.025] p-6 shadow-2xl shadow-black/50">
             {children}
           </div>

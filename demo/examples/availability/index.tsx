@@ -20,6 +20,11 @@ import { useWebSocket } from "@/hooks/use-websocket";
 const SLOT_MS = 30 * 60_000;
 const NAME = "Dr. Sarah Chen";
 const WINDOW_DAYS = 21;
+const midnight = (d: Date) => {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x.getTime();
+};
 
 function asResource(id: string): Resource {
   return {
@@ -49,6 +54,8 @@ export default function AvailabilityExample() {
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<BookingResult | null>(null);
 
+  const [availableDays, setAvailableDays] = useState<Set<number>>(new Set());
+
   const { windowStart, windowEnd } = useMemo(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -56,6 +63,21 @@ export default function AvailabilityExample() {
     end.setDate(end.getDate() + WINDOW_DAYS - 1);
     return { windowStart: start, windowEnd: end };
   }, []);
+  const windowStartMs = windowStart.getTime();
+  const windowEndMs = windowEnd.getTime() + 86_400_000;
+
+  // Which days across the window have any bookable slot — used to grey out empty days (weekends,
+  // blocked days) in the picker so you can't land on a day with nothing open.
+  const loadAvailableDays = useCallback(
+    async (id: string): Promise<Set<number>> => {
+      const raw = await getAvailability(id, windowStartMs, windowEndMs);
+      const days = new Set<number>();
+      for (const s of raw) if (s.end - s.start >= SLOT_MS) days.add(midnight(new Date(s.start)));
+      setAvailableDays(days);
+      return days;
+    },
+    [windowStartMs, windowEndMs]
+  );
 
   const loadSlots = useCallback(async (id: string, d: Date) => {
     const { dayStart, dayEnd } = dayBounds(d);
@@ -88,7 +110,15 @@ export default function AvailabilityExample() {
     seedAvailabilityScheduler()
       .then(async (id) => {
         setResourceId(id);
-        await loadSlots(id, date);
+        const days = await loadAvailableDays(id);
+        // Land on the first day that actually has availability (skip a blank weekend/today).
+        const startDay = days.has(midnight(date))
+          ? date
+          : days.size > 0
+            ? new Date(Math.min(...days))
+            : date;
+        if (startDay.getTime() !== date.getTime()) setDate(startDay);
+        await loadSlots(id, startDay);
       })
       .catch(() => toast.error("Failed to connect to deltat. Is it running?"))
       .finally(() => setLoading(false));
@@ -101,9 +131,18 @@ export default function AvailabilityExample() {
   }, [date, resourceId]);
 
   const onWsEvent = useCallback(() => {
-    if (resourceId) loadSlots(resourceId, date);
-  }, [resourceId, date, loadSlots]);
+    if (resourceId) {
+      loadSlots(resourceId, date);
+      loadAvailableDays(resourceId);
+    }
+  }, [resourceId, date, loadSlots, loadAvailableDays]);
   useWebSocket(resourceId ? { type: "subscribe", resourceId, onEvent: onWsEvent } : null);
+
+  const isDayDisabled = (day: Date) => {
+    const m = midnight(day);
+    if (m < windowStartMs || m >= windowEndMs) return true;
+    return availableDays.size > 0 && !availableDays.has(m);
+  };
 
   function confirm() {
     if (!selected || !resourceId) return;
@@ -195,7 +234,7 @@ export default function AvailabilityExample() {
                   }}
                   defaultMonth={date}
                   startMonth={windowStart}
-                  disabled={{ before: windowStart, after: windowEnd }}
+                  disabled={isDayDisabled}
                   className="bg-transparent text-zinc-100"
                 />
               </div>
