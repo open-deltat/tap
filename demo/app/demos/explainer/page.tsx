@@ -11,6 +11,7 @@ import {
   AXIS_END_HOUR,
   HOUR_MS,
   DAY_MS,
+  STEP_COUNT,
   clampSpans,
   type Span,
 } from "@/lib/algebra";
@@ -52,9 +53,11 @@ export default function ExplainerPage() {
   const [ids, setIds] = useState<Ids | null>(null);
   const [date] = useState(toLocalDateString(new Date()));
   const [bob, setBob] = useState<PersonData>(emptyPerson("Bob"));
-  const [dora, setDora] = useState<PersonData>(emptyPerson("Dora"));
+  const [dora, setDora] = useState<PersonData>(emptyPerson("Jane"));
   const [combined, setCombined] = useState<AvailabilitySlot[]>([]);
-  const [step, setStep] = useState(0);
+  // Open on the END RESULT (the full picture is clean enough to read at a glance); the play
+  // button then walks through the algebra from step 1.
+  const [step, setStep] = useState(STEP_COUNT - 1);
   const [playing, setPlaying] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<"bob" | "dora">>(new Set());
   const [myHold, setMyHold] = useState<{ start: number; end: number } | null>(null);
@@ -106,7 +109,7 @@ export default function ExplainerPage() {
       bufferMs: 0,
     });
     setDora({
-      name: "Dora",
+      name: "Jane",
       ...doraSplit,
       bookings: inWindow((bookMap[cal.doraId] ?? []) as Booking[]),
       holds: liveHolds((holdMap[cal.doraId] ?? []) as Hold[]),
@@ -219,7 +222,15 @@ export default function ExplainerPage() {
         setPlaying(false);
         setStep(n);
       }}
-      onPlayToggle={() => setPlaying((p) => !p)}
+      onPlayToggle={() => {
+        // From the end-result, "play" walks the algebra from the top; otherwise it pauses/resumes.
+        if (!playing && step >= STEP_COUNT - 1) {
+          setStep(0);
+          setPlaying(true);
+        } else {
+          setPlaying((p) => !p);
+        }
+      }}
     />
   );
 

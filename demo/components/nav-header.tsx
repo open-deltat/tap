@@ -2,56 +2,26 @@
 
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import {
-  Plane,
-  Theater,
-  Film,
-  LandPlot,
-  Calendar,
-  Clock,
-  Users,
-  UtensilsCrossed,
-  Hotel,
-  Car,
-  Radio,
-  Sigma,
-  Sun,
-  Moon,
-} from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { enabledExamples } from "@/examples/manifest";
 
-// The booking catalog (Scheduling + the global Bookings list are dropped; Scheduling's
-// multi-resource intersection is shown more legibly by Meet).
-const NAV_ITEMS = [
-  { href: "/demos/airline", label: "Airline", icon: Plane },
-  { href: "/demos/theater", label: "Theater", icon: Theater },
-  { href: "/demos/cinema", label: "Cinema", icon: Film },
-  { href: "/demos/stadium", label: "Stadium", icon: LandPlot },
-  { href: "/demos/hotel", label: "Hotel", icon: Hotel },
-  { href: "/demos/restaurant", label: "Restaurant", icon: UtensilsCrossed },
-  { href: "/demos/parking", label: "Parking", icon: Car },
-  { href: "/demos/calendar", label: "Calendar", icon: Calendar },
-  { href: "/demos/availability", label: "Availability", icon: Clock },
-  { href: "/demos/meet", label: "Meet", icon: Users },
-  { href: "/demos/live", label: "Live", icon: Radio },
-  { href: "/demos/explainer", label: "How it works", icon: Sigma },
-];
-
+// The catalog is derived from the example registry, so a single-purpose deployment
+// (DEMO_EXAMPLES=cinema) shows only its examples here automatically.
 export function NavHeader() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
+  const items = enabledExamples();
 
   return (
     <header className="flex items-center justify-between border-b px-4 py-1.5 shrink-0">
-      {/* Brand */}
       <a href="/" className="text-sm font-semibold tracking-tight select-none">
         Δt
       </a>
 
-      {/* Navigation */}
-      <nav className="flex items-center gap-1">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+      <nav className="flex flex-wrap items-center justify-center gap-1">
+        {items.map(({ href, label, icon: Icon }) => {
           const active = pathname.startsWith(href);
           return (
             <a
@@ -71,7 +41,6 @@ export function NavHeader() {
         })}
       </nav>
 
-      {/* Dark mode toggle */}
       <Button
         variant="ghost"
         size="icon"

@@ -160,14 +160,14 @@ export function AlgebraExplainer({
           Bob net: <span className="text-zinc-300">{totalHours(bob.net).toFixed(1)}h</span>
         </span>
         <span>
-          Dora net: <span className="text-zinc-300">{totalHours(dora.net).toFixed(1)}h</span>
+          Jane net: <span className="text-zinc-300">{totalHours(dora.net).toFixed(1)}h</span>
         </span>
         <span>
           Both free: <span className="text-emerald-300">{totalHours(combined).toFixed(1)}h</span>
         </span>
         {firstJointMs != null && (
           <span className="text-zinc-500">
-            Dora&apos;s 09–12 bookings are the bottleneck — once she frees at{" "}
+            Jane&apos;s 09–12 bookings are the bottleneck — once she frees at{" "}
             <span className="text-emerald-300">{formatTime(firstJointMs)}</span>, Bob&apos;s extra 09–10 slot doesn&apos;t help.
           </span>
         )}
