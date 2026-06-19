@@ -12,7 +12,8 @@ import { enabledExamples } from "@/examples/manifest";
 export function NavHeader() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
-  const items = enabledExamples();
+  // "How it works" is the landing page (the Δt logo links to it), so it doesn't need a nav item.
+  const items = enabledExamples().filter((e) => e.id !== "explainer");
 
   return (
     <header className="flex items-center justify-between border-b px-4 py-1.5 shrink-0">
