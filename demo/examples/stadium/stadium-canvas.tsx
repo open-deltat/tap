@@ -18,6 +18,7 @@ import {
 
 export interface CanvasSection {
   id: string;
+  name: string;
   ring: number;
   idx: number;
   ringCount: number;
@@ -30,28 +31,45 @@ export interface CanvasSection {
 // Clicks while zoomed out (Overview/Close-up) are ignored — zoom changes only via wheel/buttons.
 export type CanvasHit = { kind: "cell"; section: CanvasSection; cell: number };
 
+// Availability ramp + categories — the one source of truth for both the canvas and the legend.
+// CVD-safe by design: the blue → amber → vermillion ramp never leans on a green/red contrast;
+// premium sits darker than the amber midpoint (luminance separation that survives tritanopia);
+// and a picked seat is set apart by LUMINANCE — a near-white fill + dark ring — not by hue,
+// so it never collapses into plenty-blue for deuteranopia/protanopia.
+export const LEGEND_COLORS = {
+  plenty: "#4aa3df",
+  filling: "#e6b422",
+  nearlyFull: "#e0563a",
+  premium: "#b8860b",
+  soldOut: "#27272a",
+  selection: "#fafafa",
+} as const;
+
 const COLORS = {
   bg: "#08080a",
   field: "#0c1f14",
   fieldStroke: "#1f3d2b",
   fieldText: "#15803d",
-  emerald: "#10b981",
-  amber: "#f59e0b",
-  rose: "#fb7185",
-  zinc: "#27272a",
-  gold: "#d4a843",
+  rampHigh: LEGEND_COLORS.plenty,
+  rampMid: LEGEND_COLORS.filling,
+  rampLow: LEGEND_COLORS.nearlyFull,
+  zinc: LEGEND_COLORS.soldOut,
+  gold: LEGEND_COLORS.premium,
+  selection: LEGEND_COLORS.selection,
   taken: "#3f3f46",
-  selectStroke: "#ffffff",
-  label: "rgba(255,255,255,0.55)",
+  selectStroke: "#ffffff", // section outline, on the dark background
+  selectStrokeDark: "#09090b", // per-seat ring, on the bright picked fill (high contrast)
+  label: "rgba(255,255,255,0.88)",
+  labelHalo: "rgba(0,0,0,0.55)",
 };
 
 function fillFor(s: CanvasSection): string {
   if (s.remaining <= 0) return COLORS.zinc;
   if (s.assigned) return COLORS.gold;
   const ratio = s.remaining / s.capacity;
-  if (ratio > 0.5) return COLORS.emerald;
-  if (ratio > 0.15) return COLORS.amber;
-  return COLORS.rose;
+  if (ratio > 0.5) return COLORS.rampHigh;
+  if (ratio > 0.15) return COLORS.rampMid;
+  return COLORS.rampLow;
 }
 
 export function StadiumCanvas({
@@ -175,6 +193,7 @@ export function StadiumCanvas({
           ctx.strokeStyle = COLORS.selectStroke;
           ctx.stroke();
         }
+        drawSectionLabel(ctx, s, r, t, f);
       } else {
         // Seat grid. taken = first (capacity - remaining) cells; rest are free.
         drawSeats(ctx, s, r, t, f, viewport, selSectionRef.current, selCellsRef.current);
@@ -344,17 +363,48 @@ function drawSeats(
     }
     const isTaken = i < taken;
     const picked = isSel && selectedCells.has(i);
-    ctx.fillStyle = isTaken ? COLORS.taken : picked ? COLORS.emerald : fillFor(s);
+    ctx.fillStyle = isTaken ? COLORS.taken : picked ? COLORS.selection : fillFor(s);
     ctx.globalAlpha = isTaken ? 0.8 : picked ? 1 : 0.85;
     ctx.fillRect(x + pad, y + pad, cw - pad * 2, ch - pad * 2);
     if (picked) {
       ctx.globalAlpha = 1;
-      ctx.lineWidth = 1.5 / t.scale;
-      ctx.strokeStyle = COLORS.selectStroke;
+      ctx.lineWidth = 2 / t.scale;
+      ctx.strokeStyle = COLORS.selectStrokeDark;
       ctx.strokeRect(x + pad, y + pad, cw - pad * 2, ch - pad * 2);
     }
   }
   ctx.globalAlpha = 1;
+}
+
+// Section name, drawn upright (counter-rotating the section frame so text never reads sideways
+// around the oval) and fading in as the block grows on screen — present at the Close-up level,
+// gone once we switch to drawing seats. Gated on on-screen width so tiny far blocks stay clean.
+function drawSectionLabel(
+  ctx: CanvasRenderingContext2D,
+  s: CanvasSection,
+  r: Rect,
+  t: Transform,
+  f: ReturnType<typeof sectionFrame>
+) {
+  if (!s.name) return;
+  const screenW = r.w * t.scale;
+  if (screenW < 42) return;
+  const alpha = Math.min(1, (screenW - 42) / 30);
+  ctx.save();
+  ctx.rotate(-f.angle); // we're already translated to (cx, cy); undo the frame's rotation
+  const fontPx = 13 / t.scale;
+  ctx.font = `600 ${fontPx}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.globalAlpha = alpha;
+  ctx.lineWidth = 3 / t.scale;
+  ctx.strokeStyle = COLORS.labelHalo;
+  ctx.strokeText(s.name, 0, 0);
+  ctx.fillStyle = COLORS.label;
+  ctx.fillText(s.name, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 // Axis-aligned bbox of a world rect expressed in a frame's local coordinates.

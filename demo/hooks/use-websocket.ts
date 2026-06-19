@@ -18,22 +18,39 @@ export function useWebSocket(options: SubscribeOptions | null): void {
 
   useEffect(() => {
     if (!options) return;
+    const resourceId = options.resourceId;
+    let cancelled = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let ws: WebSocket;
 
-    const ws = new WebSocket(wsUrl());
+    const connect = () => {
+      ws = new WebSocket(wsUrl());
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "subscribe", resourceId: options.resourceId }));
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: "subscribe", resourceId }));
+      };
+
+      ws.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === "error") return;
+          optionsRef.current?.onEvent(data as DeltaTEvent);
+        } catch {}
+      };
+
+      // Browser sockets never auto-reconnect; without this a single drop (HMR restart,
+      // sleep/wake, proxy timeout) silently freezes live updates for the rest of the session.
+      ws.onclose = () => {
+        if (!cancelled) reconnectTimer = setTimeout(connect, 1000);
+      };
     };
+    connect();
 
-    ws.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === "error") return;
-        optionsRef.current?.onEvent(data as DeltaTEvent);
-      } catch {}
+    return () => {
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws.close();
     };
-
-    return () => { ws.close(); };
   }, [options?.resourceId]);
 }
 
