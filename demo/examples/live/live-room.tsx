@@ -251,63 +251,44 @@ export function LiveRoom() {
       title="Live Cinema"
       ribbon={ribbon}
     >
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Pane
-            title="You · live booker"
-            subtitle="click a free seat to hold it (~5 min), click again to release"
-            venueId={venueId}
-            onEvent={reload}
-          >
-            {noSurface ? (
-              <EmptySurface />
-            ) : (
-              <SeatMap
-                sections={sections}
-                availabilityByResource={seatState.availability}
-                bookingsByResource={seatState.bookings}
-                holdsByResource={otherHolds}
-                slotStart={slot.start}
-                slotEnd={slot.end}
-                selectedIds={selectedSeats}
-                onToggle={handleToggleSeat}
-                onBookingClick={() => {}}
-              />
-            )}
-          </Pane>
+      {/* Stacked top/bottom: your booker, then a read-only mirror of the same showtime. */}
+      <div className="space-y-3">
+        <Pane title="You" hint="tap a free seat to hold it" venueId={venueId} onEvent={reload}>
+          {noSurface ? (
+            <EmptySurface />
+          ) : (
+            <SeatMap
+              sections={sections}
+              availabilityByResource={seatState.availability}
+              bookingsByResource={seatState.bookings}
+              holdsByResource={otherHolds}
+              slotStart={slot.start}
+              slotEnd={slot.end}
+              selectedIds={selectedSeats}
+              onToggle={handleToggleSeat}
+              onBookingClick={() => {}}
+            />
+          )}
+        </Pane>
 
-          <Pane
-            title="Another viewer · live (read-only)"
-            subtitle="a second connection to the same showtime"
-            venueId={venueId}
-            onEvent={reload}
-            mirror
-          >
-            {noSurface ? (
-              <EmptySurface />
-            ) : (
-              <SeatMap
-                sections={sections}
-                availabilityByResource={seatState.availability}
-                bookingsByResource={seatState.bookings}
-                // The mirror is a different connection: it sees EVERY hold, including yours, as amber.
-                holdsByResource={seatState.holds}
-                slotStart={slot.start}
-                slotEnd={slot.end}
-                selectedIds={new Set()}
-                onToggle={() => {}}
-                onBookingClick={() => {}}
-              />
-            )}
-          </Pane>
-        </div>
-
-        <p className="text-center text-[11.5px] leading-relaxed text-zinc-500">
-          Two connections to the same showtime. Holds (amber) reserve a seat for ~5&nbsp;min and
-          block double-booking; updates stream over{" "}
-          <code className="rounded bg-white/5 px-1 text-zinc-400">LISTEN/NOTIFY</code> — no polling.
-          Try opening this page in two tabs.
-        </p>
+        <Pane title="Another viewer" hint="updates live — not interactive" venueId={venueId} onEvent={reload} mirror>
+          {noSurface ? (
+            <EmptySurface />
+          ) : (
+            <SeatMap
+              sections={sections}
+              availabilityByResource={seatState.availability}
+              bookingsByResource={seatState.bookings}
+              // The mirror is a different connection: it sees EVERY hold, including yours, as amber.
+              holdsByResource={seatState.holds}
+              slotStart={slot.start}
+              slotEnd={slot.end}
+              selectedIds={new Set()}
+              onToggle={() => {}}
+              onBookingClick={() => {}}
+            />
+          )}
+        </Pane>
       </div>
     </Stage>
   );
@@ -323,14 +304,14 @@ function EmptySurface() {
 
 function Pane({
   title,
-  subtitle,
+  hint,
   venueId,
   onEvent,
   mirror = false,
   children,
 }: {
   title: string;
-  subtitle: string;
+  hint: string;
   venueId: string | null;
   onEvent: () => void;
   mirror?: boolean;
@@ -355,22 +336,26 @@ function Pane({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border bg-white/[0.02] p-4 transition-colors",
+        "rounded-xl border bg-white/[0.02] p-3 transition-colors",
         mirror ? "border-sky-400/20" : "border-emerald-400/20",
         live && (mirror ? "border-sky-400/50 ring-1 ring-sky-400/30" : "border-emerald-400/50 ring-1 ring-emerald-400/30")
       )}
     >
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex flex-col">
-          <span className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-            <span className={cn("h-2 w-2 rounded-full", mirror ? "bg-sky-400" : "bg-emerald-400")} />
-            {title}
-          </span>
-          <span className="ml-4 text-[10.5px] text-zinc-500">{subtitle}</span>
-        </div>
+      {/* One compact header line: identity + read-only tag + live pulse. No text over the grid. */}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-xs font-medium text-zinc-200">
+          <span className={cn("h-2 w-2 rounded-full", mirror ? "bg-sky-400" : "bg-emerald-400")} />
+          {title}
+          {mirror && (
+            <span className="rounded-full border border-sky-400/30 bg-sky-500/10 px-1.5 py-px text-[9px] uppercase tracking-wider text-sky-300">
+              read-only
+            </span>
+          )}
+          <span className="font-normal text-[10.5px] text-zinc-500">· {hint}</span>
+        </span>
         <span
           className={cn(
-            "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider transition-colors",
+            "flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] uppercase tracking-wider transition-colors",
             live
               ? mirror
                 ? "border-sky-400/40 bg-sky-400/15 text-sky-200"
@@ -378,18 +363,19 @@ function Pane({
               : "border-white/10 text-zinc-500"
           )}
         >
-          <Wifi className="h-3 w-3" />
+          <Wifi className="h-2.5 w-2.5" />
           {live ? "notify" : "live"}
         </span>
       </div>
 
-      <div className="relative rounded-lg border border-white/[0.06] bg-white/[0.025] p-3 text-zinc-100">
-        {children}
-        {mirror && (
-          <div className="pointer-events-none absolute right-2 top-2 rounded-full border border-sky-400/30 bg-sky-500/15 px-2 py-0.5 text-[9.5px] font-medium uppercase tracking-wider text-sky-200">
-            real-time mirror — what a second connection sees
-          </div>
+      {/* The mirror is non-interactive and dimmed so it reads as "someone else's view". */}
+      <div
+        className={cn(
+          "rounded-lg border border-white/[0.06] bg-white/[0.025] p-3 text-zinc-100",
+          mirror && "pointer-events-none select-none opacity-80"
         )}
+      >
+        {children}
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { formatTime } from "@/lib/time";
 import type { AvailabilitySlot } from "@/lib/schemas";
 
@@ -30,25 +29,25 @@ export function RestaurantTimePicker({ slots, selectedStart, onSelect }: TimePic
     return <div className="text-[11px] text-zinc-500">No available times today</div>;
   }
 
+  // One dropdown rather than a wall of pills — a 90-min seating starting at the chosen time.
   return (
-    <div className="flex flex-wrap items-center justify-center gap-1.5">
-      {slots.map((slot) => {
-        const active = selectedStart === slot.start;
-        return (
-          <button
-            key={slot.start}
-            onClick={() => onSelect(slot.start, slot.end)}
-            className={cn(
-              "rounded-full border px-3 py-1 text-xs transition-colors",
-              active
-                ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-200"
-                : "border-white/10 text-zinc-400 hover:text-zinc-200"
-            )}
-          >
-            {formatTime(slot.start)}
-          </button>
-        );
-      })}
-    </div>
+    <label className="flex items-center gap-2 text-[11px] text-zinc-500">
+      Seating
+      <select
+        value={selectedStart ?? ""}
+        onChange={(e) => {
+          const start = Number(e.target.value);
+          const slot = slots.find((s) => s.start === start);
+          if (slot) onSelect(slot.start, slot.end);
+        }}
+        className="h-8 rounded-md border border-white/10 bg-white/5 px-2.5 text-xs text-zinc-200 [color-scheme:dark] focus:border-emerald-400/40 focus:outline-none"
+      >
+        {slots.map((slot) => (
+          <option key={slot.start} value={slot.start} className="bg-zinc-900 text-zinc-100">
+            {formatTime(slot.start)} – {formatTime(slot.end)}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

@@ -50,8 +50,10 @@ export function Stage({
 
         {ribbon && <div className="shrink-0 pb-4">{ribbon}</div>}
 
-        <div className="flex w-full max-w-5xl flex-1 items-center justify-center overflow-auto px-6 pb-28">
-          <div className="w-full rounded-2xl border border-white/[0.06] bg-white/[0.025] p-6 shadow-2xl shadow-black/50">
+        {/* m-auto (not items-center) so a panel taller than the viewport top-anchors and stays
+            fully scrollable — items-center would clip the top out of reach. */}
+        <div className="flex w-full max-w-5xl flex-1 justify-center overflow-auto px-6 pb-28">
+          <div className="m-auto w-full rounded-2xl border border-white/[0.06] bg-white/[0.025] p-6 shadow-2xl shadow-black/50">
             {children}
           </div>
         </div>
