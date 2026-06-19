@@ -281,7 +281,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
         <Button
           onClick={bookTable}
           disabled={isPending}
-          className="bg-emerald-500 text-white hover:bg-emerald-400"
+          className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
         >
           Reserve table
         </Button>
@@ -318,7 +318,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
         <Button
           onClick={bookBar}
           disabled={isPending}
-          className="bg-emerald-500 text-white hover:bg-emerald-400"
+          className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
         >
           Book {Math.min(partySize, barRemaining)} seat{Math.min(partySize, barRemaining) > 1 ? "s" : ""}
         </Button>

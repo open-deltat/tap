@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useTransition, useRef } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { SeatMap, type SeatSection } from "@/components/seat-map";
 import { CancelBookingDialog } from "@/components/booking-dialog";
@@ -46,7 +45,6 @@ export function SeatBookingPage({
   const [bookings, setBookings] = useState<Map<string, Booking[]>>(new Map());
   const [holds, setHolds] = useState<Map<string, Hold[]>>(new Map());
   const [selectedSeats, setSelectedSeats] = useState<Set<string>>(new Set());
-  const [bookingLabel, setBookingLabel] = useState("");
 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
@@ -248,12 +246,11 @@ export function SeatBookingPage({
           seatIds: seatList,
           start: slotStart,
           end: slotEnd,
-          label: bookingLabel,
+          label: venue?.name ?? "Booking",
           calendar,
         });
         closeAllHolds(); // sockets only — the holds were already released by bookHeldSeats
         setSelectedSeats(new Set());
-        setBookingLabel("");
         // Success → the shared modal: human receipt + the verbatim deltat rows.
         setBookingResult({
           title: `${seatList.length} seat${seatList.length > 1 ? "s" : ""} · ${venue?.name ?? "Booking"}`,
@@ -384,16 +381,10 @@ export function SeatBookingPage({
               </span>
             ))}
         </div>
-        <Input
-          placeholder="Label (optional)"
-          value={bookingLabel}
-          onChange={(e) => setBookingLabel(e.target.value)}
-          className="h-8 w-44 border-white/10 bg-white/5 text-sm text-zinc-100 placeholder:text-zinc-500"
-        />
         <Button
           onClick={handleBookSelected}
           disabled={isPending}
-          className="bg-emerald-500 text-white hover:bg-emerald-400"
+          className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
         >
           Book {selectedSeats.size}
           {selectedTotal > 0 && ` · $${selectedTotal.toLocaleString()}`}

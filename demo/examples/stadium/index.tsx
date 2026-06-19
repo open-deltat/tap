@@ -431,7 +431,7 @@ export default function StadiumExample() {
             {selected.price > 0 && ` · $${selected.price}/seat`}
           </div>
         </div>
-        <Button onClick={book} disabled={isPending} className="bg-emerald-500 text-white hover:bg-emerald-400">
+        <Button onClick={book} disabled={isPending} className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400">
           {isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
           Book {n}
           {selected.price > 0 && ` · $${(n * selected.price).toLocaleString()}`}

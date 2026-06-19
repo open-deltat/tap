@@ -243,7 +243,7 @@ export default function MeetExample() {
           </div>
           <div className="text-xs text-zinc-400">{duration} min · books atomically on both calendars</div>
         </div>
-        <Button onClick={book} disabled={isPending} className="bg-emerald-500 text-white hover:bg-emerald-400">
+        <Button onClick={book} disabled={isPending} className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400">
           {n > 1 ? `Book ${n} meetings` : "Book both"}
         </Button>
       </div>
