@@ -52,7 +52,6 @@ export function LiveRoom() {
   // Per-seat hold WS connections: open WS = hold active on the LEFT pane, close WS = released.
   const holdWsRef = useRef(new Map<string, WebSocket>());
 
-  const venue = resources.find((r) => r.id === venueId) ?? null;
   const sections = useMemo(
     () => (venueId ? buildSections(venueId, resources) : []),
     [venueId, resources]
@@ -251,7 +250,8 @@ export function LiveRoom() {
       title="Live Cinema"
       ribbon={ribbon}
     >
-      {/* Stacked top/bottom: your booker, then a read-only mirror of the same showtime. */}
+      {/* Top: your booker. Bottom: one row of three read-only viewers, each its own connection,
+          all repainting live from the shared seat state. */}
       <div className="space-y-3">
         <Pane title="You" hint="tap a free seat to hold it" venueId={venueId} onEvent={reload}>
           {noSurface ? (
@@ -271,24 +271,28 @@ export function LiveRoom() {
           )}
         </Pane>
 
-        <Pane title="Another viewer" hint="updates live — not interactive" venueId={venueId} onEvent={reload} mirror>
-          {noSurface ? (
-            <EmptySurface />
-          ) : (
-            <SeatMap
-              sections={sections}
-              availabilityByResource={seatState.availability}
-              bookingsByResource={seatState.bookings}
-              // The mirror is a different connection: it sees EVERY hold, including yours, as amber.
-              holdsByResource={seatState.holds}
-              slotStart={slot.start}
-              slotEnd={slot.end}
-              selectedIds={new Set()}
-              onToggle={() => {}}
-              onBookingClick={() => {}}
-            />
-          )}
-        </Pane>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[1, 2, 3].map((n) => (
+            <Pane key={n} title={`Viewer ${n}`} venueId={venueId} onEvent={reload} mirror>
+              {noSurface ? (
+                <EmptySurface />
+              ) : (
+                <SeatMap
+                  sections={sections}
+                  availabilityByResource={seatState.availability}
+                  bookingsByResource={seatState.bookings}
+                  // A separate connection: it sees EVERY hold, including yours, as amber.
+                  holdsByResource={seatState.holds}
+                  slotStart={slot.start}
+                  slotEnd={slot.end}
+                  selectedIds={new Set()}
+                  onToggle={() => {}}
+                  onBookingClick={() => {}}
+                />
+              )}
+            </Pane>
+          ))}
+        </div>
       </div>
     </Stage>
   );
@@ -311,7 +315,7 @@ function Pane({
   children,
 }: {
   title: string;
-  hint: string;
+  hint?: string;
   venueId: string | null;
   onEvent: () => void;
   mirror?: boolean;
@@ -351,7 +355,7 @@ function Pane({
               read-only
             </span>
           )}
-          <span className="font-normal text-[10.5px] text-zinc-500">· {hint}</span>
+          {hint && <span className="font-normal text-[10.5px] text-zinc-500">· {hint}</span>}
         </span>
         <span
           className={cn(
