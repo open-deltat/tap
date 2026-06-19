@@ -1,5 +1,374 @@
-import { StadiumBowl } from "./stadium-bowl";
+"use client";
+
+import { useEffect, useState, useCallback, useTransition, useRef } from "react";
+import { toast } from "sonner";
+import { Loader2, ZoomIn, ZoomOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { Stage } from "@/components/stage";
+import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
+import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
+import { toLocalDateString, formatTime } from "@/lib/time";
+
+import { seedStadium } from "./seed";
+import { getResources } from "@/app/actions/resources";
+import { getAvailability } from "@/app/actions/availability";
+import { getMultiResourceBookings, batchBookSlots } from "@/app/actions/bookings";
+import { formatError } from "@/lib/format-error";
+
+import { StadiumCanvas, type CanvasSection, type CanvasHit } from "./stadium-canvas";
+import { WORLD, SEAT_THRESHOLD, type Transform } from "./geometry";
+
+const MAX_QTY = 8;
+
+interface Section extends CanvasSection {
+  res: Resource;
+  price: number;
+  tier: string;
+}
+
+// Center the world in the viewport at a given scale (assumes a roughly square-ish canvas).
+function centeredTransform(scale: number, viewW = 900, viewH = 520): Transform {
+  return {
+    scale,
+    offsetX: viewW / 2 - (WORLD.w / 2) * scale,
+    offsetY: viewH / 2 - (WORLD.h / 2) * scale,
+  };
+}
+
+// Initial fit: whole bowl visible.
+const FIT_SCALE = 0.4;
 
 export default function StadiumExample() {
-  return <StadiumBowl />;
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
+
+  const [date] = useState(toLocalDateString(new Date()));
+  const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
+  const [slot, setSlot] = useState<{ start: number; end: number } | null>(null);
+
+  const [bookingsBySection, setBookingsBySection] = useState<Map<string, Booking[]>>(new Map());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedCells, setSelectedCells] = useState<Set<number>>(new Set());
+  const [result, setResult] = useState<BookingResult | null>(null);
+
+  const [transform, setTransform] = useState<Transform>(() => centeredTransform(FIT_SCALE));
+  const easeRef = useRef<number>(0);
+
+  const sections: Section[] = resources
+    .filter((r) => r.section != null)
+    .map((r) => {
+      const layout = r.section!;
+      const taken = (bookingsBySection.get(r.id) ?? []).length;
+      return {
+        id: r.id,
+        res: r,
+        price: r.price ?? 0,
+        tier: layout.tier,
+        capacity: r.capacity,
+        remaining: Math.max(0, r.capacity - taken),
+        ring: layout.ring,
+        idx: layout.idx,
+        ringCount: layout.ringCount,
+        assigned: layout.assigned,
+      };
+    });
+
+  const selected = sections.find((s) => s.id === selectedId) ?? null;
+  const totalCapacity = sections.reduce((n, s) => n + s.capacity, 0);
+  const totalRemaining = sections.reduce((n, s) => n + s.remaining, 0);
+
+  const loadBookings = useCallback(async (sectionIds: string[], start: number, end: number) => {
+    if (sectionIds.length === 0) return;
+    const map = await getMultiResourceBookings(sectionIds);
+    const filtered = new Map<string, Booking[]>();
+    for (const [id, bks] of Object.entries(map)) {
+      filtered.set(id, (bks as Booking[]).filter((b) => b.start < end && b.end > start));
+    }
+    setBookingsBySection(filtered);
+  }, []);
+
+  // Seed + initial load.
+  useEffect(() => {
+    (async () => {
+      try {
+        const [id] = await seedStadium();
+        const all = await getResources();
+        setResources(all);
+        const dayStart = new Date(`${date}T00:00`).getTime();
+        const daySlots = await getAvailability(id, dayStart, dayStart + 86_400_000);
+        setSlots(daySlots);
+        if (daySlots.length) setSlot({ start: daySlots[0].start, end: daySlots[0].end });
+      } catch {
+        toast.error("Failed to connect to deltat. Is it running?");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Per-section remaining for the chosen slot.
+  useEffect(() => {
+    if (!slot) return;
+    const ids = resources.filter((r) => r.section != null).map((r) => r.id);
+    loadBookings(ids, slot.start, slot.end);
+    setSelectedId(null);
+    setSelectedCells(new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slot, resources]);
+
+  // Ease the transform toward a target over ~280ms.
+  const easeTo = useCallback((target: Transform) => {
+    cancelAnimationFrame(easeRef.current);
+    const start = performance.now();
+    const from = transform;
+    const dur = 280;
+    const step = (now: number) => {
+      const k = Math.min(1, (now - start) / dur);
+      const e = 1 - Math.pow(1 - k, 3); // ease-out cubic
+      setTransform({
+        scale: from.scale + (target.scale - from.scale) * e,
+        offsetX: from.offsetX + (target.offsetX - from.offsetX) * e,
+        offsetY: from.offsetY + (target.offsetY - from.offsetY) * e,
+      });
+      if (k < 1) easeRef.current = requestAnimationFrame(step);
+    };
+    easeRef.current = requestAnimationFrame(step);
+  }, [transform]);
+
+  useEffect(() => () => cancelAnimationFrame(easeRef.current), []);
+
+  const onHit = useCallback(
+    (hit: CanvasHit) => {
+      if (hit.kind === "section") {
+        // Zoomed out: ease into the section (raise scale + center it).
+        const s = hit.section;
+        setSelectedId(s.id);
+        setSelectedCells(new Set());
+        const targetScale = SEAT_THRESHOLD + 1.2;
+        // Center the section's world point in the viewport at the new scale.
+        const el = document.getElementById("stadium-canvas-host");
+        const vw = el?.clientWidth ?? 900;
+        const vh = el?.clientHeight ?? 520;
+        easeTo({
+          scale: targetScale,
+          offsetX: vw / 2 - hit.worldX * targetScale,
+          offsetY: vh / 2 - hit.worldY * targetScale,
+        });
+        return;
+      }
+      // Zoomed in: toggle a free seat cell in the selection set.
+      const s = hit.section;
+      const taken = s.capacity - s.remaining;
+      if (hit.cell < taken) return; // already booked
+      setSelectedId(s.id);
+      setSelectedCells((prev) => {
+        // Switching sections resets the selection.
+        const base = selectedId === s.id ? new Set(prev) : new Set<number>();
+        if (base.has(hit.cell)) {
+          base.delete(hit.cell);
+          return base;
+        }
+        const cap = s.assigned ? 1 : Math.min(MAX_QTY, s.remaining);
+        if (s.assigned) {
+          const single = new Set<number>();
+          single.add(hit.cell);
+          return single;
+        }
+        if (base.size >= cap) return base;
+        base.add(hit.cell);
+        return base;
+      });
+    },
+    [easeTo, selectedId]
+  );
+
+  function book() {
+    if (!selected || !slot) return;
+    const n = selected.assigned ? 1 : selectedCells.size;
+    if (n < 1) return;
+    const sl = slot;
+    const sec = selected;
+    const rows = Array.from({ length: n }, () => ({
+      resourceId: sec.res.id,
+      start: sl.start,
+      end: sl.end,
+      label: `${sec.tier} · ${sec.res.name}`,
+    }));
+    startTransition(async () => {
+      try {
+        const created = await batchBookSlots(rows);
+        setResult({
+          title: `${n} ticket${n > 1 ? "s" : ""} · ${sec.res.name}`,
+          subtitle: `${sec.tier} · ${formatTime(sl.start)} – ${formatTime(sl.end)}`,
+          bookings: created,
+          resources: [sec.res],
+        });
+        setSelectedCells(new Set());
+        const ids = resources.filter((r) => r.section != null).map((r) => r.id);
+        await loadBookings(ids, sl.start, sl.end);
+      } catch (err) {
+        toast.error(formatError(err instanceof Error ? err.message : String(err)));
+      }
+    });
+  }
+
+  function zoomBy(factor: number) {
+    const el = document.getElementById("stadium-canvas-host");
+    const vw = el?.clientWidth ?? 900;
+    const vh = el?.clientHeight ?? 520;
+    // Zoom toward the viewport center.
+    const cx = vw / 2;
+    const cy = vh / 2;
+    const wx = (cx - transform.offsetX) / transform.scale;
+    const wy = (cy - transform.offsetY) / transform.scale;
+    const scale = Math.max(0.4, Math.min(30, transform.scale * factor));
+    easeTo({ scale, offsetX: cx - wx * scale, offsetY: cy - wy * scale });
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+        <div className="flex items-center gap-2 text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Connecting to deltat…
+        </div>
+      </div>
+    );
+  }
+
+  const seatLOD = transform.scale >= SEAT_THRESHOLD;
+
+  const ribbon = (
+    <div className="flex flex-col items-center gap-2">
+      {slots.length > 1 && (
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          {slots.map((s, i) => {
+            const active = slot?.start === s.start && slot?.end === s.end;
+            return (
+              <button
+                key={i}
+                onClick={() => setSlot({ start: s.start, end: s.end })}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs transition-colors",
+                  active
+                    ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-200"
+                    : "border-white/10 text-zinc-400 hover:text-zinc-200"
+                )}
+              >
+                {formatTime(s.start)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="text-[11px] text-zinc-500">
+        {totalRemaining.toLocaleString()} of {totalCapacity.toLocaleString()} seats open across{" "}
+        {sections.length} sections
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          className="bg-white/5 text-zinc-300"
+          onClick={() => zoomBy(1 / 1.5)}
+          aria-label="Zoom out"
+        >
+          <ZoomOut className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          className="bg-white/5 text-zinc-300"
+          onClick={() => zoomBy(1.5)}
+          aria-label="Zoom in"
+        >
+          <ZoomIn className="h-3.5 w-3.5" />
+        </Button>
+        <span className="text-[11px] text-zinc-600">scroll to zoom · drag to pan</span>
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+        <Legend color="#10b981" label="plenty" />
+        <Legend color="#f59e0b" label="filling" />
+        <Legend color="#fb7185" label="nearly full" />
+        <Legend color="#d4a843" label="premium box" />
+        <Legend color="#27272a" label="sold out" />
+      </div>
+    </div>
+  );
+
+  const n = selected ? (selected.assigned ? 1 : selectedCells.size) : 0;
+  const tray =
+    selected && n > 0 ? (
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1">
+          <div className="text-sm font-medium text-zinc-100">
+            {selected.tier} · {selected.res.name}
+          </div>
+          <div className="text-xs text-zinc-400">
+            {n} {selected.assigned ? "box" : `seat${n > 1 ? "s" : ""}`} selected ·{" "}
+            {selected.remaining.toLocaleString()} open
+            {selected.price > 0 && ` · $${selected.price}/seat`}
+          </div>
+        </div>
+        <Button onClick={book} disabled={isPending} className="bg-emerald-500 text-white hover:bg-emerald-400">
+          {isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+          Book {n}
+          {selected.price > 0 && ` · $${(n * selected.price).toLocaleString()}`}
+        </Button>
+      </div>
+    ) : undefined;
+
+  return (
+    <>
+      <Stage
+        primitive={{ label: "Capacity sweep · 80k seats on canvas", specId: "AVAIL-06" }}
+        title="Olympia Stadium"
+        ribbon={ribbon}
+        tray={tray}
+      >
+        <div id="stadium-canvas-host" className="relative">
+          <StadiumCanvas
+            sections={sections}
+            transform={transform}
+            selectedSectionId={selectedId}
+            selectedCells={selectedCells}
+            onTransformChange={setTransform}
+            onHit={onHit}
+          />
+          <div className="pointer-events-none mt-2 text-center text-[11px] text-zinc-600">
+            {seatLOD
+              ? "Tap a free seat to select · book the batch below"
+              : "Tap a section to zoom into its seats"}
+          </div>
+        </div>
+      </Stage>
+
+      <BookingConfirmedModal
+        result={result}
+        onClose={() => setResult(null)}
+        onBookAnother={() => setResult(null)}
+      />
+
+      {isPending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="flex items-center gap-2 text-sm text-zinc-300">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Working…
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
+      {label}
+    </span>
+  );
 }
