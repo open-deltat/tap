@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { Loader2, X, CalendarRange, Wand2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type { Booking, Resource } from "@/lib/schemas";
@@ -55,7 +54,6 @@ export default function HotelPage() {
   const [bookingsByType, setBookingsByType] = useState<Record<string, Booking[]>>({});
   const [selTypeId, setSelTypeId] = useState<string | null>(null);
   const [range, setRange] = useState<DateRange | undefined>();
-  const [guest, setGuest] = useState("");
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<BookingResult | null>(null);
@@ -207,17 +205,16 @@ export default function HotelPage() {
     const rt = selType;
     const start = fromMs + CHECK_IN_HOUR * HOUR;
     const end = fromMs + nights * DAY + CHECK_OUT_HOUR * HOUR;
-    const label = guest.trim() ? `${guest.trim()} · ${nights}-night stay` : `${nights}-night stay`;
+    const label = `${nights}-night stay`;
     startTransition(async () => {
       try {
         const created = await batchBookSlots([{ resourceId: rt.id, start, end, label }]);
         setResult({
           title: `${rt.name} · ${nights} night${nights > 1 ? "s" : ""}`,
-          subtitle: `${fmt(start)} ${hourLabel(CHECK_IN_HOUR)} → ${fmt(end)} ${hourLabel(CHECK_OUT_HOUR)}`,
+          subtitle: `${fmt(start)} ${hourLabel(CHECK_IN_HOUR)} to ${fmt(end)} ${hourLabel(CHECK_OUT_HOUR)}`,
           bookings: created,
           resources: [asResource(rt)],
         });
-        setGuest("");
         setRange(undefined);
         await refresh(types);
       } catch (err) {
@@ -387,35 +384,31 @@ export default function HotelPage() {
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
             Struck-through nights are booked. The <span className="text-amber-300">amber</span> night is
-            bookable only as your check-out — you sleep the night before and leave that morning.
+            bookable only as your check-out. You sleep the night before and leave that morning.
           </p>
 
           {/* Summary + book */}
           <div className="mt-4 border-t border-white/[0.06] pt-4">
-            {nights > 0 ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-300">
-                    {fmt(fromMs!)} → {fmt(toMs!)} ·{" "}
-                    <span className="font-mono">{nights} night{nights > 1 ? "s" : ""}</span>
+            {nights > 0 && fromMs != null && toMs != null ? (
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm text-zinc-300">
+                  {fmt(fromMs)} to {fmt(toMs)} ·{" "}
+                  <span className="font-mono">
+                    {nights} night{nights > 1 ? "s" : ""}
                   </span>
-                  <span className="text-emerald-300">stable room · all nights open</span>
+                  <span className="ml-2 text-emerald-300">all nights open</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={guest}
-                    onChange={(e) => setGuest(e.target.value)}
-                    placeholder="Name on the reservation (optional)"
-                    className="h-9 flex-1 border-white/10 bg-white/5 text-sm text-zinc-100 placeholder:text-zinc-600"
-                  />
-                  <Button
-                    onClick={book}
-                    disabled={isPending || !spanValid}
-                    className="h-9 bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-40"
-                  >
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : `Book ${nights}n`}
-                  </Button>
-                </div>
+                <Button
+                  onClick={book}
+                  disabled={isPending || !spanValid}
+                  className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400 disabled:opacity-40"
+                >
+                  {isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    `Book ${nights} night${nights > 1 ? "s" : ""}`
+                  )}
+                </Button>
               </div>
             ) : (
               <p className="text-center text-xs text-zinc-500">

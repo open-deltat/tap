@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useTransition, useMemo } from "react"
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
@@ -48,7 +47,6 @@ export default function AvailabilityExample() {
   });
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [selected, setSelected] = useState<{ start: number; end: number } | null>(null);
-  const [name, setName] = useState("");
   const [loading, setLoading] = useState(true);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -154,15 +152,14 @@ export default function AvailabilityExample() {
           resourceId: rid,
           start: selected.start,
           end: selected.end,
-          label: name.trim() || "Appointment",
+          label: "Appointment",
         });
         setResult({
           title: `Appointment · ${NAME}`,
-          subtitle: `${formatTime(selected.start)} – ${formatTime(selected.end)}`,
+          subtitle: `${formatTime(selected.start)} to ${formatTime(selected.end)}`,
           bookings: [booking],
           resources: [asResource(rid)],
         });
-        setName("");
         await loadSlots(rid, d);
       } catch (err) {
         toast.error(formatError(err instanceof Error ? err.message : String(err)));
@@ -283,25 +280,17 @@ export default function AvailabilityExample() {
               </div>
 
               {selected && (
-                <div className="mt-4 space-y-2 border-t border-white/[0.06] pt-4">
-                  <div className="text-xs text-zinc-400">
-                    {formatTime(selected.start)} – {formatTime(selected.end)}
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
+                  <div className="text-sm text-zinc-300">
+                    {formatTime(selected.start)} to {formatTime(selected.end)}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Your name (optional)"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="h-9 flex-1 border-white/10 bg-white/5 text-sm text-zinc-100 placeholder:text-zinc-500 [color-scheme:dark]"
-                    />
-                    <Button
-                      onClick={confirm}
-                      disabled={isPending}
-                      className="h-9 bg-emerald-500 text-white hover:bg-emerald-400"
-                    >
-                      {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Book"}
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={confirm}
+                    disabled={isPending}
+                    className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
+                  >
+                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Book"}
+                  </Button>
                 </div>
               )}
             </div>
