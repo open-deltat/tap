@@ -94,7 +94,7 @@ export function MeetLanes({
 
               <div
                 className={cn(
-                  "relative h-9 flex-1 overflow-hidden rounded-md border border-white/10 bg-white/[0.02]",
+                  "relative h-8 flex-1 overflow-hidden rounded-md bg-white/[0.03]",
                   clickable && "cursor-pointer"
                 )}
                 onClick={lane.intersection ? handleLaneClick : undefined}

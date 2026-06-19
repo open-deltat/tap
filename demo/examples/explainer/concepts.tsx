@@ -1,6 +1,8 @@
 // The data model page: tenant, resource, timeline, and how the different kinds of time are stored
 // on a timeline. Plain language, everyday examples, no jargon.
 
+import { TimelineTrack } from "@/components/timeline-track";
+
 function ConceptRow({ term, children }: { term: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
@@ -12,23 +14,27 @@ function ConceptRow({ term, children }: { term: string; children: React.ReactNod
 
 // One resource's timeline, showing the kinds of stretches that get stored, and the free gaps that
 // deltat works out from them.
+// Built from the same generic TimelineTrack the live demos use; the axis is just 0..100 here since
+// it's illustrative. Same component, same look.
+const AXIS = { axisStart: 0, axisEnd: 100, height: 16 } as const;
+
 function StorageViz() {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
       <Row label="Open hours" hint="stored: when you may book">
-        <span className="absolute inset-y-0 left-[6%] w-[88%] rounded bg-zinc-400/20 ring-1 ring-white/10" />
+        <TimelineTrack {...AXIS} bands={[{ start: 6, end: 94, tone: "neutral" }]} />
       </Row>
       <Row label="Closed" hint="stored: when you may not">
-        <span className="absolute inset-y-0 left-[44%] w-[10%] rounded bg-red-500/45" />
+        <TimelineTrack {...AXIS} bands={[{ start: 44, end: 54, tone: "busy", label: "Closed" }]} />
       </Row>
       <Row label="Booked" hint="stored: time already taken">
-        <span className="absolute inset-y-0 left-[14%] w-[14%] rounded bg-red-600/55" />
-        <span className="absolute inset-y-0 left-[66%] w-[12%] rounded bg-red-600/55" />
+        <TimelineTrack {...AXIS} bands={[{ start: 14, end: 28, tone: "busy" }, { start: 66, end: 78, tone: "busy" }]} />
       </Row>
       <Row label="Free" hint="not stored: worked out">
-        <span className="absolute inset-y-0 left-[28%] w-[16%] rounded bg-emerald-500/55" />
-        <span className="absolute inset-y-0 left-[54%] w-[12%] rounded bg-emerald-500/55" />
-        <span className="absolute inset-y-0 left-[78%] w-[16%] rounded bg-emerald-500/55" />
+        <TimelineTrack
+          {...AXIS}
+          bands={[{ start: 28, end: 44, tone: "free" }, { start: 54, end: 66, tone: "free" }, { start: 78, end: 94, tone: "free" }]}
+        />
       </Row>
       <div className="mt-2 text-center text-[10px] text-zinc-500">
         free time is open hours, minus closed, minus booked
@@ -41,7 +47,7 @@ function Row({ label, hint, children }: { label: string; hint: string; children:
   return (
     <div className="flex items-center gap-3 py-1">
       <span className="w-16 shrink-0 text-right text-[10px] text-zinc-400">{label}</span>
-      <span className="relative h-4 flex-1 rounded bg-white/[0.03]">{children}</span>
+      <div className="flex-1">{children}</div>
       <span className="hidden w-32 shrink-0 text-[9.5px] text-zinc-600 sm:block">{hint}</span>
     </div>
   );
