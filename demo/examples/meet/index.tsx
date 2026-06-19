@@ -18,7 +18,6 @@ import { useWebSocket } from "@/hooks/use-websocket";
 import { formatError } from "@/lib/format-error";
 
 const SLOT_STEP_MS = 30 * 60_000;
-
 const DAY_MS = 86_400_000;
 const HOUR_MS = 3_600_000;
 const AXIS_START_HOUR = 8;
@@ -35,12 +34,6 @@ function asResource(id: string, name: string): Resource {
   return { id, parentId: null, name, capacity: 1, bufferAfter: null, slotMinutes: 30, price: null, bufferMinutes: 0 };
 }
 
-/** Leading window of `durationMs` inside a free block, or null if it doesn't fit. */
-function snapToWindow(slot: AvailabilitySlot, durationMs: number): { start: number; end: number } | null {
-  if (slot.end - slot.start < durationMs) return null;
-  return { start: slot.start, end: slot.start + durationMs };
-}
-
 export default function MeetExample() {
   const [ids, setIds] = useState<MeetIds | null>(null);
   const [date, setDate] = useState(toLocalDateString(new Date()));
@@ -48,7 +41,7 @@ export default function MeetExample() {
   const [bobFree, setBobFree] = useState<AvailabilitySlot[]>([]);
   const [bothFree, setBothFree] = useState<AvailabilitySlot[]>([]);
   const [duration, setDuration] = useState<Duration>(30);
-  const [selected, setSelected] = useState<{ start: number; end: number } | null>(null);
+  const [selectedStarts, setSelectedStarts] = useState<Set<number>>(new Set());
   const [result, setResult] = useState<BookingResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -58,10 +51,9 @@ export default function MeetExample() {
   const axisEnd = dayStart + AXIS_END_HOUR * HOUR_MS;
   const durationMs = duration * 60_000;
 
-  // Discrete start times across the both-free windows, at 30-min steps — so you can pick a specific
-  // meeting time, not just the first opening of the day.
-  const slotOptions = useMemo<{ start: number; end: number }[]>(() => {
-    const out: { start: number; end: number }[] = [];
+  // Discrete bookable start times across the both-free windows, at 30-min steps.
+  const slotOptions = useMemo<AvailabilitySlot[]>(() => {
+    const out: AvailabilitySlot[] = [];
     for (const w of bothFree) {
       for (let c = w.start; c + durationMs <= w.end; c += SLOT_STEP_MS) {
         out.push({ start: c, end: c + durationMs });
@@ -69,6 +61,11 @@ export default function MeetExample() {
     }
     return out;
   }, [bothFree, durationMs]);
+
+  const selectedSlots = useMemo(
+    () => slotOptions.filter((s) => selectedStarts.has(s.start)),
+    [slotOptions, selectedStarts]
+  );
 
   const refresh = useCallback(async (calendars: MeetIds, day: string) => {
     const ds = new Date(`${day}T00:00`).getTime();
@@ -82,7 +79,7 @@ export default function MeetExample() {
     setAliceFree(alice);
     setBobFree(bob);
     setBothFree(both);
-    setSelected(null);
+    setSelectedStarts(new Set());
   }, []);
 
   useEffect(() => {
@@ -102,7 +99,7 @@ export default function MeetExample() {
 
   function changeDate(d: string) {
     setDate(d);
-    setSelected(null);
+    setSelectedStarts(new Set());
     if (ids) startTransition(() => void refresh(ids, d));
   }
 
@@ -112,12 +109,11 @@ export default function MeetExample() {
     changeDate(toLocalDateString(d));
   }
 
-  // Default to the first joint-free window of the day so the page never looks empty.
+  // Default to the first joint-free slot so the page never looks empty.
   useEffect(() => {
-    if (selected || bothFree.length === 0) return;
-    const first = bothFree.map((s) => snapToWindow(s, durationMs)).find(Boolean);
-    if (first) setSelected(first);
-  }, [bothFree, durationMs, selected]);
+    if (selectedStarts.size > 0 || slotOptions.length === 0) return;
+    setSelectedStarts(new Set([slotOptions[0].start]));
+  }, [slotOptions, selectedStarts]);
 
   // Live: re-read both calendars on any booking/cancel from either side.
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -132,31 +128,35 @@ export default function MeetExample() {
 
   function pickDuration(d: Duration) {
     setDuration(d);
-    // Re-snap any current selection to the new duration if it still fits.
-    if (selected) {
-      const block = bothFree.find((s) => s.start <= selected.start && s.end >= selected.start);
-      setSelected(block ? snapToWindow(block, d * 60_000) : null);
-    }
+    setSelectedStarts(new Set()); // slot grid changes — restart selection (default picks the first)
   }
 
-  function pick(slot: AvailabilitySlot) {
-    setSelected(snapToWindow(slot, durationMs));
+  // Click a slot → select just it; shift/cmd-click → toggle it in the multi-selection.
+  function pick(slot: AvailabilitySlot, additive: boolean) {
+    setSelectedStarts((prev) => {
+      if (!additive) return new Set([slot.start]);
+      const next = new Set(prev);
+      if (next.has(slot.start)) next.delete(slot.start);
+      else next.add(slot.start);
+      return next;
+    });
   }
 
   function book() {
-    if (!ids || !selected) return;
+    if (!ids || selectedSlots.length === 0) return;
     const cal = ids;
-    const sel = selected;
     const day = date;
+    const slots = selectedSlots;
     startTransition(async () => {
       try {
-        const created = await batchBookSlots([
-          { resourceId: cal.aliceId, start: sel.start, end: sel.end, label: "Meeting" },
-          { resourceId: cal.bobId, start: sel.start, end: sel.end, label: "Meeting" },
+        const rows = slots.flatMap((s) => [
+          { resourceId: cal.aliceId, start: s.start, end: s.end, label: "Meeting" },
+          { resourceId: cal.bobId, start: s.start, end: s.end, label: "Meeting" },
         ]);
+        const created = await batchBookSlots(rows);
         setResult({
-          title: "Meeting booked · Alice + Bob",
-          subtitle: `${formatTime(sel.start)} – ${formatTime(sel.end)}`,
+          title: `${slots.length} meeting${slots.length > 1 ? "s" : ""} · Alice + Bob`,
+          subtitle: slots.map((s) => formatTime(s.start)).join(" · "),
           bookings: created,
           resources: [asResource(cal.aliceId, "Alice"), asResource(cal.bobId, "Bob")],
         });
@@ -219,9 +219,7 @@ export default function MeetExample() {
               onClick={() => pickDuration(d)}
               className={cn(
                 "rounded-full px-3 py-1 text-xs transition-colors",
-                active
-                  ? "bg-emerald-400/15 text-emerald-200"
-                  : "text-zinc-400 hover:text-zinc-200"
+                active ? "bg-emerald-400/15 text-emerald-200" : "text-zinc-400 hover:text-zinc-200"
               )}
             >
               {d} min
@@ -235,29 +233,25 @@ export default function MeetExample() {
     </div>
   );
 
-  const tray = selected ? (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex-1">
-        <div className="text-sm font-medium text-zinc-100">
-          Meeting · {formatTime(selected.start)} – {formatTime(selected.end)}
+  const n = selectedSlots.length;
+  const tray =
+    n > 0 ? (
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1">
+          <div className="text-sm font-medium text-zinc-100">
+            {n === 1 ? `Meeting · ${formatTime(selectedSlots[0].start)} – ${formatTime(selectedSlots[0].end)}` : `${n} meetings selected`}
+          </div>
+          <div className="text-xs text-zinc-400">{duration} min · books atomically on both calendars</div>
         </div>
-        <div className="text-xs text-zinc-400">
-          {duration} min · books atomically on both calendars
-        </div>
+        <Button onClick={book} disabled={isPending} className="bg-emerald-500 text-white hover:bg-emerald-400">
+          {n > 1 ? `Book ${n} meetings` : "Book both"}
+        </Button>
       </div>
-      <Button
-        onClick={book}
-        disabled={isPending}
-        className="bg-emerald-500 text-white hover:bg-emerald-400"
-      >
-        Book both
-      </Button>
-    </div>
-  ) : (
-    <div className="text-center text-xs text-zinc-400">
-      Click a green window in the <span className="text-emerald-300">Both free</span> lane to pick a meeting time.
-    </div>
-  );
+    ) : (
+      <div className="text-center text-xs text-zinc-400">
+        Click the <span className="text-emerald-300">Both free</span> lane to pick a meeting time.
+      </div>
+    );
 
   return (
     <>
@@ -270,41 +264,15 @@ export default function MeetExample() {
         <MeetLanes
           axisStart={axisStart}
           axisEnd={axisEnd}
-          minDurationMs={durationMs}
-          selected={selected}
-          onPickIntersection={pick}
+          intersectionSlots={slotOptions}
+          selectedStarts={selectedStarts}
+          onPickSlot={pick}
           lanes={[
             { label: "Alice", slots: aliceFree },
             { label: "Bob", slots: bobFree },
             { label: "Both free", slots: bothFree, intersection: true },
           ]}
         />
-
-        {slotOptions.length > 0 && (
-          <div className="mt-4">
-            <div className="mb-1.5 text-center text-[11px] text-zinc-500">Pick a time</div>
-            <div className="flex max-h-24 flex-wrap justify-center gap-1.5 overflow-y-auto px-1">
-              {slotOptions.map((s) => {
-                const active = selected?.start === s.start;
-                return (
-                  <button
-                    key={s.start}
-                    type="button"
-                    onClick={() => setSelected({ start: s.start, end: s.end })}
-                    className={cn(
-                      "rounded-full border px-2.5 py-1 text-xs transition-colors",
-                      active
-                        ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200"
-                        : "border-white/10 text-zinc-400 hover:text-zinc-200"
-                    )}
-                  >
-                    {formatTime(s.start)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         <p className="mt-5 text-center text-[11px] text-zinc-500">
           Alice and Bob keep independent timelines. The bottom lane is{" "}
