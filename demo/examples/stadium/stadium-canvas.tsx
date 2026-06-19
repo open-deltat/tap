@@ -14,6 +14,7 @@ import {
   frameWorldBBox,
   rectsIntersect,
   gridDims,
+  seatId,
 } from "./geometry";
 
 export interface CanvasSection {
@@ -25,6 +26,9 @@ export interface CanvasSection {
   assigned: boolean;
   capacity: number;
   remaining: number;
+  // The exact cells that are booked (by grid index). Source of truth for both rendering and
+  // hit-testing, so booked seats stay where they were picked instead of clustering top-left.
+  takenCells: Set<number>;
 }
 
 // Result of clicking the canvas while zoomed into seats: a single seat cell to toggle.
@@ -61,6 +65,7 @@ const COLORS = {
   selectStrokeDark: "#09090b", // per-seat ring, on the bright picked fill (high contrast)
   label: "rgba(255,255,255,0.88)",
   labelHalo: "rgba(0,0,0,0.55)",
+  seatLabel: "rgba(12,12,14,0.72)", // per-seat id, dark text on the light seat fills
 };
 
 function fillFor(s: CanvasSection): string {
@@ -340,11 +345,12 @@ function drawSeats(
   const cw = r.w / cols;
   const ch = r.h / rows;
   const pad = Math.min(cw, ch) * 0.12;
-  const taken = Math.max(0, s.capacity - s.remaining);
   const isSel = s.id === selectedSectionId;
 
   // Inverse-transform the viewport corners into this rotated local frame for cell culling.
   const localView = worldRectToLocalAABB(viewport, f);
+  const inView = (x: number, y: number) =>
+    !(x + cw < localView.x || x > localView.x + localView.w || y + ch < localView.y || y > localView.y + localView.h);
 
   ctx.fillStyle = COLORS.taken;
   for (let i = 0; i < s.capacity; i++) {
@@ -352,16 +358,8 @@ function drawSeats(
     const row = (i - col) / cols;
     const x = r.x + col * cw;
     const y = r.y + row * ch;
-    // Cull cells outside the viewport (in local space).
-    if (
-      x + cw < localView.x ||
-      x > localView.x + localView.w ||
-      y + ch < localView.y ||
-      y > localView.y + localView.h
-    ) {
-      continue;
-    }
-    const isTaken = i < taken;
+    if (!inView(x, y)) continue;
+    const isTaken = s.takenCells.has(i);
     const picked = isSel && selectedCells.has(i);
     ctx.fillStyle = isTaken ? COLORS.taken : picked ? COLORS.selection : fillFor(s);
     ctx.globalAlpha = isTaken ? 0.8 : picked ? 1 : 0.85;
@@ -374,6 +372,31 @@ function drawSeats(
     }
   }
   ctx.globalAlpha = 1;
+
+  // Deepest zoom: stamp each bookable seat's id (e.g. "B5"), upright. Counter-rotate the frame
+  // once, then place every label at its cell-center mapped back through the section's rotation —
+  // cheaper than a save/rotate per cell. Only when cells are large enough to read.
+  const cellScreen = Math.min(cw, ch) * t.scale;
+  if (cellScreen > 22) {
+    ctx.save();
+    ctx.rotate(-f.angle);
+    const ca = Math.cos(f.angle);
+    const sa = Math.sin(f.angle);
+    ctx.font = `600 ${Math.min(cw, ch) * 0.42}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = COLORS.seatLabel;
+    for (let i = 0; i < s.capacity; i++) {
+      if (s.takenCells.has(i)) continue; // booked seats don't need an id to pick
+      const col = i % cols;
+      const row = (i - col) / cols;
+      const lx = r.x + (col + 0.5) * cw;
+      const ly = r.y + (row + 0.5) * ch;
+      if (!inView(r.x + col * cw, r.y + row * ch)) continue;
+      ctx.fillText(seatId(i, cols), lx * ca - ly * sa, lx * sa + ly * ca);
+    }
+    ctx.restore();
+  }
 }
 
 // Section name, drawn upright (counter-rotating the section frame so text never reads sideways
