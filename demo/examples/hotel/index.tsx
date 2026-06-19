@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, useCallback, useMemo } from "react";
+import { useEffect, useState, useTransition, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { Loader2, X, CalendarRange, Wand2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
@@ -14,6 +14,7 @@ import { BookingConfirmedModal, type BookingResult } from "@/components/booking-
 import { ensureHotel, type HotelRoomType } from "./seed";
 import { CHECK_IN_HOUR, CHECK_OUT_HOUR } from "./policy";
 import { batchBookSlots, getBookingsForResource, cancelBooking } from "@/app/actions/bookings";
+import { useWebSocket } from "@/hooks/use-websocket";
 import { formatError } from "@/lib/format-error";
 import { AvailabilityStrip } from "./availability-strip";
 import { occupancyByNight, bookedNightSets, stableOpenings } from "./occupancy";
@@ -50,6 +51,7 @@ function asResource(rt: HotelRoomType): Resource {
 
 export default function HotelPage() {
   const [types, setTypes] = useState<HotelRoomType[]>([]);
+  const [rootId, setRootId] = useState<string | null>(null);
   const [bookingsByType, setBookingsByType] = useState<Record<string, Booking[]>>({});
   const [selTypeId, setSelTypeId] = useState<string | null>(null);
   const [range, setRange] = useState<DateRange | undefined>();
@@ -70,7 +72,8 @@ export default function HotelPage() {
   useEffect(() => {
     (async () => {
       try {
-        const rooms = await ensureHotel();
+        const { rootId: rid, rooms } = await ensureHotel();
+        setRootId(rid);
         setTypes(rooms);
         setSelTypeId(rooms[0]?.id ?? null);
         await refresh(rooms);
@@ -82,6 +85,18 @@ export default function HotelPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Live: every type bubbles to the hotel root, so one subscription re-reads occupancy whenever
+  // anyone books or cancels — debounced + ref-read so a burst coalesces with the latest types.
+  const typesRef = useRef(types);
+  typesRef.current = types;
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const liveReload = useCallback(() => {
+    if (reloadTimer.current) clearTimeout(reloadTimer.current);
+    reloadTimer.current = setTimeout(() => void refresh(typesRef.current), 200);
+  }, [refresh]);
+  useEffect(() => () => clearTimeout(reloadTimer.current), []);
+  useWebSocket(rootId ? { type: "subscribe", resourceId: rootId, onEvent: liveReload } : null);
 
   const selType = types.find((t) => t.id === selTypeId) ?? types[0] ?? null;
   const selBookings = useMemo(
@@ -135,30 +150,27 @@ export default function HotelPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selTypeId, types.length]);
 
-  // Clamp every selection to a stable, bookable stay: check-in must be an open night, and the
-  // stay can run up to and including the first booked night (check-out that morning) — never past.
-  function onSelectRange(r: DateRange | undefined) {
-    if (!r?.from) {
-      setRange(undefined);
-      return;
+  // Two-anchor selection driven by the clicked day (not react-day-picker's range cycle, which
+  // would keep `from` fixed when you click a later day and so freeze the amber boundary). While a
+  // check-in is set and you click a LATER open day, that's your check-out — clamped to the first
+  // booked night (you leave that morning). Any other click re-anchors check-in, so the amber
+  // "last bookable night" recomputes live on every pick.
+  function onSelectRange(_sel: DateRange | undefined, triggerDate: Date) {
+    const c = midnight(triggerDate);
+    if (range?.from && !range.to) {
+      const from = midnight(range.from);
+      if (c > from) {
+        const ff = firstFullFrom(from);
+        const to = ff != null && c > ff ? ff : c;
+        setRange({ from: new Date(from), to: new Date(to) });
+        return;
+      }
     }
-    const from = midnight(r.from);
-    if (isFull(from)) {
+    if (isFull(c)) {
       toast.error("That night is booked — pick an open night to check in");
       return;
     }
-    if (!r.to) {
-      setRange({ from: new Date(from) });
-      return;
-    }
-    let to = midnight(r.to);
-    if (to <= from) {
-      setRange({ from: new Date(from) });
-      return;
-    }
-    const ff = firstFullFrom(from);
-    if (ff != null && to > ff) to = ff; // you leave the morning of the first booked night
-    setRange({ from: new Date(from), to: new Date(to) });
+    setRange({ from: new Date(c) }); // fresh check-in → amber boundary recomputes
   }
 
   // Nights actually slept: check-in date .. the night before check-out (DST-safe date cursor).
@@ -366,8 +378,8 @@ export default function HotelPage() {
                 checkout: checkoutMs != null ? [new Date(checkoutMs)] : [],
               }}
               modifiersClassNames={{
-                booked: "text-rose-300/60 line-through",
-                checkout: "rounded-md text-amber-300 ring-1 ring-amber-400/60",
+                booked: "text-rose-300/50 line-through",
+                checkout: "rounded-md text-amber-200/70 ring-1 ring-amber-500/25",
               }}
               className="bg-transparent text-zinc-100"
             />

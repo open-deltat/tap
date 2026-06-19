@@ -249,6 +249,7 @@ export function LiveRoom() {
       primitive={{ label: "Realtime · holds + LISTEN/NOTIFY", specId: "PROTO-01" }}
       title="Live Cinema"
       ribbon={ribbon}
+      contentMax="max-w-none"
     >
       {/* Top: your booker. Bottom: one row of three read-only viewers, each its own connection,
           all repainting live from the shared seat state. */}
