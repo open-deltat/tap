@@ -1,15 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Stage } from "@/components/stage";
 import { cn } from "@/lib/utils";
 import { AlgebraExplainer, type PersonData } from "./algebra/algebra-explainer";
 import { StepScrubber } from "./algebra/step-scrubber";
-import { HoldsExplainer } from "./holds/holds-explainer";
-import { HoldsScrubber } from "./holds/holds-scrubber";
-import { HOLDS_STEP_COUNT } from "./holds/script";
+import { HoldsNarrative } from "./holds/holds-narrative";
+import { FEATURE_TOPICS, TopicCard } from "./topics";
 import {
   AXIS_START_HOUR,
   AXIS_END_HOUR,
@@ -37,6 +35,13 @@ interface Ids {
   doraId: string;
 }
 
+// Sidebar: two interactive walkthroughs, then the feature explainers.
+const NAV: { id: string; label: string }[] = [
+  { id: "algebra", label: "Availability algebra" },
+  { id: "holds", label: "Holds & races" },
+  ...FEATURE_TOPICS.map((t) => ({ id: t.id, label: t.label })),
+];
+
 const emptyPerson = (name: string): PersonData => ({
   name,
   open: [],
@@ -53,12 +58,8 @@ function splitRules(rules: Rule[], ds: number, de: number): { open: Span[]; bloc
   return { open, blocking };
 }
 
-type Chapter = "algebra" | "holds";
-
 export default function ExplainerExample() {
-  const [chapter, setChapter] = useState<Chapter>("algebra");
-  const [holdsStep, setHoldsStep] = useState(0);
-  const [holdsPlaying, setHoldsPlaying] = useState(true);
+  const [topic, setTopic] = useState<string>("algebra");
   const [ids, setIds] = useState<Ids | null>(null);
   const [date] = useState(toLocalDateString(new Date()));
   const [bob, setBob] = useState<PersonData>(emptyPerson("Bob"));
@@ -164,7 +165,6 @@ export default function ExplainerExample() {
     const start = slot.start;
     const end = slot.start + HOLD_MINUTES * 60_000;
 
-    // Toggle off if clicking the same window again.
     if (myHold && myHold.start === start && myHold.end === end) {
       closeAllHolds();
       return;
@@ -173,8 +173,6 @@ export default function ExplainerExample() {
     setMyHold({ start, end });
     if (step < 3) setStep(3); // surface the holds layer so the subtraction is visible
 
-    // Both sockets must close/error before we clear the amber hold — one socket failing
-    // early must not prematurely clear the hold the other is still holding.
     const pending = new Set([ids.bobId, ids.doraId]);
     for (const resourceId of [ids.bobId, ids.doraId]) {
       const ws = new WebSocket(wsUrl());
@@ -211,126 +209,115 @@ export default function ExplainerExample() {
   }
 
   const firstJointMs = combined.length > 0 ? combined[0].start : null;
+  const featureTopic = FEATURE_TOPICS.find((t) => t.id === topic);
 
-  const tabs = (
-    <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1 text-[12px]">
-      {(
-        [
-          ["algebra", "Availability algebra"],
-          ["holds", "Holds & race conditions"],
-        ] as const
-      ).map(([key, label]) => (
-        <button
-          key={key}
-          type="button"
-          onClick={() => setChapter(key)}
-          className={cn(
-            "rounded-md px-3 py-1.5 font-medium transition-colors",
-            chapter === key
-              ? "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30"
-              : "text-zinc-400 hover:text-zinc-200"
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-
-  if (chapter === "holds") {
-    const holdsTray = (
-      <HoldsScrubber
-        step={holdsStep}
-        playing={holdsPlaying}
-        onStep={(n) => {
-          setHoldsPlaying(false);
-          setHoldsStep(n);
-        }}
-        onPlayToggle={() => {
-          if (!holdsPlaying && holdsStep >= HOLDS_STEP_COUNT - 1) {
-            setHoldsStep(0);
-            setHoldsPlaying(true);
-          } else {
-            setHoldsPlaying((p) => !p);
-          }
-        }}
-      />
-    );
-
-    return (
-      <Stage
-        primitive={{ label: "Hold + race resolution", specId: "HOLD-01" }}
-        title="How deltat handles holds & races"
-        ribbon={tabs}
-        tray={holdsTray}
-      >
-        <HoldsExplainer step={holdsStep} />
-        <p className="mt-4 text-center text-[11px] text-zinc-500">
-          A scripted walkthrough — no live deltat needed. Two clients, one seat row, one contested
-          seat. The engine resolves the race so exactly one hold wins.
-        </p>
-      </Stage>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+  let content: ReactNode;
+  if (topic === "holds") {
+    content = <HoldsNarrative />;
+  } else if (featureTopic) {
+    content = <TopicCard topic={featureTopic} />;
+  } else if (loading) {
+    content = (
+      <div className="flex h-full items-center justify-center text-zinc-400">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to deltat…
         </div>
       </div>
     );
+  } else {
+    content = (
+      <div className="mx-auto max-w-3xl">
+        <div className="flex items-center gap-2 text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">
+          <span>Availability algebra</span>
+          <span className="rounded border border-white/10 px-1 py-px font-mono text-[9px] tracking-normal">
+            AVAIL-01
+          </span>
+        </div>
+        <h2 className="mt-2 text-2xl font-semibold text-zinc-100">How deltat computes availability</h2>
+        <p className="mt-1 text-sm text-emerald-300/90">
+          Open hours minus blocks minus bookings minus holds — then the intersection of two people.
+        </p>
+
+        <div className="mt-6">
+          <AlgebraExplainer
+            bob={bob}
+            dora={dora}
+            combined={combined}
+            axisStart={axisStart}
+            axisEnd={axisEnd}
+            step={step}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+            myHold={myHold}
+            onPickIntersection={placeHold}
+            firstJointMs={firstJointMs}
+            minDurationMs={MIN_DURATION_MS}
+          />
+        </div>
+
+        <div className="mt-5">
+          <StepScrubber
+            step={step}
+            playing={playing}
+            onStep={(n) => {
+              setPlaying(false);
+              setStep(n);
+            }}
+            onPlayToggle={() => {
+              if (!playing && step >= STEP_COUNT - 1) {
+                setStep(0);
+                setPlaying(true);
+              } else {
+                setPlaying((p) => !p);
+              }
+            }}
+          />
+        </div>
+
+        <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
+          Every band is a real deltat read: rules give the open band,{" "}
+          <span className="text-zinc-300">getAvailability</span> gives each net, and{" "}
+          <span className="text-emerald-300">getCombinedAvailability(min_available = 2)</span> gives the
+          intersection — which starts at {firstJointMs ? formatTime(firstJointMs) : "—"}.
+        </p>
+      </div>
+    );
   }
 
-  const tray = (
-    <StepScrubber
-      step={step}
-      playing={playing}
-      onStep={(n) => {
-        setPlaying(false);
-        setStep(n);
-      }}
-      onPlayToggle={() => {
-        // From the end-result, "play" walks the algebra from the top; otherwise it pauses/resumes.
-        if (!playing && step >= STEP_COUNT - 1) {
-          setStep(0);
-          setPlaying(true);
-        } else {
-          setPlaying((p) => !p);
-        }
-      }}
-    />
-  );
-
   return (
-    <Stage
-      primitive={{ label: "Availability algebra", specId: "AVAIL-01" }}
-      title="How deltat computes availability"
-      ribbon={tabs}
-      tray={tray}
-    >
-      <AlgebraExplainer
-        bob={bob}
-        dora={dora}
-        combined={combined}
-        axisStart={axisStart}
-        axisEnd={axisEnd}
-        step={step}
-        collapsed={collapsed}
-        onToggleCollapse={toggleCollapse}
-        myHold={myHold}
-        onPickIntersection={placeHold}
-        firstJointMs={firstJointMs}
-        minDurationMs={MIN_DURATION_MS}
-      />
-      <p className="mt-4 text-center text-[11px] text-zinc-500">
-        Every band is a real deltat read: rules give the open band,{" "}
-        <span className="text-zinc-300">getAvailability</span> gives each net, and{" "}
-        <span className="text-emerald-300">getCombinedAvailability(min_available = 2)</span> gives the
-        intersection — which starts at {firstJointMs ? formatTime(firstJointMs) : "—"}.
-      </p>
-    </Stage>
+    <div className="relative h-full overflow-hidden bg-[#0a0a0c] text-zinc-100">
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute left-1/2 top-1/3 h-[55vh] w-[55vh] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/10 blur-[130px]" />
+        <div className="absolute inset-0 opacity-[0.035] [background-image:radial-gradient(circle,#ffffff_1px,transparent_1px)] [background-size:22px_22px]" />
+      </div>
+
+      <div className="relative mx-auto flex h-full max-w-6xl gap-4 px-4 py-6 sm:gap-6 sm:px-6">
+        <aside className="w-40 shrink-0 overflow-auto sm:w-56">
+          <div className="mb-3 px-2 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+            How deltat works
+          </div>
+          <nav className="space-y-0.5">
+            {NAV.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTopic(item.id)}
+                className={cn(
+                  "block w-full rounded-md px-2.5 py-1.5 text-left text-[13px] transition-colors",
+                  topic === item.id
+                    ? "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/20"
+                    : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200"
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="min-w-0 flex-1 overflow-auto pb-10">{content}</main>
+      </div>
+    </div>
   );
 }
