@@ -17,7 +17,15 @@ import { getMultiResourceBookings, batchBookSlots } from "@/app/actions/bookings
 import { formatError } from "@/lib/format-error";
 
 import { StadiumCanvas, type CanvasSection, type CanvasHit } from "./stadium-canvas";
-import { WORLD, SEAT_THRESHOLD, type Transform } from "./geometry";
+import {
+  WORLD,
+  SEAT_THRESHOLD,
+  SEAT_LEVEL,
+  type Transform,
+  zoomLevels,
+  transformCenteredOn,
+  nearestLevel,
+} from "./geometry";
 
 const MAX_QTY = 8;
 
@@ -27,17 +35,17 @@ interface Section extends CanvasSection {
   tier: string;
 }
 
-// Center the world in the viewport at a given scale (assumes a roughly square-ish canvas).
-function centeredTransform(scale: number, viewW = 900, viewH = 520): Transform {
+// Fallback canvas size before the host element has measured (first render / SSR).
+const FALLBACK_VIEW = { w: 900, h: 520 };
+
+// Read the live canvas size; fall back to a sensible default if unmeasured.
+function canvasSize(): { w: number; h: number } {
+  const el = typeof document !== "undefined" ? document.getElementById("stadium-canvas-host") : null;
   return {
-    scale,
-    offsetX: viewW / 2 - (WORLD.w / 2) * scale,
-    offsetY: viewH / 2 - (WORLD.h / 2) * scale,
+    w: el?.clientWidth || FALLBACK_VIEW.w,
+    h: el?.clientHeight || FALLBACK_VIEW.h,
   };
 }
-
-// Initial fit: whole bowl visible.
-const FIT_SCALE = 0.4;
 
 export default function StadiumExample() {
   const [resources, setResources] = useState<Resource[]>([]);
@@ -53,7 +61,11 @@ export default function StadiumExample() {
   const [selectedCells, setSelectedCells] = useState<Set<number>>(new Set());
   const [result, setResult] = useState<BookingResult | null>(null);
 
-  const [transform, setTransform] = useState<Transform>(() => centeredTransform(FIT_SCALE));
+  // Discrete zoom: a level index into the ladder, not a free scale.
+  const [transform, setTransform] = useState<Transform>(() => {
+    const levels = zoomLevels(FALLBACK_VIEW.w, FALLBACK_VIEW.h);
+    return transformCenteredOn(levels[0], WORLD.w / 2, WORLD.h / 2, FALLBACK_VIEW.w, FALLBACK_VIEW.h);
+  });
   const easeRef = useRef<number>(0);
 
   const sections: Section[] = resources
@@ -109,6 +121,15 @@ export default function StadiumExample() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Once the canvas is mounted and measured, snap the overview (L0) to the real size so the
+  // whole stadium fits — the initial state used fallback dims before the host existed.
+  useEffect(() => {
+    if (loading) return;
+    const { w, h } = canvasSize();
+    const levels = zoomLevels(w, h);
+    setTransform(transformCenteredOn(levels[0], WORLD.w / 2, WORLD.h / 2, w, h));
+  }, [loading]);
+
   // Per-section remaining for the chosen slot.
   useEffect(() => {
     if (!slot) return;
@@ -119,15 +140,17 @@ export default function StadiumExample() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slot, resources]);
 
-  // Ease the transform toward a target over ~280ms.
+  // Ease the transform toward a target over ~250ms with easeInOutCubic.
   const easeTo = useCallback((target: Transform) => {
     cancelAnimationFrame(easeRef.current);
     const start = performance.now();
     const from = transform;
-    const dur = 280;
+    const dur = 250;
+    const easeInOutCubic = (k: number) =>
+      k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
     const step = (now: number) => {
       const k = Math.min(1, (now - start) / dur);
-      const e = 1 - Math.pow(1 - k, 3); // ease-out cubic
+      const e = easeInOutCubic(k);
       setTransform({
         scale: from.scale + (target.scale - from.scale) * e,
         offsetX: from.offsetX + (target.offsetX - from.offsetX) * e,
@@ -140,23 +163,43 @@ export default function StadiumExample() {
 
   useEffect(() => () => cancelAnimationFrame(easeRef.current), []);
 
+  // Ease to a discrete ladder level, keeping a world focus point at the canvas center.
+  // Default focus is whatever's currently centered, so wheel/buttons zoom toward center.
+  const goToLevel = useCallback(
+    (level: number, focus?: { x: number; y: number }) => {
+      const { w, h } = canvasSize();
+      const levels = zoomLevels(w, h);
+      const clamped = Math.max(0, Math.min(levels.length - 1, level));
+      const scale = levels[clamped];
+      const fx = focus?.x ?? (w / 2 - transform.offsetX) / transform.scale;
+      const fy = focus?.y ?? (h / 2 - transform.offsetY) / transform.scale;
+      easeTo(transformCenteredOn(scale, fx, fy, w, h));
+    },
+    [easeTo, transform]
+  );
+
+  // Wheel step: derive the current level from the live scale (drag-pan never changes scale,
+  // but this keeps us robust if the two ever drift) and move one step toward the cursor.
+  const onZoomStep = useCallback(
+    (direction: 1 | -1, focusX: number, focusY: number) => {
+      const { w, h } = canvasSize();
+      const levels = zoomLevels(w, h);
+      const current = nearestLevel(levels, transform.scale);
+      const next = Math.max(0, Math.min(levels.length - 1, current + direction));
+      if (next === current) return;
+      goToLevel(next, { x: focusX, y: focusY });
+    },
+    [goToLevel, transform.scale]
+  );
+
   const onHit = useCallback(
     (hit: CanvasHit) => {
       if (hit.kind === "section") {
-        // Zoomed out: ease into the section (raise scale + center it).
+        // Below the seats level: ease to the seats level (L2) and center this section.
         const s = hit.section;
         setSelectedId(s.id);
         setSelectedCells(new Set());
-        const targetScale = SEAT_THRESHOLD + 1.2;
-        // Center the section's world point in the viewport at the new scale.
-        const el = document.getElementById("stadium-canvas-host");
-        const vw = el?.clientWidth ?? 900;
-        const vh = el?.clientHeight ?? 520;
-        easeTo({
-          scale: targetScale,
-          offsetX: vw / 2 - hit.worldX * targetScale,
-          offsetY: vh / 2 - hit.worldY * targetScale,
-        });
+        goToLevel(SEAT_LEVEL, { x: hit.worldX, y: hit.worldY });
         return;
       }
       // Zoomed in: toggle a free seat cell in the selection set.
@@ -182,7 +225,7 @@ export default function StadiumExample() {
         return base;
       });
     },
-    [easeTo, selectedId]
+    [goToLevel, selectedId]
   );
 
   function book() {
@@ -215,17 +258,12 @@ export default function StadiumExample() {
     });
   }
 
-  function zoomBy(factor: number) {
-    const el = document.getElementById("stadium-canvas-host");
-    const vw = el?.clientWidth ?? 900;
-    const vh = el?.clientHeight ?? 520;
-    // Zoom toward the viewport center.
-    const cx = vw / 2;
-    const cy = vh / 2;
-    const wx = (cx - transform.offsetX) / transform.scale;
-    const wy = (cy - transform.offsetY) / transform.scale;
-    const scale = Math.max(0.4, Math.min(30, transform.scale * factor));
-    easeTo({ scale, offsetX: cx - wx * scale, offsetY: cy - wy * scale });
+  // +/- buttons step one ladder level toward the canvas center.
+  function stepZoom(direction: 1 | -1) {
+    const { w, h } = canvasSize();
+    const levels = zoomLevels(w, h);
+    const current = nearestLevel(levels, transform.scale);
+    goToLevel(current + direction);
   }
 
   if (loading) {
@@ -273,8 +311,8 @@ export default function StadiumExample() {
           size="icon-sm"
           variant="ghost"
           className="bg-white/5 text-zinc-300"
-          onClick={() => zoomBy(1 / 1.5)}
-          aria-label="Zoom out"
+          onClick={() => stepZoom(-1)}
+          aria-label="Zoom out one level"
         >
           <ZoomOut className="h-3.5 w-3.5" />
         </Button>
@@ -282,12 +320,12 @@ export default function StadiumExample() {
           size="icon-sm"
           variant="ghost"
           className="bg-white/5 text-zinc-300"
-          onClick={() => zoomBy(1.5)}
-          aria-label="Zoom in"
+          onClick={() => stepZoom(1)}
+          aria-label="Zoom in one level"
         >
           <ZoomIn className="h-3.5 w-3.5" />
         </Button>
-        <span className="text-[11px] text-zinc-600">scroll to zoom · drag to pan</span>
+        <span className="text-[11px] text-zinc-600">scroll to step zoom · drag to pan</span>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
         <Legend color="#10b981" label="plenty" />
@@ -336,6 +374,7 @@ export default function StadiumExample() {
             selectedSectionId={selectedId}
             selectedCells={selectedCells}
             onTransformChange={setTransform}
+            onZoomStep={onZoomStep}
             onHit={onHit}
           />
           <div className="pointer-events-none mt-2 text-center text-[11px] text-zinc-600">

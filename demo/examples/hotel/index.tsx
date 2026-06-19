@@ -9,12 +9,15 @@ import type { Booking, Resource } from "@/lib/schemas";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 
 import { ensureHotel, type HotelRoomType } from "./seed";
+import { CHECK_IN_HOUR, CHECK_OUT_HOUR } from "./policy";
 import { batchBookSlots, getBookingsForResource, cancelBooking } from "@/app/actions/bookings";
 import { formatError } from "@/lib/format-error";
 import { AvailabilityStrip } from "./availability-strip";
 
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
 const fmt = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+const hourLabel = (h: number) => `${((h + 11) % 12) + 1} ${h < 12 ? "AM" : "PM"}`;
 
 function asResource(rt: HotelRoomType): Resource {
   return {
@@ -66,15 +69,17 @@ export default function HotelPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function book(rt: HotelRoomType, start: number, n: number) {
-    const end = start + n * DAY;
+  function book(rt: HotelRoomType, startMidnight: number, n: number) {
+    // Check-in 3 PM on the first day → check-out 11 AM on the (start + n) day.
+    const start = startMidnight + CHECK_IN_HOUR * HOUR;
+    const end = startMidnight + n * DAY + CHECK_OUT_HOUR * HOUR;
     const label = guest.trim() ? `${guest.trim()} · ${n}-night stay` : `${n}-night stay`;
     startTransition(async () => {
       try {
         const created = await batchBookSlots([{ resourceId: rt.id, start, end, label }]);
         setResult({
           title: `${rt.name} · ${n} night${n > 1 ? "s" : ""}`,
-          subtitle: `${fmt(start)} → ${fmt(end)}`,
+          subtitle: `${fmt(start)} ${hourLabel(CHECK_IN_HOUR)} → ${fmt(end)} ${hourLabel(CHECK_OUT_HOUR)}`,
           bookings: created,
           resources: [asResource(rt)],
         });
@@ -177,7 +182,10 @@ export default function HotelPage() {
           <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Book a stay</h2>
-              <p className="mt-1 text-xs text-zinc-500">Pick a length, then click an opening — same room, no switching.</p>
+              <p className="mt-1 text-xs text-zinc-500">
+                Pick a length, then click an opening — same room, no switching. Check-in{" "}
+                {hourLabel(CHECK_IN_HOUR)} · check-out {hourLabel(CHECK_OUT_HOUR)}.
+              </p>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-zinc-500">nights</span>
@@ -251,9 +259,8 @@ function RoomHeader({ rt }: { rt: HotelRoomType }) {
 
 function Legend() {
   const items = [
-    { cls: "bg-emerald-500/70", label: "free" },
-    { cls: "bg-amber-500/45", label: "partial" },
-    { cls: "bg-rose-500/45", label: "full" },
+    { cls: "bg-emerald-500/70", label: "open room" },
+    { cls: "bg-rose-500/50", label: "booked room" },
   ];
   return (
     <span className="ml-1 inline-flex items-center gap-2 align-middle">
