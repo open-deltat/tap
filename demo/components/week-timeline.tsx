@@ -26,10 +26,12 @@ interface Props {
   rows: WeekRow[];
   /** Click a free cell in a result row (dayIndex). */
   onPick?: (dayIndex: number) => void;
+  /** Ring the column of the chosen day. */
+  selectedDay?: number;
   labelWidth?: number;
 }
 
-export function WeekTimeline({ start, dayCount, rows, onPick, labelWidth = 64 }: Props) {
+export function WeekTimeline({ start, dayCount, rows, onPick, selectedDay, labelWidth = 64 }: Props) {
   const dayDate = (i: number) => {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
@@ -41,6 +43,7 @@ export function WeekTimeline({ start, dayCount, rows, onPick, labelWidth = 64 }:
     Array.from({ length: dayCount }, (_, i) => {
       const free = states[i] === "free";
       const actionable = result && free && !!onPick;
+      const picked = result && i === selectedDay;
       const cell = (
         <div
           className={cn(
@@ -50,7 +53,8 @@ export function WeekTimeline({ start, dayCount, rows, onPick, labelWidth = 64 }:
                 ? "border-emerald-400/50 bg-emerald-500/40"
                 : "border-emerald-400/30 bg-emerald-500/20"
               : "border-white/[0.06] bg-white/[0.02]",
-            actionable && "cursor-pointer hover:bg-emerald-400/60"
+            actionable && "cursor-pointer hover:bg-emerald-400/60",
+            picked && "ring-2 ring-emerald-300 ring-offset-1 ring-offset-[#0a0a0c]"
           )}
         />
       );
