@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { parse } from "node:url";
 import next from "next";
 import { WebSocketServer, type WebSocket } from "ws";
+import { z } from "zod";
 import { dt } from "./lib/deltat";
 
 const dev = process.env.NODE_ENV !== "production";
@@ -9,6 +10,23 @@ const port = parseInt(process.env.PORT || "3000", 10);
 
 const app = next({ dev });
 const handle = app.getRequestHandler();
+
+// The WebSocket wire protocol, validated at the boundary so untrusted JSON never reaches deltat as
+// an unchecked `any`. The first message opens a live subscription (and optionally a hold); later
+// messages confirm it. deltat enforces the semantic limits on the values (span/timestamp ranges).
+const InitMessage = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("subscribe"), resourceId: z.string().min(1).max(64) }),
+  z.object({
+    type: z.literal("hold"),
+    resourceId: z.string().min(1).max(64),
+    start: z.number().int(),
+    end: z.number().int(),
+  }),
+]);
+const ConfirmMessage = z.object({ type: z.literal("confirm"), label: z.string().max(10_000).optional() });
+
+type InitMessage = z.infer<typeof InitMessage>;
+type ConfirmMessage = z.infer<typeof ConfirmMessage>;
 
 interface WsState {
   unlisten: (() => Promise<void>) | null;
@@ -18,7 +36,7 @@ interface WsState {
   end: number | null;
 }
 
-async function handleInit(ws: WebSocket, state: WsState, msg: any) {
+async function handleInit(ws: WebSocket, state: WsState, msg: InitMessage) {
   state.resourceId = msg.resourceId;
 
   state.unlisten = await dt.events.listen(msg.resourceId, (event) => {
@@ -40,7 +58,7 @@ async function handleInit(ws: WebSocket, state: WsState, msg: any) {
   }
 }
 
-async function handleConfirm(ws: WebSocket, state: WsState, msg: any) {
+async function handleConfirm(ws: WebSocket, state: WsState, msg: ConfirmMessage) {
   if (!state.holdId || !state.resourceId || state.start == null || state.end == null) {
     ws.send(JSON.stringify({ type: "error", message: "No active hold to confirm" }));
     return;
@@ -82,13 +100,13 @@ async function handleClose(state: WsState) {
 await app.prepare();
 
 const server = createServer((req, res) => {
-  handle(req, res, parse(req.url!, true));
+  handle(req, res, parse(req.url ?? "/", true));
 });
 
 const wss = new WebSocketServer({ noServer: true });
 
 server.on("upgrade", (req, socket, head) => {
-  const { pathname } = parse(req.url!);
+  const { pathname } = parse(req.url ?? "/");
   if (pathname === "/ws") {
     wss.handleUpgrade(req, socket, head, (ws) => {
       wss.emit("connection", ws);
@@ -102,18 +120,15 @@ wss.on("connection", (ws) => {
 
   ws.on("message", async (raw) => {
     try {
-      const msg = JSON.parse(String(raw));
+      const json: unknown = JSON.parse(String(raw));
 
       if (!initialized) {
         initialized = true;
-        await handleInit(ws, state, msg);
+        await handleInit(ws, state, InitMessage.parse(json));
         return;
       }
 
-      if (msg.type === "confirm") {
-        await handleConfirm(ws, state, msg);
-        return;
-      }
+      await handleConfirm(ws, state, ConfirmMessage.parse(json));
     } catch (err) {
       ws.send(JSON.stringify({ type: "error", message: String(err) }));
       if (!initialized) ws.close();
