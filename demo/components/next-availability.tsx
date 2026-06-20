@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Loader2, CalendarClock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { ACCENT_GHOST } from "@/lib/accent";
 import { findNextAvailable, type NextOpening } from "@/lib/first-available";
 import { formatTime } from "@/lib/time";
 
@@ -51,29 +53,29 @@ export function NextAvailability({
   }, [key]);
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-4 rounded-2xl bg-[#0a0a0c]/60 px-6 text-center backdrop-blur-md">
-      <CalendarClock aria-hidden className="h-7 w-7 text-zinc-500" />
-      <div className="text-sm font-medium text-zinc-200">{title}</div>
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-2xl bg-[#0a0a0c]/35 px-6 text-center backdrop-blur-[2px]">
+      <div className="text-sm font-medium text-zinc-300">{title}</div>
 
       <div role="status" aria-live="polite">
         {state.loading ? (
-          <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <div className="flex items-center gap-2 text-xs text-zinc-500">
             <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" /> Finding the next opening…
           </div>
         ) : state.next ? (
           <Button
             onClick={() => state.next && onJump(state.next)}
-            className="h-11 gap-2 px-5 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
+            className={cn("h-9 gap-1.5 rounded-full px-4 text-[13px] font-medium", ACCENT_GHOST)}
           >
-            Jump to next availability
-            <span className="font-normal opacity-90">
+            <CalendarClock aria-hidden className="h-3.5 w-3.5" />
+            Next opening
+            <span className="font-normal text-emerald-300/70">
               · {dayLabel(state.next.start)}
               {showTime ? `, ${formatTime(state.next.start)}` : ""}
             </span>
-            <ArrowRight aria-hidden className="h-4 w-4" />
+            <ArrowRight aria-hidden className="h-3.5 w-3.5" />
           </Button>
         ) : (
-          <div className="text-xs text-zinc-400">Nothing open in the next {horizonDays} days.</div>
+          <div className="text-xs text-zinc-500">Nothing open in the next {horizonDays} days.</div>
         )}
       </div>
     </div>

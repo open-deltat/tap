@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback, useTransition, useRef } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Segmented } from "@/components/ui/segmented";
+import { BookButton } from "@/components/book-button";
 import { SeatMap, type SeatSection } from "@/components/seat-map";
 import { CancelBookingDialog } from "@/components/booking-dialog";
 import { Stage, type StagePrimitive } from "@/components/stage";
@@ -318,51 +318,31 @@ export function SeatBookingPage({
     );
   }
 
-  const venueRibbon =
+  // Selectors live in context, right above the seat map they filter — not stranded at the top.
+  const controls =
     venues.length > 1 || venueSlots.length > 1 ? (
-      <div className="flex flex-col items-center gap-2">
+      <div className="mb-5 flex flex-col items-center gap-2">
         {venues.length > 1 && (
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
-            {venues.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => setVenueId(r.id)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs transition-colors",
-                  r.id === venueId
-                    ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-200"
-                    : "border-white/10 text-zinc-400 hover:text-zinc-200"
-                )}
-              >
-                {r.name}
-              </button>
-            ))}
-          </div>
+          <Segmented
+            items={venues.map((r) => ({ value: r.id, label: r.name ?? "Venue" }))}
+            value={venueId}
+            onChange={(v) => setVenueId(v)}
+            ariaLabel="Venue"
+          />
         )}
         {venueSlots.length > 1 && (
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
-            {venueSlots.map((slot, i) => {
-              const active =
-                selectedSlot?.start === slot.start && selectedSlot?.end === slot.end;
-              return (
-                <button
-                  key={i}
-                  onClick={() => setSelectedSlot({ start: slot.start, end: slot.end })}
-                  className={cn(
-                    "rounded-full border px-3 py-1 text-xs transition-colors",
-                    active
-                      ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-200"
-                      : "border-white/10 text-zinc-400 hover:text-zinc-200"
-                  )}
-                >
-                  {formatTime(slot.start)}
-                </button>
-              );
-            })}
-          </div>
+          <Segmented
+            items={venueSlots.map((s) => ({ value: s.start, label: formatTime(s.start) }))}
+            value={selectedSlot?.start ?? null}
+            onChange={(start) => {
+              const slot = venueSlots.find((s) => s.start === start);
+              if (slot) setSelectedSlot({ start: slot.start, end: slot.end });
+            }}
+            ariaLabel="Showtime"
+          />
         )}
       </div>
-    ) : undefined;
+    ) : null;
 
   const bookingTray =
     selectedSeats.size > 0 && selectedSlot ? (
@@ -381,14 +361,10 @@ export function SeatBookingPage({
               </span>
             ))}
         </div>
-        <Button
-          onClick={handleBookSelected}
-          disabled={isPending}
-          className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
-        >
+        <BookButton onClick={handleBookSelected} loading={isPending}>
           Book {selectedSeats.size}
           {selectedTotal > 0 && ` · $${selectedTotal.toLocaleString()}`}
-        </Button>
+        </BookButton>
       </div>
     ) : undefined;
 
@@ -413,7 +389,8 @@ export function SeatBookingPage({
 
   return (
     <>
-      <Stage primitive={primitive} title={venue?.name ?? undefined} ribbon={venueRibbon} tray={bookingTray}>
+      <Stage primitive={primitive} title={venue?.name ?? undefined} tray={bookingTray}>
+        {controls}
         {surface}
       </Stage>
 
