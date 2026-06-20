@@ -3,9 +3,11 @@
 import { useEffect, useState, useCallback, useTransition, useMemo } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { Stage } from "@/components/stage";
+import { BookButton } from "@/components/book-button";
+import { PILL_ACTIVE } from "@/lib/accent";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 import { NextAvailability } from "@/components/next-availability";
 import { formatTime, dayBounds } from "@/lib/time";
@@ -112,7 +114,7 @@ export default function AvailabilityExample() {
       .then(async (id) => {
         setResourceId(id);
         // Stay on today. If today has nothing open, the slot panel shows an explicit
-        // "jump to next availability" action rather than silently moving the date.
+        // "next opening" action rather than silently moving the date.
         await Promise.all([loadAvailableDays(id), loadSlots(id, date)]);
       })
       .catch(() => toast.error("Failed to connect to deltat. Is it running?"))
@@ -182,143 +184,102 @@ export default function AvailabilityExample() {
     day: "numeric",
   });
 
-  return (
-    <div className="relative h-full overflow-auto bg-[#0a0a0c] text-zinc-100">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-1/3 h-[55vh] w-[55vh] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/10 blur-[130px]" />
-        <div className="absolute inset-0 opacity-[0.035] [background-image:radial-gradient(circle,#ffffff_1px,transparent_1px)] [background-size:22px_22px]" />
+  const tray = selected ? (
+    <div className="flex items-center justify-between gap-3">
+      <div className="text-sm text-zinc-300">
+        <span className="text-zinc-500">{dateLabel}</span> · {formatTime(selected.start)} to {formatTime(selected.end)}
       </div>
+      <BookButton onClick={confirm} loading={isPending}>
+        Book appointment
+      </BookButton>
+    </div>
+  ) : undefined;
 
-      <div className="relative flex min-h-full flex-col items-center px-4 py-10">
-        <div className="mb-4 text-center">
-          <div className="flex items-center justify-center gap-2 text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">
-            <span>Availability − rules − bookings</span>
-            <span className="rounded border border-white/10 px-1 py-px font-mono text-[9px] tracking-normal text-zinc-500">
-              AVAIL-01
-            </span>
+  return (
+    <>
+      <Stage primitive={{ label: "Availability − rules − bookings", specId: "AVAIL-01" }} title={NAME} contentMax="max-w-3xl" tray={tray}>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-[auto_1fr]">
+          {/* Date picker — greyed days have nothing open */}
+          <div className="sm:border-r sm:border-white/[0.06] sm:pr-5 [color-scheme:dark]">
+            <Calendar
+              mode="single"
+              required
+              selected={date}
+              onSelect={(d) => {
+                if (!d) return;
+                const next = new Date(d);
+                next.setHours(0, 0, 0, 0);
+                setDate(next);
+              }}
+              month={month}
+              onMonthChange={setMonth}
+              startMonth={windowStart}
+              disabled={isDayDisabled}
+              className="bg-transparent text-zinc-100"
+            />
           </div>
-        </div>
 
-        <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.025] shadow-2xl shadow-black/50">
-          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr]">
-            {/* Left — practitioner header + date picker */}
-            <div className="border-b border-white/[0.06] p-5 sm:border-b-0 sm:border-r">
-              <div className="mb-4">
-                <div className="flex items-center gap-2.5">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-300">
-                    SC
-                  </span>
-                  <div>
-                    <div className="text-sm font-semibold text-zinc-100">{NAME}</div>
-                    <div className="text-xs text-zinc-500">30-min sessions</div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="[color-scheme:dark]">
-                <Calendar
-                  mode="single"
-                  required
-                  selected={date}
-                  onSelect={(d) => {
-                    if (!d) return;
-                    const next = new Date(d);
-                    next.setHours(0, 0, 0, 0);
-                    setDate(next);
-                  }}
-                  month={month}
-                  onMonthChange={setMonth}
-                  startMonth={windowStart}
-                  disabled={isDayDisabled}
-                  className="bg-transparent text-zinc-100"
-                />
-              </div>
+          {/* That day's 30-min slots */}
+          <div className="flex min-h-[24rem] flex-col">
+            <div className="mb-3 flex items-baseline justify-between">
+              <div className="text-sm font-medium text-zinc-200">{dateLabel}</div>
+              {slots.length > 0 && <div className="text-[11px] text-zinc-500">{slots.length} open</div>}
             </div>
 
-            {/* Right — that day's 30-min slots */}
-            <div className="flex min-h-[26rem] flex-col p-5">
-              <div className="mb-3 flex items-baseline justify-between">
-                <div className="text-sm font-medium text-zinc-200">{dateLabel}</div>
-                <div className="text-[11px] text-zinc-500">
-                  {slots.length > 0 ? `${slots.length} open` : "—"}
+            <div className="relative flex-1">
+              {slotsLoading ? (
+                <div className="flex h-full items-center justify-center text-xs text-zinc-500">
+                  <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  Loading…
                 </div>
-              </div>
-
-              <div className="relative flex-1">
-                {slotsLoading ? (
-                  <div className="flex h-full items-center justify-center text-xs text-zinc-500">
-                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    Loading…
-                  </div>
-                ) : slots.length === 0 ? (
-                  <>
-                    <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-600">
-                      No openings today.
-                    </div>
-                    {resourceId && (
-                      <NextAvailability
-                        resourceIds={[resourceId]}
-                        from={date}
-                        title="Dr. Chen has nothing open today."
-                        minDurationMs={SLOT_MS}
-                        // Cap the search at the calendar's enabled window so a jump never lands on a greyed-out day.
-                        horizonDays={Math.max(1, Math.ceil((windowEndMs - date.getTime()) / 86_400_000))}
-                        onJump={(o) => {
-                          const d = new Date(o.start);
-                          d.setHours(0, 0, 0, 0);
-                          setDate(d);
-                          setMonth(d);
-                        }}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <div className="grid max-h-[22rem] grid-cols-2 gap-2 overflow-y-auto pr-1">
-                    {slots.map((s) => {
-                      const active = selected?.start === s.start;
-                      return (
-                        <button
-                          key={s.start}
-                          onClick={() => setSelected({ start: s.start, end: s.end })}
-                          className={cn(
-                            "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
-                            active
-                              ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200"
-                              : "border-white/10 text-zinc-300 hover:border-emerald-400/30 hover:bg-white/[0.04]"
-                          )}
-                        >
-                          {formatTime(s.start)}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {selected && (
-                <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
-                  <div className="text-sm text-zinc-300">
-                    {formatTime(selected.start)} to {formatTime(selected.end)}
-                  </div>
-                  <Button
-                    onClick={confirm}
-                    disabled={isPending}
-                    className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
-                  >
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Book"}
-                  </Button>
+              ) : slots.length === 0 ? (
+                resourceId && (
+                  <NextAvailability
+                    resourceIds={[resourceId]}
+                    from={date}
+                    title="Dr. Chen has nothing open today."
+                    minDurationMs={SLOT_MS}
+                    // Cap the search at the calendar's enabled window so a jump never lands on a greyed-out day.
+                    horizonDays={Math.max(1, Math.ceil((windowEndMs - date.getTime()) / 86_400_000))}
+                    onJump={(o) => {
+                      const d = new Date(o.start);
+                      d.setHours(0, 0, 0, 0);
+                      setDate(d);
+                      setMonth(d);
+                    }}
+                  />
+                )
+              ) : (
+                <div className="grid max-h-[22rem] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
+                  {slots.map((s) => {
+                    const active = selected?.start === s.start;
+                    return (
+                      <button
+                        key={s.start}
+                        onClick={() => setSelected({ start: s.start, end: s.end })}
+                        className={cn(
+                          "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                          active
+                            ? PILL_ACTIVE
+                            : "border-white/10 text-zinc-300 hover:border-emerald-400/30 hover:bg-white/[0.04]"
+                        )}
+                      >
+                        {formatTime(s.start)}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
         </div>
-      </div>
+      </Stage>
 
       <BookingConfirmedModal
         result={result}
         onClose={() => setResult(null)}
         onBookAnother={() => setResult(null)}
       />
-    </div>
+    </>
   );
 }
