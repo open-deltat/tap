@@ -20,6 +20,7 @@ import {
   weekToRanges,
   rulesToWeek,
   builderDateRange,
+  shortHour,
   type WeekHours,
 } from "./schedule";
 import { ensureBuilderCalendar } from "./seed";
@@ -190,6 +191,16 @@ export default function BuilderExample() {
     return { label: DOW_LABEL[d.dow], boxes };
   });
 
+  // Auto-fit the axis to the hours actually used this week (first availability to last), padded to
+  // whole hours, plus an hour ruler — so the strip zooms to the data instead of always showing 0-24h.
+  const HOUR = 3_600_000;
+  const allBoxes = stripRows.flatMap((r) => r.boxes);
+  const lo = allBoxes.length ? Math.floor(Math.min(...allBoxes.map((b) => b.start)) / HOUR) * HOUR : 8 * HOUR;
+  const hi = allBoxes.length ? Math.ceil(Math.max(...allBoxes.map((b) => b.end)) / HOUR) * HOUR : 18 * HOUR;
+  const tickStep = Math.max(HOUR, Math.ceil((hi - lo) / 6 / HOUR) * HOUR);
+  const ticks: { value: number; label: string }[] = [];
+  for (let t = lo; t <= hi; t += tickStep) ticks.push({ value: t, label: shortHour(t) });
+
   const tray = (
     <div className="flex flex-wrap items-center gap-3">
       <div className="flex-1">
@@ -278,7 +289,7 @@ export default function BuilderExample() {
 
           <div>
             <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">What deltat stores</div>
-            <LabeledTimeline axisStart={0} axisEnd={DAY_MS} labelWidth={40} rows={stripRows} />
+            <LabeledTimeline axisStart={lo} axisEnd={hi} labelWidth={40} rows={stripRows} ticks={ticks} />
             <p className="mt-3 text-[12px] leading-relaxed text-zinc-400">
               Your weekly hours become real rules, one stretch per day, read back live from deltat for
               the next seven days. There is no &quot;every Monday&quot; stored anywhere, just concrete time.
