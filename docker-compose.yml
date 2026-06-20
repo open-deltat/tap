@@ -1,0 +1,35 @@
+# Run the deltat database + the examples app together.
+#
+#   DELTAT_PASSWORD=<choose-one> docker compose up --build -d
+#   open http://localhost:3000
+#
+# Assumes the deltat repo is a sibling of this one (../deltat). Only the demo's port 3000
+# is published; the app reaches deltat over the internal compose network via pgwire.
+# For a single-repo platform (e.g. Coolify) where ../deltat isn't available, swap the
+# deltat `build:` for a prebuilt image: `image: ghcr.io/open-tap/deltat:latest`.
+services:
+  deltat:
+    build: ../deltat
+    restart: unless-stopped
+    environment:
+      DELTAT_PASSWORD: ${DELTAT_PASSWORD:?set DELTAT_PASSWORD}
+      DELTAT_BIND: 0.0.0.0
+    volumes:
+      - deltat-data:/data # WAL persistence; remove this line for a fully ephemeral demo
+
+  demo:
+    build: ./demo
+    restart: unless-stopped
+    environment:
+      DELTAT_HOST: deltat
+      DELTAT_PORT: "5433"
+      DELTAT_DB: demo
+      DELTAT_PASSWORD: ${DELTAT_PASSWORD:?set DELTAT_PASSWORD}
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - deltat
+
+volumes:
+  deltat-data: {}
