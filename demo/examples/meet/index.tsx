@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Stage } from "@/components/stage";
 import { MeetLanes } from "./meet-lanes";
+import { NextAvailability } from "@/components/next-availability";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 import type { AvailabilitySlot, Resource } from "@/lib/schemas";
 import { toLocalDateString, formatTime } from "@/lib/time";
@@ -26,7 +27,7 @@ const DURATIONS = [30, 60] as const;
 type Duration = (typeof DURATIONS)[number];
 
 interface MeetIds {
-  aliceId: string;
+  janeId: string;
   bobId: string;
 }
 
@@ -37,7 +38,7 @@ function asResource(id: string, name: string): Resource {
 export default function MeetExample() {
   const [ids, setIds] = useState<MeetIds | null>(null);
   const [date, setDate] = useState(toLocalDateString(new Date()));
-  const [aliceFree, setAliceFree] = useState<AvailabilitySlot[]>([]);
+  const [janeFree, setJaneFree] = useState<AvailabilitySlot[]>([]);
   const [bobFree, setBobFree] = useState<AvailabilitySlot[]>([]);
   const [bothFree, setBothFree] = useState<AvailabilitySlot[]>([]);
   const [duration, setDuration] = useState<Duration>(30);
@@ -70,13 +71,13 @@ export default function MeetExample() {
   const refresh = useCallback(async (calendars: MeetIds, day: string) => {
     const ds = new Date(`${day}T00:00`).getTime();
     const de = ds + DAY_MS;
-    const [alice, bob, both] = await Promise.all([
-      getAvailability(calendars.aliceId, ds, de),
+    const [jane, bob, both] = await Promise.all([
+      getAvailability(calendars.janeId, ds, de),
       getAvailability(calendars.bobId, ds, de),
-      // min_available = 2 → the intersection: both Alice and Bob free.
-      getCombinedAvailability([calendars.aliceId, calendars.bobId], ds, de, 2),
+      // min_available = 2 → the intersection: both Jane and Bob free.
+      getCombinedAvailability([calendars.janeId, calendars.bobId], ds, de, 2),
     ]);
-    setAliceFree(alice);
+    setJaneFree(jane);
     setBobFree(bob);
     setBothFree(both);
     setSelectedStarts(new Set());
@@ -123,7 +124,7 @@ export default function MeetExample() {
     refreshTimer.current = setTimeout(() => void refresh(ids, date), 200);
   }, [ids, date, refresh]);
   useEffect(() => () => clearTimeout(refreshTimer.current), []);
-  useWebSocket(ids ? { type: "subscribe", resourceId: ids.aliceId, onEvent: onWsEvent } : null);
+  useWebSocket(ids ? { type: "subscribe", resourceId: ids.janeId, onEvent: onWsEvent } : null);
   useWebSocket(ids ? { type: "subscribe", resourceId: ids.bobId, onEvent: onWsEvent } : null);
 
   function pickDuration(d: Duration) {
@@ -150,15 +151,15 @@ export default function MeetExample() {
     startTransition(async () => {
       try {
         const rows = slots.flatMap((s) => [
-          { resourceId: cal.aliceId, start: s.start, end: s.end, label: "Meeting" },
+          { resourceId: cal.janeId, start: s.start, end: s.end, label: "Meeting" },
           { resourceId: cal.bobId, start: s.start, end: s.end, label: "Meeting" },
         ]);
         const created = await batchBookSlots(rows);
         setResult({
-          title: `${slots.length} meeting${slots.length > 1 ? "s" : ""} · Alice + Bob`,
+          title: `${slots.length} meeting${slots.length > 1 ? "s" : ""} · Jane + Bob`,
           subtitle: slots.map((s) => formatTime(s.start)).join(" · "),
           bookings: created,
-          resources: [asResource(cal.aliceId, "Alice"), asResource(cal.bobId, "Bob")],
+          resources: [asResource(cal.janeId, "Jane"), asResource(cal.bobId, "Bob")],
         });
         await refresh(cal, day);
       } catch (err) {
@@ -234,12 +235,12 @@ export default function MeetExample() {
   );
 
   const n = selectedSlots.length;
-  const tray =
-    n > 0 ? (
+  const noShared = bothFree.length === 0;
+  const tray = noShared ? undefined : n > 0 ? (
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex-1">
           <div className="text-sm font-medium text-zinc-100">
-            {n === 1 ? `Meeting · ${formatTime(selectedSlots[0].start)} – ${formatTime(selectedSlots[0].end)}` : `${n} meetings selected`}
+            {n === 1 ? `Meeting · ${formatTime(selectedSlots[0].start)} to ${formatTime(selectedSlots[0].end)}` : `${n} meetings selected`}
           </div>
           <div className="text-xs text-zinc-400">{duration} min · books atomically on both calendars</div>
         </div>
@@ -261,22 +262,35 @@ export default function MeetExample() {
         ribbon={ribbon}
         tray={tray}
       >
-        <MeetLanes
-          axisStart={axisStart}
-          axisEnd={axisEnd}
-          intersectionSlots={slotOptions}
-          selectedStarts={selectedStarts}
-          onPickSlot={pick}
-          lanes={[
-            { label: "Alice", slots: aliceFree },
-            { label: "Bob", slots: bobFree },
-            { label: "Both free", slots: bothFree, intersection: true },
-          ]}
-        />
+        <div className="relative">
+          <MeetLanes
+            axisStart={axisStart}
+            axisEnd={axisEnd}
+            intersectionSlots={slotOptions}
+            selectedStarts={selectedStarts}
+            onPickSlot={pick}
+            lanes={[
+              { label: "Jane", slots: janeFree },
+              { label: "Bob", slots: bobFree },
+              { label: "Both free", slots: bothFree, intersection: true },
+            ]}
+          />
+          {noShared && ids && (
+            <NextAvailability
+              resourceIds={[ids.janeId, ids.bobId]}
+              from={new Date(`${date}T00:00`)}
+              title="Bob and Jane have no shared free time today."
+              minAvailable={2}
+              minDurationMs={durationMs}
+              horizonDays={28}
+              onJump={(o) => changeDate(o.date)}
+            />
+          )}
+        </div>
 
         <p className="mt-5 text-center text-[11px] text-zinc-500">
-          Alice and Bob keep independent timelines. The bottom lane is{" "}
-          <span className="text-emerald-300">min_available = 2</span> across both — the intersection,
+          Jane and Bob keep independent timelines. The bottom lane is{" "}
+          <span className="text-emerald-300">min_available = 2</span> across both, the intersection
           computed by deltat, lined up under the overlap above.
         </p>
       </Stage>

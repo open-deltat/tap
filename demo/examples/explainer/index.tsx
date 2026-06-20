@@ -4,8 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AlgebraExplainer, type PersonData } from "./algebra/algebra-explainer";
-import { LabeledTimeline, type TimelineBox } from "@/components/labeled-timeline";
+import { LabeledTimeline, type TimelineBox, type TimelineRow, type BoxColor } from "@/components/labeled-timeline";
 import { HoldsStatic } from "./holds/holds-static";
 import { OverviewTopic } from "./overview";
 import { DataModelTopic } from "./concepts";
@@ -17,29 +16,25 @@ import {
   AXIS_END_HOUR,
   HOUR_MS,
   DAY_MS,
-  STEP_COUNT,
   clampSpans,
   type Span,
+  type PersonData,
 } from "./algebra";
 import { toLocalDateString, formatTime } from "@/lib/time";
-import type { AvailabilitySlot, Booking, Hold, Rule } from "@/lib/schemas";
+import type { AvailabilitySlot, Booking, Rule } from "@/lib/schemas";
 
 import { ensureExplainerCalendars } from "./seed";
 import { getAvailability, getCombinedAvailability } from "@/app/actions/availability";
 import { getRulesForResource } from "@/app/actions/rules";
 import { getMultiResourceBookings } from "@/app/actions/bookings";
-import { getMultiResourceHolds } from "@/app/actions/holds";
-import { useWebSocket, wsUrl } from "@/hooks/use-websocket";
-
-const HOLD_MINUTES = 60; // window length the click snaps to
-const MIN_DURATION_MS = 60 * 60_000;
+import { useWebSocket } from "@/hooks/use-websocket";
 
 interface Ids {
   bobId: string;
-  doraId: string;
+  janeId: string;
 }
 
-// Sidebar: the first-principles overview, two interactive walkthroughs, then the feature explainers.
+// Sidebar: the first-principles overview, then the feature explainers, all static teaching pages.
 const NAV: { id: string; label: string }[] = [
   { id: "overview", label: "Why deltat" },
   { id: "model", label: "Data model" },
@@ -55,9 +50,7 @@ const emptyPerson = (name: string): PersonData => ({
   open: [],
   blocking: [],
   bookings: [],
-  holds: [],
   net: [],
-  bufferMs: 0,
 });
 
 function splitRules(rules: Rule[], ds: number, de: number): { open: Span[]; blocking: Span[] } {
@@ -71,71 +64,49 @@ export default function ExplainerExample() {
   const [ids, setIds] = useState<Ids | null>(null);
   const [date] = useState(toLocalDateString(new Date()));
   const [bob, setBob] = useState<PersonData>(emptyPerson("Bob"));
-  const [dora, setDora] = useState<PersonData>(emptyPerson("Jane"));
+  const [jane, setJane] = useState<PersonData>(emptyPerson("Jane"));
   const [combined, setCombined] = useState<AvailabilitySlot[]>([]);
-  // Open on the END RESULT (the full picture is clean enough to read at a glance); the play
-  // button then walks through the algebra from step 1.
-  // Show the full picture (all layers) at once — no step-through slideshow.
-  const step = STEP_COUNT - 1;
-  const [collapsed, setCollapsed] = useState<Set<"bob" | "dora">>(new Set());
-  const [myHold, setMyHold] = useState<{ start: number; end: number } | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // One raw WS hold socket per resource — open = hold active, close = released.
-  const holdWsRef = useRef(new Map<string, WebSocket>());
 
   const dayStart = new Date(`${date}T00:00`).getTime();
   const axisStart = dayStart + AXIS_START_HOUR * HOUR_MS;
   const axisEnd = dayStart + AXIS_END_HOUR * HOUR_MS;
 
-  const closeAllHolds = useCallback(() => {
-    for (const ws of holdWsRef.current.values()) ws.close();
-    holdWsRef.current.clear();
-    setMyHold(null);
-  }, []);
+  const loadAll = useCallback(
+    async (cal: Ids) => {
+      const ds = dayStart;
+      const de = ds + DAY_MS;
 
-  const loadAll = useCallback(async (cal: Ids) => {
-    const ds = dayStart;
-    const de = ds + DAY_MS;
-    const now = Date.now();
+      const [bobRules, janeRules] = await Promise.all([
+        getRulesForResource(cal.bobId),
+        getRulesForResource(cal.janeId),
+      ]);
+      const bookMap = await getMultiResourceBookings([cal.bobId, cal.janeId]);
+      const [bobNet, janeNet, both] = await Promise.all([
+        getAvailability(cal.bobId, ds, de),
+        getAvailability(cal.janeId, ds, de),
+        getCombinedAvailability([cal.bobId, cal.janeId], ds, de, 2),
+      ]);
 
-    const [bobRules, doraRules] = await Promise.all([
-      getRulesForResource(cal.bobId),
-      getRulesForResource(cal.doraId),
-    ]);
-    const bookMap = await getMultiResourceBookings([cal.bobId, cal.doraId]);
-    const holdMap = await getMultiResourceHolds([cal.bobId, cal.doraId]);
-    const [bobNet, doraNet, both] = await Promise.all([
-      getAvailability(cal.bobId, ds, de),
-      getAvailability(cal.doraId, ds, de),
-      getCombinedAvailability([cal.bobId, cal.doraId], ds, de, 2),
-    ]);
+      const inWindow = <T extends { start: number; end: number }>(xs: T[]) =>
+        xs.filter((x) => x.start < de && x.end > ds);
 
-    const inWindow = <T extends { start: number; end: number }>(xs: T[]) =>
-      xs.filter((x) => x.start < de && x.end > ds);
-    const liveHolds = (xs: Hold[]) => inWindow(xs).filter((h) => h.expiresAt > now);
-
-    const bobSplit = splitRules(bobRules, ds, de);
-    const doraSplit = splitRules(doraRules, ds, de);
-
-    setBob({
-      name: "Bob",
-      ...bobSplit,
-      bookings: inWindow((bookMap[cal.bobId] ?? []) as Booking[]),
-      holds: liveHolds((holdMap[cal.bobId] ?? []) as Hold[]),
-      net: bobNet,
-      bufferMs: 0,
-    });
-    setDora({
-      name: "Jane",
-      ...doraSplit,
-      bookings: inWindow((bookMap[cal.doraId] ?? []) as Booking[]),
-      holds: liveHolds((holdMap[cal.doraId] ?? []) as Hold[]),
-      net: doraNet,
-      bufferMs: 0,
-    });
-    setCombined(both);
-  }, [dayStart]);
+      setBob({
+        name: "Bob",
+        ...splitRules(bobRules, ds, de),
+        bookings: inWindow((bookMap[cal.bobId] ?? []) as Booking[]),
+        net: bobNet,
+      });
+      setJane({
+        name: "Jane",
+        ...splitRules(janeRules, ds, de),
+        bookings: inWindow((bookMap[cal.janeId] ?? []) as Booking[]),
+        net: janeNet,
+      });
+      setCombined(both);
+    },
+    [dayStart]
+  );
 
   // Seed + initial load.
   useEffect(() => {
@@ -153,10 +124,7 @@ export default function ExplainerExample() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cleanup hold sockets on unmount.
-  useEffect(() => () => closeAllHolds(), [closeAllHolds]);
-
-  // Debounced refresh on any real-time event from either calendar.
+  // Debounced refresh on any real-time event from either calendar, so the equation stays live.
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onWsEvent = useCallback(() => {
     if (!ids) return;
@@ -164,56 +132,7 @@ export default function ExplainerExample() {
     refreshTimer.current = setTimeout(() => void loadAll(ids), 200);
   }, [ids, loadAll]);
   useWebSocket(ids ? { type: "subscribe", resourceId: ids.bobId, onEvent: onWsEvent } : null);
-  useWebSocket(ids ? { type: "subscribe", resourceId: ids.doraId, onEvent: onWsEvent } : null);
-
-  // Place a 60-min hold on BOTH resources via two raw sockets (server TTL = 5 min).
-  function placeHold(slot: AvailabilitySlot) {
-    if (!ids) return;
-    if (slot.end - slot.start < MIN_DURATION_MS) return;
-    const start = slot.start;
-    const end = slot.start + HOLD_MINUTES * 60_000;
-
-    if (myHold && myHold.start === start && myHold.end === end) {
-      closeAllHolds();
-      return;
-    }
-    closeAllHolds();
-    setMyHold({ start, end });
-
-    const pending = new Set([ids.bobId, ids.doraId]);
-    for (const resourceId of [ids.bobId, ids.doraId]) {
-      const ws = new WebSocket(wsUrl());
-      const revert = () => {
-        holdWsRef.current.delete(resourceId);
-        pending.delete(resourceId);
-        if (pending.size === 0) setMyHold(null);
-      };
-      ws.onopen = () => ws.send(JSON.stringify({ type: "hold", resourceId, start, end }));
-      ws.onerror = revert;
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(String(event.data));
-          if (data?.type === "error") {
-            ws.close();
-            revert();
-            toast.error("That slot was just taken");
-          }
-        } catch {
-          // deltat event frame — ignore
-        }
-      };
-      holdWsRef.current.set(resourceId, ws);
-    }
-  }
-
-  function toggleCollapse(who: "bob" | "dora") {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(who)) next.delete(who);
-      else next.add(who);
-      return next;
-    });
-  }
+  useWebSocket(ids ? { type: "subscribe", resourceId: ids.janeId, onEvent: onWsEvent } : null);
 
   const firstJointMs = combined.length > 0 ? combined[0].start : null;
 
@@ -240,6 +159,32 @@ export default function ExplainerExample() {
       </div>
     );
   } else {
+    // The whole availability calculation as one labeled equation, read live from deltat: each person's
+    // availability (open hours), minus blocked time, minus bookings, equals free. The result under the line is the
+    // time both are free at once.
+    const toBoxes = (
+      xs: { start: number; end: number }[],
+      color: BoxColor,
+      text: string
+    ): TimelineBox[] => xs.map((s) => ({ start: s.start, end: s.end, color, text }));
+    const bookingBoxes = (xs: Booking[]): TimelineBox[] =>
+      xs.map((b) => ({ start: b.start, end: b.end, color: "rose", text: b.label ?? "Booked" }));
+
+    const personRows = (p: PersonData, blockReason: string): TimelineRow[] => [
+      { label: "Availability", boxes: toBoxes(p.open, "zinc", "Availability") },
+      ...(p.blocking.length ? [{ op: "−", label: "Blocked", boxes: toBoxes(p.blocking, "rose", blockReason) }] : []),
+      ...(p.bookings.length ? [{ op: "−", label: "Booked", boxes: bookingBoxes(p.bookings) }] : []),
+      { op: "=", label: "Free", boxes: toBoxes(p.net, "emerald", "Free") },
+    ];
+
+    const labeledRows: TimelineRow[] = [
+      { heading: "Bob", boxes: [] },
+      ...personRows(bob, "Lunch"),
+      { heading: "Jane", boxes: [] },
+      ...personRows(jane, "Blocked"),
+      { divider: true, label: "Both free", boxes: toBoxes(combined, "emerald", "Both") },
+    ];
+
     content = (
       <div className="mx-auto max-w-3xl">
         <div className="flex items-center gap-2 text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">
@@ -250,43 +195,20 @@ export default function ExplainerExample() {
         </div>
         <h2 className="mt-2 text-2xl font-semibold text-zinc-100">How deltat works out free time</h2>
         <p className="mt-1 text-sm text-emerald-300/90">
-          Start with open hours, take away the busy time, and what is left is free. Then find when two people are free at once.
+          Start with each person&apos;s availability, take away the busy time, and what is left is free. Then find when two people are free at once.
         </p>
 
         <div className="mt-6">
-          <AlgebraExplainer
-            bob={bob}
-            dora={dora}
-            combined={combined}
-            axisStart={axisStart}
-            axisEnd={axisEnd}
-            step={step}
-            collapsed={collapsed}
-            onToggleCollapse={toggleCollapse}
-            myHold={myHold}
-            onPickIntersection={placeHold}
-            firstJointMs={firstJointMs}
-            minDurationMs={MIN_DURATION_MS}
-          />
+          <LabeledTimeline axisStart={axisStart} axisEnd={axisEnd} labelWidth={72} rows={labeledRows} />
         </div>
 
-        <p className="mt-4 text-[11px] leading-relaxed text-zinc-500">
-          Every band here is read live from deltat. The bottom one is the time Bob and Jane are both
-          free. It starts at {firstJointMs ? formatTime(firstJointMs) : "no shared time today"}.
+        <p className="mt-4 text-[12px] leading-relaxed text-zinc-400">
+          Read it like a sum. Each person starts with their availability, then deltat takes away their
+          blocked time and their bookings, and what is left is free. The row under the line is when Bob
+          and Jane are both free. It starts at{" "}
+          {firstJointMs ? formatTime(firstJointMs) : "no shared time today"}. Every box is read live
+          from deltat.
         </p>
-
-        <div className="mt-5">
-          <div className="mb-1.5 text-[10px] uppercase tracking-[0.18em] text-zinc-500">Labeled-box style</div>
-          <LabeledTimeline
-            axisStart={axisStart}
-            axisEnd={axisEnd}
-            rows={[
-              { label: "Bob free", boxes: bob.net.map((s): TimelineBox => ({ start: s.start, end: s.end, color: "emerald", text: "free" })) },
-              { label: "Jane free", boxes: dora.net.map((s): TimelineBox => ({ start: s.start, end: s.end, color: "emerald", text: "free" })) },
-              { label: "Both free", boxes: combined.map((s): TimelineBox => ({ start: s.start, end: s.end, color: "emerald", text: "both" })) },
-            ]}
-          />
-        </div>
       </div>
     );
   }

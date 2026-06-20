@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Check, X, Zap } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { FOCUS_SEAT, type LaneSnapshot, type SeatState } from "./script";
 
 interface SeatRowProps {
@@ -68,26 +68,6 @@ export function SeatRow({ label, lane, pulseFocus = false }: SeatRowProps) {
         })}
       </div>
 
-      <div className="w-[24px] shrink-0" />
-    </div>
-  );
-}
-
-/** The ⚡ delta marker that sits between the two lanes when a change streams A → B. */
-export function DeltaArrow({ active }: { active: boolean }) {
-  return (
-    <div className="flex items-center justify-center gap-2 py-1">
-      <div className="w-[88px] shrink-0" />
-      <div
-        className={cn(
-          "flex flex-1 items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-wider transition-opacity duration-300",
-          active ? "text-emerald-300 opacity-100" : "text-zinc-600 opacity-0"
-        )}
-      >
-        <Zap className="h-3 w-3 fill-emerald-400/40" />
-        <span>delta · LISTEN/NOTIFY</span>
-        <span aria-hidden className="text-emerald-400/70">↓</span>
-      </div>
       <div className="w-[24px] shrink-0" />
     </div>
   );

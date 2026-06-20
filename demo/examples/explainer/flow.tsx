@@ -45,7 +45,7 @@ const STEPS: { who: string; text: string }[] = [
   },
   {
     who: "Check",
-    text: "deltat checks the seat does not clash with anything already there, and that there is still room. A section can hold many people at once, and it only says yes while there is still space.",
+    text: "deltat checks the seat does not collide with anything already there, and that there is still room. A section can hold many people at once, and it only says yes while there is still space.",
   },
   {
     who: "All or nothing",

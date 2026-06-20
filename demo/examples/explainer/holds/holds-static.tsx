@@ -3,7 +3,6 @@
 import { cn } from "@/lib/utils";
 import { HOLDS_STEPS } from "./script";
 import { SeatRow } from "./seat-row";
-import { HoldsFlow } from "./holds-flow";
 
 const LEGEND: { label: string; cls: string }[] = [
   { label: "free", cls: "border-emerald-400/40 bg-emerald-500/20" },
@@ -30,11 +29,6 @@ export function HoldsStatic() {
         ))}
       </div>
 
-      <div className="mt-6">
-        <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">The lifecycle</div>
-        <HoldsFlow />
-      </div>
-
       <div className="mb-2 mt-8 text-[11px] uppercase tracking-[0.18em] text-zinc-500">Step by step</div>
       <ol className="space-y-2.5">
         {HOLDS_STEPS.map((step, i) => (
@@ -45,9 +39,9 @@ export function HoldsStatic() {
             <div className="flex-1 rounded-lg border border-white/[0.07] bg-white/[0.02] p-3">
               <div className="text-[13px] font-medium text-zinc-100">{step.title}</div>
               <div className="mt-2">
-                <SeatRow label="Person A" lane={step.a} />
+                <SeatRow label="Bob" lane={step.a} />
                 <div className="my-1.5 h-px bg-white/10" />
-                <SeatRow label="Person B" lane={step.b} />
+                <SeatRow label="Jane" lane={step.b} />
               </div>
               <p className="mt-2 text-[12px] leading-relaxed text-zinc-400">{step.caption}</p>
             </div>
