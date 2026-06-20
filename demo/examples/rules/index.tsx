@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useMemo, useTransition } from "react"
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { Stage } from "@/components/stage";
 import { NextAvailability } from "@/components/next-availability";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
@@ -24,15 +23,7 @@ import { formatError } from "@/lib/format-error";
 const H = 3_600_000;
 const SLOT_MS = 60 * 60_000;
 
-type Scenario = "studio" | "dinner";
-
-const TABS: { id: Scenario; label: string }[] = [
-  { id: "studio", label: "Studio session" },
-  { id: "dinner", label: "Dinner party" },
-];
-
 const STUDIO = {
-  title: "A session that needs five resources",
   combinedLabel: "All free",
   bookLabel: "Book the session",
   note: "Five independent resources, each with its own schedule. The session can only run when the room, the engineer, the console, and both musicians are all free at once (the bottom row).",
@@ -41,7 +32,6 @@ const STUDIO = {
 export default function RulesExample() {
   const [ids, setIds] = useState<{ studio: string[]; dinner: string[] } | null>(null);
   const [resources, setResources] = useState<Resource[]>([]);
-  const [scenario, setScenario] = useState<Scenario>("studio");
   const [lanes, setLanes] = useState<ResourceLane[]>([]);
   const [combined, setCombined] = useState<Span[]>([]);
   const [selected, setSelected] = useState<{ start: number; end: number } | null>(null);
@@ -111,16 +101,16 @@ export default function RulesExample() {
   }, []);
 
   useEffect(() => {
-    if (!ids || resources.length === 0 || scenario !== "studio") return;
+    if (!ids || resources.length === 0) return;
     setSelected(null);
     load(activeIds, minAvailable);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ids, resources, scenario, dayStart]);
+  }, [ids, resources, dayStart]);
 
   // Live: subscribe to the studio resources and re-read on any change.
   const reload = useCallback(() => {
-    if (ids && !isPending && scenario === "studio") load(activeIds, minAvailable);
-  }, [ids, isPending, scenario, activeIds, minAvailable, load]);
+    if (ids && !isPending) load(activeIds, minAvailable);
+  }, [ids, isPending, activeIds, minAvailable, load]);
   useWebSocket(activeIds[0] ? { type: "subscribe", resourceId: activeIds[0], onEvent: reload } : null);
   useWebSocket(activeIds[1] ? { type: "subscribe", resourceId: activeIds[1], onEvent: reload } : null);
   useWebSocket(activeIds[2] ? { type: "subscribe", resourceId: activeIds[2], onEvent: reload } : null);
@@ -162,69 +152,23 @@ export default function RulesExample() {
     );
   }
 
-  const isStudio = scenario === "studio";
-  const ribbon = (
-    <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1 text-[12px]">
-      {TABS.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          onClick={() => setScenario(t.id)}
-          className={cn(
-            "rounded-md px-3 py-1.5 font-medium transition-colors",
-            scenario === t.id ? "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30" : "text-zinc-400 hover:text-zinc-200"
-          )}
-        >
-          {t.label}
-        </button>
-      ))}
-    </div>
-  );
-
   const noSlot = combined.length === 0;
   const notToday = dayStart !== todayMidnight;
   const dateLabel = date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
-  const tray = !isStudio || noSlot ? undefined : selected ? (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex-1">
-        <div className="text-sm font-medium text-zinc-100">{STUDIO.title}</div>
-        <div className="text-xs text-zinc-400">
-          {formatTime(selected.start)} to {formatTime(selected.end)} · books all {activeIds.length} at once
-        </div>
-      </div>
-      <Button
-        onClick={book}
-        disabled={isPending}
-        className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
-      >
-        {STUDIO.bookLabel}
-      </Button>
-    </div>
-  ) : (
-    <div className="text-center text-xs text-zinc-400">Pick a green slot in the bottom row.</div>
-  );
-
   return (
     <>
-      <Stage
-        primitive={{ label: "Rules + resources · live timelines", specId: "AVAIL-08" }}
-        title={isStudio ? STUDIO.title : "Find a night for dinner"}
-        ribbon={ribbon}
-        tray={tray}
-      >
-        {!isStudio ? (
-          ids && <DinnerFinder resourceIds={ids.dinner} resources={resources} />
-        ) : (
-          <>
+      <Stage primitive={{ label: "Rules + resources · live timelines", specId: "AVAIL-08" }} title="Stacked resources, one timeline each">
+        <div className="space-y-10">
+          <section>
+            <div className="mb-3 text-center">
+              <h3 className="text-sm font-semibold text-zinc-100">Studio session</h3>
+              <p className="text-[11px] text-zinc-500">A recording that needs five resources free at once, today.</p>
+            </div>
             {notToday && (
               <div className="mb-3 flex items-center justify-center gap-2 text-xs text-zinc-400">
                 <span>Viewing {dateLabel}</span>
-                <button
-                  type="button"
-                  onClick={() => setDate(new Date(todayMidnight))}
-                  className="text-emerald-300 hover:text-emerald-200"
-                >
+                <button type="button" onClick={() => setDate(new Date(todayMidnight))} className="text-emerald-300 hover:text-emerald-200">
                   back to today
                 </button>
               </div>
@@ -255,9 +199,23 @@ export default function RulesExample() {
                 />
               )}
             </div>
-            <p className="mx-auto mt-5 max-w-2xl text-center text-[11.5px] leading-relaxed text-zinc-500">{STUDIO.note}</p>
-          </>
-        )}
+            {!noSlot && selected && (
+              <div className="mx-auto mt-4 flex max-w-2xl items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
+                <div className="text-xs text-zinc-400">
+                  {formatTime(selected.start)} to {formatTime(selected.end)} · books all {activeIds.length} at once
+                </div>
+                <Button onClick={book} disabled={isPending} className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400">
+                  {STUDIO.bookLabel}
+                </Button>
+              </div>
+            )}
+            <p className="mx-auto mt-4 max-w-2xl text-center text-[11.5px] leading-relaxed text-zinc-500">{STUDIO.note}</p>
+          </section>
+
+          <div className="h-px bg-white/[0.06]" />
+
+          <section>{ids && <DinnerFinder resourceIds={ids.dinner} resources={resources} />}</section>
+        </div>
       </Stage>
 
       <BookingConfirmedModal result={result} onClose={() => setResult(null)} onBookAnother={() => setResult(null)} />
