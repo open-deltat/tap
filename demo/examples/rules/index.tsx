@@ -13,6 +13,7 @@ import { formatTime } from "@/lib/time";
 
 import { ensureRulesExample } from "./seed";
 import { ScheduleBoard, type ResourceLane, type Span } from "./schedule-board";
+import { DinnerFinder } from "./dinner-finder";
 import { getResources } from "@/app/actions/resources";
 import { getRulesForResource } from "@/app/actions/rules";
 import { getMultiResourceBookings, batchBookSlots } from "@/app/actions/bookings";
@@ -23,34 +24,24 @@ import { formatError } from "@/lib/format-error";
 const H = 3_600_000;
 const SLOT_MS = 60 * 60_000;
 
-type Scenario = "worklife" | "studio";
+type Scenario = "studio" | "dinner";
 
-const SCENARIOS: Record<
-  Scenario,
-  { tab: string; title: string; combinedLabel: string; bookLabel: string; note: string; min: number | "all" }
-> = {
-  worklife: {
-    tab: "Work + personal",
-    title: "One person, two calendars",
-    combinedLabel: "Free (either)",
-    bookLabel: "Hold this slot",
-    note: "Two resources for one person. Each calendar keeps its own availability and its own bookings. The bottom row is when Bob is free in either.",
-    min: 1,
-  },
-  studio: {
-    tab: "Studio session",
-    title: "A session that needs three resources",
-    combinedLabel: "All free",
-    bookLabel: "Book the session",
-    note: "Three independent resources, each with its own schedule. A session can only run when the room, the engineer, and the console are all free at once (the bottom row).",
-    min: "all",
-  },
+const TABS: { id: Scenario; label: string }[] = [
+  { id: "studio", label: "Studio session" },
+  { id: "dinner", label: "Dinner party" },
+];
+
+const STUDIO = {
+  title: "A session that needs five resources",
+  combinedLabel: "All free",
+  bookLabel: "Book the session",
+  note: "Five independent resources, each with its own schedule. The session can only run when the room, the engineer, the console, and both musicians are all free at once (the bottom row).",
 };
 
 export default function RulesExample() {
-  const [ids, setIds] = useState<{ worklife: string[]; studio: string[] } | null>(null);
+  const [ids, setIds] = useState<{ studio: string[]; dinner: string[] } | null>(null);
   const [resources, setResources] = useState<Resource[]>([]);
-  const [scenario, setScenario] = useState<Scenario>("worklife");
+  const [scenario, setScenario] = useState<Scenario>("studio");
   const [lanes, setLanes] = useState<ResourceLane[]>([]);
   const [combined, setCombined] = useState<Span[]>([]);
   const [selected, setSelected] = useState<{ start: number; end: number } | null>(null);
@@ -73,11 +64,9 @@ export default function RulesExample() {
   const axisStart = dayStart + 7 * H;
   const axisEnd = dayStart + 23 * H;
 
-  const activeIds = useMemo(
-    () => (ids ? (scenario === "worklife" ? ids.worklife : ids.studio) : []),
-    [ids, scenario]
-  );
-  const minAvailable = SCENARIOS[scenario].min === "all" ? activeIds.length : (SCENARIOS[scenario].min as number);
+  // The single-day board flow drives the studio scenario; "dinner" renders its own multi-week finder.
+  const activeIds = useMemo(() => ids?.studio ?? [], [ids]);
+  const minAvailable = activeIds.length;
 
   const nameOf = useCallback((id: string) => resources.find((r) => r.id === id)?.name ?? "Resource", [resources]);
 
@@ -122,19 +111,21 @@ export default function RulesExample() {
   }, []);
 
   useEffect(() => {
-    if (!ids || resources.length === 0) return;
+    if (!ids || resources.length === 0 || scenario !== "studio") return;
     setSelected(null);
     load(activeIds, minAvailable);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids, resources, scenario, dayStart]);
 
-  // Live: subscribe to the active resources (max 3) and re-read on any change.
+  // Live: subscribe to the studio resources and re-read on any change.
   const reload = useCallback(() => {
-    if (ids && !isPending) load(activeIds, minAvailable);
-  }, [ids, isPending, activeIds, minAvailable, load]);
+    if (ids && !isPending && scenario === "studio") load(activeIds, minAvailable);
+  }, [ids, isPending, scenario, activeIds, minAvailable, load]);
   useWebSocket(activeIds[0] ? { type: "subscribe", resourceId: activeIds[0], onEvent: reload } : null);
   useWebSocket(activeIds[1] ? { type: "subscribe", resourceId: activeIds[1], onEvent: reload } : null);
   useWebSocket(activeIds[2] ? { type: "subscribe", resourceId: activeIds[2], onEvent: reload } : null);
+  useWebSocket(activeIds[3] ? { type: "subscribe", resourceId: activeIds[3], onEvent: reload } : null);
+  useWebSocket(activeIds[4] ? { type: "subscribe", resourceId: activeIds[4], onEvent: reload } : null);
 
   function onPick(s: Span) {
     setSelected({ start: s.start, end: Math.min(s.start + SLOT_MS, s.end) });
@@ -143,7 +134,7 @@ export default function RulesExample() {
   function book() {
     if (!selected || activeIds.length === 0) return;
     const sel = selected;
-    const label = scenario === "worklife" ? "Bob" : "Studio session";
+    const label = "Studio session";
     startTransition(async () => {
       try {
         const created = await batchBookSlots(activeIds.map((id) => ({ resourceId: id, start: sel.start, end: sel.end, label })));
@@ -171,20 +162,20 @@ export default function RulesExample() {
     );
   }
 
-  const sc = SCENARIOS[scenario];
+  const isStudio = scenario === "studio";
   const ribbon = (
     <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] p-1 text-[12px]">
-      {(Object.keys(SCENARIOS) as Scenario[]).map((k) => (
+      {TABS.map((t) => (
         <button
-          key={k}
+          key={t.id}
           type="button"
-          onClick={() => setScenario(k)}
+          onClick={() => setScenario(t.id)}
           className={cn(
             "rounded-md px-3 py-1.5 font-medium transition-colors",
-            scenario === k ? "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30" : "text-zinc-400 hover:text-zinc-200"
+            scenario === t.id ? "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30" : "text-zinc-400 hover:text-zinc-200"
           )}
         >
-          {SCENARIOS[k].tab}
+          {t.label}
         </button>
       ))}
     </div>
@@ -194,10 +185,10 @@ export default function RulesExample() {
   const notToday = dayStart !== todayMidnight;
   const dateLabel = date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
-  const tray = noSlot ? undefined : selected ? (
+  const tray = !isStudio || noSlot ? undefined : selected ? (
     <div className="flex flex-wrap items-center gap-3">
       <div className="flex-1">
-        <div className="text-sm font-medium text-zinc-100">{sc.title}</div>
+        <div className="text-sm font-medium text-zinc-100">{STUDIO.title}</div>
         <div className="text-xs text-zinc-400">
           {formatTime(selected.start)} to {formatTime(selected.end)} · books all {activeIds.length} at once
         </div>
@@ -207,7 +198,7 @@ export default function RulesExample() {
         disabled={isPending}
         className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
       >
-        {sc.bookLabel}
+        {STUDIO.bookLabel}
       </Button>
     </div>
   ) : (
@@ -216,50 +207,57 @@ export default function RulesExample() {
 
   return (
     <>
-      <Stage primitive={{ label: "Rules + resources · live timelines", specId: "AVAIL-08" }} title={sc.title} ribbon={ribbon} tray={tray}>
-        {notToday && (
-          <div className="mb-3 flex items-center justify-center gap-2 text-xs text-zinc-400">
-            <span>Viewing {dateLabel}</span>
-            <button
-              type="button"
-              onClick={() => setDate(new Date(todayMidnight))}
-              className="text-emerald-300 hover:text-emerald-200"
-            >
-              back to today
-            </button>
-          </div>
+      <Stage
+        primitive={{ label: "Rules + resources · live timelines", specId: "AVAIL-08" }}
+        title={isStudio ? STUDIO.title : "Find a night for dinner"}
+        ribbon={ribbon}
+        tray={tray}
+      >
+        {!isStudio ? (
+          ids && <DinnerFinder resourceIds={ids.dinner} resources={resources} />
+        ) : (
+          <>
+            {notToday && (
+              <div className="mb-3 flex items-center justify-center gap-2 text-xs text-zinc-400">
+                <span>Viewing {dateLabel}</span>
+                <button
+                  type="button"
+                  onClick={() => setDate(new Date(todayMidnight))}
+                  className="text-emerald-300 hover:text-emerald-200"
+                >
+                  back to today
+                </button>
+              </div>
+            )}
+            <div className="relative">
+              <ScheduleBoard
+                resources={lanes}
+                combined={combined}
+                combinedLabel={STUDIO.combinedLabel}
+                selected={selected}
+                onPick={onPick}
+                axisStart={axisStart}
+                axisEnd={axisEnd}
+              />
+              {noSlot && activeIds.length > 0 && (
+                <NextAvailability
+                  resourceIds={activeIds}
+                  from={date}
+                  title="The room, engineer, console, and musicians are not all free today."
+                  minAvailable={minAvailable}
+                  minDurationMs={SLOT_MS}
+                  horizonDays={28}
+                  onJump={(o) => {
+                    const d = new Date(o.start);
+                    d.setHours(0, 0, 0, 0);
+                    setDate(d);
+                  }}
+                />
+              )}
+            </div>
+            <p className="mx-auto mt-5 max-w-2xl text-center text-[11.5px] leading-relaxed text-zinc-500">{STUDIO.note}</p>
+          </>
         )}
-        <div className="relative">
-          <ScheduleBoard
-            resources={lanes}
-            combined={combined}
-            combinedLabel={sc.combinedLabel}
-            selected={selected}
-            onPick={onPick}
-            axisStart={axisStart}
-            axisEnd={axisEnd}
-          />
-          {noSlot && activeIds.length > 0 && (
-            <NextAvailability
-              resourceIds={activeIds}
-              from={date}
-              title={
-                scenario === "studio"
-                  ? "The room, engineer, and console are not all free today."
-                  : "Bob has no free time today."
-              }
-              minAvailable={minAvailable}
-              minDurationMs={SLOT_MS}
-              horizonDays={28}
-              onJump={(o) => {
-                const d = new Date(o.start);
-                d.setHours(0, 0, 0, 0);
-                setDate(d);
-              }}
-            />
-          )}
-        </div>
-        <p className="mx-auto mt-5 max-w-2xl text-center text-[11.5px] leading-relaxed text-zinc-500">{sc.note}</p>
       </Stage>
 
       <BookingConfirmedModal result={result} onClose={() => setResult(null)} onBookAnother={() => setResult(null)} />
