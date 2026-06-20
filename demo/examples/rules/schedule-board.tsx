@@ -101,9 +101,9 @@ export function ScheduleBoard({ resources, combined, combinedLabel, selected, on
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
-        <Legend cls="bg-zinc-500/30" label="open hours" />
+        <Legend cls="bg-zinc-500/30" label="availability" />
         <Legend cls="bg-emerald-500/50" label="free" />
-        <Legend cls="bg-rose-600/50" label="busy (closed or booked)" />
+        <Legend cls="bg-rose-600/50" label="busy (blocked or booked)" />
         <span>Click a green slot to pick a time.</span>
       </div>
     </div>

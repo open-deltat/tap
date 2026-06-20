@@ -1,16 +1,17 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
-import { createVenue, findRootByName, baseMs } from "@/app/actions/seed-helpers";
+import { createVenue, addSchedule, daily, findRootByName, baseMs } from "@/app/actions/seed-helpers";
 
 const H = 3_600_000;
+const DAYS = 28; // recurring open hours, so any day works and there are future days to jump to
 
 // Two scenarios that show the rules + resources model with real data:
 //   work-life  — one person with TWO calendars (work + personal) that have DIFFERENT open hours.
 //   studio     — a session that needs THREE independent resources free at once (room + person + gear).
 const NAMES = {
-  work: "Alex · Work",
-  personal: "Alex · Personal",
+  work: "Bob · Work",
+  personal: "Bob · Personal",
   studio: "Studio A",
   engineer: "Sound Engineer",
   console: "Mixing Console",
@@ -28,7 +29,9 @@ async function ensureCalendar(name: string, setup: Setup): Promise<string> {
 
   const r = await createVenue(name, { slotMinutes: 30, bufferMinutes: 0 });
   const base = baseMs();
-  await dt.rules.create([{ resourceId: r.id, start: base + setup.open[0] * H, end: base + setup.open[1] * H, blocking: false }]);
+  // Open hours recur every day; the blocks and bookings below sit on today only, so today shows the
+  // full scenario while future days stay clean (the "jump to next availability" targets).
+  await addSchedule(r.id, base, DAYS, daily([{ h: setup.open[0], m: 0, dur: (setup.open[1] - setup.open[0]) * 60 }]));
   if (setup.blocks?.length) {
     await dt.rules.create(
       setup.blocks.map((b) => ({ resourceId: r.id, start: base + b.h[0] * H, end: base + b.h[1] * H, blocking: true }))

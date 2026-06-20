@@ -6,7 +6,7 @@
  * renders the snapshot for the current step, so prev/next/scrub is trivially deterministic.
  */
 
-export const SEAT_COUNT = 6;
+const SEAT_COUNT = 6;
 /** The seat the whole story is about (0-indexed). */
 export const FOCUS_SEAT = 3;
 
@@ -29,8 +29,6 @@ export interface HoldsStep {
   caption: string;
   a: LaneSnapshot;
   b: LaneSnapshot;
-  /** Show the ⚡ delta arrow flowing A → B between the lanes. */
-  delta?: boolean;
 }
 
 const allFree = (): SeatState[] => Array.from({ length: SEAT_COUNT }, () => "free");
@@ -46,55 +44,47 @@ export const HOLDS_STEPS: HoldsStep[] = [
   {
     title: "Both see the same seats",
     caption:
-      "Person A and Person B open the same screen. They both see the live seat map at once. Nobody has to refresh.",
+      "Bob and Jane open the same screen. They both see the live seat map at once. Nobody has to refresh.",
     a: { seats: allFree() },
     b: { seats: allFree() },
   },
   {
-    title: "Person A holds a seat",
+    title: "Bob holds a seat",
     caption:
-      "Person A taps seat 4. deltat puts a hold on it, so it counts as taken straight away.",
+      "Bob taps seat 4. deltat puts a hold on it, so it counts as taken straight away.",
     a: { seats: row([[FOCUS_SEAT, "hold"]]), acting: true },
     b: { seats: allFree() },
   },
   {
-    title: "Person B sees the hold",
+    title: "Jane sees the hold",
     caption:
-      "The hold is streamed to Person B right away, so seat 4 turns amber on their screen within a moment.",
+      "The hold is streamed to Jane right away, so seat 4 turns amber on their screen within a moment.",
     a: { seats: row([[FOCUS_SEAT, "hold"]]) },
-    b: { seats: row([[FOCUS_SEAT, "hold"]]) },
-    delta: true,
-  },
+    b: { seats: row([[FOCUS_SEAT, "hold"]]) },  },
   {
-    title: "Person B can't take it",
+    title: "Jane can't take it",
     caption:
-      "Person B taps seat 4, but it is already held by Person A, so deltat refuses. Person B cannot take it until the hold clears.",
+      "Jane taps seat 4, but it is already held by Bob, so deltat refuses. Jane cannot take it until the hold clears.",
     a: { seats: row([[FOCUS_SEAT, "hold"]]) },
     b: { seats: row([[FOCUS_SEAT, "reject"]]), acting: true },
   },
   {
     title: "The hold is temporary",
     caption:
-      "A hold does not last forever. It has a short timer, and it stays alive only while Person A's live connection is open.",
+      "A hold does not last forever. It has a short timer, and it stays alive only while Bob's live connection is open.",
     a: { seats: row([[FOCUS_SEAT, "hold"]]) },
     b: { seats: row([[FOCUS_SEAT, "hold"]]) },
   },
   {
-    title: "If A leaves, it frees up",
+    title: "If Bob leaves, it frees up",
     caption:
-      "If that timer runs out, or Person A's connection drops, the hold is released on its own and seat 4 turns green again. There is nothing to clean up.",
+      "If that timer runs out, or Bob's connection drops, the hold is released on its own and seat 4 turns green again. There is nothing to clean up.",
     a: { seats: allFree() },
-    b: { seats: allFree() },
-    delta: true,
-  },
+    b: { seats: allFree() },  },
   {
-    title: "Or A confirms, and it's booked",
+    title: "Or Bob confirms, and it's booked",
     caption:
-      "If Person A confirms instead, the hold becomes a real booking in one step, with no gap where anyone could slip in.",
+      "If Bob confirms instead, the hold becomes a real booking in one step, with no gap where anyone could slip in.",
     a: { seats: row([[FOCUS_SEAT, "booked"]]), acting: true },
-    b: { seats: row([[FOCUS_SEAT, "booked"]]) },
-    delta: true,
-  },
+    b: { seats: row([[FOCUS_SEAT, "booked"]]) },  },
 ];
-
-export const HOLDS_STEP_COUNT = HOLDS_STEPS.length;

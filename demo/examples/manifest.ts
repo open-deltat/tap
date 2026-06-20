@@ -11,6 +11,7 @@ import {
   Users,
   Radio,
   Layers,
+  CalendarCog,
   Sigma,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +41,7 @@ const META: Record<ExampleId, Omit<ExampleMeta, "id" | "href">> = {
   meet: { label: "Meet", icon: Users, specId: "AVAIL-08" },
   live: { label: "Live", icon: Radio, specId: "PROTO-01" },
   rules: { label: "Rules", icon: Layers, specId: "AVAIL-08" },
+  builder: { label: "Builder", icon: CalendarCog, specId: "EDGE-03" },
   explainer: { label: "How it works", icon: Sigma, specId: "AVAIL-01" },
 };
 
