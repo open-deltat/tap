@@ -1,9 +1,11 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
+import { requireSession } from "@/lib/auth";
 import { ensureCalendarResource } from "./setup";
 
 export async function getWeekData(weekStart: number, weekEnd: number) {
+  await requireSession();
   const resourceId = await ensureCalendarResource();
 
   const [availability, bookings] = await Promise.all([
