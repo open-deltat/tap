@@ -1,0 +1,467 @@
+"use client";
+
+import { useEffect, useRef, useCallback } from "react";
+import {
+  FIELD,
+  SEAT_THRESHOLD,
+  type Transform,
+  type Rect,
+  sectionFrame,
+  localRect,
+  worldToLocal,
+  screenToWorld,
+  pointInRect,
+  frameWorldBBox,
+  rectsIntersect,
+  gridDims,
+  seatId,
+} from "./geometry";
+
+export interface CanvasSection {
+  id: string;
+  name: string;
+  ring: number;
+  idx: number;
+  ringCount: number;
+  assigned: boolean;
+  capacity: number;
+  remaining: number;
+  // The exact cells that are booked (by grid index). Source of truth for both rendering and
+  // hit-testing, so booked seats stay where they were picked instead of clustering top-left.
+  takenCells: Set<number>;
+}
+
+// Result of clicking the canvas while zoomed into seats: a single seat cell to toggle.
+// Clicks while zoomed out (Overview/Close-up) are ignored — zoom changes only via wheel/buttons.
+export type CanvasHit = { kind: "cell"; section: CanvasSection; cell: number };
+
+// Availability ramp + categories — the one source of truth for both the canvas and the legend.
+// CVD-safe by design: the blue → amber → vermillion ramp never leans on a green/red contrast;
+// premium sits darker than the amber midpoint (luminance separation that survives tritanopia);
+// and a picked seat is set apart by LUMINANCE — a near-white fill + dark ring — not by hue,
+// so it never collapses into plenty-blue for deuteranopia/protanopia.
+export const LEGEND_COLORS = {
+  plenty: "#4aa3df",
+  filling: "#e6b422",
+  nearlyFull: "#e0563a",
+  premium: "#b8860b",
+  soldOut: "#27272a",
+  selection: "#fafafa",
+} as const;
+
+const COLORS = {
+  bg: "#08080a",
+  field: "#0c1f14",
+  fieldStroke: "#1f3d2b",
+  fieldText: "#15803d",
+  rampHigh: LEGEND_COLORS.plenty,
+  rampMid: LEGEND_COLORS.filling,
+  rampLow: LEGEND_COLORS.nearlyFull,
+  zinc: LEGEND_COLORS.soldOut,
+  gold: LEGEND_COLORS.premium,
+  selection: LEGEND_COLORS.selection,
+  taken: "#3f3f46",
+  selectStroke: "#ffffff", // section outline, on the dark background
+  selectStrokeDark: "#09090b", // per-seat ring, on the bright picked fill (high contrast)
+  label: "rgba(255,255,255,0.88)",
+  labelHalo: "rgba(0,0,0,0.55)",
+  seatLabel: "rgba(12,12,14,0.72)", // per-seat id, dark text on the light seat fills
+};
+
+function fillFor(s: CanvasSection): string {
+  if (s.remaining <= 0) return COLORS.zinc;
+  if (s.assigned) return COLORS.gold;
+  const ratio = s.remaining / s.capacity;
+  if (ratio > 0.5) return COLORS.rampHigh;
+  if (ratio > 0.15) return COLORS.rampMid;
+  return COLORS.rampLow;
+}
+
+export function StadiumCanvas({
+  sections,
+  transform,
+  selectedSectionId,
+  selectedCells,
+  onTransformChange,
+  onZoomStep,
+  onHit,
+}: {
+  sections: CanvasSection[];
+  transform: Transform;
+  selectedSectionId: string | null;
+  selectedCells: Set<number>;
+  onTransformChange: (t: Transform) => void;
+  // One wheel gesture (debounced) = one level step. `focusX/Y` are the world point under
+  // the cursor to keep stable across the zoom; the parent decides the target level + offset.
+  onZoomStep: (direction: 1 | -1, focusX: number, focusY: number) => void;
+  onHit: (hit: CanvasHit) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameRef = useRef<number>(0);
+
+  // Mutable mirrors so the rAF draw + pointer handlers read current values without
+  // re-binding listeners on every render.
+  const tRef = useRef(transform);
+  tRef.current = transform;
+  const sectionsRef = useRef(sections);
+  sectionsRef.current = sections;
+  const selSectionRef = useRef(selectedSectionId);
+  selSectionRef.current = selectedSectionId;
+  const selCellsRef = useRef(selectedCells);
+  selCellsRef.current = selectedCells;
+
+  // Cached frames keyed by section id — geometry is stable for a given layout.
+  const framesRef = useRef(new Map<string, ReturnType<typeof sectionFrame>>());
+  useEffect(() => {
+    const m = new Map<string, ReturnType<typeof sectionFrame>>();
+    for (const s of sections) m.set(s.id, sectionFrame(s.ring, s.idx, s.ringCount, s.assigned));
+    framesRef.current = m;
+    scheduleDraw();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sections]);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = container.clientWidth;
+    const cssH = container.clientHeight;
+    if (canvas.width !== Math.round(cssW * dpr) || canvas.height !== Math.round(cssH * dpr)) {
+      canvas.width = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, cssW, cssH);
+
+    const t = tRef.current;
+    // Viewport in world coordinates (for culling).
+    const viewport: Rect = {
+      x: -t.offsetX / t.scale,
+      y: -t.offsetY / t.scale,
+      w: cssW / t.scale,
+      h: cssH / t.scale,
+    };
+
+    // World→screen baked into the ctx transform; we draw in world units below.
+    ctx.save();
+    ctx.translate(t.offsetX, t.offsetY);
+    ctx.scale(t.scale, t.scale);
+
+    // Field.
+    ctx.beginPath();
+    ctx.ellipse(FIELD.cx, FIELD.cy, FIELD.rx, FIELD.ry, 0, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS.field;
+    ctx.fill();
+    ctx.lineWidth = 3 / t.scale;
+    ctx.strokeStyle = COLORS.fieldStroke;
+    ctx.stroke();
+    if (t.scale < SEAT_THRESHOLD) {
+      ctx.fillStyle = COLORS.fieldText;
+      ctx.font = "600 28px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("FIELD", FIELD.cx, FIELD.cy);
+    }
+
+    const seatLOD = t.scale >= SEAT_THRESHOLD;
+
+    for (const s of sectionsRef.current) {
+      const f = framesRef.current.get(s.id);
+      if (!f) continue;
+      // Cull: skip sections whose world bbox doesn't meet the viewport.
+      if (!rectsIntersect(frameWorldBBox(f), viewport)) continue;
+
+      const r = localRect(f);
+      ctx.save();
+      ctx.translate(f.cx, f.cy);
+      ctx.rotate(f.angle);
+
+      if (!seatLOD) {
+        // One shape per section, colored by availability.
+        ctx.beginPath();
+        roundRect(ctx, r.x, r.y, r.w, r.h, Math.min(8, r.w * 0.15));
+        ctx.fillStyle = fillFor(s);
+        ctx.globalAlpha = s.remaining <= 0 ? 0.5 : 0.92;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        if (s.id === selSectionRef.current) {
+          ctx.lineWidth = 3 / t.scale;
+          ctx.strokeStyle = COLORS.selectStroke;
+          ctx.stroke();
+        }
+        drawSectionLabel(ctx, s, r, t, f);
+      } else {
+        // Seat grid. taken = first (capacity - remaining) cells; rest are free.
+        drawSeats(ctx, s, r, t, f, viewport, selSectionRef.current, selCellsRef.current);
+      }
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }, []);
+
+  // Coalesce to one pending frame by cancel-and-reschedule. A boolean "already scheduled" guard
+  // can get stranded true if the frame is cancelled by an effect cleanup (StrictMode mount→
+  // cleanup→mount), after which every schedule no-ops and the canvas never paints.
+  const scheduleDraw = useCallback(() => {
+    cancelAnimationFrame(frameRef.current);
+    frameRef.current = requestAnimationFrame(draw);
+  }, [draw]);
+
+  // Redraw whenever inputs change.
+  useEffect(() => {
+    scheduleDraw();
+  }, [transform, selectedSectionId, selectedCells, scheduleDraw]);
+
+  // Resize handling.
+  useEffect(() => {
+    const ro = new ResizeObserver(() => scheduleDraw());
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(frameRef.current);
+    };
+  }, [scheduleDraw]);
+
+  // Wheel zoom: discrete levels. Debounce so one scroll gesture steps exactly one level,
+  // zooming toward the cursor (the world point under it stays put across the eased step).
+  const wheelLockRef = useRef(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      // Trailing wheel events from the same gesture keep resetting the release timer.
+      if (releaseTimer) clearTimeout(releaseTimer);
+      releaseTimer = setTimeout(() => {
+        wheelLockRef.current = false;
+      }, 140);
+      if (wheelLockRef.current) return;
+      wheelLockRef.current = true;
+      const rect = el.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const [wx, wy] = screenToWorld(tRef.current, sx, sy);
+      onZoomStep(e.deltaY < 0 ? 1 : -1, wx, wy);
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", handler);
+      if (releaseTimer) clearTimeout(releaseTimer);
+    };
+  }, [onZoomStep]);
+
+  // Pointer drag-pan + click hit-testing (distinguish a click from a drag).
+  const dragRef = useRef<{
+    x: number;
+    y: number;
+    ox: number;
+    oy: number;
+    moved: boolean;
+  } | null>(null);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    (e.target as Element).setPointerCapture(e.pointerId);
+    const t = tRef.current;
+    dragRef.current = { x: e.clientX, y: e.clientY, ox: t.offsetX, oy: t.offsetY, moved: false };
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) d.moved = true;
+    onTransformChange({ scale: tRef.current.scale, offsetX: d.ox + dx, offsetY: d.oy + dy });
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d || d.moved) return;
+    handleClick(e.clientX, e.clientY);
+  };
+
+  const handleClick = (clientX: number, clientY: number) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
+    const t = tRef.current;
+    // Clicks only do something at the seat LOD — they never change zoom.
+    if (t.scale < SEAT_THRESHOLD) return;
+    const [wx, wy] = screenToWorld(t, sx, sy);
+
+    for (const s of sectionsRef.current) {
+      const f = framesRef.current.get(s.id);
+      if (!f) continue;
+      const [lx, ly] = worldToLocal(f, wx, wy);
+      const r = localRect(f);
+      if (!pointInRect(r, lx, ly)) continue;
+
+      // Map local point → cell index.
+      const { cols, rows } = gridDims(s.capacity, r.w, r.h);
+      const col = clamp(Math.floor(((lx - r.x) / r.w) * cols), 0, cols - 1);
+      const row = clamp(Math.floor(((ly - r.y) / r.h) * rows), 0, rows - 1);
+      const cell = row * cols + col;
+      if (cell >= s.capacity) return;
+      onHit({ kind: "cell", section: s, cell });
+      return;
+    }
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="h-[58vh] w-full cursor-pointer touch-none overflow-hidden rounded-xl bg-[#08080a] active:cursor-grabbing"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerLeave={() => (dragRef.current = null)}
+    >
+      <canvas ref={canvasRef} className="block h-full w-full" />
+    </div>
+  );
+}
+
+function drawSeats(
+  ctx: CanvasRenderingContext2D,
+  s: CanvasSection,
+  r: Rect,
+  t: Transform,
+  f: ReturnType<typeof sectionFrame>,
+  viewport: Rect,
+  selectedSectionId: string | null,
+  selectedCells: Set<number>
+) {
+  const { cols, rows } = gridDims(s.capacity, r.w, r.h);
+  const cw = r.w / cols;
+  const ch = r.h / rows;
+  const pad = Math.min(cw, ch) * 0.12;
+  const isSel = s.id === selectedSectionId;
+
+  // Inverse-transform the viewport corners into this rotated local frame for cell culling.
+  const localView = worldRectToLocalAABB(viewport, f);
+  const inView = (x: number, y: number) =>
+    !(x + cw < localView.x || x > localView.x + localView.w || y + ch < localView.y || y > localView.y + localView.h);
+
+  ctx.fillStyle = COLORS.taken;
+  for (let i = 0; i < s.capacity; i++) {
+    const col = i % cols;
+    const row = (i - col) / cols;
+    const x = r.x + col * cw;
+    const y = r.y + row * ch;
+    if (!inView(x, y)) continue;
+    const isTaken = s.takenCells.has(i);
+    const picked = isSel && selectedCells.has(i);
+    ctx.fillStyle = isTaken ? COLORS.taken : picked ? COLORS.selection : fillFor(s);
+    ctx.globalAlpha = isTaken ? 0.8 : picked ? 1 : 0.85;
+    ctx.fillRect(x + pad, y + pad, cw - pad * 2, ch - pad * 2);
+    if (picked) {
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 2 / t.scale;
+      ctx.strokeStyle = COLORS.selectStrokeDark;
+      ctx.strokeRect(x + pad, y + pad, cw - pad * 2, ch - pad * 2);
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // Deepest zoom: stamp each bookable seat's id (e.g. "B5"), upright. Counter-rotate the frame
+  // once, then place every label at its cell-center mapped back through the section's rotation —
+  // cheaper than a save/rotate per cell. Only when cells are large enough to read.
+  const cellScreen = Math.min(cw, ch) * t.scale;
+  if (cellScreen > 22) {
+    ctx.save();
+    ctx.rotate(-f.angle);
+    const ca = Math.cos(f.angle);
+    const sa = Math.sin(f.angle);
+    ctx.font = `600 ${Math.min(cw, ch) * 0.42}px ui-sans-serif, system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = COLORS.seatLabel;
+    for (let i = 0; i < s.capacity; i++) {
+      if (s.takenCells.has(i)) continue; // booked seats don't need an id to pick
+      const col = i % cols;
+      const row = (i - col) / cols;
+      const lx = r.x + (col + 0.5) * cw;
+      const ly = r.y + (row + 0.5) * ch;
+      if (!inView(r.x + col * cw, r.y + row * ch)) continue;
+      ctx.fillText(seatId(i, cols), lx * ca - ly * sa, lx * sa + ly * ca);
+    }
+    ctx.restore();
+  }
+}
+
+// Section name, drawn upright (counter-rotating the section frame so text never reads sideways
+// around the oval) and fading in as the block grows on screen — present at the Close-up level,
+// gone once we switch to drawing seats. Gated on on-screen width so tiny far blocks stay clean.
+function drawSectionLabel(
+  ctx: CanvasRenderingContext2D,
+  s: CanvasSection,
+  r: Rect,
+  t: Transform,
+  f: ReturnType<typeof sectionFrame>
+) {
+  if (!s.name) return;
+  // Show labels from the close-up level up, so EVERY section is labelled at once (not just the big
+  // ones) — below that they'd be unreadable. Each label is scaled to fit its section's width.
+  if (t.scale < SEAT_THRESHOLD * 0.34) return;
+  const screenW = r.w * t.scale;
+  const fitPx = (screenW * 0.84) / Math.max(1, s.name.length * 0.58);
+  const fontPx = Math.max(7, Math.min(14, fitPx));
+  ctx.save();
+  ctx.rotate(-f.angle); // we're already translated to (cx, cy); undo the frame's rotation
+  ctx.font = `600 ${fontPx / t.scale}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = Math.max(2, fontPx * 0.2) / t.scale;
+  ctx.strokeStyle = COLORS.labelHalo;
+  ctx.strokeText(s.name, 0, 0);
+  ctx.fillStyle = COLORS.label;
+  ctx.fillText(s.name, 0, 0);
+  ctx.restore();
+}
+
+// Axis-aligned bbox of a world rect expressed in a frame's local coordinates.
+function worldRectToLocalAABB(world: Rect, f: ReturnType<typeof sectionFrame>): Rect {
+  const corners: [number, number][] = [
+    [world.x, world.y],
+    [world.x + world.w, world.y],
+    [world.x, world.y + world.h],
+    [world.x + world.w, world.y + world.h],
+  ];
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const [wx, wy] of corners) {
+    const [lx, ly] = worldToLocal(f, wx, wy);
+    minX = Math.min(minX, lx);
+    minY = Math.min(minY, ly);
+    maxX = Math.max(maxX, lx);
+    maxY = Math.max(maxY, ly);
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radius: number) {
+  const rad = Math.min(radius, w / 2, h / 2);
+  ctx.moveTo(x + rad, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rad);
+  ctx.arcTo(x + w, y + h, x, y + h, rad);
+  ctx.arcTo(x, y + h, x, y, rad);
+  ctx.arcTo(x, y, x + w, y, rad);
+  ctx.closePath();
+}
+
+function clamp(v: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, v));
+}

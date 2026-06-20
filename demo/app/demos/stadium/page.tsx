@@ -1,6 +1,8 @@
-import { SeatBookingPage } from "@/components/seat-booking-page";
-import { seedStadium } from "@/app/actions/seed-stadium";
+import { notFound } from "next/navigation";
+import { isExampleEnabled } from "@/examples/config";
+import Example from "@/examples/stadium";
 
-export default function StadiumPage() {
-  return <SeatBookingPage seedFn={seedStadium} />;
+export default function Page() {
+  if (!isExampleEnabled("stadium")) notFound();
+  return <Example />;
 }
