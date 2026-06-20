@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Loader2, Wifi } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BookButton } from "@/components/book-button";
+import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 import { cn } from "@/lib/utils";
 import { Stage } from "@/components/stage";
 import { SeatMap } from "@/components/seat-map";
@@ -48,6 +49,7 @@ export function LiveRoom() {
   const [selectedSeats, setSelectedSeats] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const [result, setResult] = useState<BookingResult | null>(null);
 
   // Per-seat hold WS connections: open WS = hold active on the LEFT pane, close WS = released.
   const holdWsRef = useRef(new Map<string, WebSocket>());
@@ -184,23 +186,43 @@ export function LiveRoom() {
     startTransition(async () => {
       try {
         const seatList = Array.from(selectedSeats);
+        const venue = resources.find((r) => r.id === venueId);
+        const bookedResources = resources.filter((r) => selectedSeats.has(r.id));
+        const slotStart = slot.start;
+        const slotEnd = slot.end;
         // bookHeldSeats releases each seat's hold server-side BEFORE booking, so the atomic batch
         // can't conflict with the client's own holds.
-        await bookHeldSeats({
+        const created = await bookHeldSeats({
           seatIds: seatList,
-          start: slot.start,
-          end: slot.end,
-          label: "Live booking",
+          start: slotStart,
+          end: slotEnd,
+          label: venue?.name ?? "Live booking",
         });
         closeAllHolds(); // sockets only — the holds were already released by bookHeldSeats
         setSelectedSeats(new Set());
+        setResult({
+          title: `${seatList.length} seat${seatList.length > 1 ? "s" : ""} · ${venue?.name ?? "Live"}`,
+          subtitle: `${formatTime(slotStart)} to ${formatTime(slotEnd)}`,
+          bookings: created,
+          resources: bookedResources,
+        });
         const seatIds = allSeatIds(sections);
-        await loadSeatState(seatIds, slot.start, slot.end);
+        await loadSeatState(seatIds, slotStart, slotEnd);
       } catch (err) {
         toast.error(formatError(err instanceof Error ? err.message : String(err)));
       }
     });
   }
+
+  function seatName(seatId: string): string {
+    for (const s of sections) {
+      const seat = s.seats.find((x) => x.id === seatId);
+      if (seat) return seat.name;
+    }
+    return seatId;
+  }
+  const sectionOf = (seatId: string) => sections.find((s) => s.seats.some((x) => x.id === seatId));
+  const selectedTotal = Array.from(selectedSeats).reduce((sum, id) => sum + (sectionOf(id)?.price ?? 0), 0);
 
   // My own holds show as selected (green) on the LEFT, not held (amber). The RIGHT mirror is a
   // second connection, so it sees ALL holds — including mine — as amber.
@@ -225,36 +247,46 @@ export function LiveRoom() {
     );
   }
 
-  const ribbon = (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="text-[11px] text-zinc-500">
-        {slot ? `${formatTime(slot.start)} – ${formatTime(slot.end)}` : "No showtime"}
-        {selectedSeats.size > 0 && ` · ${selectedSeats.size} held`}
-      </div>
-      <Button
-        size="sm"
-        onClick={handleBookHeld}
-        disabled={isPending || selectedSeats.size === 0}
-        className="h-7 gap-1.5 bg-emerald-500 text-xs text-white hover:bg-emerald-400 disabled:opacity-40"
-      >
-        Book held seats{selectedSeats.size > 0 && ` (${selectedSeats.size})`}
-      </Button>
-    </div>
-  );
-
   const noSurface = !slot || sections.length === 0;
 
+  const tray =
+    slot && selectedSeats.size > 0 ? (
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-1 flex-wrap items-center gap-1.5">
+          {Array.from(selectedSeats)
+            .map((id) => ({ id, name: seatName(id), price: sectionOf(id)?.price }))
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(({ id, name, price }) => (
+              <span key={id} className="rounded bg-emerald-400/15 px-1.5 py-0.5 text-xs font-medium text-emerald-200">
+                {name}
+                {price != null && <span className="ml-0.5 text-emerald-300/70">${price}</span>}
+              </span>
+            ))}
+        </div>
+        <BookButton onClick={handleBookHeld} loading={isPending}>
+          Book {selectedSeats.size}
+          {selectedTotal > 0 && ` · $${selectedTotal.toLocaleString()}`}
+        </BookButton>
+      </div>
+    ) : undefined;
+
   return (
+    <>
     <Stage
       primitive={{ label: "Realtime · holds + LISTEN/NOTIFY", specId: "PROTO-01" }}
       title="Live Cinema"
-      ribbon={ribbon}
+      tray={tray}
       contentMax="max-w-none"
     >
       {/* Top: your booker. Bottom: one row of three read-only viewers, each its own connection,
           all repainting live from the shared seat state. */}
       <div className="space-y-3">
-        <Pane title="You" hint="tap a free seat to hold it" venueId={venueId} onEvent={reload}>
+        <Pane
+          title="You"
+          hint={slot ? `${formatTime(slot.start)} – ${formatTime(slot.end)} · tap a free seat to hold it` : "tap a free seat to hold it"}
+          venueId={venueId}
+          onEvent={reload}
+        >
           {noSurface ? (
             <EmptySurface />
           ) : (
@@ -296,6 +328,9 @@ export function LiveRoom() {
         </div>
       </div>
     </Stage>
+
+    <BookingConfirmedModal result={result} onClose={() => setResult(null)} onBookAnother={() => setResult(null)} />
+    </>
   );
 }
 

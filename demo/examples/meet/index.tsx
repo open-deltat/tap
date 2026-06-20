@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Loader2 } from "lucide-react";
 import { Stage } from "@/components/stage";
+import { DateNav } from "@/components/date-nav";
+import { Segmented } from "@/components/ui/segmented";
+import { BookButton } from "@/components/book-button";
 import { MeetLanes } from "./meet-lanes";
 import { NextAvailability } from "@/components/next-availability";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
@@ -179,120 +180,86 @@ export default function MeetExample() {
     );
   }
 
-  const ribbon = (
-    <div className="flex flex-wrap items-center justify-center gap-3">
-      <div className="flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-zinc-300"
-          disabled={isPending}
-          onClick={() => shiftDay(-1)}
-          aria-label="Previous day"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <input
-          type="date"
-          value={date}
-          disabled={isPending}
-          onChange={(e) => changeDate(e.target.value)}
-          className="rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-zinc-200 disabled:opacity-50 [color-scheme:dark]"
-        />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-zinc-300"
-          disabled={isPending}
-          onClick={() => shiftDay(1)}
-          aria-label="Next day"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="flex items-center gap-1 rounded-full border border-white/10 p-0.5">
-        {DURATIONS.map((d) => {
-          const active = duration === d;
-          return (
-            <button
-              key={d}
-              type="button"
-              onClick={() => pickDuration(d)}
-              className={cn(
-                "rounded-full px-3 py-1 text-xs transition-colors",
-                active ? "bg-emerald-400/15 text-emerald-200" : "text-zinc-400 hover:text-zinc-200"
-              )}
-            >
-              {d} min
-            </button>
-          );
-        })}
-      </div>
+  const today = toLocalDateString(new Date());
+  const dateLabel = new Date(`${date}T00:00`).toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+  // Controls live in context, right above the lanes they drive — not stranded at the top of the page.
+  const controls = (
+    <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
+      <DateNav
+        label={dateLabel}
+        onPrev={() => shiftDay(-1)}
+        onNext={() => shiftDay(1)}
+        onToday={() => changeDate(today)}
+        showToday={date !== today}
+      />
+      <Segmented
+        items={DURATIONS.map((d) => ({ value: d, label: `${d} min` }))}
+        value={duration}
+        onChange={pickDuration}
+        ariaLabel="Meeting length"
+      />
       <span className="text-[11px] text-zinc-500">
-        {bothFree.length === 0 ? "no shared free time" : `${bothFree.length} shared window${bothFree.length > 1 ? "s" : ""}`}
+        {bothFree.length === 0 ? "no shared time" : `${bothFree.length} shared window${bothFree.length > 1 ? "s" : ""}`}
       </span>
     </div>
   );
 
   const n = selectedSlots.length;
   const noShared = bothFree.length === 0;
-  const tray = noShared ? undefined : n > 0 ? (
+  const tray =
+    !noShared && n > 0 ? (
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1">
-          <div className="text-sm font-medium text-zinc-100">
-            {n === 1 ? `Meeting · ${formatTime(selectedSlots[0].start)} to ${formatTime(selectedSlots[0].end)}` : `${n} meetings selected`}
-          </div>
-          <div className="text-xs text-zinc-400">{duration} min · books atomically on both calendars</div>
+        <div className="flex-1 text-sm text-zinc-300">
+          {n === 1
+            ? `Meeting · ${formatTime(selectedSlots[0].start)} to ${formatTime(selectedSlots[0].end)}`
+            : `${n} meetings selected`}
         </div>
-        <Button onClick={book} disabled={isPending} className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400">
+        <BookButton onClick={book} loading={isPending}>
           {n > 1 ? `Book ${n} meetings` : "Book both"}
-        </Button>
+        </BookButton>
       </div>
-    ) : (
-      <div className="text-center text-xs text-zinc-400">
-        Click the <span className="text-emerald-300">Both free</span> lane to pick a meeting time.
-      </div>
-    );
+    ) : undefined;
 
   return (
     <>
       <Stage
         primitive={{ label: "Multi-resource intersection · atomic batch", specId: "AVAIL-08" }}
         title="Find a meeting time"
-        ribbon={ribbon}
         tray={tray}
       >
-        <div className="relative">
-          <MeetLanes
-            axisStart={axisStart}
-            axisEnd={axisEnd}
-            intersectionSlots={slotOptions}
-            selectedStarts={selectedStarts}
-            onPickSlot={pick}
-            lanes={[
-              { label: "Jane", slots: janeFree },
-              { label: "Bob", slots: bobFree },
-              { label: "Both free", slots: bothFree, intersection: true },
-            ]}
-          />
-          {noShared && ids && (
-            <NextAvailability
-              resourceIds={[ids.janeId, ids.bobId]}
-              from={new Date(`${date}T00:00`)}
-              title="Bob and Jane have no shared free time today."
-              minAvailable={2}
-              minDurationMs={durationMs}
-              horizonDays={28}
-              onJump={(o) => changeDate(o.date)}
+        <div className="mx-auto max-w-3xl">
+          {controls}
+          <div className="relative">
+            <MeetLanes
+              axisStart={axisStart}
+              axisEnd={axisEnd}
+              intersectionSlots={slotOptions}
+              selectedStarts={selectedStarts}
+              onPickSlot={pick}
+              lanes={[
+                { label: "Jane", slots: janeFree },
+                { label: "Bob", slots: bobFree },
+                { label: "Both free", slots: bothFree, intersection: true },
+              ]}
             />
-          )}
+            {noShared && ids && (
+              <NextAvailability
+                resourceIds={[ids.janeId, ids.bobId]}
+                from={new Date(`${date}T00:00`)}
+                title="Bob and Jane have no shared free time today."
+                minAvailable={2}
+                minDurationMs={durationMs}
+                horizonDays={28}
+                onJump={(o) => changeDate(o.date)}
+              />
+            )}
+          </div>
         </div>
-
-        <p className="mt-5 text-center text-[11px] text-zinc-500">
-          Jane and Bob keep independent timelines. The bottom lane is{" "}
-          <span className="text-emerald-300">min_available = 2</span> across both, the intersection
-          computed by deltat, lined up under the overlap above.
-        </p>
       </Stage>
 
       <BookingConfirmedModal

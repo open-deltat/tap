@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback, useMemo, useTransition } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Stage } from "@/components/stage";
+import { BookButton } from "@/components/book-button";
 import { NextAvailability } from "@/components/next-availability";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 import type { Resource, Booking } from "@/lib/schemas";
@@ -23,11 +23,7 @@ import { formatError } from "@/lib/format-error";
 const H = 3_600_000;
 const SLOT_MS = 60 * 60_000;
 
-const STUDIO = {
-  combinedLabel: "All free",
-  bookLabel: "Book the session",
-  note: "Five independent resources, each with its own schedule. The session can only run when the room, the engineer, the console, and both musicians are all free at once (the bottom row).",
-};
+const dayLabel = (ms: number) => new Date(ms).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
 
 export default function RulesExample() {
   const [ids, setIds] = useState<{ studio: string[]; dinner: string[] } | null>(null);
@@ -38,6 +34,12 @@ export default function RulesExample() {
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<BookingResult | null>(null);
+
+  // One Stage, one floating tray, two booking flows: the tray shows whichever scenario you last
+  // touched (the studio board or the dinner finder), so the booker is always in the same place.
+  const [lastFlow, setLastFlow] = useState<"studio" | "dinner">("studio");
+  const [dinnerPending, setDinnerPending] = useState<{ start: number; end: number } | null>(null);
+  const [dinnerReloadKey, setDinnerReloadKey] = useState(0);
 
   const [date, setDate] = useState<Date>(() => {
     const d = new Date();
@@ -54,7 +56,6 @@ export default function RulesExample() {
   const axisStart = dayStart + 7 * H;
   const axisEnd = dayStart + 23 * H;
 
-  // The single-day board flow drives the studio scenario; "dinner" renders its own multi-week finder.
   const activeIds = useMemo(() => ids?.studio ?? [], [ids]);
   const minAvailable = activeIds.length;
 
@@ -118,8 +119,14 @@ export default function RulesExample() {
   useWebSocket(activeIds[4] ? { type: "subscribe", resourceId: activeIds[4], onEvent: reload } : null);
 
   function onPick(s: Span) {
+    setLastFlow("studio");
     setSelected({ start: s.start, end: Math.min(s.start + SLOT_MS, s.end) });
   }
+
+  // The dinner finder reports its bookable pick + when it's interacted with, so the shared tray can
+  // show the dinner booker; index owns the actual booking + the success modal for both flows.
+  const handleDinnerPending = useCallback((p: { start: number; end: number } | null) => setDinnerPending(p), []);
+  const handleDinnerInteract = useCallback(() => setLastFlow("dinner"), []);
 
   function book() {
     if (!selected || activeIds.length === 0) return;
@@ -141,6 +148,26 @@ export default function RulesExample() {
     });
   }
 
+  function bookDinner() {
+    if (!ids || !dinnerPending) return;
+    const dinnerIds = ids.dinner;
+    const { start, end } = dinnerPending;
+    startTransition(async () => {
+      try {
+        const created = await batchBookSlots(dinnerIds.map((id) => ({ resourceId: id, start, end, label: "Dinner" })));
+        setResult({
+          title: "Dinner booked",
+          subtitle: `${dayLabel(start)} · ${formatTime(start)} to ${formatTime(end)}`,
+          bookings: created,
+          resources: resources.filter((r) => dinnerIds.includes(r.id)),
+        });
+        setDinnerReloadKey((k) => k + 1);
+      } catch (err) {
+        toast.error(formatError(err instanceof Error ? err.message : String(err)));
+      }
+    });
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
@@ -156,9 +183,34 @@ export default function RulesExample() {
   const notToday = dayStart !== todayMidnight;
   const dateLabel = date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
+  const studioTray =
+    !noSlot && selected ? (
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm text-zinc-300">
+          {formatTime(selected.start)} to {formatTime(selected.end)} · books all {activeIds.length} at once
+        </div>
+        <BookButton onClick={book} loading={isPending}>
+          Book the session
+        </BookButton>
+      </div>
+    ) : undefined;
+
+  const dinnerTray = dinnerPending ? (
+    <div className="flex items-center justify-between gap-3">
+      <div className="text-sm text-zinc-300">
+        {dayLabel(dinnerPending.start)} · {formatTime(dinnerPending.start)} to {formatTime(dinnerPending.end)}
+      </div>
+      <BookButton onClick={bookDinner} loading={isPending}>
+        Book dinner
+      </BookButton>
+    </div>
+  ) : undefined;
+
+  const tray = lastFlow === "dinner" ? dinnerTray ?? studioTray : studioTray ?? dinnerTray;
+
   return (
     <>
-      <Stage primitive={{ label: "Rules + resources · live timelines", specId: "AVAIL-08" }} title="Stacked resources, one timeline each">
+      <Stage primitive={{ label: "Rules + resources · live timelines", specId: "AVAIL-08" }} title="Find a time everyone shares" tray={tray}>
         <div className="space-y-10">
           <section>
             <div className="mb-3 text-center">
@@ -177,7 +229,7 @@ export default function RulesExample() {
               <ScheduleBoard
                 resources={lanes}
                 combined={combined}
-                combinedLabel={STUDIO.combinedLabel}
+                combinedLabel="All free"
                 selected={selected}
                 onPick={onPick}
                 axisStart={axisStart}
@@ -199,22 +251,20 @@ export default function RulesExample() {
                 />
               )}
             </div>
-            {!noSlot && selected && (
-              <div className="mx-auto mt-4 flex max-w-2xl items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
-                <div className="text-xs text-zinc-400">
-                  {formatTime(selected.start)} to {formatTime(selected.end)} · books all {activeIds.length} at once
-                </div>
-                <Button onClick={book} disabled={isPending} className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400">
-                  {STUDIO.bookLabel}
-                </Button>
-              </div>
-            )}
-            <p className="mx-auto mt-4 max-w-2xl text-center text-[11.5px] leading-relaxed text-zinc-500">{STUDIO.note}</p>
           </section>
 
           <div className="h-px bg-white/[0.06]" />
 
-          <section>{ids && <DinnerFinder resourceIds={ids.dinner} resources={resources} />}</section>
+          <section>
+            {ids && (
+              <DinnerFinder
+                resourceIds={ids.dinner}
+                onPendingChange={handleDinnerPending}
+                onInteract={handleDinnerInteract}
+                reloadKey={dinnerReloadKey}
+              />
+            )}
+          </section>
         </div>
       </Stage>
 

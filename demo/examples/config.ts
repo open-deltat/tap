@@ -16,7 +16,6 @@ export const ALL_EXAMPLE_IDS = [
   "hotel",
   "restaurant",
   "parking",
-  "calendar",
   "availability",
   "meet",
   "live",

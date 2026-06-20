@@ -4,9 +4,10 @@ import { useEffect, useState, useTransition, useCallback, useMemo, useRef } from
 import { toast } from "sonner";
 import { Loader2, X, CalendarRange, Wand2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
-import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
+import { Segmented } from "@/components/ui/segmented";
+import { Stage } from "@/components/stage";
+import { BookButton } from "@/components/book-button";
 import type { Booking, Resource } from "@/lib/schemas";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 
@@ -246,28 +247,40 @@ export default function HotelPage() {
     );
   }
 
-  return (
-    <div className="flex h-full flex-col bg-[#0a0a0c] text-zinc-100">
-      <div className="shrink-0 pb-3 pt-6 text-center">
-        <div className="text-sm font-medium text-zinc-300">Grand Hotel</div>
-        <div className="mt-1.5 flex items-center justify-center gap-2 text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">
-          <span>Capacity sweep · availability windows</span>
-          <span className="rounded border border-white/10 px-1 py-px font-mono text-[9px] tracking-normal text-zinc-500">
-            AVAIL-04
+  const tray =
+    nights > 0 && fromMs != null && toMs != null ? (
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm text-zinc-300">
+          {selType?.name} · {fmt(fromMs)} to {fmt(toMs)} ·{" "}
+          <span className="font-mono">
+            {nights} night{nights > 1 ? "s" : ""}
           </span>
+          {spanValid && <span className="ml-2 text-emerald-300">all nights open</span>}
         </div>
+        <BookButton onClick={book} loading={isPending} disabled={!spanValid}>
+          Book {nights} night{nights > 1 ? "s" : ""}
+        </BookButton>
       </div>
+    ) : undefined;
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-px overflow-hidden bg-white/[0.06] lg:grid-cols-2">
-        {/* Front desk — read-only occupancy overview + manage reservations */}
-        <section className="flex min-h-0 flex-col overflow-auto bg-[#0a0a0c] p-6">
-          <header className="mb-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Front desk</h2>
-            <p className="mt-1 text-xs text-zinc-500">
-              Rooms taken per night over the next 30 nights. <Legend />
-            </p>
-          </header>
-          <div className="space-y-5">
+  return (
+    <>
+      <Stage
+        primitive={{ label: "Capacity sweep · availability windows", specId: "AVAIL-04" }}
+        title="Grand Hotel"
+        contentMax="max-w-6xl"
+        tray={tray}
+      >
+        <div className="grid grid-cols-1 gap-7 lg:grid-cols-2">
+          {/* Front desk — read-only occupancy overview + manage reservations */}
+          <section>
+            <header className="mb-4">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Front desk</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                Rooms taken per night, next 30 nights. <Legend />
+              </p>
+            </header>
+            <div className="space-y-5">
             {types.map((rt) => {
               const all = bookingsByType[rt.id] ?? [];
               const sorted = [...all].sort((a, b) => a.start - b.start);
@@ -309,38 +322,32 @@ export default function HotelPage() {
           </div>
         </section>
 
-        {/* Book a stay — pick a room, pick your dates, we validate against availability */}
-        <section className="flex min-h-0 flex-col overflow-auto bg-[#0a0a0c] p-6">
-          <header className="mb-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Book a stay</h2>
-            <p className="mt-1 text-xs text-zinc-500">
-              Pick a room and your dates — deltat checks every night is open. Check-in{" "}
-              {hourLabel(CHECK_IN_HOUR)} · check-out {hourLabel(CHECK_OUT_HOUR)}.
-            </p>
-          </header>
+          {/* Book a stay — pick a room, pick your dates, we validate against availability */}
+          <section>
+            <header className="mb-4">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Book a stay</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                Check-in {hourLabel(CHECK_IN_HOUR)} · check-out {hourLabel(CHECK_OUT_HOUR)}.
+              </p>
+            </header>
 
-          {/* Room type */}
-          <div className="mb-4 flex flex-wrap gap-2">
-            {types.map((rt) => {
-              const active = rt.id === selType?.id;
-              return (
-                <button
-                  key={rt.id}
-                  type="button"
-                  onClick={() => setSelTypeId(rt.id)}
-                  className={cn(
-                    "rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
-                    active
-                      ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-200"
-                      : "border-white/10 text-zinc-400 hover:text-zinc-200"
-                  )}
-                >
-                  {rt.name}
-                  <span className="ml-1.5 font-mono text-[10px] text-zinc-500">×{rt.capacity}</span>
-                </button>
-              );
-            })}
-          </div>
+            {/* Room type */}
+            <div className="mb-4 flex">
+              <Segmented
+                items={types.map((rt) => ({
+                  value: rt.id,
+                  label: (
+                    <>
+                      {rt.name}
+                      <span className="ml-1.5 font-mono text-[10px] text-zinc-500">×{rt.capacity}</span>
+                    </>
+                  ),
+                }))}
+                value={selType?.id ?? null}
+                onChange={(id) => setSelTypeId(id)}
+                ariaLabel="Room type"
+              />
+            </div>
 
           {/* Instant finders — the SYNC-01 capability surfaced as one-tap helpers */}
           <div className="mb-3 flex flex-wrap gap-2">
@@ -382,42 +389,13 @@ export default function HotelPage() {
               className="bg-transparent text-zinc-100"
             />
           </div>
-          <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-            Struck-through nights are booked. The <span className="text-amber-300">amber</span> night is
-            bookable only as your check-out. You sleep the night before and leave that morning.
-          </p>
-
-          {/* Summary + book */}
-          <div className="mt-4 border-t border-white/[0.06] pt-4">
-            {nights > 0 && fromMs != null && toMs != null ? (
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm text-zinc-300">
-                  {fmt(fromMs)} to {fmt(toMs)} ·{" "}
-                  <span className="font-mono">
-                    {nights} night{nights > 1 ? "s" : ""}
-                  </span>
-                  <span className="ml-2 text-emerald-300">all nights open</span>
-                </div>
-                <Button
-                  onClick={book}
-                  disabled={isPending || !spanValid}
-                  className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400 disabled:opacity-40"
-                >
-                  {isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    `Book ${nights} night${nights > 1 ? "s" : ""}`
-                  )}
-                </Button>
-              </div>
-            ) : (
-              <p className="text-center text-xs text-zinc-500">
-                Pick a check-in and check-out date, or use an instant finder above.
-              </p>
-            )}
-          </div>
-        </section>
-      </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
+              Struck-through nights are booked. The <span className="text-amber-300">amber</span> night is
+              bookable only as your check-out. You sleep the night before and leave that morning.
+            </p>
+          </section>
+        </div>
+      </Stage>
 
       <BookingConfirmedModal
         result={result}
@@ -433,7 +411,7 @@ export default function HotelPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
