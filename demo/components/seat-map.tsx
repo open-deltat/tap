@@ -145,10 +145,10 @@ function SectionGrid({
     <div className="flex flex-col items-center">
       {/* Section header */}
       <div className="mb-2 text-center">
-        <div className="text-sm font-semibold">{section.name}</div>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-sm font-semibold text-zinc-100">{section.name}</div>
+        <div className="text-xs text-zinc-500">
           {section.price !== null && (
-            <span className="font-medium text-foreground">{formatPrice(section.price)}</span>
+            <span className="font-medium text-zinc-300">{formatPrice(section.price)}</span>
           )}
           {section.price !== null && " · "}
           {stats.available} available{stats.held > 0 && ` · ${stats.held} held`} · {stats.booked} booked
@@ -162,7 +162,7 @@ function SectionGrid({
           <div
             key={col}
             className={cn(
-              "w-8 text-center text-[10px] font-medium text-muted-foreground",
+              "w-8 text-center text-[10px] font-medium text-zinc-600",
               ci === aisleAfter && "mr-4"
             )}
           >
@@ -174,7 +174,7 @@ function SectionGrid({
       {/* Seat rows */}
       {grid.rows.map((row, ri) => (
         <div key={ri} className="flex items-center gap-0.5">
-          <div className="w-7 text-right text-[10px] font-medium text-muted-foreground pr-0.5">
+          <div className="w-7 text-right text-[10px] font-medium text-zinc-600 pr-0.5">
             {grid.rowLabels[ri]}
           </div>
           {row.map((seat, ci) => {
@@ -203,17 +203,17 @@ function SectionGrid({
                 className={cn(
                   "w-8 h-8 rounded text-[10px] font-medium transition-all border",
                   st === "unavailable" &&
-                    "bg-muted/40 text-muted-foreground/50 border-transparent cursor-not-allowed",
+                    "bg-white/[0.03] text-zinc-600 border-white/[0.06] cursor-not-allowed",
                   st === "available" &&
                     !isSelected &&
-                    "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 cursor-pointer",
+                    "bg-emerald-500/15 text-emerald-200 border-emerald-400/30 hover:bg-emerald-500/25 hover:border-emerald-400/50 cursor-pointer",
                   st === "available" &&
                     isSelected &&
-                    "bg-emerald-500 text-white border-emerald-600 ring-2 ring-emerald-300 cursor-pointer",
+                    "bg-emerald-400/85 text-emerald-950 border-emerald-300 ring-2 ring-white/60 cursor-pointer",
                   st === "held" &&
-                    "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200 cursor-pointer",
+                    "bg-amber-400/25 text-amber-200 border-amber-400/40 hover:bg-amber-400/35 cursor-pointer",
                   st === "booked" &&
-                    "bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200 cursor-pointer",
+                    "bg-rose-500/25 text-rose-200 border-rose-400/40 hover:bg-rose-500/35 cursor-pointer",
                   ci === aisleAfter && "mr-4"
                 )}
                 disabled={st === "unavailable"}
@@ -313,25 +313,25 @@ export function SeatMap({
       ))}
 
       {/* Legend */}
-      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+      <div className="flex items-center gap-4 mt-2 text-xs text-zinc-500">
         <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-emerald-50 border border-emerald-200" />
+          <div className="w-3.5 h-3.5 rounded bg-emerald-500/15 border border-emerald-400/30" />
           <span>Available</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-emerald-500 border border-emerald-600" />
+          <div className="w-3.5 h-3.5 rounded bg-emerald-400/85 border border-emerald-300" />
           <span>Selected</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-amber-100 border border-amber-300" />
+          <div className="w-3.5 h-3.5 rounded bg-amber-400/25 border border-amber-400/40" />
           <span>Held</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-blue-100 border border-blue-200" />
+          <div className="w-3.5 h-3.5 rounded bg-rose-500/25 border border-rose-400/40" />
           <span>Booked</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-muted/40 border border-transparent" />
+          <div className="w-3.5 h-3.5 rounded bg-white/[0.03] border border-white/[0.06]" />
           <span>Unavailable</span>
         </div>
       </div>
