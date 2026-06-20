@@ -46,3 +46,14 @@ export async function verifySession(): Promise<boolean> {
   if (!token) return false;
   return verify(token) !== null;
 }
+
+/**
+ * Enforce authentication at the action boundary. A layout redirect only gates rendering; Server
+ * Actions are independent POST endpoints, so every authenticated action must call this as its first
+ * line — otherwise an unauthenticated request can invoke it directly.
+ */
+export async function requireSession(): Promise<void> {
+  if (!(await verifySession())) {
+    throw new Error("Unauthorized");
+  }
+}

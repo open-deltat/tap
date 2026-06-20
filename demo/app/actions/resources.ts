@@ -11,6 +11,8 @@ function toResource(r: DeltaTResource, meta?: ResourceMeta): Resource {
     slotMinutes: meta?.slotMinutes ?? 60,
     bufferMinutes: (r.bufferAfter ?? 0) / 60_000,
     price: meta?.price ?? null,
+    maxGuests: meta?.maxGuests,
+    section: meta?.section,
   };
 }
 

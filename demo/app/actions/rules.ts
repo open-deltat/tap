@@ -53,6 +53,43 @@ export async function addRecurringRules(input: {
   );
 }
 
+// Replace a resource's whole weekly availability: drop every non-blocking (open-hours) rule, then
+// expand the per-day ranges into fresh concrete rules. Blocking rules and bookings are left alone.
+// This is the cal.com-style "save my weekly hours" operation, mapped onto deltat primitives.
+export async function setWeeklyAvailability(input: {
+  resourceId: string;
+  ranges: { dow: number; startTime: string; endTime: string }[];
+  fromDate: string;
+  toDate: string;
+}): Promise<number> {
+  // Snapshot the open-hours rules we are about to replace.
+  const stale = (await dt.rules.get(input.resourceId)).filter((x) => !x.blocking).map((x) => x.id);
+
+  // Add the new open hours FIRST. If this fails partway, the resource keeps its old hours; the
+  // worst case is duplicate open rules, which merge in availability and get cleaned on the next save.
+  // (Deleting first would risk leaving the schedule empty on a mid-run failure.)
+  const segments = input.ranges.flatMap((rg) =>
+    expandRecurrence({
+      daysOfWeek: [rg.dow],
+      startTime: rg.startTime,
+      endTime: rg.endTime,
+      fromDate: input.fromDate,
+      toDate: input.toDate,
+      blocking: false,
+    })
+  );
+  const created = segments.length
+    ? await dt.rules.create(
+        segments.map((s) => ({ resourceId: input.resourceId, start: s.start, end: s.end, blocking: s.blocking }))
+      )
+    : [];
+
+  // Then remove exactly the rules we snapshotted — never the ones we just created.
+  for (const id of stale) await dt.rules.delete(id);
+
+  return created.length;
+}
+
 export async function editRule(
   id: string,
   data: { start: number; end: number; blocking: boolean }

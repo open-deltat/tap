@@ -32,16 +32,22 @@ export class Availability {
   }): Promise<AvailabilitySlot[]> {
     if (opts.resourceIds.length === 0) return [];
 
-    const inList = opts.resourceIds.map((id) => `'${id}'`).join(", ");
+    // Parameterized like every other SDK builder — never string-splice ids/values into SQL.
     const minAvail = opts.minAvailable ?? opts.resourceIds.length;
+    const values: (string | number)[] = [...opts.resourceIds];
+    const idPlaceholders = opts.resourceIds.map((_, i) => `$${i + 1}`).join(", ");
+    const startParam = values.push(opts.start);
+    const endParam = values.push(opts.end);
+    const minAvailParam = values.push(minAvail);
 
-    let sql = `SELECT * FROM availability WHERE resource_id IN (${inList}) AND start >= ${opts.start} AND "end" <= ${opts.end} AND min_available = ${minAvail}`;
+    let sql = `SELECT * FROM availability WHERE resource_id IN (${idPlaceholders}) AND start >= $${startParam} AND "end" <= $${endParam} AND min_available = $${minAvailParam}`;
 
     if (opts.minDuration != null) {
-      sql += ` AND min_duration = ${opts.minDuration}`;
+      const minDurationParam = values.push(opts.minDuration);
+      sql += ` AND min_duration = $${minDurationParam}`;
     }
 
-    const rows = await this.sql.unsafe(sql);
+    const rows = await this.sql.unsafe(sql, values);
     return rows.map(mapSlot);
   }
 }
