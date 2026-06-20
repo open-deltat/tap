@@ -42,6 +42,8 @@ interface Props {
   futureLabel?: string;
   /** Left label column width in px. */
   labelWidth?: number;
+  /** A top ruler of labelled marks (e.g. hour ticks), positioned on the same scale as the rows. */
+  ticks?: { value: number; label: string }[];
 }
 
 export function LabeledTimeline({
@@ -52,6 +54,7 @@ export function LabeledTimeline({
   pastLabel = "past",
   futureLabel = "future",
   labelWidth = 64,
+  ticks,
 }: Props) {
   const range = axisEnd - axisStart || 1;
   const pct = (ms: number) => ((ms - axisStart) / range) * 100;
@@ -66,6 +69,26 @@ export function LabeledTimeline({
 
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+      {ticks && ticks.length > 0 && (
+        <div className="mb-1.5 flex items-end gap-2">
+          {hasOps && <span className="w-3 shrink-0" />}
+          {labelWidth > 0 && <span className="shrink-0" style={{ width: labelWidth }} />}
+          <div className="relative h-3.5 flex-1">
+            {ticks.map((t, i) => {
+              const left = clamp(pct(t.value));
+              return (
+                <span
+                  key={i}
+                  className="absolute -translate-x-1/2 text-[9px] tabular-nums text-zinc-500"
+                  style={{ left: `${left}%` }}
+                >
+                  {t.label}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
       <div className="space-y-1.5">
         {rows.map((row, ri) => (
           <div key={ri}>

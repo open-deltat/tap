@@ -57,6 +57,15 @@ export function builderDateRange(): { fromDate: string; toDate: string } {
   return { fromDate: toDateStr(from), toDate: toDateStr(to) };
 }
 
+/** Compact hour label like "8a", "12p", "5p" for a minutes-from-midnight offset (axis tick labels). */
+export function shortHour(offsetMs: number): string {
+  const h = Math.round(offsetMs / 3_600_000);
+  const ap = h < 12 || h === 24 ? "a" : "p";
+  let h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  return `${h12}${ap}`;
+}
+
 /** Half-hour options "00:00".."23:30" for the time dropdowns. */
 export const TIME_OPTIONS: string[] = Array.from({ length: 48 }, (_, i) => {
   const h = Math.floor(i / 2);
