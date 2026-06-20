@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
+import { NextAvailability } from "@/components/next-availability";
 import { formatTime, dayBounds } from "@/lib/time";
 import { formatError } from "@/lib/format-error";
 import type { AvailabilitySlot, Resource } from "@/lib/schemas";
@@ -45,6 +46,8 @@ export default function AvailabilityExample() {
     d.setHours(0, 0, 0, 0);
     return d;
   });
+  // Controlled calendar month, so jumping to a future opening also moves the visible month.
+  const [month, setMonth] = useState<Date>(date);
   const [slots, setSlots] = useState<AvailabilitySlot[]>([]);
   const [selected, setSelected] = useState<{ start: number; end: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,15 +111,9 @@ export default function AvailabilityExample() {
     seedAvailabilityScheduler()
       .then(async (id) => {
         setResourceId(id);
-        const days = await loadAvailableDays(id);
-        // Land on the first day that actually has availability (skip a blank weekend/today).
-        const startDay = days.has(midnight(date))
-          ? date
-          : days.size > 0
-            ? new Date(Math.min(...days))
-            : date;
-        if (startDay.getTime() !== date.getTime()) setDate(startDay);
-        await loadSlots(id, startDay);
+        // Stay on today. If today has nothing open, the slot panel shows an explicit
+        // "jump to next availability" action rather than silently moving the date.
+        await Promise.all([loadAvailableDays(id), loadSlots(id, date)]);
       })
       .catch(() => toast.error("Failed to connect to deltat. Is it running?"))
       .finally(() => setLoading(false));
@@ -229,7 +226,8 @@ export default function AvailabilityExample() {
                     next.setHours(0, 0, 0, 0);
                     setDate(next);
                   }}
-                  defaultMonth={date}
+                  month={month}
+                  onMonthChange={setMonth}
                   startMonth={windowStart}
                   disabled={isDayDisabled}
                   className="bg-transparent text-zinc-100"
@@ -253,9 +251,27 @@ export default function AvailabilityExample() {
                     Loading…
                   </div>
                 ) : slots.length === 0 ? (
-                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-500">
-                    No availability — Dr. Chen works weekdays, and two days are blocked out.
-                  </div>
+                  <>
+                    <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-600">
+                      No openings today.
+                    </div>
+                    {resourceId && (
+                      <NextAvailability
+                        resourceIds={[resourceId]}
+                        from={date}
+                        title="Dr. Chen has nothing open today."
+                        minDurationMs={SLOT_MS}
+                        // Cap the search at the calendar's enabled window so a jump never lands on a greyed-out day.
+                        horizonDays={Math.max(1, Math.ceil((windowEndMs - date.getTime()) / 86_400_000))}
+                        onJump={(o) => {
+                          const d = new Date(o.start);
+                          d.setHours(0, 0, 0, 0);
+                          setDate(d);
+                          setMonth(d);
+                        }}
+                      />
+                    )}
+                  </>
                 ) : (
                   <div className="grid max-h-[22rem] grid-cols-2 gap-2 overflow-y-auto pr-1">
                     {slots.map((s) => {

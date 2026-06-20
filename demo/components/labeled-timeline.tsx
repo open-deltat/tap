@@ -15,6 +15,12 @@ export interface TimelineBox {
 
 export interface TimelineRow {
   label?: string;
+  /** A math operator shown in a left gutter (e.g. "−", "=") so the rows read like an equation. */
+  op?: string;
+  /** Draw a separator line above this row, to mark it as the result of the rows above. */
+  divider?: boolean;
+  /** Render this row as a section title (e.g. a person's name) above the rows that follow it. */
+  heading?: string;
   boxes: TimelineBox[];
 }
 
@@ -56,34 +62,50 @@ export function LabeledTimeline({
     return width > 0 ? { left: `${left}%`, width: `${width}%` } : null;
   };
 
+  const hasOps = rows.some((r) => r.op);
+
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
       <div className="space-y-1.5">
         {rows.map((row, ri) => (
-          <div key={ri} className="flex items-center gap-2">
-            {(row.label || labelWidth > 0) && (
-              <span className="shrink-0 text-right text-[10px] text-zinc-400" style={{ width: labelWidth }}>
-                {row.label}
-              </span>
-            )}
-            <div className="relative h-6 flex-1">
-              {row.boxes.map((b, bi) => {
-                const p = pos(b.start, b.end);
-                return p ? (
-                  <div
-                    key={bi}
-                    title={b.text}
-                    className={cn(
-                      "absolute inset-y-0 flex items-center justify-center overflow-hidden rounded-md border text-[9px] font-medium",
-                      COLOR[b.color]
-                    )}
-                    style={p}
-                  >
-                    <span className="truncate px-1">{b.text}</span>
-                  </div>
-                ) : null;
-              })}
+          <div key={ri}>
+            {row.divider && <div className="mb-1.5 h-px bg-emerald-400/20" />}
+            {row.heading ? (
+              <div className={cn("pb-0.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-300", ri > 0 && "pt-2")}>
+                {row.heading}
+              </div>
+            ) : (
+            <div className="flex items-center gap-2">
+              {hasOps && (
+                <span className="w-3 shrink-0 text-right font-mono text-[11px] text-zinc-500">
+                  {row.op ?? ""}
+                </span>
+              )}
+              {(row.label || labelWidth > 0) && (
+                <span className="shrink-0 text-right text-[10px] text-zinc-400" style={{ width: labelWidth }}>
+                  {row.label}
+                </span>
+              )}
+              <div className="relative h-5 flex-1">
+                {row.boxes.map((b, bi) => {
+                  const p = pos(b.start, b.end);
+                  return p ? (
+                    <div
+                      key={bi}
+                      title={b.text}
+                      className={cn(
+                        "absolute inset-y-0 flex items-center justify-center overflow-hidden rounded border text-[10px] font-medium",
+                        COLOR[b.color]
+                      )}
+                      style={p}
+                    >
+                      <span className="truncate px-1">{b.text}</span>
+                    </div>
+                  ) : null;
+                })}
+              </div>
             </div>
+            )}
           </div>
         ))}
       </div>

@@ -39,11 +39,11 @@ async function ensurePerson(
   return cal.id;
 }
 
-// Alice: Mon–Fri 09:00–17:00.   Bob: Mon–Fri 08:00–16:00 (earlier, so mornings/evenings differ).
-const ALICE_HOURS: Record<number, Win[]> = { 1: [{ h: 9, m: 0, dur: 480 }], 2: [{ h: 9, m: 0, dur: 480 }], 3: [{ h: 9, m: 0, dur: 480 }], 4: [{ h: 9, m: 0, dur: 480 }], 5: [{ h: 9, m: 0, dur: 480 }] };
+// Jane: Mon–Fri 09:00–17:00.   Bob: Mon–Fri 08:00–16:00 (earlier, so mornings/evenings differ).
+const JANE_HOURS: Record<number, Win[]> = { 1: [{ h: 9, m: 0, dur: 480 }], 2: [{ h: 9, m: 0, dur: 480 }], 3: [{ h: 9, m: 0, dur: 480 }], 4: [{ h: 9, m: 0, dur: 480 }], 5: [{ h: 9, m: 0, dur: 480 }] };
 const BOB_HOURS: Record<number, Win[]> = { 1: [{ h: 8, m: 0, dur: 480 }], 2: [{ h: 8, m: 0, dur: 480 }], 3: [{ h: 8, m: 0, dur: 480 }], 4: [{ h: 8, m: 0, dur: 480 }], 5: [{ h: 8, m: 0, dur: 480 }] };
 
-const ALICE_MEETINGS: Record<number, Booking[]> = {
+const JANE_MEETINGS: Record<number, Booking[]> = {
   1: [{ h: 9, dur: 1, label: "Standup" }, { h: 14, dur: 1, label: "1:1" }],
   2: [{ h: 11, dur: 1, label: "Design review" }],
   3: [{ h: 9, dur: 2, label: "Workshop" }],
@@ -58,8 +58,8 @@ const BOB_MEETINGS: Record<number, Booking[]> = {
   5: [{ h: 14, dur: 2, label: "Demo" }],
 };
 
-export async function ensureMeetCalendars(): Promise<{ aliceId: string; bobId: string }> {
-  const aliceId = await ensurePerson("Alice", ALICE_HOURS, ALICE_MEETINGS);
+export async function ensureMeetCalendars(): Promise<{ janeId: string; bobId: string }> {
+  const janeId = await ensurePerson("Jane", JANE_HOURS, JANE_MEETINGS);
   const bobId = await ensurePerson("Bob", BOB_HOURS, BOB_MEETINGS);
-  return { aliceId, bobId };
+  return { janeId, bobId };
 }

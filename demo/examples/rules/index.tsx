@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Stage } from "@/components/stage";
+import { NextAvailability } from "@/components/next-availability";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 import type { Resource, Booking } from "@/lib/schemas";
 import { formatTime } from "@/lib/time";
@@ -33,7 +34,7 @@ const SCENARIOS: Record<
     title: "One person, two calendars",
     combinedLabel: "Free (either)",
     bookLabel: "Hold this slot",
-    note: "Two resources for one person. Each calendar keeps its own open hours and its own bookings. The bottom row is when Alex is free in either.",
+    note: "Two resources for one person. Each calendar keeps its own availability and its own bookings. The bottom row is when Bob is free in either.",
     min: 1,
   },
   studio: {
@@ -57,11 +58,17 @@ export default function RulesExample() {
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<BookingResult | null>(null);
 
-  const dayStart = useMemo(() => {
+  const [date, setDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const todayMidnight = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d.getTime();
   }, []);
+  const dayStart = date.getTime();
   const dayEnd = dayStart + 86_400_000;
   const axisStart = dayStart + 7 * H;
   const axisEnd = dayStart + 23 * H;
@@ -85,7 +92,7 @@ export default function RulesExample() {
       for (const id of resourceIds) {
         const [rules, net] = await Promise.all([getRulesForResource(id), getAvailability(id, dayStart, dayEnd)]);
         const open: Span[] = rules.filter((r) => !r.blocking).map((r) => ({ start: r.start, end: r.end }));
-        const blocking: Span[] = rules.filter((r) => r.blocking).map((r) => ({ start: r.start, end: r.end, label: "Closed" }));
+        const blocking: Span[] = rules.filter((r) => r.blocking).map((r) => ({ start: r.start, end: r.end, label: "Blocked" }));
         const bookings: Span[] = ((bookMap[id] ?? []) as Booking[])
           .filter((b) => b.start < dayEnd && b.end > dayStart)
           .map((b) => ({ start: b.start, end: b.end, label: b.label || "Booked" }));
@@ -119,7 +126,7 @@ export default function RulesExample() {
     setSelected(null);
     load(activeIds, minAvailable);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ids, resources, scenario]);
+  }, [ids, resources, scenario, dayStart]);
 
   // Live: subscribe to the active resources (max 3) and re-read on any change.
   const reload = useCallback(() => {
@@ -136,7 +143,7 @@ export default function RulesExample() {
   function book() {
     if (!selected || activeIds.length === 0) return;
     const sel = selected;
-    const label = scenario === "worklife" ? "Alex" : "Studio session";
+    const label = scenario === "worklife" ? "Bob" : "Studio session";
     startTransition(async () => {
       try {
         const created = await batchBookSlots(activeIds.map((id) => ({ resourceId: id, start: sel.start, end: sel.end, label })));
@@ -183,7 +190,11 @@ export default function RulesExample() {
     </div>
   );
 
-  const tray = selected ? (
+  const noSlot = combined.length === 0;
+  const notToday = dayStart !== todayMidnight;
+  const dateLabel = date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+  const tray = noSlot ? undefined : selected ? (
     <div className="flex flex-wrap items-center gap-3">
       <div className="flex-1">
         <div className="text-sm font-medium text-zinc-100">{sc.title}</div>
@@ -206,15 +217,48 @@ export default function RulesExample() {
   return (
     <>
       <Stage primitive={{ label: "Rules + resources · live timelines", specId: "AVAIL-08" }} title={sc.title} ribbon={ribbon} tray={tray}>
-        <ScheduleBoard
-          resources={lanes}
-          combined={combined}
-          combinedLabel={sc.combinedLabel}
-          selected={selected}
-          onPick={onPick}
-          axisStart={axisStart}
-          axisEnd={axisEnd}
-        />
+        {notToday && (
+          <div className="mb-3 flex items-center justify-center gap-2 text-xs text-zinc-400">
+            <span>Viewing {dateLabel}</span>
+            <button
+              type="button"
+              onClick={() => setDate(new Date(todayMidnight))}
+              className="text-emerald-300 hover:text-emerald-200"
+            >
+              back to today
+            </button>
+          </div>
+        )}
+        <div className="relative">
+          <ScheduleBoard
+            resources={lanes}
+            combined={combined}
+            combinedLabel={sc.combinedLabel}
+            selected={selected}
+            onPick={onPick}
+            axisStart={axisStart}
+            axisEnd={axisEnd}
+          />
+          {noSlot && activeIds.length > 0 && (
+            <NextAvailability
+              resourceIds={activeIds}
+              from={date}
+              title={
+                scenario === "studio"
+                  ? "The room, engineer, and console are not all free today."
+                  : "Bob has no free time today."
+              }
+              minAvailable={minAvailable}
+              minDurationMs={SLOT_MS}
+              horizonDays={28}
+              onJump={(o) => {
+                const d = new Date(o.start);
+                d.setHours(0, 0, 0, 0);
+                setDate(d);
+              }}
+            />
+          )}
+        </div>
         <p className="mx-auto mt-5 max-w-2xl text-center text-[11.5px] leading-relaxed text-zinc-500">{sc.note}</p>
       </Stage>
 

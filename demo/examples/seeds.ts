@@ -9,6 +9,7 @@ import { seedAvailabilityScheduler } from "@/examples/availability/seed";
 import { ensureMeetCalendars } from "@/examples/meet/seed";
 import { seedLive } from "@/examples/live/seed";
 import { ensureRulesExample } from "@/examples/rules/seed";
+import { ensureBuilderCalendar } from "@/examples/builder/seed";
 import { ensureExplainerCalendars } from "@/examples/explainer/seed";
 // Calendar's seed is the SHARED personal calendar (also the mirror target for the provider),
 // so it stays in app/actions rather than moving into examples/calendar/.
@@ -30,5 +31,6 @@ export const SEEDS: Record<ExampleId, () => Promise<unknown>> = {
   meet: ensureMeetCalendars,
   live: seedLive,
   rules: ensureRulesExample,
+  builder: ensureBuilderCalendar,
   explainer: ensureExplainerCalendars,
 };

@@ -69,7 +69,7 @@ export function SessionSidebar() {
       <div className="min-h-0 flex-1 overflow-auto p-3">
         {bookings.length === 0 ? (
           <p className="px-1 pt-2 text-[11px] leading-relaxed text-zinc-600">
-            Book anything in a demo — it lands here and auto-clears after {Math.round(ttlMs / 1000)} seconds,
+            Book anything in a demo and it lands here, then auto-clears after {Math.round(ttlMs / 1000)} seconds,
             so the examples stay fresh for the next visitor.
           </p>
         ) : (
