@@ -1,4 +1,4 @@
-// The first page: what deltat is, in plain language, using everyday examples.
+// The first page: why deltat exists, in plain language, using everyday examples.
 
 // Three things booked on one line of time; two of them collide, one sits clear.
 function CollisionViz() {
@@ -11,7 +11,7 @@ function CollisionViz() {
     <div className="relative h-32 overflow-hidden rounded-lg border border-white/10 bg-white/[0.02]">
       <div className="absolute inset-y-0 left-[30%] w-[12%] bg-rose-500/10">
         <div className="absolute inset-x-0 top-1 text-center text-[8.5px] font-medium uppercase tracking-wider text-rose-300/80">
-          they collide
+          collision
         </div>
       </div>
       {/* the time axis: past on the left, future on the right */}
@@ -40,19 +40,16 @@ export function OverviewTopic() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">Start here</div>
-      <h2 className="mt-2 text-2xl font-semibold text-zinc-100">What deltat is</h2>
-      <p className="mt-1 text-sm text-emerald-300/90">A small database that does one job: keep bookings from colliding.</p>
+      <h2 className="mt-2 text-2xl font-semibold text-zinc-100">Why Δt</h2>
+      <p className="mt-1 text-sm text-emerald-300/90">
+        Databases were built to store rows. They were never built for time.
+      </p>
 
-      <div className="mt-5 space-y-3 text-[13.5px] leading-relaxed text-zinc-400">
+      <div className="mt-5 text-[13.5px] leading-relaxed text-zinc-400">
         <p>
-          You know a database you can run yourself, like Postgres in a Docker container, or one you
-          rent from a cloud provider. deltat is one of those. The difference is what it is built for.
-          A normal database stores rows in tables. deltat stores time.
-        </p>
-        <p>
-          Here is the whole idea. Picture one line that runs left to right, and that line is just
-          time. A booking is a stretch on that line, like &quot;this room, 7pm to 9pm&quot;. Two bookings
-          collide when their stretches cover the same moment. That is the entire model.
+          Normal databases store rows in tables, like a spreadsheet. To handle time you bolt on a
+          start and an end column and write tricky checks for overlaps. It works, but it stays slow,
+          because the database has no idea what time is.
         </p>
       </div>
 
@@ -60,17 +57,11 @@ export function OverviewTopic() {
         <CollisionViz />
       </div>
 
-      <div className="mt-5 space-y-3 text-[13.5px] leading-relaxed text-zinc-400">
+      <div className="mt-5 text-[13.5px] leading-relaxed text-zinc-400">
         <p>
-          A flight, a hotel, and a dinner all sit on the same line. The flight and the hotel overlap,
-          so they collide. The dinner is on its own, so it is fine. Checking a booking is really just
-          asking &quot;does this stretch touch one that is already there?&quot;
-        </p>
-        <p>
-          Most apps add booking on top of a database built for spreadsheets of rows, and it gets
-          painful. deltat turns it around. Time is not one column among many. Time is the whole
-          database. That keeps it tiny and quick, and it answers &quot;what is free?&quot; in well under a
-          millisecond.
+          Δt flips that. Time is the whole database. A booking is just a stretch on one line, and two
+          bookings collide when they cover the same moment, like the flight and the hotel above. That
+          is the whole idea, and it answers &quot;what is free?&quot; in well under a millisecond.
         </p>
       </div>
 

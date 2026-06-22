@@ -76,7 +76,7 @@ export function AvailabilityStrip({
           </span>
         ) : (
           openings.map((o) => {
-            const label = `${fmt(o.start)} – ${fmt(o.start + o.nights * DAY)} · ${o.nights}n`;
+            const label = `${fmt(o.start)} to ${fmt(o.start + o.nights * DAY)} · ${o.nights}n`;
             if (!onPick) {
               return (
                 <span

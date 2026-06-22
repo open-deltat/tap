@@ -36,16 +36,15 @@ export interface CanvasSection {
 export type CanvasHit = { kind: "cell"; section: CanvasSection; cell: number };
 
 // Availability ramp + categories — the one source of truth for both the canvas and the legend.
-// CVD-safe by design: the blue → amber → vermillion ramp never leans on a green/red contrast;
-// premium sits darker than the amber midpoint (luminance separation that survives tritanopia);
-// and a picked seat is set apart by LUMINANCE — a near-white fill + dark ring — not by hue,
-// so it never collapses into plenty-blue for deuteranopia/protanopia.
+// On-theme with the rest of the app's tone map: emerald = plenty free, amber = filling,
+// rose = nearly full, dark zinc = sold out. Premium boxes are a brighter mint so they read as
+// special; a picked seat is set apart by LUMINANCE (near-white fill + dark ring), not hue.
 export const LEGEND_COLORS = {
-  plenty: "#4aa3df",
-  filling: "#e6b422",
-  nearlyFull: "#e0563a",
-  premium: "#b8860b",
-  soldOut: "#27272a",
+  plenty: "#10b981", // emerald-500
+  filling: "#fbbf24", // amber-400
+  nearlyFull: "#f43f5e", // rose-500
+  premium: "#6ee7b7", // emerald-300 (premium box)
+  soldOut: "#27272a", // zinc-800
   selection: "#fafafa",
 } as const;
 

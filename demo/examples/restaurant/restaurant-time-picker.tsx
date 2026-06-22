@@ -44,7 +44,7 @@ export function RestaurantTimePicker({ slots, selectedStart, onSelect }: TimePic
       >
         {slots.map((slot) => (
           <option key={slot.start} value={slot.start} className="bg-zinc-900 text-zinc-100">
-            {formatTime(slot.start)} – {formatTime(slot.end)}
+            {formatTime(slot.start)} to {formatTime(slot.end)}
           </option>
         ))}
       </select>
