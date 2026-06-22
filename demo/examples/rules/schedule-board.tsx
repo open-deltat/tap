@@ -37,7 +37,7 @@ export function ScheduleBoard({ resources, combined, combinedLabel, selected, on
     <div className="select-none">
       {/* hour ruler, aligned with the tracks */}
       <div className="mb-1 flex gap-3">
-        <div className="w-32 shrink-0" />
+        <div className="w-20 shrink-0 sm:w-32" />
         <div className="relative h-5 flex-1">
           {ticks.map((t) => (
             <div
@@ -53,8 +53,8 @@ export function ScheduleBoard({ resources, combined, combinedLabel, selected, on
 
       <div className="space-y-2">
         {resources.map((r) => (
-          <div key={r.name} className="flex items-center gap-3">
-            <div className="w-32 shrink-0 truncate text-right text-xs font-medium text-zinc-300">{r.name}</div>
+          <div key={r.name} className="flex items-center gap-2 sm:gap-3">
+            <div className="w-20 shrink-0 truncate text-right text-xs font-medium text-zinc-300 sm:w-32">{r.name}</div>
             <div className="flex-1">
               <TimelineTrack
                 axisStart={axisStart}
@@ -78,8 +78,8 @@ export function ScheduleBoard({ resources, combined, combinedLabel, selected, on
         ))}
       </div>
 
-      <div className="mt-3 flex items-center gap-3">
-        <div className="w-32 shrink-0 text-right text-xs font-semibold text-emerald-300">{combinedLabel}</div>
+      <div className="mt-3 flex items-center gap-2 sm:gap-3">
+        <div className="w-20 shrink-0 text-right text-xs font-semibold text-emerald-300 sm:w-32">{combinedLabel}</div>
         <div className="flex-1">
           <TimelineTrack
             axisStart={axisStart}

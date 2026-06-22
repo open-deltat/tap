@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { FitToWidth } from "@/components/fit-to-width";
 import type { AvailabilitySlot, Booking } from "@/lib/schemas";
 import type { Hold } from "@open-tap/client";
 
@@ -305,25 +306,31 @@ export function SeatMap({
 
   return (
     <div className="flex flex-col items-center gap-6">
-      {sections.map((section, i) => (
-        <SectionGrid
-          key={section.id}
-          section={section}
-          grid={grids[i]}
-          seatStatus={seatStatus}
-          selectedIds={selectedIds}
-          bookingsByResource={bookingsByResource}
-          holdsByResource={holdsByResource}
-          slotStart={slotStart}
-          slotEnd={slotEnd}
-          onToggle={onToggle}
-          onBookingClick={onBookingClick}
-          onHoldClick={onHoldClick}
-        />
-      ))}
+      {/* On phones the fixed-size grid is uniformly scaled down to fit the width (all seats keep the
+          same shape); desktop is wide enough that the scale is 1, a no-op. */}
+      <FitToWidth>
+        <div className="flex flex-col items-center gap-6">
+          {sections.map((section, i) => (
+            <SectionGrid
+              key={section.id}
+              section={section}
+              grid={grids[i]}
+              seatStatus={seatStatus}
+              selectedIds={selectedIds}
+              bookingsByResource={bookingsByResource}
+              holdsByResource={holdsByResource}
+              slotStart={slotStart}
+              slotEnd={slotEnd}
+              onToggle={onToggle}
+              onBookingClick={onBookingClick}
+              onHoldClick={onHoldClick}
+            />
+          ))}
+        </div>
+      </FitToWidth>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 mt-2 text-xs text-zinc-500">
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 mt-2 text-xs text-zinc-500">
         <div className="flex items-center gap-1">
           <div className="w-3.5 h-3.5 rounded bg-emerald-500/15 border border-emerald-400/30" />
           <span>Available</span>
