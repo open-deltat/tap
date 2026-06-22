@@ -51,6 +51,10 @@ export function LiveRoom() {
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<BookingResult | null>(null);
 
+  // Live latency readout: real round-trip times to Δt for reads, the hold→NOTIFY propagation, and a booking.
+  const [perf, setPerf] = useState<{ read?: number; book?: number; live?: number }>({});
+  const holdSentAt = useRef<number | null>(null);
+
   // Per-seat hold WS connections: open WS = hold active on the LEFT pane, close WS = released.
   const holdWsRef = useRef(new Map<string, WebSocket>());
 
@@ -68,6 +72,7 @@ export function LiveRoom() {
   const loadSeatState = useCallback(
     async (seatIds: string[], start: number, end: number) => {
       if (seatIds.length === 0) return;
+      const t0 = performance.now();
       const [availMap, bookMap, holdMap] = await Promise.all([
         getMultiResourceAvailability(seatIds, start, end),
         getMultiResourceBookings(seatIds),
@@ -87,6 +92,7 @@ export function LiveRoom() {
         );
       }
       setSeatState({ availability, bookings, holds });
+      setPerf((p) => ({ ...p, read: performance.now() - t0 }));
     },
     []
   );
@@ -124,6 +130,12 @@ export function LiveRoom() {
   // landing during the booking transition doesn't momentarily re-show just-booked seats as free.
   const reload = useCallback(() => {
     if (isPending || !slot || !venueId) return;
+    // If this NOTIFY is the echo of a hold we just sent, this is the real hold→broadcast round-trip.
+    const sent = holdSentAt.current;
+    if (sent != null) {
+      holdSentAt.current = null;
+      setPerf((p) => ({ ...p, live: performance.now() - sent }));
+    }
     const seatIds = allSeatIds(buildSections(venueId, resources));
     if (seatIds.length > 0) loadSeatState(seatIds, slot.start, slot.end);
   }, [isPending, slot, venueId, resources, loadSeatState]);
@@ -154,6 +166,7 @@ export function LiveRoom() {
       });
     };
     ws.onopen = () => {
+      holdSentAt.current = performance.now();
       ws.send(JSON.stringify({
         type: "hold",
         resourceId: seatId,
@@ -192,12 +205,14 @@ export function LiveRoom() {
         const slotEnd = slot.end;
         // bookHeldSeats releases each seat's hold server-side BEFORE booking, so the atomic batch
         // can't conflict with the client's own holds.
+        const t0 = performance.now();
         const created = await bookHeldSeats({
           seatIds: seatList,
           start: slotStart,
           end: slotEnd,
           label: venue?.name ?? "Live booking",
         });
+        setPerf((p) => ({ ...p, book: performance.now() - t0 }));
         closeAllHolds(); // sockets only — the holds were already released by bookHeldSeats
         setSelectedSeats(new Set());
         setResult({
@@ -281,6 +296,7 @@ export function LiveRoom() {
       {/* Top: your booker. Bottom: one row of three read-only viewers, each its own connection,
           all repainting live from the shared seat state. */}
       <div className="space-y-3">
+        <PerfBar perf={perf} />
         <Pane
           title="You"
           hint={slot ? `${formatTime(slot.start)} – ${formatTime(slot.end)} · tap a free seat to hold it` : "tap a free seat to hold it"}
@@ -338,6 +354,38 @@ function EmptySurface() {
   return (
     <div className="py-16 text-center text-sm text-zinc-400">
       No showtime available right now.
+    </div>
+  );
+}
+
+function fmtMs(n: number): string {
+  return (n < 10 ? n.toFixed(1) : String(Math.round(n))) + " ms";
+}
+
+/** Real round-trip timings to Δt: a multi-seat read, the hold→broadcast loop, and a batch booking.
+ *  Each value fills in the first time you do that action; until then it shows a dash. */
+function PerfBar({ perf }: { perf: { read?: number; book?: number; live?: number } }) {
+  const stats: { label: string; hint: string; value?: number }[] = [
+    { label: "read", hint: "availability + holds", value: perf.read },
+    { label: "live update", hint: "hold to broadcast", value: perf.live },
+    { label: "book", hint: "atomic batch", value: perf.book },
+  ];
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+      <span className="text-[10px] uppercase tracking-wider text-zinc-500">live latency</span>
+      {stats.map((s) => (
+        <span
+          key={s.label}
+          className="flex items-baseline gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-2 py-1"
+          title={s.hint}
+        >
+          <span className="text-[10px] text-zinc-400">{s.label}</span>
+          <span className="font-mono tabular-nums text-xs font-semibold text-emerald-300">
+            {s.value != null ? fmtMs(s.value) : "—"}
+          </span>
+        </span>
+      ))}
+      <span className="text-[10px] text-zinc-600">real round-trips to Δt</span>
     </div>
   );
 }
