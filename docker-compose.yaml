@@ -10,7 +10,7 @@ services:
     build: https://github.com/open-tap/deltat.git#main
     restart: unless-stopped
     environment:
-      DELTAT_PASSWORD: ${DELTAT_PASSWORD:?set DELTAT_PASSWORD}
+      DELTAT_PASSWORD: ${DELTAT_PASSWORD:-deltat}
       DELTAT_BIND: 0.0.0.0
     volumes:
       - deltat-data:/data # WAL persistence; remove this line for a fully ephemeral demo
@@ -24,7 +24,7 @@ services:
       DELTAT_HOST: deltat
       DELTAT_PORT: "5433"
       DELTAT_DB: demo
-      DELTAT_PASSWORD: ${DELTAT_PASSWORD:?set DELTAT_PASSWORD}
+      DELTAT_PASSWORD: ${DELTAT_PASSWORD:-deltat}
       PORT: "3000"
     ports:
       - "3000:3000"
