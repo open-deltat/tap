@@ -66,7 +66,7 @@ export function MeetLanes({
   return (
     <div className="select-none">
       {/* shared hour ruler */}
-      <div className="relative ml-20 h-5">
+      <div className="relative ml-14 h-5 sm:ml-20">
         {ticks.map((t) => (
           <div
             key={t}
@@ -85,7 +85,7 @@ export function MeetLanes({
             <div key={lane.label} className="flex items-stretch gap-3">
               <div
                 className={cn(
-                  "w-[68px] shrink-0 self-center text-right text-xs font-medium",
+                  "w-12 shrink-0 self-center text-right text-xs font-medium sm:w-[68px]",
                   lane.intersection ? "text-emerald-300" : "text-zinc-400"
                 )}
               >
