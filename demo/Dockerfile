@@ -6,10 +6,12 @@ FROM oven/bun:1
 
 WORKDIR /app
 
-# Copy the whole workspace so `workspace:*` deps resolve, then install against the root lockfile.
+# Copy the whole workspace so `workspace:*` deps resolve, then install.
 # (.dockerignore keeps node_modules/.next/.git/data out of the build context.)
+# Not --frozen-lockfile: the committed lock drifts across bun versions, and a deploy build
+# should reconcile it rather than hard-fail (bun's own advice when the lock has changes).
 COPY . .
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Production Next build for the demo (output lands in demo/.next).
 RUN cd demo && bun run build
