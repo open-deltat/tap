@@ -1,12 +1,22 @@
-import { createHmac } from "crypto";
+import { createHmac, createHash, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
-import { config } from "./config";
+import { config, assertProductionSecrets } from "./config";
 
 const COOKIE_NAME = "cal_session";
 
 interface SessionPayload {
   user: string;
   iat: number;
+}
+
+/**
+ * Compare via fixed-length digests so the check time does not depend on how many leading
+ * characters match, closing the timing side channel on the signature and password compares.
+ */
+export function constantTimeEqual(a: string, b: string): boolean {
+  const aHash = createHash("sha256").update(a).digest();
+  const bHash = createHash("sha256").update(b).digest();
+  return timingSafeEqual(aHash, bHash);
 }
 
 function sign(payload: SessionPayload): string {
@@ -20,8 +30,12 @@ function verify(token: string): SessionPayload | null {
   if (!dataB64 || !sig) return null;
   const data = Buffer.from(dataB64, "base64url").toString();
   const expected = createHmac("sha256", config.secret).update(data).digest("hex");
-  if (sig !== expected) return null;
-  return JSON.parse(data) as SessionPayload;
+  if (!constantTimeEqual(sig, expected)) return null;
+  try {
+    return JSON.parse(data) as SessionPayload;
+  } catch {
+    return null;
+  }
 }
 
 export async function createSession() {
@@ -41,6 +55,7 @@ export async function deleteSession() {
 }
 
 export async function verifySession(): Promise<boolean> {
+  assertProductionSecrets();
   const jar = await cookies();
   const token = jar.get(COOKIE_NAME)?.value;
   if (!token) return false;
@@ -50,7 +65,7 @@ export async function verifySession(): Promise<boolean> {
 /**
  * Enforce authentication at the action boundary. A layout redirect only gates rendering; Server
  * Actions are independent POST endpoints, so every authenticated action must call this as its first
- * line — otherwise an unauthenticated request can invoke it directly.
+ * line, otherwise an unauthenticated request can invoke it directly.
  */
 export async function requireSession(): Promise<void> {
   if (!(await verifySession())) {
