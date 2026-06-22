@@ -258,7 +258,7 @@ export default function BuilderExample() {
                     {on ? (
                       <div className="flex flex-1 flex-col gap-1.5">
                         {ranges.map((r, idx) => (
-                          <div key={idx} className="flex items-center gap-1.5">
+                          <div key={idx} className="flex flex-wrap items-center gap-1.5">
                             <TimeSelect value={r.start} onChange={(v) => editRange(dow, idx, "start", v)} />
                             <span className="text-zinc-500">to</span>
                             <TimeSelect value={r.end} onChange={(v) => editRange(dow, idx, "end", v)} />

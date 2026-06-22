@@ -72,7 +72,8 @@ export function WeekTimeline({ start, dayCount, rows, onPick, selectedDay, label
     });
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+    <div className="overflow-x-auto rounded-lg border border-white/10 bg-white/[0.02] p-3">
+      <div className="min-w-[28rem] sm:min-w-0">
       {/* date axis */}
       <div className="mb-1.5 flex items-end gap-2">
         <span className="shrink-0" style={{ width: labelWidth }} />
@@ -107,6 +108,7 @@ export function WeekTimeline({ start, dayCount, rows, onPick, selectedDay, label
             </div>
           </div>
         ))}
+      </div>
       </div>
     </div>
   );
