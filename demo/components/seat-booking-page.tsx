@@ -17,9 +17,9 @@ import { usePersonalCalendar } from "@/components/personal-calendar-provider";
 import { useWebSocket, wsUrl } from "@/hooks/use-websocket";
 
 import { getResources } from "@/app/actions/resources";
-import { getAvailability, getMultiResourceAvailability } from "@/app/actions/availability";
-import { getMultiResourceBookings, bookHeldSeats, cancelBooking, cancelBookingWithMirror } from "@/app/actions/bookings";
-import { getMultiResourceHolds } from "@/app/actions/holds";
+import { getAvailability } from "@/app/actions/availability";
+import { bookHeldSeats, cancelBooking, cancelBookingWithMirror } from "@/app/actions/bookings";
+import { getSeatState } from "@/app/actions/seat-state";
 import { formatError } from "@/lib/format-error";
 
 export function SeatBookingPage({
@@ -90,11 +90,8 @@ export function SeatBookingPage({
     async (seatIds: string[], start: number, end: number) => {
       if (seatIds.length === 0) return;
       try {
-        const [availMap, bookMap, holdMap] = await Promise.all([
-          getMultiResourceAvailability(seatIds, start, end),
-          getMultiResourceBookings(seatIds),
-          getMultiResourceHolds(seatIds),
-        ]);
+        const { availability: availMap, bookings: bookMap, holds: holdMap } =
+          await getSeatState(seatIds, start, end);
         setAvailability(new Map(Object.entries(availMap)));
         const filteredBookings = new Map<string, Booking[]>();
         for (const [id, bks] of Object.entries(bookMap)) {
