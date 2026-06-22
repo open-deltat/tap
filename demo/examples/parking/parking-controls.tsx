@@ -38,7 +38,7 @@ export function ParkingControls({
             className="h-8 w-28 border-white/10 bg-white/5 text-sm text-zinc-100"
           />
         </label>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center justify-center gap-1">
           {DURATIONS.map((d) => {
             const active = duration === d.minutes;
             return (

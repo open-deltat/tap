@@ -41,6 +41,32 @@ Adding an example = add its id to `config.ts`, its label/icon to `manifest.ts`, 
 - `app/demos/<id>/page.tsx` — thin route shim: enablement guard → render the example.
 - `proxy.ts` — mints the per-visitor session cookie.
 
+## Mobile
+
+The demo is **mobile-friendly** (not mobile-first): every example must be usable and well-laid-out
+on a phone browser, because bookings increasingly happen on phones. The desktop layouts are the
+reference and must render **byte-identical** at `>=640px` — so mobile is added as a layer, never by
+changing the desktop output.
+
+Conventions:
+
+- **Responsive prefixes, desktop re-pinned.** Put the mobile value as the bare class and restore the
+  current desktop value at the breakpoint: `px-3 sm:px-6`, `w-20 sm:w-32`, `flex-col md:flex-row`.
+  Never drop a desktop class without re-pinning it at `sm:`/`md:`. `flex-wrap` is a safe addition —
+  it's a no-op when content already fits (i.e. at desktop widths).
+- **Use the width.** The `/demos` shell hides the session sidebar (`session-sidebar.tsx`, `hidden
+  sm:flex`) and `Stage` tightens its padding (`px-3 sm:px-6`, `p-4 sm:p-6`) on phones, so the example
+  gets the full screen.
+- **Fixed-size grids scale, they don't reflow.** Seat maps must keep every seat the *same shape*, so
+  they can't shrink cells responsively. Instead they're wrapped in `components/fit-to-width.tsx`,
+  which uniformly scales the whole grid down to fit the viewport (`scale = min(1, containerW /
+  naturalW)`). At desktop widths the scale is `1` — identity transform, byte-identical. Genuinely
+  wide ribbons (the 21-day finder) may use horizontal scroll instead (`overflow-x-auto` +
+  `min-w-[…] sm:min-w-0`).
+
+Verify any change at **390px** (fits, no horizontal overflow, seats keep their shape) **and 1280px**
+(pixel-identical to before).
+
 ## Folder migration status
 
 Each example is being moved into a self-contained `examples/<id>/` folder (seed + page +
