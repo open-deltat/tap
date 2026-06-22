@@ -44,6 +44,26 @@ export class Holds {
       .sql`SELECT * FROM holds WHERE resource_id = ${resourceId}`;
     return rows.map(mapHold);
   }
+
+  /** Holds for many resources in one round-trip, grouped by resource id. Every requested id is
+   *  present in the result (empty array if it has none). Ids are positional ($N) params, never
+   *  spliced into the SQL. */
+  async getMany(resourceIds: string[]): Promise<Record<string, Hold[]>> {
+    const grouped: Record<string, Hold[]> = {};
+    for (const id of resourceIds) grouped[id] = [];
+    if (resourceIds.length === 0) return grouped;
+
+    const placeholders = resourceIds.map((_, i) => `$${i + 1}`).join(", ");
+    const rows = await this.sql.unsafe(
+      `SELECT * FROM holds WHERE resource_id IN (${placeholders})`,
+      [...resourceIds]
+    );
+    for (const row of rows) {
+      const h = mapHold(row);
+      (grouped[h.resourceId] ??= []).push(h);
+    }
+    return grouped;
+  }
 }
 
 function mapHold(row: Record<string, unknown>): Hold {
