@@ -5,11 +5,13 @@ import { cn } from "@/lib/utils";
 import { HoldsStatic } from "./holds/holds-static";
 import { OverviewTopic } from "./overview";
 import { DataModelTopic } from "./concepts";
+import { FeaturesTopic } from "./features";
 
-// The "How it works" landing: a short first-principles intro, the data model, and the holds/races
-// story. Live availability, recurrence, and multi-night live in their own runnable examples now.
+// The "How it works" landing: why Δt, what you can build with it (linking to the live demos), the
+// data model, and the holds/races story.
 const NAV: { id: string; label: string }[] = [
-  { id: "overview", label: "Why deltat" },
+  { id: "overview", label: "Why Δt" },
+  { id: "features", label: "What you can build" },
   { id: "model", label: "Data model" },
   { id: "holds", label: "Holds and races" },
 ];
@@ -18,7 +20,8 @@ export default function ExplainerExample() {
   const [topic, setTopic] = useState<string>("overview");
 
   let content: ReactNode;
-  if (topic === "model") content = <DataModelTopic />;
+  if (topic === "features") content = <FeaturesTopic />;
+  else if (topic === "model") content = <DataModelTopic />;
   else if (topic === "holds") content = <HoldsStatic />;
   else content = <OverviewTopic />;
 
@@ -31,7 +34,7 @@ export default function ExplainerExample() {
 
       <div className="relative mx-auto flex h-full max-w-6xl gap-4 px-4 py-6 sm:gap-6 sm:px-6">
         <aside className="w-40 shrink-0 overflow-auto sm:w-56">
-          <div className="mb-3 px-2 text-[11px] uppercase tracking-[0.18em] text-zinc-500">How deltat works</div>
+          <div className="mb-3 px-2 text-[11px] uppercase tracking-[0.18em] text-zinc-500">How Δt works</div>
           <nav className="space-y-0.5">
             {NAV.map((item) => (
               <button

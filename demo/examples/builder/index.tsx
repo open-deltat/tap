@@ -99,7 +99,7 @@ export default function BuilderExample() {
         setWeek(rulesToWeek(rules));
         await loadStrip(id);
       } catch {
-        toast.error("Failed to connect to deltat. Is it running?");
+        toast.error("Failed to connect to Δt. Is it running?");
       } finally {
         setLoading(false);
       }
@@ -164,7 +164,7 @@ export default function BuilderExample() {
       <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to deltat…
+          Connecting to Δt…
         </div>
       </div>
     );
@@ -207,7 +207,7 @@ export default function BuilderExample() {
       <div className="flex-1">
         <div className="text-sm font-medium text-zinc-100">Weekly availability</div>
         <div className="text-xs text-zinc-400">
-          {ruleCount != null ? `${ruleCount} rules live in deltat` : "…"} · expanded over the next 4 weeks
+          {ruleCount != null ? `${ruleCount} time blocks in Δt` : "…"} · for the next 4 weeks
         </div>
       </div>
       <Button
@@ -231,7 +231,7 @@ export default function BuilderExample() {
   return (
     <>
       <Stage
-        primitive={{ label: "Availability builder · expandRecurrence", specId: "EDGE-03" }}
+        primitive={{ label: "Set weekly hours, get real time", specId: "EDGE-03" }}
         title="Build a weekly schedule"
         tray={tray}
       >
@@ -290,12 +290,11 @@ export default function BuilderExample() {
           </div>
 
           <div>
-            <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">What deltat stores</div>
+            <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">What Δt stores</div>
             <LabeledTimeline axisStart={lo} axisEnd={hi} labelWidth={40} rows={stripRows} ticks={ticks} />
             <p className="mt-3 text-[12px] leading-relaxed text-zinc-400">
-              Your weekly hours become real rules, one stretch per day, read back live from deltat for
-              the next seven days. There is no &quot;every Monday&quot; stored anywhere, just concrete time.
-              Edit the hours and save to watch this redraw. Booked time shows in red.
+              Your weekly hours turn into real blocks of time, one per day. Nothing stores &quot;every
+              Monday&quot;, just the actual days. Edit and save to watch it redraw. Red is already booked.
             </p>
           </div>
         </div>

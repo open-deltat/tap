@@ -83,7 +83,7 @@ export function SessionSidebar() {
                     {booking.label || "Booking"}
                   </div>
                   <div className="mt-0.5 font-mono text-[10px] text-zinc-500">
-                    {formatTime(booking.start)} – {formatTime(booking.end)}
+                    {formatTime(booking.start)} to {formatTime(booking.end)}
                   </div>
                   <div className="mt-1.5 h-0.5 w-full overflow-hidden rounded-full bg-white/10">
                     <div

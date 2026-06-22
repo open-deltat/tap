@@ -13,7 +13,7 @@ export default function RestaurantExample() {
   useEffect(() => {
     seedRestaurant()
       .then(setRestaurantId)
-      .catch(() => toast.error("Failed to connect to deltat. Is it running?"))
+      .catch(() => toast.error("Failed to connect to Δt. Is it running?"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -22,7 +22,7 @@ export default function RestaurantExample() {
       <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to deltat…
+          Connecting to Δt…
         </div>
       </div>
     );
