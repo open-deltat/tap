@@ -1,22 +1,13 @@
-import { createHmac, createHash, timingSafeEqual } from "crypto";
+import { createHmac } from "crypto";
 import { cookies } from "next/headers";
 import { config, assertProductionSecrets } from "./config";
+import { constantTimeEqual } from "./crypto";
 
 const COOKIE_NAME = "cal_session";
 
 interface SessionPayload {
   user: string;
   iat: number;
-}
-
-/**
- * Compare via fixed-length digests so the check time does not depend on how many leading
- * characters match, closing the timing side channel on the signature and password compares.
- */
-export function constantTimeEqual(a: string, b: string): boolean {
-  const aHash = createHash("sha256").update(a).digest();
-  const bHash = createHash("sha256").update(b).digest();
-  return timingSafeEqual(aHash, bHash);
 }
 
 function sign(payload: SessionPayload): string {

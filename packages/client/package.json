@@ -1,6 +1,16 @@
 {
   "name": "@open-tap/client",
   "version": "0.1.0",
+  "description": "TypeScript SDK for deltat, a time-allocation database: resources, rules, bookings, holds, availability, and recurrence expansion over the PostgreSQL wire protocol.",
+  "license": "MIT",
+  "author": "Simon Orzel",
+  "homepage": "https://github.com/open-tap/tap",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-tap/tap.git",
+    "directory": "packages/client"
+  },
+  "keywords": ["scheduling", "availability", "booking", "calendar", "deltat"],
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
