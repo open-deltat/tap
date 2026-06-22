@@ -33,7 +33,7 @@ export function DateNav({
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      <span className="min-w-[11rem] text-center text-sm font-medium text-zinc-200 tabular-nums">{label}</span>
+      <span className="min-w-[9rem] text-center text-sm font-medium text-zinc-200 tabular-nums sm:min-w-[11rem]">{label}</span>
       <Button
         variant="ghost"
         size="icon-sm"
