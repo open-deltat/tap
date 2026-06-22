@@ -51,7 +51,7 @@ export function SessionSidebar() {
   const headlineSecs = bookings.length > 0 ? Math.max(0, Math.ceil((soonest - now) / 1000)) : null;
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-white/10 bg-[#070708] text-zinc-200">
+    <aside className="hidden h-full w-60 shrink-0 flex-col border-r border-white/10 bg-[#070708] text-zinc-200 sm:flex">
       <div className="border-b border-white/10 px-4 py-3">
         <div className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Your session</div>
         <div className="mt-1 flex items-center gap-1.5 text-[11px] text-zinc-500">

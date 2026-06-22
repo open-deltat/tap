@@ -32,10 +32,10 @@ export default function ExplainerExample() {
         <div className="absolute inset-0 opacity-[0.035] [background-image:radial-gradient(circle,#ffffff_1px,transparent_1px)] [background-size:22px_22px]" />
       </div>
 
-      <div className="relative mx-auto flex h-full max-w-6xl gap-4 px-4 py-6 sm:gap-6 sm:px-6">
-        <aside className="w-40 shrink-0 overflow-auto sm:w-56">
+      <div className="relative mx-auto flex h-full max-w-6xl flex-col gap-4 px-4 py-6 sm:flex-row sm:gap-6 sm:px-6">
+        <aside className="w-full shrink-0 overflow-auto sm:w-56">
           <div className="mb-3 px-2 text-[11px] uppercase tracking-[0.18em] text-zinc-500">How Δt works</div>
-          <nav className="space-y-0.5">
+          <nav className="flex gap-1 overflow-x-auto sm:block sm:space-y-0.5">
             {NAV.map((item) => (
               <button
                 key={item.id}

@@ -55,15 +55,15 @@ export function Stage({
 
         {/* m-auto (not items-center) so a panel taller than the viewport top-anchors and stays
             fully scrollable — items-center would clip the top out of reach. */}
-        <div className={`flex w-full flex-1 justify-center overflow-auto px-6 pb-28 ${contentMax}`}>
-          <div className="m-auto w-full rounded-2xl border border-white/[0.06] bg-white/[0.025] p-6 shadow-2xl shadow-black/50">
+        <div className={`flex w-full flex-1 justify-center overflow-auto px-3 pb-28 sm:px-6 ${contentMax}`}>
+          <div className="m-auto w-full rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 shadow-2xl shadow-black/50 sm:p-6">
             {children}
           </div>
         </div>
       </div>
 
       {tray && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-4">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-3 sm:p-4">
           <div className="pointer-events-auto w-full max-w-2xl rounded-xl border border-white/10 bg-zinc-900/85 p-3 shadow-2xl shadow-black/50 backdrop-blur-md">
             {tray}
           </div>
