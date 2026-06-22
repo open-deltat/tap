@@ -197,28 +197,36 @@ function SectionGrid({
               (h) => h.start < slotEnd && h.end > slotStart && h.expiresAt > now
             );
 
+            // A selected seat is one YOU are holding right now. Your own hold removes the seat's
+            // availability and is filtered out of holdsByResource, so its recomputed status would
+            // otherwise read "unavailable". isSelected therefore wins: always show it as your hold
+            // (violet) and keep it clickable so you can release it.
             return (
               <button
                 key={seat.id}
                 className={cn(
                   "w-8 h-8 rounded text-[10px] font-medium transition-all border",
-                  st === "unavailable" &&
+                  isSelected &&
+                    "bg-violet-500/80 text-white border-violet-300 ring-2 ring-violet-300/60 cursor-pointer",
+                  !isSelected &&
+                    st === "unavailable" &&
                     "bg-white/[0.03] text-zinc-600 border-white/[0.06] cursor-not-allowed",
-                  st === "available" &&
-                    !isSelected &&
+                  !isSelected &&
+                    st === "available" &&
                     "bg-emerald-500/15 text-emerald-200 border-emerald-400/30 hover:bg-emerald-500/25 hover:border-emerald-400/50 cursor-pointer",
-                  st === "available" &&
-                    isSelected &&
-                    "bg-emerald-400/85 text-emerald-950 border-emerald-300 ring-2 ring-white/60 cursor-pointer",
-                  st === "held" &&
-                    "bg-amber-400/25 text-amber-200 border-amber-400/40 hover:bg-amber-400/35 cursor-pointer",
-                  st === "booked" &&
+                  !isSelected &&
+                    st === "held" &&
+                    "bg-amber-400/55 text-amber-50 border-amber-400/60 hover:bg-amber-400/70 cursor-pointer",
+                  !isSelected &&
+                    st === "booked" &&
                     "bg-rose-500/25 text-rose-200 border-rose-400/40 hover:bg-rose-500/35 cursor-pointer",
                   ci === aisleAfter && "mr-4"
                 )}
-                disabled={st === "unavailable"}
+                disabled={!isSelected && st === "unavailable"}
                 onClick={() => {
-                  if (st === "booked" && booking) {
+                  if (isSelected) {
+                    onToggle(seat.id);
+                  } else if (st === "booked" && booking) {
                     onBookingClick(booking);
                   } else if (st === "held" && hold && onHoldClick) {
                     onHoldClick(hold);
@@ -227,13 +235,15 @@ function SectionGrid({
                   }
                 }}
                 title={
-                  st === "booked"
-                    ? `${seat.name}, ${booking?.label || "booked"}`
-                    : st === "held"
-                      ? `${seat.name}, on hold`
-                      : st === "available"
-                        ? `${seat.name}, free`
-                        : `${seat.name}, not available`
+                  isSelected
+                    ? `${seat.name}, holding`
+                    : st === "booked"
+                      ? `${seat.name}, ${booking?.label || "booked"}`
+                      : st === "held"
+                        ? `${seat.name}, on hold`
+                        : st === "available"
+                          ? `${seat.name}, free`
+                          : `${seat.name}, not available`
                 }
               >
                 {seat.name}
@@ -319,11 +329,11 @@ export function SeatMap({
           <span>Available</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-emerald-400/85 border border-emerald-300" />
-          <span>Selected</span>
+          <div className="w-3.5 h-3.5 rounded bg-violet-500/80 border border-violet-300" />
+          <span>Holding (you)</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-amber-400/25 border border-amber-400/40" />
+          <div className="w-3.5 h-3.5 rounded bg-amber-400/55 border border-amber-400/60" />
           <span>Held</span>
         </div>
         <div className="flex items-center gap-1">

@@ -413,6 +413,7 @@ export default function StadiumExample() {
         <Legend color={LEGEND_COLORS.nearlyFull} label="nearly full" />
         <Legend color={LEGEND_COLORS.premium} label="premium box" />
         <Legend color={LEGEND_COLORS.soldOut} label="sold out" />
+        <Legend color={LEGEND_COLORS.selection} label="holding (you)" />
       </div>
     </div>
   );
