@@ -94,8 +94,5 @@ export async function getBookingsForResource(
 export async function getMultiResourceBookings(
   resourceIds: string[]
 ): Promise<Record<string, Booking[]>> {
-  const results = await Promise.all(
-    resourceIds.map(async (id) => [id, await dt.bookings.get(id)] as const)
-  );
-  return Object.fromEntries(results);
+  return dt.bookings.getMany(resourceIds);
 }

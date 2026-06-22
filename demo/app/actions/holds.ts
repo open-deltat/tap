@@ -12,8 +12,5 @@ export async function getHoldsForResource(
 export async function getMultiResourceHolds(
   resourceIds: string[]
 ): Promise<Record<string, Hold[]>> {
-  const results = await Promise.all(
-    resourceIds.map(async (id) => [id, await dt.holds.get(id)] as const)
-  );
-  return Object.fromEntries(results);
+  return dt.holds.getMany(resourceIds);
 }
