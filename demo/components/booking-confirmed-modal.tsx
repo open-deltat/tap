@@ -56,10 +56,10 @@ export function BookingConfirmedModal({
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground">deltat record</span>
+            <span className="text-xs font-medium text-muted-foreground">What Δt saved</span>
             {isBatch && (
               <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400">
-                atomic batch · {result?.bookings.length ?? 0} rows · both-or-neither
+                all booked together · {result?.bookings.length ?? 0} rows · all or nothing
               </span>
             )}
           </div>
@@ -78,14 +78,13 @@ export function BookingConfirmedModal({
                 >
                   <Field label="id" value={booking.id} copyable />
                   <Field label="resource" value={booking.resourceId} note={resource?.name ?? undefined} />
-                  <Field label="span (ms)" value={`[${booking.start}, ${booking.end})`} />
+                  <Field label="time (ms)" value={`[${booking.start}, ${booking.end})`} />
                   <Field
-                    label="span"
+                    label="time"
                     value={`[${formatTime(booking.start)}, ${formatTime(booking.end)})`}
-                    note="half-open"
                   />
                   {booking.label && <Field label="label" value={booking.label} />}
-                  {cfg && <Field label="resource cfg" value={cfg} />}
+                  {cfg && <Field label="settings" value={cfg} />}
                 </div>
               );
             })}

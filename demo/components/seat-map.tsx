@@ -228,12 +228,12 @@ function SectionGrid({
                 }}
                 title={
                   st === "booked"
-                    ? `${seat.name} — ${booking?.label || "Booked"}`
+                    ? `${seat.name}, ${booking?.label || "booked"}`
                     : st === "held"
-                      ? `${seat.name} — Held`
+                      ? `${seat.name}, on hold`
                       : st === "available"
-                        ? `${seat.name} — Available`
-                        : `${seat.name} — Unavailable`
+                        ? `${seat.name}, free`
+                        : `${seat.name}, not available`
                 }
               >
                 {seat.name}

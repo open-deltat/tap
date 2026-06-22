@@ -77,7 +77,7 @@ export default function HotelPage() {
         setSelTypeId(rooms[0]?.id ?? null);
         await refresh(rooms);
       } catch {
-        toast.error("Failed to connect to deltat. Is it running?");
+        toast.error("Failed to connect to Δt. Is it running?");
       } finally {
         setLoading(false);
       }
@@ -241,7 +241,7 @@ export default function HotelPage() {
       <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to deltat…
+          Connecting to Δt…
         </div>
       </div>
     );
@@ -266,7 +266,7 @@ export default function HotelPage() {
   return (
     <>
       <Stage
-        primitive={{ label: "Capacity sweep · availability windows", specId: "AVAIL-04" }}
+        primitive={{ label: "Find open nights to book", specId: "AVAIL-04" }}
         title="Grand Hotel"
         contentMax="max-w-6xl"
         tray={tray}

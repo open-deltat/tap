@@ -88,7 +88,7 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
         const { start, end } = windowMs();
         await refresh(zs, start, end);
       } catch {
-        toast.error("Failed to connect to deltat. Is it running?");
+        toast.error("Failed to connect to Δt. Is it running?");
       } finally {
         setLoading(false);
       }
@@ -157,7 +157,7 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
       <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to deltat…
+          Connecting to Δt…
         </div>
       </div>
     );
@@ -199,7 +199,7 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
   return (
     <>
       <Stage
-        primitive={{ label: "Capacity sweep · parking zones", specId: "AVAIL-05" }}
+        primitive={{ label: "Grab a spot before the zone fills", specId: "AVAIL-05" }}
         title="Downtown Garage"
         ribbon={ribbon}
         tray={tray}
