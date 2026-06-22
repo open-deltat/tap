@@ -117,7 +117,7 @@ export default function AvailabilityExample() {
         // "next opening" action rather than silently moving the date.
         await Promise.all([loadAvailableDays(id), loadSlots(id, date)]);
       })
-      .catch(() => toast.error("Failed to connect to deltat. Is it running?"))
+      .catch(() => toast.error("Failed to connect to Δt. Is it running?"))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -172,7 +172,7 @@ export default function AvailabilityExample() {
       <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to deltat…
+          Connecting to Δt…
         </div>
       </div>
     );
@@ -197,7 +197,7 @@ export default function AvailabilityExample() {
 
   return (
     <>
-      <Stage primitive={{ label: "Availability − rules − bookings", specId: "AVAIL-01" }} title={NAME} contentMax="max-w-3xl" tray={tray}>
+      <Stage primitive={{ label: "Free time is open hours minus busy", specId: "AVAIL-01" }} title={NAME} contentMax="max-w-3xl" tray={tray}>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-[auto_1fr]">
           {/* Date picker — greyed days have nothing open */}
           <div className="sm:border-r sm:border-white/[0.06] sm:pr-5 [color-scheme:dark]">

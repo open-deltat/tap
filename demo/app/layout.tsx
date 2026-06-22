@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "deltat",
-  description: "Time-allocation calendar powered by deltat",
+  title: "Δt",
+  description: "Time-allocation calendar powered by Δt",
 };
 
 export default function RootLayout({

@@ -161,7 +161,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
         ]);
         setResult({
           title: `${selectedTable.name} · ${partySize} guest${partySize > 1 ? "s" : ""}`,
-          subtitle: `${selectedTable.section} · ${formatTime(slot.start)} – ${formatTime(slot.end)}`,
+          subtitle: `${selectedTable.section} · ${formatTime(slot.start)} to ${formatTime(slot.end)}`,
           bookings: created,
           resources: resource ? [resource] : undefined,
         });
@@ -189,7 +189,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
         const created = await batchBookSlots(rows);
         setResult({
           title: `Bar · ${k} seat${k > 1 ? "s" : ""}`,
-          subtitle: `${formatTime(slot.start)} – ${formatTime(slot.end)}`,
+          subtitle: `${formatTime(slot.start)} to ${formatTime(slot.end)}`,
           bookings: created,
           resources: resource ? [resource] : undefined,
         });
@@ -275,7 +275,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
             {selectedTable.section} · {selectedTable.name}
           </div>
           <div className="text-xs text-zinc-400">
-            {partySize} guest{partySize > 1 ? "s" : ""} · {formatTime(slot.start)} – {formatTime(slot.end)}
+            {partySize} guest{partySize > 1 ? "s" : ""} · {formatTime(slot.start)} to {formatTime(slot.end)}
           </div>
         </div>
         <Button
@@ -291,7 +291,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
         <div className="flex-1">
           <div className="text-sm font-medium text-zinc-100">{bar.name}</div>
           <div className="text-xs text-zinc-400">
-            {barRemaining} of {bar.capacity} free · {formatTime(slot.start)} – {formatTime(slot.end)}
+            {barRemaining} of {bar.capacity} free · {formatTime(slot.start)} to {formatTime(slot.end)}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -344,7 +344,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
   return (
     <>
       <Stage
-        primitive={{ label: "Collision · tables + capacity bar", specId: "AVAIL-03" }}
+        primitive={{ label: "Book a table or a bar seat", specId: "AVAIL-03" }}
         title="Bella Cucina"
         ribbon={ribbon}
         tray={tray}
