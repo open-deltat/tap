@@ -21,6 +21,8 @@ demo/              Next.js app — interactive demos for holds, calendars, seat 
 - **Events** — real-time LISTEN/NOTIFY subscriptions
 - **`expandRecurrence()`** — expand recurring patterns (days of week, time range, date range, excludes) into concrete rule segments
 
+> deltat's current transport is the PostgreSQL wire protocol, a transitional choice; a v2 framed protocol with HTTP and MCP adapters is planned (see deltat `docs/REQUIREMENTS.md`, PROTO-01/02). The typed API above is designed to outlast that swap.
+
 ```ts
 import { DeltaT, expandRecurrence } from "@open-tap/client";
 
