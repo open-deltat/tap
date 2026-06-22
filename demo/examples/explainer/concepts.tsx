@@ -1,11 +1,11 @@
-// The data model page: tenant, resource, timeline, and how the different kinds of time are stored
-// on a timeline. Plain language, everyday examples, no jargon.
+// The data model page: tenant, resource, timeline, shown as a nesting, plus how time is stored.
 
+import { cn } from "@/lib/utils";
 import { LabeledTimeline, type TimelineRow } from "@/components/labeled-timeline";
 
-// The storage diagram as one equation: availability, minus blocked, minus booked, equals free.
+// Open time, minus blocked, minus booked, equals free, read as one sum.
 const STORAGE_ROWS: TimelineRow[] = [
-  { label: "Availability", boxes: [{ start: 6, end: 94, color: "zinc", text: "Availability" }] },
+  { label: "Open", boxes: [{ start: 6, end: 94, color: "zinc", text: "Open" }] },
   { op: "−", label: "Blocked", boxes: [{ start: 44, end: 54, color: "rose", text: "Blocked" }] },
   {
     op: "−",
@@ -27,11 +27,59 @@ const STORAGE_ROWS: TimelineRow[] = [
   },
 ];
 
-function ConceptRow({ term, children }: { term: string; children: React.ReactNode }) {
+// One box that contains the next, so the nesting reads at a glance: a tenant holds resources,
+// resources hold resources, and the smallest one carries a timeline.
+function Box({
+  kind,
+  name,
+  accent,
+  timeline,
+  children,
+}: {
+  kind: string;
+  name: string;
+  accent?: boolean;
+  timeline?: boolean;
+  children?: React.ReactNode;
+}) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-      <div className="text-sm font-semibold text-zinc-100">{term}</div>
-      <div className="mt-1 text-[13px] leading-relaxed text-zinc-400">{children}</div>
+    <div
+      className={cn(
+        "rounded-md border p-2.5",
+        accent ? "border-emerald-400/30 bg-emerald-500/[0.06]" : "border-white/10 bg-white/[0.02]"
+      )}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500">{kind}</div>
+          <div className="text-[13px] font-medium text-zinc-100">{name}</div>
+        </div>
+        {timeline && (
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] uppercase tracking-[0.15em] text-emerald-300/70">timeline</span>
+            <div className="flex h-3.5 w-32 overflow-hidden rounded-sm border border-white/10">
+              <div className="h-full bg-emerald-500/40" style={{ width: "38%" }} />
+              <div className="h-full bg-rose-500/45" style={{ width: "24%" }} />
+              <div className="h-full bg-emerald-500/40" style={{ width: "38%" }} />
+            </div>
+          </div>
+        )}
+      </div>
+      {children && <div className="mt-2.5">{children}</div>}
+    </div>
+  );
+}
+
+function HierarchyViz() {
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+      <Box kind="Tenant" name="Acme Tickets">
+        <Box kind="Resource" name="Stadium">
+          <Box kind="Resource" name="Section A">
+            <Box kind="Resource" name="Seat 12" accent timeline />
+          </Box>
+        </Box>
+      </Box>
     </div>
   );
 }
@@ -41,62 +89,38 @@ export function DataModelTopic() {
     <div className="mx-auto max-w-2xl">
       <div className="text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">Data model</div>
       <h2 className="mt-2 text-2xl font-semibold text-zinc-100">Where everything lives</h2>
-      <p className="mt-1 text-sm text-emerald-300/90">Three nested ideas, and one timeline that holds the rest.</p>
+      <p className="mt-1 text-sm text-emerald-300/90">
+        A tenant holds resources, resources can hold resources, and the smallest one has a timeline.
+      </p>
 
-      <div className="mt-5 space-y-3">
-        <ConceptRow term="Tenant">
-          Your own private database, the one you run or rent. We call it a tenant. Everything inside
-          it is private to you. One company, one event company, one app. They never see each
-          other&apos;s data.
-        </ConceptRow>
-        <ConceptRow term="Resource">
-          Anything you can book. A seat, a hotel room, a restaurant table, a doctor, a whole venue.
-          A resource can sit inside another, like a stadium that holds sections that hold seats, and
-          there can be a huge number of them.
-          <br />
-          <span className="text-zinc-500">A stadium is about 80,000 seats, each one a resource.</span>
-        </ConceptRow>
-        <ConceptRow term="Timeline">
-          Every resource has its own line of time, its timeline. Rules and bookings are stretches on
-          that timeline. When you ask &quot;is this free at 8pm?&quot;, deltat looks at that one timeline and
-          checks for overlap.
-        </ConceptRow>
+      <div className="mt-5">
+        <HierarchyViz />
       </div>
 
-      <h3 className="mt-7 text-base font-semibold text-zinc-100">How time is stored on a timeline</h3>
+      <dl className="mt-4 space-y-1.5 text-[12.5px] leading-relaxed text-zinc-400">
+        <div>
+          <span className="font-medium text-zinc-200">Tenant</span> · your own private database. Nobody
+          else sees inside it.
+        </div>
+        <div>
+          <span className="font-medium text-zinc-200">Resource</span> · anything you can book. They can
+          sit inside each other.
+        </div>
+        <div>
+          <span className="font-medium text-zinc-200">Timeline</span> · each resource&apos;s own line of
+          time, where bookings live.
+        </div>
+      </dl>
+
+      <h3 className="mt-7 text-base font-semibold text-zinc-100">How time is stored</h3>
       <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">
-        Everything is just labelled stretches on the timeline. There are only three kinds you store,
-        and a fourth that deltat works out for you. Read it as a sum: availability, minus blocked time,
-        minus what is booked, and what is left is free.
+        Everything on a timeline is a labelled stretch. You store three kinds, and Δt works out the
+        fourth: open time, minus blocked, minus booked, leaves what is free.
       </p>
 
       <div className="mt-4">
         <LabeledTimeline axisStart={0} axisEnd={100} rows={STORAGE_ROWS} />
-        <div className="mt-2 text-center text-[10px] text-zinc-500">
-          free time is availability, minus blocked, minus booked
-        </div>
-      </div>
-
-      <div className="mt-4 space-y-3 text-[13px] leading-relaxed text-zinc-400">
-        <p>
-          <span className="font-medium text-zinc-200">Availability</span> is stored as rules: stretches
-          that mark when a resource is open, like a clinic from 9am to 5pm.
-        </p>
-        <p>
-          <span className="font-medium text-zinc-200">Blocked time</span> is stored as blocking rules:
-          holidays, lunch, a day off, maintenance. They punch holes in the availability.
-        </p>
-        <p>
-          <span className="font-medium text-zinc-200">Booked time</span> is stored as bookings. Each
-          reservation is one stretch on the timeline, the slice of time it took. A hold is the same
-          thing with a timer that frees it if nobody confirms.
-        </p>
-        <p>
-          <span className="font-medium text-zinc-200">Free time</span> is what is left, and it is
-          not stored at all. deltat takes the availability, removes the blocking rules, removes the
-          bookings and holds, and what is left is free. It works this out the instant you ask, so it
-          can never go stale.
-        </p>
+        <div className="mt-2 text-center text-[10px] text-zinc-500">free is open, minus blocked, minus booked</div>
       </div>
     </div>
   );

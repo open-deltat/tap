@@ -24,7 +24,7 @@ import { formatError } from "@/lib/format-error";
 
 export function SeatBookingPage({
   seedFn,
-  primitive = { label: "Collision + Hold · seat timeline", specId: "AVAIL-02" },
+  primitive = { label: "Hold a seat, then book it", specId: "AVAIL-02" },
 }: {
   seedFn: () => Promise<string[]>;
   primitive?: StagePrimitive;
@@ -156,7 +156,7 @@ export function SeatBookingPage({
         if (ids.length > 0) setVenueId(ids[0]);
       } catch (err) {
         console.error("Failed to seed:", err);
-        toast.error("Failed to connect to deltat. Is it running?");
+        toast.error("Failed to connect to Δt. Is it running?");
       } finally {
         setLoading(false);
       }
@@ -254,7 +254,7 @@ export function SeatBookingPage({
         // Success → the shared modal: human receipt + the verbatim deltat rows.
         setBookingResult({
           title: `${seatList.length} seat${seatList.length > 1 ? "s" : ""} · ${venue?.name ?? "Booking"}`,
-          subtitle: `${formatTime(slotStart)} – ${formatTime(slotEnd)}`,
+          subtitle: `${formatTime(slotStart)} to ${formatTime(slotEnd)}`,
           bookings: created,
           resources: bookedResources,
         });
@@ -312,7 +312,7 @@ export function SeatBookingPage({
       <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to deltat…
+          Connecting to Δt…
         </div>
       </div>
     );

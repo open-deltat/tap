@@ -7,7 +7,7 @@ export default function AirlineExample() {
   return (
     <SeatBookingPage
       seedFn={seedAirline}
-      primitive={{ label: "Collision + Hold · seat timeline", specId: "AVAIL-02" }}
+      primitive={{ label: "Hold a seat, then book it", specId: "AVAIL-02" }}
     />
   );
 }
