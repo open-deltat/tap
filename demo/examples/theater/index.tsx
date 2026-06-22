@@ -5,7 +5,7 @@ export default function TheaterExample() {
   return (
     <SeatBookingPage
       seedFn={seedTheater}
-      primitive={{ label: "Collision + Hold · assigned seating", specId: "AVAIL-02" }}
+      primitive={{ label: "Hold a seat, then book it", specId: "AVAIL-02" }}
     />
   );
 }

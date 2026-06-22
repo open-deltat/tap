@@ -51,7 +51,7 @@ export async function updateResourceSettings(
   await dt.resources.update(id, { bufferAfter: settings.bufferMinutes * 60_000 });
   const all = await dt.resources.get();
   const r = all.find((r) => r.id === id);
-  if (!r) throw new Error("Resource not found in deltat");
+  if (!r) throw new Error("Resource not found in Δt");
   return toResource(r, updated);
 }
 

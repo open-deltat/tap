@@ -159,7 +159,7 @@ export default function StadiumExample() {
         setSlots(daySlots);
         if (daySlots.length) setSlot({ start: daySlots[0].start, end: daySlots[0].end });
       } catch {
-        toast.error("Failed to connect to deltat. Is it running?");
+        toast.error("Failed to connect to Δt. Is it running?");
       } finally {
         setLoading(false);
       }
@@ -370,7 +370,7 @@ export default function StadiumExample() {
       <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to deltat…
+          Connecting to Δt…
         </div>
       </div>
     );
@@ -442,7 +442,7 @@ export default function StadiumExample() {
   return (
     <>
       <Stage
-        primitive={{ label: "Capacity sweep · 80k seats on canvas", specId: "AVAIL-06" }}
+        primitive={{ label: "Find open seats in a huge crowd", specId: "AVAIL-06" }}
         title="Olympia Stadium"
         ribbon={ribbon}
         tray={tray}

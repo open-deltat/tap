@@ -91,7 +91,7 @@ export default function MeetExample() {
         setIds(got);
         await refresh(got, date);
       } catch {
-        toast.error("Failed to connect to deltat. Is it running?");
+        toast.error("Failed to connect to Δt. Is it running?");
       } finally {
         setLoading(false);
       }
@@ -174,7 +174,7 @@ export default function MeetExample() {
       <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Connecting to deltat…
+          Connecting to Δt…
         </div>
       </div>
     );
@@ -228,7 +228,7 @@ export default function MeetExample() {
   return (
     <>
       <Stage
-        primitive={{ label: "Multi-resource intersection · atomic batch", specId: "AVAIL-08" }}
+        primitive={{ label: "Find a time two people share", specId: "AVAIL-08" }}
         title="Find a meeting time"
         tray={tray}
       >

@@ -76,7 +76,7 @@ export function DinnerFinder({
 
   useEffect(() => {
     load()
-      .catch(() => toast.error("Failed to connect to deltat. Is it running?"))
+      .catch(() => toast.error("Failed to connect to Δt. Is it running?"))
       .finally(() => setLoading(false));
   }, [load, reloadKey]);
 
@@ -119,7 +119,7 @@ export function DinnerFinder({
     <div className="mx-auto max-w-2xl">
       <div className="text-center text-sm font-medium text-zinc-100">Dinner with five friends</div>
       <p className="mx-auto mt-1 max-w-lg text-center text-[12px] leading-relaxed text-zinc-400">
-        The row where all five line up (<span className="text-emerald-300">min_available = 5</span>). Pick a length, a green{" "}
+        The bottom row is when all five are free at the same time. Pick a length, a green{" "}
         <span className="text-emerald-300">Everyone</span> day, then a time.
       </p>
 
