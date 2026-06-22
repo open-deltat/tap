@@ -38,14 +38,15 @@ export type CanvasHit = { kind: "cell"; section: CanvasSection; cell: number };
 // Availability ramp + categories — the one source of truth for both the canvas and the legend.
 // On-theme with the rest of the app's tone map: emerald = plenty free, amber = filling,
 // rose = nearly full, dark zinc = sold out. Premium boxes are a brighter mint so they read as
-// special; a picked seat is set apart by LUMINANCE (near-white fill + dark ring), not hue.
+// special; a picked seat is the seats you're holding — violet fill + white ring, matching the
+// "Holding (you)" tone used across the seat-map examples.
 export const LEGEND_COLORS = {
   plenty: "#10b981", // emerald-500
   filling: "#fbbf24", // amber-400
   nearlyFull: "#f43f5e", // rose-500
   premium: "#6ee7b7", // emerald-300 (premium box)
   soldOut: "#27272a", // zinc-800
-  selection: "#fafafa",
+  selection: "#8b5cf6", // violet-500 — the seats you are holding
 } as const;
 
 const COLORS = {
@@ -61,7 +62,7 @@ const COLORS = {
   selection: LEGEND_COLORS.selection,
   taken: "#3f3f46",
   selectStroke: "#ffffff", // section outline, on the dark background
-  selectStrokeDark: "#09090b", // per-seat ring, on the bright picked fill (high contrast)
+  selectStrokeDark: "#ffffff", // per-seat ring around the violet picked fill (high contrast)
   label: "rgba(255,255,255,0.88)",
   labelHalo: "rgba(0,0,0,0.55)",
   seatLabel: "rgba(12,12,14,0.72)", // per-seat id, dark text on the light seat fills
