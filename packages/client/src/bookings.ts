@@ -69,6 +69,26 @@ export class Bookings {
       .sql`SELECT * FROM bookings WHERE resource_id = ${resourceId}`;
     return rows.map(mapBooking);
   }
+
+  /** Bookings for many resources in one round-trip, grouped by resource id. Every requested id is
+   *  present in the result (empty array if it has none), so callers can index without a fallback.
+   *  Ids are positional ($N) params, never spliced into the SQL. */
+  async getMany(resourceIds: string[]): Promise<Record<string, Booking[]>> {
+    const grouped: Record<string, Booking[]> = {};
+    for (const id of resourceIds) grouped[id] = [];
+    if (resourceIds.length === 0) return grouped;
+
+    const placeholders = resourceIds.map((_, i) => `$${i + 1}`).join(", ");
+    const rows = await this.sql.unsafe(
+      `SELECT * FROM bookings WHERE resource_id IN (${placeholders})`,
+      [...resourceIds]
+    );
+    for (const row of rows) {
+      const b = mapBooking(row);
+      (grouped[b.resourceId] ??= []).push(b);
+    }
+    return grouped;
+  }
 }
 
 function mapBooking(row: Record<string, unknown>): Booking {
