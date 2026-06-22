@@ -13,6 +13,11 @@ WORKDIR /app
 COPY . .
 RUN bun install
 
+# @open-tap/client publishes from dist/ (tsc output, gitignored), so it isn't in the clone and
+# `bun install` only symlinks it. Build it before the app imports it. (@open-tap/shared ships
+# raw .ts and needs no build.)
+RUN cd packages/client && bun run build
+
 # Production Next build for the demo (output lands in demo/.next).
 RUN cd demo && bun run build
 
