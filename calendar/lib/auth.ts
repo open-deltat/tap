@@ -4,6 +4,7 @@ import { config, assertProductionSecrets } from "./config";
 import { constantTimeEqual } from "./crypto";
 
 const COOKIE_NAME = "cal_session";
+const MAX_SESSION_MS = 60 * 60 * 24 * 7 * 1000; // 7 days, matching the cookie maxAge
 
 interface SessionPayload {
   user: string;
@@ -23,7 +24,11 @@ function verify(token: string): SessionPayload | null {
   const expected = createHmac("sha256", config.secret).update(data).digest("hex");
   if (!constantTimeEqual(sig, expected)) return null;
   try {
-    return JSON.parse(data) as SessionPayload;
+    const payload = JSON.parse(data) as SessionPayload;
+    // Bound a leaked token's replay window server-side: the signed iat is load-bearing, not the
+    // browser-enforced cookie maxAge. An expired token is rejected even if the cookie was copied.
+    if (Date.now() - payload.iat > MAX_SESSION_MS) return null;
+    return payload;
   } catch {
     return null;
   }
