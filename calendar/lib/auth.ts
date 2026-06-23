@@ -1,8 +1,10 @@
 import { createHmac } from "crypto";
 import { cookies } from "next/headers";
-import { config } from "./config";
+import { config, assertProductionSecrets } from "./config";
+import { constantTimeEqual } from "./crypto";
 
 const COOKIE_NAME = "cal_session";
+const MAX_SESSION_MS = 60 * 60 * 24 * 7 * 1000; // 7 days, matching the cookie maxAge
 
 interface SessionPayload {
   user: string;
@@ -20,8 +22,19 @@ function verify(token: string): SessionPayload | null {
   if (!dataB64 || !sig) return null;
   const data = Buffer.from(dataB64, "base64url").toString();
   const expected = createHmac("sha256", config.secret).update(data).digest("hex");
-  if (sig !== expected) return null;
-  return JSON.parse(data) as SessionPayload;
+  if (!constantTimeEqual(sig, expected)) return null;
+  try {
+    const payload = JSON.parse(data) as SessionPayload;
+    // The signed payload is untrusted shape until checked: a non-numeric iat would make the age
+    // comparison NaN (always false) and silently accept a never-expiring token.
+    if (typeof payload.iat !== "number" || !Number.isFinite(payload.iat)) return null;
+    // Bound a leaked token's replay window server-side: the signed iat is load-bearing, not the
+    // browser-enforced cookie maxAge. An expired token is rejected even if the cookie was copied.
+    if (Date.now() - payload.iat > MAX_SESSION_MS) return null;
+    return payload;
+  } catch {
+    return null;
+  }
 }
 
 export async function createSession() {
@@ -30,6 +43,7 @@ export async function createSession() {
   jar.set(COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
@@ -41,6 +55,7 @@ export async function deleteSession() {
 }
 
 export async function verifySession(): Promise<boolean> {
+  assertProductionSecrets();
   const jar = await cookies();
   const token = jar.get(COOKIE_NAME)?.value;
   if (!token) return false;
@@ -50,7 +65,7 @@ export async function verifySession(): Promise<boolean> {
 /**
  * Enforce authentication at the action boundary. A layout redirect only gates rendering; Server
  * Actions are independent POST endpoints, so every authenticated action must call this as its first
- * line — otherwise an unauthenticated request can invoke it directly.
+ * line, otherwise an unauthenticated request can invoke it directly.
  */
 export async function requireSession(): Promise<void> {
   if (!(await verifySession())) {
