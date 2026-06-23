@@ -51,21 +51,18 @@ export async function createSeats(
   cols: (string | number)[],
   opts: { slotMinutes: number; bufferMinutes: number; price: number }
 ): Promise<Resource[]> {
-  const seats: Resource[] = [];
-  for (const row of rows) {
-    for (const col of cols) {
-      const name = `${row}${col}`;
-      const r = await dt.resources.create({
-        parentId,
-        name,
-        bufferAfter: opts.bufferMinutes * 60_000 || undefined,
-      });
-      const m = toMeta({ slotMinutes: opts.slotMinutes, price: opts.price });
-      store.set(r.id, m);
-      seats.push({ ...r, ...m, bufferMinutes: opts.bufferMinutes });
-    }
-  }
-  return seats;
+  const bufferAfter = opts.bufferMinutes * 60_000 || undefined;
+  // One multi-row INSERT for the whole grid instead of a round-trip per seat.
+  const items = rows.flatMap((row) =>
+    cols.map((col) => ({ parentId, name: `${row}${col}`, bufferAfter }))
+  );
+  const created = await dt.resources.createMany(items);
+
+  const m = toMeta({ slotMinutes: opts.slotMinutes, price: opts.price });
+  return created.map((r) => {
+    store.set(r.id, m);
+    return { ...r, ...m, bufferMinutes: opts.bufferMinutes };
+  });
 }
 
 export async function prebookSeats(
