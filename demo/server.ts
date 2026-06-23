@@ -4,6 +4,7 @@ import next from "next";
 import { WebSocketServer, type WebSocket } from "ws";
 import { z } from "zod";
 import { dt } from "./lib/deltat";
+import { trackBookings } from "./lib/session-bookings";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT || "3000", 10);
@@ -19,6 +20,10 @@ const STREAM_WARN_MS = parseInt(process.env.STREAM_WARN_MS || "60000", 10); // w
 const MAX_WS_PER_IP = parseInt(process.env.MAX_WS_PER_IP || "20", 10);
 const MAX_WS_TOTAL = parseInt(process.env.MAX_WS_TOTAL || "800", 10);
 const POLICY_CLOSE = 4002; // app-defined close code: "closed by server stream policy" (don't auto-reconnect)
+// X-Forwarded-For is only trustworthy behind a proxy that overwrites it. The shipped compose
+// publishes port 3000 directly, so default to OFF and key the per-IP cap on the real socket address
+// — otherwise a single host forges a fresh XFF per upgrade and walks past MAX_WS_PER_IP.
+const TRUST_PROXY = process.env.TRUST_PROXY === "1" || process.env.TRUST_PROXY === "true";
 
 const wsIp = new WeakMap<WebSocket, string>();
 const perIp = new Map<string, number>();
@@ -96,6 +101,10 @@ async function handleConfirm(ws: WebSocket, state: WsState, msg: ConfirmMessage)
       label: msg.label || undefined,
     }]);
 
+    // Self-clean like every other demo booking: the WS path has no visitor cookie, so register it
+    // under a shared "ws" key and let the module reaper cancel it after the short TTL.
+    trackBookings("ws", [booking], Date.now());
+
     ws.send(JSON.stringify({ type: "confirmed", booking }));
   } catch (err) {
     ws.send(JSON.stringify({ type: "error", message: String(err) }));
@@ -108,7 +117,7 @@ async function handleClose(state: WsState) {
     state.holdId = null;
   }
   if (state.unlisten) {
-    await state.unlisten();
+    try { await state.unlisten(); } catch {}
     state.unlisten = null;
   }
 }
@@ -122,8 +131,10 @@ const server = createServer((req, res) => {
 const wss = new WebSocketServer({ noServer: true });
 
 function clientIp(req: { headers: Record<string, string | string[] | undefined>; socket: { remoteAddress?: string } }): string {
-  const fwd = req.headers["x-forwarded-for"];
-  if (typeof fwd === "string" && fwd.length > 0) return fwd.split(",")[0].trim();
+  if (TRUST_PROXY) {
+    const fwd = req.headers["x-forwarded-for"];
+    if (typeof fwd === "string" && fwd.length > 0) return fwd.split(",")[0].trim();
+  }
   return req.socket.remoteAddress ?? "unknown";
 }
 
@@ -147,14 +158,20 @@ server.on("upgrade", (req, socket, head) => {
 wss.on("connection", (ws) => {
   const state: WsState = { unlisten: null, holdId: null, resourceId: null, start: null, end: null };
   let initialized = false;
+  let initStarted = false;
 
   ws.on("message", async (raw) => {
     try {
       const json: unknown = JSON.parse(String(raw));
 
       if (!initialized) {
-        initialized = true;
+        // One init per socket. initStarted gates re-entry while the awaited init is in flight, so a
+        // second frame can't open a second subscription/hold; initialized flips only after init
+        // succeeds, so a failed init still hits the `if (!initialized) ws.close()` path below.
+        if (initStarted) return;
+        initStarted = true;
         await handleInit(ws, state, InitMessage.parse(json));
+        initialized = true;
         return;
       }
 
