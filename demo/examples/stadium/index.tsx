@@ -407,7 +407,7 @@ export default function StadiumExample() {
         {totalRemaining.toLocaleString()} of {totalCapacity.toLocaleString()} seats open across{" "}
         {sections.length} sections
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] text-zinc-500 sm:gap-x-4">
         <Legend color={LEGEND_COLORS.plenty} label="plenty" />
         <Legend color={LEGEND_COLORS.filling} label="filling" />
         <Legend color={LEGEND_COLORS.nearlyFull} label="nearly full" />
@@ -508,7 +508,8 @@ export default function StadiumExample() {
           </div>
 
           <div className="pointer-events-none absolute bottom-3 left-3 text-[11px] text-zinc-500/80">
-            scroll to zoom · drag to pan
+            <span className="hidden sm:inline">scroll to zoom · drag to pan</span>
+            <span className="sm:hidden">pinch to zoom · drag to pan</span>
           </div>
 
           {seatLOD && (
