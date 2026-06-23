@@ -46,6 +46,26 @@ export class Rules {
     return rules;
   }
 
+  // Replace a resource's open-hours (non-blocking) rules with `segments` — the cal.com-style
+  // "save my weekly hours" operation, mapped onto deltat primitives. Snapshots the existing
+  // non-blocking rule ids, creates the new ones FIRST, then deletes the stale ones, so a mid-run
+  // failure leaves the old hours (worst case: duplicate open rules, which merge in availability),
+  // never an empty schedule. Blocking rules and bookings are untouched. Callers expand their own
+  // recurrence into `segments`.
+  async replaceOpenHours(
+    resourceId: string,
+    segments: { start: number; end: number }[]
+  ): Promise<Rule[]> {
+    const stale = (await this.get(resourceId)).filter((r) => !r.blocking).map((r) => r.id);
+    const created = segments.length
+      ? await this.create(
+          segments.map((s) => ({ resourceId, start: s.start, end: s.end, blocking: false }))
+        )
+      : [];
+    await Promise.all(stale.map((id) => this.delete(id)));
+    return created;
+  }
+
   async update(
     id: string,
     opts: { start: number; end: number; blocking: boolean }
