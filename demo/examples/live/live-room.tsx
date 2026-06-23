@@ -368,7 +368,7 @@ function PerfBar({ perf }: { perf: { read?: number; book?: number; live?: number
     { label: "book", hint: "atomic batch", value: perf.book },
   ];
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+    <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl border-0 bg-transparent px-0 py-0 sm:border sm:border-white/[0.06] sm:bg-white/[0.02] sm:px-3 sm:py-2">
       <span className="text-[10px] uppercase tracking-wider text-zinc-500">live latency</span>
       {stats.map((s) => (
         <span
@@ -421,7 +421,7 @@ function Pane({
   return (
     <div
       className={cn(
-        "rounded-xl border bg-white/[0.02] p-3 transition-colors",
+        "rounded-xl border bg-white/[0.02] p-2 transition-colors sm:p-3",
         mirror ? "border-sky-400/20" : "border-emerald-400/20",
         live && (mirror ? "border-sky-400/50 ring-1 ring-sky-400/30" : "border-emerald-400/50 ring-1 ring-emerald-400/30")
       )}
@@ -456,7 +456,7 @@ function Pane({
       {/* The mirror is non-interactive and dimmed so it reads as "someone else's view". */}
       <div
         className={cn(
-          "rounded-lg border border-white/[0.06] bg-white/[0.025] p-3 text-zinc-100",
+          "rounded-lg border-0 bg-transparent p-0 text-zinc-100 sm:border sm:border-white/[0.06] sm:bg-white/[0.025] sm:p-3",
           mirror && "pointer-events-none select-none opacity-80"
         )}
       >
