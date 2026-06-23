@@ -16,10 +16,9 @@ export async function getMultiResourceAvailability(
   start: number,
   end: number
 ): Promise<Record<string, AvailabilitySlot[]>> {
-  const results = await Promise.all(
-    resourceIds.map(async (id) => [id, await dt.availability.get({ resourceId: id, start, end })] as const)
-  );
-  return Object.fromEntries(results);
+  // One round-trip (IN-clause) instead of one query per resource — this is the seat-map hot path,
+  // re-run on every NOTIFY, so the fan-out mattered.
+  return dt.availability.getMany({ resourceIds, start, end });
 }
 
 export async function getCombinedAvailability(
