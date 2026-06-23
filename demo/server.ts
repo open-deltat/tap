@@ -158,14 +158,18 @@ server.on("upgrade", (req, socket, head) => {
 wss.on("connection", (ws) => {
   const state: WsState = { unlisten: null, holdId: null, resourceId: null, start: null, end: null };
   let initialized = false;
+  let initStarted = false;
 
   ws.on("message", async (raw) => {
     try {
       const json: unknown = JSON.parse(String(raw));
 
       if (!initialized) {
-        // Flip the flag only after init succeeds, so a failure here still hits the
-        // `if (!initialized) ws.close()` path below instead of leaving a half-open socket.
+        // One init per socket. initStarted gates re-entry while the awaited init is in flight, so a
+        // second frame can't open a second subscription/hold; initialized flips only after init
+        // succeeds, so a failed init still hits the `if (!initialized) ws.close()` path below.
+        if (initStarted) return;
+        initStarted = true;
         await handleInit(ws, state, InitMessage.parse(json));
         initialized = true;
         return;
