@@ -49,7 +49,7 @@ function Box({
         accent ? "border-emerald-400/30 bg-emerald-500/[0.06]" : "border-white/10 bg-white/[0.02]"
       )}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <div>
           <div className="text-[9px] uppercase tracking-[0.18em] text-zinc-500">{kind}</div>
           <div className="text-[13px] font-medium text-zinc-100">{name}</div>
@@ -57,7 +57,7 @@ function Box({
         {timeline && (
           <div className="flex items-center gap-2">
             <span className="text-[9px] uppercase tracking-[0.15em] text-emerald-300/70">timeline</span>
-            <div className="flex h-3.5 w-32 overflow-hidden rounded-sm border border-white/10">
+            <div className="flex h-3.5 w-20 overflow-hidden rounded-sm border border-white/10 sm:w-32">
               <div className="h-full bg-emerald-500/40" style={{ width: "38%" }} />
               <div className="h-full bg-rose-500/45" style={{ width: "24%" }} />
               <div className="h-full bg-emerald-500/40" style={{ width: "38%" }} />

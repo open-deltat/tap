@@ -217,7 +217,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
 
   const ribbon = (
     <div className="flex flex-col items-center gap-2.5">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <div className="flex items-center gap-1.5 text-zinc-400">
           <Button
             size="icon"
