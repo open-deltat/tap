@@ -50,6 +50,38 @@ export class Availability {
     const rows = await this.sql.unsafe(sql, values);
     return rows.map(mapSlot);
   }
+
+  // Per-resource availability for several resources in ONE round-trip, grouped by resource id —
+  // the analog of bookings/holds getMany. Omitting min_available routes to the engine's
+  // per-resource path (rows tagged with resource_id), unlike getCombined which merges the set.
+  async getMany(opts: {
+    resourceIds: string[];
+    start: number;
+    end: number;
+    minDuration?: number;
+  }): Promise<Record<string, AvailabilitySlot[]>> {
+    const grouped: Record<string, AvailabilitySlot[]> = {};
+    for (const id of opts.resourceIds) grouped[id] = [];
+    if (opts.resourceIds.length === 0) return grouped;
+
+    // Parameterized like every other SDK builder — never string-splice ids/values into SQL.
+    const values: (string | number)[] = [...opts.resourceIds];
+    const idPlaceholders = opts.resourceIds.map((_, i) => `$${i + 1}`).join(", ");
+    const startParam = values.push(opts.start);
+    const endParam = values.push(opts.end);
+    let sql = `SELECT * FROM availability WHERE resource_id IN (${idPlaceholders}) AND start >= $${startParam} AND "end" <= $${endParam}`;
+    if (opts.minDuration != null) {
+      const minDurationParam = values.push(opts.minDuration);
+      sql += ` AND min_duration = $${minDurationParam}`;
+    }
+
+    const rows = await this.sql.unsafe(sql, values);
+    for (const row of rows) {
+      const rid = String(row.resource_id);
+      (grouped[rid] ??= []).push(mapSlot(row));
+    }
+    return grouped;
+  }
 }
 
 function mapSlot(row: Record<string, unknown>): AvailabilitySlot {
