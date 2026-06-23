@@ -5,7 +5,6 @@ import { Bookings } from "./bookings.js";
 import { Holds } from "./holds.js";
 import { Availability } from "./availability.js";
 import { Events } from "./events.js";
-import { Schedules } from "./schedules.js";
 
 export interface DeltaTOptions {
   host?: string;
@@ -23,7 +22,6 @@ export class DeltaT {
   readonly holds: Holds;
   readonly availability: Availability;
   readonly events: Events;
-  readonly schedules: Schedules;
 
   constructor(options?: DeltaTOptions | Sql) {
     if (options && "begin" in options) {
@@ -47,7 +45,6 @@ export class DeltaT {
     this.holds = new Holds(this.sql);
     this.availability = new Availability(this.sql);
     this.events = new Events(this.sql);
-    this.schedules = new Schedules(this.sql);
   }
 
   async close(): Promise<void> {
