@@ -1,29 +1,18 @@
 "use server";
 
-import { dt } from "@/lib/deltat";
 import { requireSession } from "@/lib/auth";
 import { ensureCalendarResource } from "@/lib/calendar-resource";
-import { localUtcOffsetMinutes } from "@open-tap/client";
-import type { DayName, Schedule } from "@open-tap/client";
+import { projectScheduleToRules } from "@/lib/schedule-projection";
+import { readSchedule, writeSchedule, type WeeklySchedule } from "@/lib/schedule-store";
 
-export async function saveSchedule(input: {
-  days: DayName[];
-  startTime: string;
-  endTime: string;
-}): Promise<void> {
+export async function saveSchedule(input: WeeklySchedule): Promise<void> {
   await requireSession();
   const resourceId = await ensureCalendarResource();
-  await dt.schedules.set({
-    resourceId,
-    days: input.days,
-    startTime: input.startTime,
-    endTime: input.endTime,
-    utcOffsetMinutes: localUtcOffsetMinutes(),
-  });
+  await projectScheduleToRules(resourceId, input);
+  await writeSchedule(input);
 }
 
-export async function getSchedule(): Promise<Schedule | null> {
+export async function getSchedule(): Promise<WeeklySchedule | null> {
   await requireSession();
-  const resourceId = await ensureCalendarResource();
-  return dt.schedules.get(resourceId);
+  return readSchedule();
 }
