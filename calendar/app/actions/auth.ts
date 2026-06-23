@@ -1,14 +1,16 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { config } from "@/lib/config";
+import { config, assertProductionSecrets } from "@/lib/config";
 import { createSession, deleteSession } from "@/lib/auth";
+import { credentialsMatch } from "@/lib/credentials";
 
 export async function login(_prev: { error: string } | null, formData: FormData) {
-  const user = formData.get("username") as string;
-  const pass = formData.get("password") as string;
+  assertProductionSecrets();
+  const user = String(formData.get("username") ?? "");
+  const pass = String(formData.get("password") ?? "");
 
-  if (user !== config.user || pass !== config.pass) {
+  if (!credentialsMatch(user, pass, config.user, config.pass)) {
     return { error: "Invalid credentials" };
   }
 

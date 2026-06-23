@@ -7,7 +7,6 @@ export { Holds } from "./holds.js";
 export { Availability } from "./availability.js";
 export { Events } from "./events.js";
 export {
-  Schedules,
   daysOfWeekMask,
   daysFromMask,
   timeToMinutes,
@@ -26,7 +25,6 @@ export type {
   Booking,
   Hold,
   AvailabilitySlot,
-  Schedule,
   DayName,
   DeltaTEvent,
 } from "./types.js";
