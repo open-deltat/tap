@@ -43,5 +43,6 @@ export async function projectScheduleToRules(
       segments.map((s) => ({ resourceId, start: s.start, end: s.end, blocking: s.blocking })),
     );
   }
-  for (const id of stale) await dt.rules.delete(id);
+  // The stale deletes are independent of each other — run them concurrently rather than serially.
+  await Promise.all(stale.map((id) => dt.rules.delete(id)));
 }

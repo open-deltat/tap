@@ -23,12 +23,24 @@ export class Rules {
       blocking: item.blocking ?? false,
     }));
 
-    // deltat honors only single-row rule inserts — a multi-row VALUES(...) silently keeps
-    // just the first row. Rules are independent (no all-or-nothing semantics), so insert
-    // them one at a time. (Becomes a native batch op when the framed protocol replaces SQL.)
-    for (const r of rules) {
+    if (rules.length === 1) {
+      const r = rules[0];
       await this
         .sql`INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES (${r.id}, ${r.resourceId}, ${r.start}, ${r.end}, ${r.blocking})`;
+    } else {
+      // One multi-row INSERT — deltat now honors multi-row rule inserts (BatchInsertRules), so a
+      // 90-day schedule projection is a single round-trip instead of one INSERT per rule.
+      const params: (string | number | boolean)[] = [];
+      const valueRows: string[] = [];
+      for (const r of rules) {
+        const i = params.length;
+        params.push(r.id, r.resourceId, r.start, r.end, r.blocking);
+        valueRows.push(`($${i + 1}, $${i + 2}, $${i + 3}, $${i + 4}, $${i + 5})`);
+      }
+      await this.sql.unsafe(
+        `INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES ${valueRows.join(", ")}`,
+        params
+      );
     }
 
     return rules;
