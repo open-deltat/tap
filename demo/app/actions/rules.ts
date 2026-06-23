@@ -62,12 +62,8 @@ export async function setWeeklyAvailability(input: {
   fromDate: string;
   toDate: string;
 }): Promise<number> {
-  // Snapshot the open-hours rules we are about to replace.
-  const stale = (await dt.rules.get(input.resourceId)).filter((x) => !x.blocking).map((x) => x.id);
-
-  // Add the new open hours FIRST. If this fails partway, the resource keeps its old hours; the
-  // worst case is duplicate open rules, which merge in availability and get cleaned on the next save.
-  // (Deleting first would risk leaving the schedule empty on a mid-run failure.)
+  // Expand the per-day ranges, then let the SDK's replaceOpenHours do the snapshot/add-first/
+  // delete-stale dance (shared with the calendar app).
   const segments = input.ranges.flatMap((rg) =>
     expandRecurrence({
       daysOfWeek: [rg.dow],
@@ -78,15 +74,7 @@ export async function setWeeklyAvailability(input: {
       blocking: false,
     })
   );
-  const created = segments.length
-    ? await dt.rules.create(
-        segments.map((s) => ({ resourceId: input.resourceId, start: s.start, end: s.end, blocking: s.blocking }))
-      )
-    : [];
-
-  // Then remove exactly the rules we snapshotted — never the ones we just created.
-  for (const id of stale) await dt.rules.delete(id);
-
+  const created = await dt.rules.replaceOpenHours(input.resourceId, segments);
   return created.length;
 }
 
