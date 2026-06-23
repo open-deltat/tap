@@ -2,7 +2,7 @@
 
 import { dt } from "@/lib/deltat";
 import { requireSession } from "@/lib/auth";
-import { ensureCalendarResource } from "./setup";
+import { ensureCalendarResource } from "@/lib/calendar-resource";
 
 export async function getWeekData(weekStart: number, weekEnd: number) {
   await requireSession();
