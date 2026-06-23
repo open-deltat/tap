@@ -8,7 +8,7 @@ import { BookingConfirmedModal, type BookingResult } from "@/components/booking-
 import { cn } from "@/lib/utils";
 import { Stage } from "@/components/stage";
 import { SeatMap } from "@/components/seat-map";
-import { useWebSocket, wsUrl } from "@/hooks/use-websocket";
+import { useWebSocket, wsUrl, type StreamStatus } from "@/hooks/use-websocket";
 import { buildSections, allSeatIds } from "@/lib/seat-sections";
 import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
 import type { Hold } from "@open-tap/client";
@@ -54,6 +54,11 @@ export function LiveRoom() {
   // Live latency readout: real round-trip times to Δt for reads, the hold→NOTIFY propagation, and a booking.
   const [perf, setPerf] = useState<{ read?: number; book?: number; live?: number }>({});
   const holdSentAt = useRef<number | null>(null);
+
+  // The server pauses idle streams (DoS guard). The "You" pane reports the stream status; bumping
+  // streamKey remounts every pane so "keep watching" reopens all of them with a fresh server clock.
+  const [streamStatus, setStreamStatus] = useState<StreamStatus>("connecting");
+  const [streamKey, setStreamKey] = useState(0);
 
   // Per-seat hold WS connections: open WS = hold active on the LEFT pane, close WS = released.
   const holdWsRef = useRef(new Map<string, WebSocket>());
@@ -294,11 +299,16 @@ export function LiveRoom() {
           all repainting live from the shared seat state. */}
       <div className="space-y-3">
         <PerfBar perf={perf} />
+        {(streamStatus === "expiring" || streamStatus === "paused") && (
+          <StreamNotice status={streamStatus} onResume={() => setStreamKey((k) => k + 1)} />
+        )}
+        <div key={streamKey} className="space-y-3">
         <Pane
           title="You"
           hint={slot ? `${formatTime(slot.start)} – ${formatTime(slot.end)} · tap a free seat to hold it` : "tap a free seat to hold it"}
           venueId={venueId}
           onEvent={reload}
+          onStatus={setStreamStatus}
         >
           {noSurface ? (
             <EmptySurface />
@@ -339,6 +349,7 @@ export function LiveRoom() {
             </Pane>
           ))}
         </div>
+        </div>
       </div>
     </Stage>
 
@@ -368,7 +379,7 @@ function PerfBar({ perf }: { perf: { read?: number; book?: number; live?: number
     { label: "book", hint: "atomic batch", value: perf.book },
   ];
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2">
+    <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl border-0 bg-transparent px-0 py-0 sm:border sm:border-white/[0.06] sm:bg-white/[0.02] sm:px-3 sm:py-2">
       <span className="text-[10px] uppercase tracking-wider text-zinc-500">live latency</span>
       {stats.map((s) => (
         <span
@@ -387,11 +398,38 @@ function PerfBar({ perf }: { perf: { read?: number; book?: number; live?: number
   );
 }
 
+/** Server-driven stream-lifetime notice. The proxy warns before it pauses an idle stream and closes
+ *  it by policy; this is the one-tap "keep watching / resume" so a real viewer never gets a silent
+ *  break, while an idle squatter just lapses. */
+function StreamNotice({ status, onResume }: { status: StreamStatus; onResume: () => void }) {
+  const expiring = status === "expiring";
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-xl border px-3 py-2 text-sm",
+        expiring
+          ? "border-amber-400/40 bg-amber-400/10 text-amber-200"
+          : "border-white/15 bg-white/[0.03] text-zinc-300"
+      )}
+    >
+      <span>{expiring ? "Live updates pause soon to keep the demo fast." : "Live updates paused."}</span>
+      <button
+        type="button"
+        onClick={onResume}
+        className="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-200 transition-colors hover:bg-emerald-500/25"
+      >
+        {expiring ? "Keep watching" : "Resume"}
+      </button>
+    </div>
+  );
+}
+
 function Pane({
   title,
   hint,
   venueId,
   onEvent,
+  onStatus,
   mirror = false,
   children,
 }: {
@@ -399,6 +437,7 @@ function Pane({
   hint?: string;
   venueId: string | null;
   onEvent: () => void;
+  onStatus?: (s: StreamStatus) => void;
   mirror?: boolean;
   children: ReactNode;
 }) {
@@ -415,13 +454,14 @@ function Pane({
     timer.current = setTimeout(() => setLive(false), 700);
   }, [onEvent]);
 
-  useWebSocket(venueId ? { type: "subscribe", resourceId: venueId, onEvent: onWsEvent } : null);
+  const { status } = useWebSocket(venueId ? { type: "subscribe", resourceId: venueId, onEvent: onWsEvent } : null);
+  useEffect(() => { onStatus?.(status); }, [status, onStatus]);
   useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   return (
     <div
       className={cn(
-        "rounded-xl border bg-white/[0.02] p-3 transition-colors",
+        "rounded-xl border bg-white/[0.02] p-2 transition-colors sm:p-3",
         mirror ? "border-sky-400/20" : "border-emerald-400/20",
         live && (mirror ? "border-sky-400/50 ring-1 ring-sky-400/30" : "border-emerald-400/50 ring-1 ring-emerald-400/30")
       )}
@@ -456,7 +496,7 @@ function Pane({
       {/* The mirror is non-interactive and dimmed so it reads as "someone else's view". */}
       <div
         className={cn(
-          "rounded-lg border border-white/[0.06] bg-white/[0.025] p-3 text-zinc-100",
+          "rounded-lg border-0 bg-transparent p-0 text-zinc-100 sm:border sm:border-white/[0.06] sm:bg-white/[0.025] sm:p-3",
           mirror && "pointer-events-none select-none opacity-80"
         )}
       >
