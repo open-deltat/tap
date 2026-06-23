@@ -25,6 +25,9 @@ function verify(token: string): SessionPayload | null {
   if (!constantTimeEqual(sig, expected)) return null;
   try {
     const payload = JSON.parse(data) as SessionPayload;
+    // The signed payload is untrusted shape until checked: a non-numeric iat would make the age
+    // comparison NaN (always false) and silently accept a never-expiring token.
+    if (typeof payload.iat !== "number" || !Number.isFinite(payload.iat)) return null;
     // Bound a leaked token's replay window server-side: the signed iat is load-bearing, not the
     // browser-enforced cookie maxAge. An expired token is rejected even if the cookie was copied.
     if (Date.now() - payload.iat > MAX_SESSION_MS) return null;
