@@ -20,8 +20,9 @@ export function FitToWidth({ children }: { children: ReactNode }) {
     const c = content.current;
     if (!w || !c) return;
     const measure = () => {
-      // offsetWidth/Height are the untransformed layout box, so they stay constant as scale changes
-      // (no measurement feedback loop). scrollbar-free width comes from the wrapper.
+      // offsetWidth/Height are the untransformed layout box. The content must NOT be a stretched
+      // flex child (items-start below + shrink-0), or its offsetHeight would track the height we
+      // set and the ResizeObserver would spiral it toward 0 whenever scale < 1.
       const s = Math.min(1, w.clientWidth / c.offsetWidth);
       setScale(s);
       setHeight(c.offsetHeight * s);
@@ -37,6 +38,7 @@ export function FitToWidth({ children }: { children: ReactNode }) {
     <div ref={wrap} className="flex w-full justify-center overflow-hidden" style={{ height }}>
       <div
         ref={content}
+        className="shrink-0 self-start"
         style={{ transform: `scale(${scale})`, transformOrigin: "top center", width: "max-content" }}
       >
         {children}
