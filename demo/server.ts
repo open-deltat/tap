@@ -8,6 +8,22 @@ import { dt } from "./lib/deltat";
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT || "3000", 10);
 
+// Stream guard (server-authoritative — a browser timer can't be trusted). Each /ws stream is closed
+// after STREAM_MAX_AGE_MS so nobody can squat a live connection; the client is warned
+// STREAM_WARN_MS before so it can offer a one-tap "keep watching". Per-IP / total caps bound a
+// flood. 0 disables a limit. (deltat has its own per-connection guard for direct-pgwire attackers;
+// this is the per-browser-session control deltat can't do, since porsager multiplexes all browser
+// sockets onto one deltat connection.)
+const STREAM_MAX_AGE_MS = parseInt(process.env.STREAM_MAX_AGE_MS || "300000", 10); // 5 min
+const STREAM_WARN_MS = parseInt(process.env.STREAM_WARN_MS || "60000", 10); // warn 60s before
+const MAX_WS_PER_IP = parseInt(process.env.MAX_WS_PER_IP || "20", 10);
+const MAX_WS_TOTAL = parseInt(process.env.MAX_WS_TOTAL || "800", 10);
+const POLICY_CLOSE = 4002; // app-defined close code: "closed by server stream policy" (don't auto-reconnect)
+
+const wsIp = new WeakMap<WebSocket, string>();
+const perIp = new Map<string, number>();
+let wsTotal = 0;
+
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
@@ -105,13 +121,27 @@ const server = createServer((req, res) => {
 
 const wss = new WebSocketServer({ noServer: true });
 
+function clientIp(req: { headers: Record<string, string | string[] | undefined>; socket: { remoteAddress?: string } }): string {
+  const fwd = req.headers["x-forwarded-for"];
+  if (typeof fwd === "string" && fwd.length > 0) return fwd.split(",")[0].trim();
+  return req.socket.remoteAddress ?? "unknown";
+}
+
 server.on("upgrade", (req, socket, head) => {
   const { pathname } = parse(req.url ?? "/");
-  if (pathname === "/ws") {
-    wss.handleUpgrade(req, socket, head, (ws) => {
-      wss.emit("connection", ws);
-    });
+  if (pathname !== "/ws") return;
+  const ip = clientIp(req);
+  if ((MAX_WS_TOTAL > 0 && wsTotal >= MAX_WS_TOTAL) || (MAX_WS_PER_IP > 0 && (perIp.get(ip) ?? 0) >= MAX_WS_PER_IP)) {
+    socket.write("HTTP/1.1 429 Too Many Requests\r\n\r\n");
+    socket.destroy();
+    return;
   }
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    wsIp.set(ws, ip);
+    perIp.set(ip, (perIp.get(ip) ?? 0) + 1);
+    wsTotal += 1;
+    wss.emit("connection", ws);
+  });
 });
 
 wss.on("connection", (ws) => {
@@ -135,14 +165,45 @@ wss.on("connection", (ws) => {
     }
   });
 
-  ws.on("close", () => handleClose(state));
+  // Server-authoritative stream lifetime: warn, then close by policy. The client is told via a
+  // `__expiring` frame so it can offer "keep watching" (a fresh subscribe), and on close it gets the
+  // POLICY_CLOSE code so it pauses instead of reconnect-storming.
+  const warnTimer =
+    STREAM_MAX_AGE_MS > 0
+      ? setTimeout(() => {
+          if (ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify({ type: "__expiring", seconds: Math.round(STREAM_WARN_MS / 1000) }));
+          }
+        }, Math.max(0, STREAM_MAX_AGE_MS - STREAM_WARN_MS))
+      : null;
+  const closeTimer =
+    STREAM_MAX_AGE_MS > 0
+      ? setTimeout(() => {
+          if (ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify({ type: "__closing" }));
+            ws.close(POLICY_CLOSE, "stream age limit");
+          }
+        }, STREAM_MAX_AGE_MS)
+      : null;
 
   const ping = setInterval(() => {
     if (ws.readyState === ws.OPEN) ws.ping();
     else clearInterval(ping);
   }, 30_000);
 
-  ws.on("close", () => clearInterval(ping));
+  ws.on("close", () => {
+    handleClose(state);
+    clearInterval(ping);
+    if (warnTimer) clearTimeout(warnTimer);
+    if (closeTimer) clearTimeout(closeTimer);
+    const ip = wsIp.get(ws);
+    if (ip) {
+      const n = (perIp.get(ip) ?? 1) - 1;
+      if (n <= 0) perIp.delete(ip);
+      else perIp.set(ip, n);
+      wsTotal = Math.max(0, wsTotal - 1);
+    }
+  });
 });
 
 server.listen(port, () => {
