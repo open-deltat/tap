@@ -55,15 +55,20 @@ export function Stage({
 
         {/* m-auto (not items-center) so a panel taller than the viewport top-anchors and stays
             fully scrollable — items-center would clip the top out of reach. */}
-        <div className={`flex w-full flex-1 justify-center overflow-auto px-3 pb-28 sm:px-6 ${contentMax}`}>
-          <div className="m-auto w-full rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 shadow-2xl shadow-black/50 sm:p-6">
+        <div className={`flex w-full flex-1 justify-center overflow-auto px-0 pb-28 sm:px-6 ${contentMax}`}>
+          {/* On phones the panel goes edge-to-edge (no border/bg/padding) so the example uses the
+              full viewport; sm: restores the floating panel, byte-identical to before. */}
+          <div className="m-auto w-full rounded-none border-0 bg-transparent p-0 shadow-none sm:rounded-2xl sm:border sm:border-white/[0.06] sm:bg-white/[0.025] sm:p-6 sm:shadow-2xl sm:shadow-black/50">
             {children}
           </div>
         </div>
       </div>
 
+      {/* fixed (not absolute) on mobile so the tray pins to the visible viewport bottom regardless
+          of the tall scroll content; sm: reverts to absolute-in-Stage (desktop unchanged). The
+          safe-area pad keeps the Book button clear of the iOS home indicator. */}
       {tray && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-3 sm:p-4">
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:absolute sm:p-4">
           <div className="pointer-events-auto w-full max-w-2xl rounded-xl border border-white/10 bg-zinc-900/85 p-3 shadow-2xl shadow-black/50 backdrop-blur-md">
             {tray}
           </div>
