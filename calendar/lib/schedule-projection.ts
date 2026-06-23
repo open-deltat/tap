@@ -36,13 +36,7 @@ export async function projectScheduleToRules(
     blocking: false,
   });
 
-  const stale = (await dt.rules.get(resourceId)).filter((r) => !r.blocking).map((r) => r.id);
-
-  if (segments.length > 0) {
-    await dt.rules.create(
-      segments.map((s) => ({ resourceId, start: s.start, end: s.end, blocking: s.blocking })),
-    );
-  }
-  // The stale deletes are independent of each other — run them concurrently rather than serially.
-  await Promise.all(stale.map((id) => dt.rules.delete(id)));
+  // Shared with the demo's setWeeklyAvailability: snapshot existing open hours, create the new
+  // ones first, then delete the stale — so a mid-run failure never empties the schedule.
+  await dt.rules.replaceOpenHours(resourceId, segments);
 }
