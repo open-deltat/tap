@@ -10,7 +10,6 @@ import {
   Users,
   Radio,
   CalendarCog,
-  Sigma,
   type LucideIcon,
 } from "lucide-react";
 import { ALL_EXAMPLE_IDS, isExampleEnabled, type ExampleId } from "./config";
@@ -18,11 +17,10 @@ import { ALL_EXAMPLE_IDS, isExampleEnabled, type ExampleId } from "./config";
 // Client-safe catalog (label + icon + tag + grouping) for each example. Nav, the landing gallery,
 // and any example switcher render from `enabledExamples()` so a single-purpose deployment shows only
 // what DEMO_EXAMPLES allows. Route + seed live alongside each example (see examples/<id>/).
-//   featured — the headline demos (shown large on the landing gallery)
-//   seats    — assigned-seat / ticket maps
-//   spaces   — capacity + scheduling (rooms, tables, hours)
-//   concept  — the "How it works" landing, reached from the top bar, not a gallery tile
-export type ExampleGroup = "featured" | "seats" | "spaces" | "concept";
+//   featured: the headline demos (shown large on the landing gallery)
+//   seats:    assigned-seat / ticket maps
+//   spaces:   capacity + scheduling (rooms, tables, hours)
+export type ExampleGroup = "featured" | "seats" | "spaces";
 
 export interface ExampleMeta {
   id: ExampleId;
@@ -46,7 +44,6 @@ const META: Record<ExampleId, Omit<ExampleMeta, "id" | "href">> = {
   restaurant: { label: "Restaurant tables", icon: UtensilsCrossed, specId: "AVAIL-03", group: "spaces", tagline: "Tables plus a walk-up bar" },
   parking: { label: "Parking spots", icon: Car, specId: "AVAIL-05", group: "spaces", tagline: "Grab a spot in a zone" },
   builder: { label: "Weekly hours", icon: CalendarCog, specId: "EDGE-03", group: "spaces", tagline: "Set your weekly hours once" },
-  explainer: { label: "How it works", icon: Sigma, specId: "AVAIL-01", group: "concept", tagline: "The Δt data model" },
 };
 
 export function enabledExamples(): ExampleMeta[] {

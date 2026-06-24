@@ -12,7 +12,6 @@ import Availability from "@/examples/availability";
 import Meet from "@/examples/meet";
 import Live from "@/examples/live";
 import Builder from "@/examples/builder";
-import Explainer from "@/examples/explainer";
 
 // One route for every example, keyed by id, replacing the per-example page shims. The same live
 // component renders here as before; only the routing boilerplate is shared.
@@ -28,7 +27,6 @@ const COMPONENTS: Record<string, ComponentType> = {
   meet: Meet,
   live: Live,
   builder: Builder,
-  explainer: Explainer,
 };
 
 export function generateStaticParams() {
