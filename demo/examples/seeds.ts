@@ -6,9 +6,8 @@ import { ensureHotel } from "@/examples/hotel/seed";
 import { seedRestaurant } from "@/examples/restaurant/seed";
 import { seedParking } from "@/examples/parking/seed";
 import { seedAvailabilityScheduler } from "@/examples/availability/seed";
-import { ensureMeetCalendars } from "@/examples/meet/seed";
+import { ensureMeetFriends } from "@/examples/meet/seed";
 import { seedLive } from "@/examples/live/seed";
-import { ensureRulesExample } from "@/examples/rules/seed";
 import { ensureBuilderCalendar } from "@/examples/builder/seed";
 import type { ExampleId } from "./config";
 
@@ -23,9 +22,8 @@ export const SEEDS: Record<ExampleId, () => Promise<unknown>> = {
   restaurant: seedRestaurant,
   parking: seedParking,
   availability: seedAvailabilityScheduler,
-  meet: ensureMeetCalendars,
+  meet: ensureMeetFriends,
   live: seedLive,
-  rules: ensureRulesExample,
   builder: ensureBuilderCalendar,
   // The "How it works" landing is fully static — nothing to seed.
   explainer: async () => {},

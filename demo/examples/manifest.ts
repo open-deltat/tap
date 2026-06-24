@@ -9,7 +9,6 @@ import {
   Clock,
   Users,
   Radio,
-  Layers,
   CalendarCog,
   Sigma,
   type LucideIcon,
@@ -37,8 +36,7 @@ export interface ExampleMeta {
 
 const META: Record<ExampleId, Omit<ExampleMeta, "id" | "href">> = {
   availability: { label: "Appointments", icon: Clock, specId: "AVAIL-01", group: "featured", tagline: "Open hours, minus what is booked" },
-  meet: { label: "Find a meeting", icon: Users, specId: "AVAIL-08", group: "featured", tagline: "Two calendars, the time they share" },
-  rules: { label: "Group bookings", icon: Layers, specId: "AVAIL-08", group: "featured", tagline: "A time everyone is free at once" },
+  meet: { label: "Group bookings", icon: Users, specId: "AVAIL-08", group: "featured", tagline: "A time the whole group is free" },
   live: { label: "Realtime seats", icon: Radio, specId: "PROTO-01", group: "featured", tagline: "Holds that update live for everyone" },
   airline: { label: "Flight seats", icon: Plane, specId: "AVAIL-02", group: "seats", tagline: "Pick a seat on a flight" },
   cinema: { label: "Movie seats", icon: Film, specId: "AVAIL-02", group: "seats", tagline: "Hold seats for a showtime" },
