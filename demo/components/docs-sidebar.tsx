@@ -10,15 +10,16 @@ const SECTIONS: { title: string; links: { href: string; label: string }[] }[] = 
   {
     title: "Δt · the database",
     links: [
-      { href: "/docs", label: "Overview" },
+      { href: "/docs", label: "What is Δt" },
       { href: "/docs/data-model", label: "Data model" },
       { href: "/docs/holds-and-availability", label: "Holds and availability" },
-      { href: "/docs/protocol-and-engine", label: "Protocol and engine" },
+      { href: "/docs/protocol-and-engine", label: "Under the hood" },
     ],
   },
   {
     title: "tap · the SDK",
     links: [
+      { href: "/docs/sdk", label: "What is tap" },
       { href: "/docs/sdk/quickstart", label: "Quickstart" },
       { href: "/docs/sdk/reference", label: "SDK reference" },
       { href: "/docs/sdk/self-host", label: "Self-host" },

@@ -1,14 +1,14 @@
-The complete verb surface of the tap TypeScript SDK, on one page, grouped by namespace. One entry per verb: signature, what it does, and a runnable example. This page is built from the real verb surface and nothing else, so it cannot drift.
+This is the full verb surface of the tap TypeScript SDK, one entry per verb, grouped by namespace. Each entry has a signature, a line on what it does, and a tiny example. If a method is not on this page, it is not a verb.
 
-If a method is not listed here, it is not part of the verb surface. The recurrence helpers (`expandRecurrence`, `RecurrencePattern`, `ExplicitSegment`, `RuleSegment`) and the schedule-era time/mask helpers (`daysOfWeekMask`, `timeToMinutes`, `DayName`, and friends) are intentionally excluded. For recurring open hours, expand on your side and call `rules.replaceOpenHours` or `rules.create` with pre-expanded segments (see [Recurring hours](#recurring-hours) below).
+The running example throughout is a ticketing setup: Acme Tickets owns a Stadium, the Stadium has Section A, and Section A has Seat 12. Resources nest like that, and only the leaves (the seats) carry a real timeline.
 
-## Conventions
+## Three things to know first
 
-These three rules hold across every verb. They are stated once here and assumed everywhere below.
+These hold for every verb, so they are stated once here.
 
-- **Half-open intervals.** Every span is `[start, end)`: the start instant is included, the end instant is not. Two spans collide when they cover the same moment, so `[10:00, 11:00)` and `[11:00, 12:00)` do not collide. A booking is a half-open segment on the number line of Unix time; a conflict is two segments overlapping on that one line.
-- **Unix milliseconds.** Every `start`, `end`, and `expiresAt` is an integer Unix timestamp in milliseconds. The kernel deals only in integer instants. Timezones, calendars, and display all live at the edge (in your code), never in the database.
-- **Batch atomicity.** Verbs that take an array (`resources.createMany`, `rules.create`, `bookings.create`) apply all-or-nothing in one round-trip. A batch that would conflict is rejected whole; nothing partial is written.
+- **Intervals are half-open `[start, end)`.** The start instant counts, the end instant does not. So `[10:00, 11:00)` and `[11:00, 12:00)` sit next to each other without colliding. Two spans collide only when they actually share a moment.
+- **Time is Unix milliseconds.** Every `start`, `end`, and `expiresAt` is an integer count of milliseconds since the epoch. No `Date` objects, no strings. Timezones and calendars stay in your code.
+- **Array verbs go in one round-trip.** `resources.createMany`, `rules.create`, and `bookings.create` send the whole array as a single statement, and the kernel applies it as one atomic batch: if any part conflicts, none of it is written. Heads up on naming: resources use `createMany` for the array form, but rules and bookings use `create` (there is no `bookings.createMany`).
 
 ## Setup
 
@@ -18,11 +18,9 @@ import { DeltaT } from "@open-tap/client";
 const db = new DeltaT({ host: "localhost", port: 5433, database: "acme", password: "deltat" });
 ```
 
----
-
 ## client
 
-The connection. Construct one `DeltaT` per database (tenant) and reuse it.
+One `DeltaT` per database, and reuse it. The `database` value is the tenant, so different names get fully separate data.
 
 ### constructor
 
@@ -30,7 +28,7 @@ The connection. Construct one `DeltaT` per database (tenant) and reuse it.
 constructor(options?: DeltaTOptions | Sql)
 ```
 
-Construct a DeltaT client, either from connection options (host/port/database/username/password) or by wrapping an existing postgres `Sql` instance.
+Open a connection from options (`host`, `port`, `database`, `username`, `password`), or wrap an existing postgres `Sql` instance. Unspecified options fall back to sensible defaults (`localhost`, `5433`, database `default`, username `user`, password `deltat`).
 
 ```ts
 const db = new DeltaT({ host: "localhost", port: 5433, database: "acme", password: "deltat" });
@@ -42,17 +40,15 @@ const db = new DeltaT({ host: "localhost", port: 5433, database: "acme", passwor
 async close(): Promise<void>
 ```
 
-Close the underlying postgres connection pool.
+Close the underlying connection pool when you are done.
 
 ```ts
 await db.close();
 ```
 
----
-
 ## resources
 
-A resource is anything you can book. Resources form a parent/child tree: a resource can hold other resources, and only the leaves carry a timeline. Children inherit open hours from ancestors (non-blocking overrides, nearest ancestor wins; blocking accumulates).
+A resource is anything you can book. They form a tree: a resource can contain other resources, and only the leaves carry a timeline. Children inherit open hours from their ancestors (open hours override, nearest ancestor wins; blackouts accumulate down the tree).
 
 ### create
 
@@ -60,10 +56,10 @@ A resource is anything you can book. Resources form a parent/child tree: a resou
 async create(opts?: { parentId?: string | null; name?: string | null; capacity?: number; bufferAfter?: number | null; }): Promise<Resource>
 ```
 
-Create one resource (capacity defaults to 1, `parentId`/`name`/`bufferAfter` default to null) and return it with its generated ulid id.
+Create one resource and get it back with a generated id. `capacity` defaults to 1; `parentId`, `name`, and `bufferAfter` default to null.
 
 ```ts
-const room = await db.resources.create({ name: "Room A", capacity: 4 });
+const stadium = await db.resources.create({ name: "Stadium" });
 ```
 
 ### createMany
@@ -72,10 +68,10 @@ const room = await db.resources.create({ name: "Room A", capacity: 4 });
 async createMany(items: { parentId?: string | null; name?: string | null; capacity?: number; bufferAfter?: number | null; }[]): Promise<Resource[]>
 ```
 
-Create several resources in one round-trip, applied in input order, so an item may reference a parent created earlier in the same call (parent-first ordering). Bounded by the kernel batch size of 1000.
+Create several resources in one round-trip. They are applied in the order you pass them, so a later item can name a parent created earlier in the same call (build top-down).
 
 ```ts
-const [building, floor] = await db.resources.createMany([{ name: "HQ" }, { name: "Floor 1" }]);
+const [acme, stadium] = await db.resources.createMany([{ name: "Acme Tickets" }, { name: "Stadium" }]);
 ```
 
 ### update
@@ -84,10 +80,10 @@ const [building, floor] = await db.resources.createMany([{ name: "HQ" }, { name:
 async update(id: string, opts: { name?: string | null; capacity?: number; bufferAfter?: number | null; }): Promise<void>
 ```
 
-Update a resource's name, capacity, and/or bufferAfter. Only provided fields are written; a no-op if none are given.
+Change a resource's name, capacity, or bufferAfter. Only the fields you pass are written; passing nothing is a no-op.
 
 ```ts
-await db.resources.update(room.id, { capacity: 6 });
+await db.resources.update(sectionA.id, { capacity: 500 });
 ```
 
 ### delete
@@ -99,7 +95,7 @@ async delete(id: string): Promise<void>
 Delete a resource by id.
 
 ```ts
-await db.resources.delete(room.id);
+await db.resources.delete(seat12.id);
 ```
 
 ### get
@@ -108,17 +104,15 @@ await db.resources.delete(room.id);
 async get(filter?: { parentId: string } | { roots: true }): Promise<Resource[]>
 ```
 
-List resources: all when no filter, only top-level (`parent_id IS NULL`) with `{ roots: true }`, or direct children with `{ parentId }`.
+List resources. No filter returns everything, `{ roots: true }` returns only top-level resources, and `{ parentId }` returns the direct children of one resource.
 
 ```ts
-const roots = await db.resources.get({ roots: true });
+const sections = await db.resources.get({ parentId: stadium.id });
 ```
-
----
 
 ## rules
 
-A rule is an open or closed region of a resource's timeline. An open-hours rule (`blocking` false or omitted) adds available time; a blackout rule (`blocking: true`) removes it. Availability is open windows minus blocking rules minus active allocations.
+A rule paints a stretch of a resource's timeline open or closed. Leave `blocking` off (or false) for open hours, set it to true for a blackout. Availability is open hours minus blackouts minus active allocations.
 
 ### create
 
@@ -126,10 +120,10 @@ A rule is an open or closed region of a resource's timeline. An open-hours rule 
 async create(items: { resourceId: string; start: number; end: number; blocking?: boolean; }[]): Promise<Rule[]>
 ```
 
-Create one or many rules in one round-trip. Open-hours when `blocking` is false or omitted, blackout when `blocking` is true. Returns the created rules with generated ulid ids.
+Create one or many rules in one round-trip. Returns the created rules with generated ids.
 
 ```ts
-await db.rules.create([{ resourceId: room.id, start: 1719216000000, end: 1719244800000 }]);
+await db.rules.create([{ resourceId: seat12.id, start: 1719216000000, end: 1719244800000 }]);
 ```
 
 ### replaceOpenHours
@@ -138,10 +132,10 @@ await db.rules.create([{ resourceId: room.id, start: 1719216000000, end: 1719244
 async replaceOpenHours(resourceId: string, segments: { start: number; end: number }[]): Promise<Rule[]>
 ```
 
-Replace a resource's non-blocking (open-hours) rules with new segments. Creates the new rules first, then deletes the stale ones, so a mid-run failure never leaves an empty schedule. Blocking rules and bookings are untouched.
+Swap a resource's open hours for a new set. It creates the new rules first, then deletes the old ones, so a failure partway through never leaves the resource with no schedule at all. Blackouts and bookings are left alone. This is the "save my weekly hours" move.
 
 ```ts
-await db.rules.replaceOpenHours(room.id, [{ start: 1719216000000, end: 1719244800000 }]);
+await db.rules.replaceOpenHours(seat12.id, [{ start: 1719216000000, end: 1719244800000 }]);
 ```
 
 ### update
@@ -174,17 +168,15 @@ await db.rules.delete(rule.id);
 async get(resourceId: string): Promise<Rule[]>
 ```
 
-List all rules for a resource.
+List every rule on a resource.
 
 ```ts
-const rules = await db.rules.get(room.id);
+const rules = await db.rules.get(seat12.id);
 ```
-
----
 
 ## bookings
 
-A booking is a confirmed allocation: a half-open segment placed on a resource's timeline. It counts against availability and collides with any overlapping allocation.
+A booking is a confirmed allocation: a half-open segment on a resource's timeline. It counts against availability and collides with any overlapping allocation.
 
 ### create
 
@@ -192,10 +184,10 @@ A booking is a confirmed allocation: a half-open segment placed on a resource's 
 async create(items: { resourceId: string; start: number; end: number; label?: string; }[]): Promise<Booking[]>
 ```
 
-Create one or many bookings in one round-trip and return them with generated ulid ids. An empty input returns an empty array. The batch is atomic.
+Create one or many bookings in one round-trip, returned with generated ids. `label` is optional. An empty array returns an empty array.
 
 ```ts
-const [b] = await db.bookings.create([{ resourceId: room.id, start: 1719216000000, end: 1719219600000, label: "Standup" }]);
+const [b] = await db.bookings.create([{ resourceId: seat12.id, start: 1719216000000, end: 1719219600000, label: "Match night" }]);
 ```
 
 ### cancel
@@ -216,10 +208,10 @@ await db.bookings.cancel(b.id);
 async get(resourceId: string, filter?: { start?: number; end?: number }): Promise<Booking[]>
 ```
 
-List bookings for a resource. When both `filter.start` and `filter.end` are given, return only bookings overlapping the half-open window `[start, end)`.
+List a resource's bookings. Pass both `start` and `end` to get only the ones overlapping that window.
 
 ```ts
-const today = await db.bookings.get(room.id, { start: 1719187200000, end: 1719273600000 });
+const tonight = await db.bookings.get(seat12.id, { start: 1719187200000, end: 1719273600000 });
 ```
 
 ### getMany
@@ -228,17 +220,15 @@ const today = await db.bookings.get(room.id, { start: 1719187200000, end: 171927
 async getMany(resourceIds: string[]): Promise<Record<string, Booking[]>>
 ```
 
-Fetch bookings for many resources in one round-trip, grouped by resource id. Every requested id is present in the result (an empty array if it has none).
+Fetch bookings for many resources in one round-trip, grouped by resource id. Every id you asked for shows up in the result, with an empty array if it has none.
 
 ```ts
-const byRoom = await db.bookings.getMany([roomA.id, roomB.id]);
+const bySeat = await db.bookings.getMany([seat11.id, seat12.id]);
 ```
-
----
 
 ## holds
 
-A hold is a self-expiring tentative allocation: a segment with a self-destruct timer. It marks a slot taken for everyone the instant it is placed, and it lets go on its own at `expiresAt` if nobody confirms. That tiny timer is what settles a race between two callers grabbing the same slot. A hold counts toward availability and conflict only while `expiresAt > now`; expired holds are ignored by the reaper.
+A hold is a tentative allocation with a self-destruct timer. The moment it lands it blocks the slot for everyone, and if nobody confirms by `expiresAt` it quietly frees itself. That timer is what settles a race between two people grabbing the same seat. A hold only counts while `expiresAt > now`; an expired one is ignored on every read, and a background sweep eventually removes it.
 
 ### place
 
@@ -246,10 +236,10 @@ A hold is a self-expiring tentative allocation: a segment with a self-destruct t
 async place(opts: { resourceId: string; start: number; end: number; expiresAt: number; }): Promise<Hold>
 ```
 
-Place a single hold that auto-expires at `expiresAt` (Unix ms) and return it with a generated ulid id.
+Place one hold that auto-expires at `expiresAt` (Unix ms). Returns it with a generated id.
 
 ```ts
-const hold = await db.holds.place({ resourceId: room.id, start: 1719216000000, end: 1719219600000, expiresAt: Date.now() + 120000 });
+const hold = await db.holds.place({ resourceId: seat12.id, start: 1719216000000, end: 1719219600000, expiresAt: Date.now() + 120000 });
 ```
 
 ### release
@@ -258,7 +248,7 @@ const hold = await db.holds.place({ resourceId: room.id, start: 1719216000000, e
 async release(id: string): Promise<void>
 ```
 
-Release (delete) a hold by id before it expires.
+Let go of a hold by id before it expires.
 
 ```ts
 await db.holds.release(hold.id);
@@ -270,10 +260,10 @@ await db.holds.release(hold.id);
 async get(resourceId: string, filter?: { start?: number; end?: number }): Promise<Hold[]>
 ```
 
-List holds for a resource. When both `filter.start` and `filter.end` are given, return only holds overlapping the half-open window `[start, end)`.
+List a resource's holds. Pass both `start` and `end` to get only the ones overlapping that window.
 
 ```ts
-const active = await db.holds.get(room.id, { start: 1719187200000, end: 1719273600000 });
+const active = await db.holds.get(seat12.id, { start: 1719187200000, end: 1719273600000 });
 ```
 
 ### getMany
@@ -282,17 +272,15 @@ const active = await db.holds.get(room.id, { start: 1719187200000, end: 17192736
 async getMany(resourceIds: string[]): Promise<Record<string, Hold[]>>
 ```
 
-Fetch holds for many resources in one round-trip, grouped by resource id. Every requested id is present (an empty array if none).
+Fetch holds for many resources in one round-trip, grouped by resource id. Every requested id is present, empty array if none.
 
 ```ts
-const byRoom = await db.holds.getMany([roomA.id, roomB.id]);
+const bySeat = await db.holds.getMany([seat11.id, seat12.id]);
 ```
-
----
 
 ## availability
 
-Availability is derived, never stored. It is computed as open windows minus blocking rules minus active allocations (bookings plus live holds), each allocation extended by its `bufferAfter`. These reads return the gaps between segments.
+Availability is never stored, always computed on the spot: open hours, minus blackouts, minus active allocations (bookings plus live holds), with each allocation stretched by its `bufferAfter`. These reads give you the free gaps.
 
 ### get
 
@@ -300,10 +288,10 @@ Availability is derived, never stored. It is computed as open windows minus bloc
 async get(opts: { resourceId: string; start: number; end: number; minDuration?: number; }): Promise<AvailabilitySlot[]>
 ```
 
-Compute free slots for a single resource within `[start, end)`. `minDuration` filters to slots at least that long.
+Free slots for one resource inside `[start, end)`. `minDuration` drops gaps shorter than that. Slots carry only `start` and `end`.
 
 ```ts
-const slots = await db.availability.get({ resourceId: room.id, start: 1719187200000, end: 1719273600000, minDuration: 1800000 });
+const slots = await db.availability.get({ resourceId: seat12.id, start: 1719187200000, end: 1719273600000, minDuration: 1800000 });
 ```
 
 ### getCombined
@@ -312,10 +300,10 @@ const slots = await db.availability.get({ resourceId: room.id, start: 1719187200
 async getCombined(opts: { resourceIds: string[]; start: number; end: number; minAvailable?: number; minDuration?: number; }): Promise<AvailabilitySlot[]>
 ```
 
-Compute merged availability across several resources within `[start, end)`. `minAvailable` controls how many must be free at once: it defaults to all (intersection), `1` is a pool (union), `k` is at least `k` free. Result slots carry no `resource_id` because the set is merged into one combined timeline.
+Merge several resources into one timeline. `minAvailable` says how many must be free at once: it defaults to all of them (intersection), `1` treats them as a pool (any one free), and `k` means at least `k` free. The merged slots carry no resource id.
 
 ```ts
-const pool = await db.availability.getCombined({ resourceIds: [roomA.id, roomB.id], start: 1719187200000, end: 1719273600000, minAvailable: 1 });
+const anySeat = await db.availability.getCombined({ resourceIds: [seat11.id, seat12.id], start: 1719187200000, end: 1719273600000, minAvailable: 1 });
 ```
 
 ### getMany
@@ -324,17 +312,15 @@ const pool = await db.availability.getCombined({ resourceIds: [roomA.id, roomB.i
 async getMany(opts: { resourceIds: string[]; start: number; end: number; minDuration?: number; }): Promise<Record<string, AvailabilitySlot[]>>
 ```
 
-Compute per-resource availability for several resources in one round-trip, grouped by resource id (the analog of `bookings.getMany` / `holds.getMany`). Unlike `getCombined`, it does not merge the set: rows stay tagged with their `resource_id`.
+Per-resource availability for several resources in one round-trip, grouped by id. Unlike `getCombined`, nothing is merged: each slot stays tagged with its resource.
 
 ```ts
-const byRoom = await db.availability.getMany({ resourceIds: [roomA.id, roomB.id], start: 1719187200000, end: 1719273600000 });
+const bySeat = await db.availability.getMany({ resourceIds: [seat11.id, seat12.id], start: 1719187200000, end: 1719273600000 });
 ```
-
----
 
 ## events
 
-Real-time change notification. Changes are pushed the instant they happen over a per-resource channel (`resource_<id>`), and events bubble to ancestors up the parent tree.
+Real-time change notifications over a per-resource channel (`resource_<id>`). Events also bubble up to ancestors, so a subscriber on the Stadium hears about changes to Seat 12.
 
 ### listen
 
@@ -342,34 +328,22 @@ Real-time change notification. Changes are pushed the instant they happen over a
 async listen(resourceId: string, callback: (event: DeltaTEvent) => void): Promise<() => Promise<void>>
 ```
 
-Subscribe to LISTEN/NOTIFY events for a resource (channel `resource_<id>`). Returns an async unsubscribe function. Malformed payloads are silently ignored.
+Subscribe to changes on a resource. Returns an async unsubscribe function. Anything that arrives malformed is ignored.
 
 ```ts
-const stop = await db.events.listen(room.id, (e) => console.log(e));
+const stop = await db.events.listen(seat12.id, (e) => console.log(e));
 await stop();
 ```
 
----
+## A few honest notes
 
-## Recurring hours
-
-There is no recurrence verb in the SDK. Recurrence, timezones, and calendars live at the edge: you expand a recurring pattern into concrete non-blocking rule segments in your own code, then hand the kernel plain `[start, end)` instants. Use `rules.replaceOpenHours` to swap a resource's open hours for a freshly expanded set (create-then-delete, so the schedule is never empty mid-run), or `rules.create` to add segments:
+**Recurrence lives in your code, not here.** There is no recurrence verb. Expand a recurring pattern into concrete `[start, end)` segments yourself, then hand them to `rules.replaceOpenHours` (to swap a whole schedule) or `rules.create` (to add some). The schedule and time-mask helpers that exist in the package are deliberately left off this verb surface.
 
 ```ts
 const segments = expandWeeklyHours(weekStart);
-await db.rules.replaceOpenHours(room.id, segments);
+await db.rules.replaceOpenHours(seat12.id, segments);
 ```
 
----
+**`db.sql` is an escape hatch, not a verb.** It hands you the raw postgres connection. It is real and public, but reaching for it ties your code to the current transport. Use the verbs above; drop to `db.sql` only when nothing else covers the case.
 
-## Notes
-
-### `DeltaT.sql` is an escape hatch, not a verb
-
-`db.sql` exposes the raw underlying postgres `Sql` instance. It is public and real, but it is an advanced escape hatch, not part of the verb surface, so it is deliberately not documented as an API verb. Using it ties your code to the transitional pgwire transport, which is the current core transport only and is slated for replacement by the framed `Command` protocol. Prefer the verbs above; reach for `db.sql` only when no verb covers what you need.
-
-### Lifecycle direction (today vs the target)
-
-Today's verbs are not yet the canonical lifecycle vocabulary the protocol targets. The target names a Hold lifecycle of place/commit/release and a Booking lifecycle of confirm/cancel; the current SDK uses `holds.place`/`holds.release` and `bookings.create`/`bookings.cancel` instead, and `bookings.create` stands in for confirm.
-
-Most importantly: **no `commit` verb exists yet, at any layer.** Turning a hold into a booking today is `holds.release` followed by `bookings.create`, which is a non-atomic release-then-book. That leaves a real time-of-check-to-time-of-use (TOCTOU) window where another caller can slip into the freed slot before your booking lands. The atomic `CommitHold` (one lock, excluding that hold from the conflict check) is specified but unbuilt at HEAD. Until it ships, treat hold-to-confirm as best-effort, not as an atomic handoff.
+**There is no commit verb yet.** Turning a hold into a booking today is two steps: `holds.release` then `bookings.create`. That gap is non-atomic, so another caller can slip into the freed slot before your booking lands. An atomic hold-to-booking handoff is planned but not built, so for now treat the two-step as best-effort.

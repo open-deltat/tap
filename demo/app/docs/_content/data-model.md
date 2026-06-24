@@ -1,135 +1,128 @@
-The nesting above is what Δt uses for every example in these docs: a tenant `Acme Tickets`, a resource `Stadium`, a resource `Section A` inside it, and `Seat 12` as the innermost resource that actually carries a timeline.
+Δt stores a little and computes a lot. You tell it what exists (your resources), when each one is open, and what is already taken. It works out what is free, every time you ask, by subtracting the busy parts from the open parts. There is no separate "availability" table to keep in sync, because availability is never stored. It is derived on read.
 
-Space has three dimensions. Time is the fourth, and it is representable as a single line: the number line of instants in Unix time. A resource's timeline is exactly that line. Everything you put on it is a stretch of the line, and the only question Δt ever answers is where the gaps are.
+This page covers how your data is shaped: the tenant boundary, the resource tree, the things you put on a timeline (open hours, blackouts, bookings), and the two knobs that change how a slot fills up (capacity and buffer).
 
-## In kernel terms
+## A tenant is your private database
 
-The plain words above each map to one precise type in the engine. This section names them so the rest of the docs and the SDK signatures line up. Nothing new is happening here, it is the same model with the kernel's vocabulary.
+The `database` name on your connection picks the tenant. Each tenant is fully separate: its own state, its own durable log on disk, no shared rows with anyone else. Acme Tickets gets `database: "acme"` and never sees another tenant's data, because there is nothing shared to leak.
 
-### A timeline is a list of intervals
+In practice you make one client per tenant and reuse it:
 
-Every stretch on a timeline, regardless of what it means, is one `Interval`. Time itself is `Ms`, signed Unix milliseconds, the only time type in the kernel.
+```ts
+import { DeltaT } from "@open-tap/client";
 
-```rust
-/// Unix milliseconds, the only time type.
-pub type Ms = i64;
-
-/// Half-open interval `[start, end)`.
-pub struct Span {
-    pub start: Ms,
-    pub end: Ms,
-}
-
-/// What an interval represents.
-pub enum IntervalKind {
-    NonBlocking,                       // opens availability
-    Blocking,                          // closes availability
-    Hold { expires_at: Ms },           // temporary reservation with expiry
-    Booking { label: Option<String> }, // permanent reservation
-}
-
-/// Rules, holds, and bookings are all just intervals.
-pub struct Interval {
-    pub id: Ulid,
-    pub span: Span,
-    pub kind: IntervalKind,
-}
+const db = new DeltaT({
+  host: "localhost",
+  port: 5433,
+  database: "acme",
+  password: "deltat",
+});
 ```
 
-A `Span` is half-open, `[start, end)`: the end instant is not part of the stretch, so two bookings that touch end-to-start do not overlap. `overlaps` is the one geometric predicate the whole engine rests on: `self.start < other.end && other.start < self.end`.
+When you are done, `db.close()` ends the connection pool.
 
-The four `IntervalKind` variants are the plain words made precise:
+## Resources nest in a tree, leaves carry the timeline
 
-| Plain word | Kernel kind | Role |
-| --- | --- | --- |
-| open time | `NonBlocking` rule | opens a window of availability |
-| blocked | `Blocking` rule | closes a window |
-| booked | `Booking { label }` | a confirmed allocation |
-| (a hold) | `Hold { expires_at }` | a tentative allocation with a self-destruct timer |
+A resource is anything bookable. Resources form a parent and child tree, so Acme Tickets > Stadium > Section A > Seat 12 is just four resources, each pointing at its parent.
 
-Rules (`NonBlocking` / `Blocking`) are the open-and-blocked layer. Allocations (`Hold` / `Booking`) are the things people place on top. A booking is permanent until cancelled. A hold counts only while `expires_at` is greater than `now`. Once it lapses it is ignored on every read, and the background reaper removes it.
+The leaf is where the timeline lives. Seat 12 is the thing that gets opened, blocked, and booked. The branches above it (Stadium, Section A) exist to group seats and to set rules that flow downward, as the diagram below draws out.
 
-### A resource carries the timeline
+<!--HIERARCHY-->
 
-The innermost box in the diagram, `Seat 12`, is a `ResourceState`. Each resource owns its intervals and two scheduling parameters.
+Inheritance has one rule worth knowing up front, because it is not symmetric:
 
-```rust
-pub struct ResourceState {
-    pub id: Ulid,
-    pub parent_id: Option<Ulid>,
-    pub name: Option<String>,
-    /// Max concurrent allocations (default 1).
-    pub capacity: u32,
-    /// Buffer time in ms after each allocation ends (e.g. cleaning time).
-    pub buffer_after: Option<Ms>,
-    /// All intervals (rules + allocations), sorted by span.start.
-    pub intervals: Vec<Interval>,
-}
-```
+- **Open hours flow down by override.** A seat uses the nearest ancestor that declares open hours. If Section A says "open 7pm to 11pm," every seat under it inherits that, until a seat sets its own hours and takes over.
+- **Blackouts flow down by accumulation.** Every blackout on the seat and on each ancestor above it applies. Close the whole Stadium for maintenance and every seat under it is closed too, on top of whatever each seat already had.
 
-`parent_id` is the nesting. `Seat 12` points at `Section A`, which points at `Stadium`. That is the tree drawn above as boxes-inside-boxes.
+So a slot is open when something at or above it says open, and nothing at or above it blocks it.
 
-From the SDK, you create that tree and its intervals with the real verbs:
+Creating that tree is a few calls. `resources.create` makes one resource and returns it with a generated id. Pass `parentId` to hang it under another:
 
 ```ts
 const stadium = await db.resources.create({ name: "Stadium" });
-const sectionA = await db.resources.create({ parentId: stadium.id, name: "Section A" });
-const seat12 = await db.resources.create({ parentId: sectionA.id, name: "Seat 12" });
-
-// open hours on the seat (NonBlocking rule)
-await db.rules.create([{ resourceId: seat12.id, start: 1719216000000, end: 1719244800000 }]);
-// a blackout (Blocking rule)
-await db.rules.create([{ resourceId: seat12.id, start: 1719223200000, end: 1719226800000, blocking: true }]);
-// a confirmed booking
-await db.bookings.create([{ resourceId: seat12.id, start: 1719219600000, end: 1719223200000, label: "Standup" }]);
+const sectionA = await db.resources.create({
+  parentId: stadium.id,
+  name: "Section A",
+});
+const seat12 = await db.resources.create({
+  parentId: sectionA.id,
+  name: "Seat 12",
+});
 ```
 
-### Availability is derived, never stored
+If you are seeding many at once, `resources.createMany` sends them in one round-trip and keeps your input order, so an item can reference a parent listed earlier in the same call.
 
-There is no "free" column anywhere in the engine. The fourth row of the storage diagram is computed on demand:
+## Open hours, blackouts, and bookings
 
-> availability = open windows, minus blocking rules, minus active allocations (bookings plus live holds), each allocation extended by `buffer_after`.
+Three kinds of thing land on a leaf's timeline:
 
-The read path scans a buffer-expanded window so an allocation whose buffer tail reaches into the query window still subtracts. Nothing is cached: every read re-derives.
+- **Open hours** say when the resource is on sale. Without them, nothing is ever free.
+- **Blackouts** carve closed time out of the open hours: a maintenance window, a holiday, a private event.
+- **Bookings** are confirmed allocations. A booking stays until you cancel it.
+
+Open hours and blackouts are both "rules," and you write them with the same verb. The only difference is the `blocking` flag: leave it off for open hours, set it to `true` for a blackout.
+
+```ts
+// Open Seat 12 for tonight's window
+await db.rules.create([
+  { resourceId: seat12.id, start: 1_700_000_000_000, end: 1_700_014_400_000 },
+]);
+
+// Black out a slice of it
+await db.rules.create([
+  { resourceId: seat12.id, start: 1_700_003_600_000, end: 1_700_007_200_000, blocking: true },
+]);
+```
+
+When you want to swap a resource's whole set of open hours (the "save my weekly hours" move), reach for `rules.replaceOpenHours`. It writes the new open-hours rules first and only then deletes the old ones, so a failure halfway through never leaves the resource with an empty schedule. Blackouts and bookings are left untouched.
+
+Bookings live on their own verb. `bookings.create` takes one or many and returns them with generated ids; `bookings.cancel(id)` removes one.
+
+## Free is what is left
+
+You never write availability. You ask for it, and Δt computes it on the spot:
+
+> free = open hours, minus blackouts, minus what is already taken (bookings, plus holds that have not expired)
+
+<!--STORAGE-->
 
 ```ts
 const slots = await db.availability.get({
   resourceId: seat12.id,
-  start: 1719187200000,
-  end: 1719273600000,
-  minDuration: 1800000, // only slots at least 30 min long
+  start: 1_700_000_000_000,
+  end: 1_700_086_400_000,
+});
+// slots are { start, end } pairs, the gaps that are actually bookable
+```
+
+Because it is computed fresh each time, there is nothing stale to reconcile. A hold placed a moment ago already subtracts from the answer, and an expired hold has already given its slot back. Pass `minDuration` to drop gaps shorter than you care about.
+
+(A hold is a tentative allocation with an expiry timestamp, covered on its own page. The short version: it blocks the slot the instant it lands and frees itself if nobody confirms.)
+
+## Capacity: how many at once
+
+By default a resource holds one allocation at a time. Set `capacity` higher and the same resource can take that many overlapping bookings before it is full. A booking only removes a slot once occupancy reaches capacity, so capacity 50 means fifty people can hold overlapping time before the slot reads as taken. Useful for a general-admission section, a class with a fixed number of seats, or a pool of identical units behind one id.
+
+## Buffer: turnaround after each
+
+`bufferAfter` adds quiet time after every allocation. Book Seat 12 until 9pm with a buffer of 15 minutes and the slot stays unavailable until 9:15, even though the booking itself ended at 9. The buffer only extends the end, never the start, and it is not a separate booking you have to manage. It just makes each allocation occupy a little more of the timeline.
+
+```ts
+const cleanedSeat = await db.resources.create({
+  name: "Seat 12 (with turnaround)",
+  capacity: 1,
+  bufferAfter: 900_000, // 15 minutes in ms
 });
 ```
 
-A sub-millisecond answer is a RAM-read property, not a durable-commit one: the state is in memory and availability is a tree scan, so reads do not pay for an fsync.
+## A few conventions to internalize
 
-### Parent/child inheritance
+- **Time is integer Unix milliseconds.** Every `start`, `end`, and expiry is a plain number, not a date string.
+- **Intervals are half-open, `[start, end)`.** The end instant is excluded, so a booking ending at 9:00 and one starting at 9:00 do not overlap. No off-by-one wars over the boundary.
+- **Calendars live in your code.** Δt has no notion of timezones, weekdays, or recurrence. You expand "every Tuesday 7pm to 11pm" into concrete instants on your side, then feed it the plain numbers. The data model stays a flat number line, which is what keeps it simple.
 
-A child resource does not restate its parent's hours. It inherits them, and the two rule kinds compose differently:
+## What is not here yet
 
-- **Open hours (`NonBlocking`) override, nearest ancestor wins.** If `Section A` sets open hours, they apply to `Seat 12` unless `Seat 12` sets its own. The closest resource up the tree that declares open hours is the one that counts.
-- **Blocking accumulates.** A blackout on `Stadium`, one on `Section A`, and one on `Seat 12` all apply to `Seat 12`. Blocks add up the whole way down; none of them is overridden.
+There is no atomic "commit this hold into a booking" verb. Turning a hold into a booking today is two steps: release the hold, then create the booking. That leaves a brief window where the slot is open to someone else. If you need the slot guaranteed, keep the hold alive until the booking succeeds rather than releasing first.
 
-So a seat is open when some ancestor (or itself) says it is open and no ancestor (or itself) blocks it.
-
-### Multi-slot capacity
-
-`capacity: u32` is the maximum number of concurrent allocations on a resource. A single seat has capacity 1. A hotel room type with five identical rooms has capacity 5, modelled as one resource, not five.
-
-Availability with capacity greater than 1 is a `+1` / `-1` sweep-line over the allocation edges: walk the timeline, add one at each allocation start, subtract one at each end, and a moment is free wherever occupancy is below capacity.
-
-```ts
-const roomType = await db.resources.create({ name: "Standard Room", capacity: 5 });
-```
-
-Capacity 1 is just the degenerate case of the same sweep: free means occupancy zero.
-
-### buffer_after extends the effective end
-
-`buffer_after` is turnaround time: cleaning, cooldown, a gap you want after each allocation before the next can start. It extends each allocation's effective end to `span.end + buffer`. It never moves the start, and it is not stored as a separate interval. A 30-minute clean on a one-hour booking makes that booking occupy 90 minutes of the timeline for availability and conflict purposes, all of it after the booked stretch.
-
-```ts
-const room = await db.resources.create({ name: "Room A", capacity: 1, bufferAfter: 1800000 });
-```
-
-The value is bounded at the write boundary and every `span.end + buffer` site uses saturating arithmetic, so an out-of-range buffer (including one replayed from an old WAL) cannot overflow and panic the engine.
+For the durability, transport, and self-host details under all of this, see the [Under the hood](/docs/protocol-and-engine) page.
