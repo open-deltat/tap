@@ -1,6 +1,6 @@
-The fastest path from zero to a confirmed booking. We follow one scenario end to end: the seat **Seat 12**, in **Section A**, of the **Stadium**, owned by the tenant **Acme Tickets**. By the end you will have opened a seat for sale, checked that it is free, held it while a buyer decides, and turned that hold into a booking.
+tap is the TypeScript way to talk to a Δt instance. You give it resources and time rules, and it tells you what is free, lets you hold a slot for a moment, and confirms a booking. This page takes you from nothing to a confirmed booking with as little ceremony as possible.
 
-This is the same model the [Data model](/docs/data-model) page describes: a tenant holds resources, resources can hold resources, and the smallest one carries a timeline. Everything on that timeline is a labelled stretch. You store three kinds, and Δt works out the fourth: open time, minus blocked, minus booked, leaves what is free.
+We will use one running example: Acme Tickets sells seats in a stadium. The tree is Stadium, then Section A, then Seat 12. We will open Seat 12 for sale, find out when it is free, hold it, and book it.
 
 ## Install
 
@@ -8,138 +8,110 @@ This is the same model the [Data model](/docs/data-model) page describes: a tena
 bun add @open-tap/client
 ```
 
-## Connect
-
-The SDK talks to deltat over the PostgreSQL wire protocol, so it is built on a `postgres`-compatible connection (Bun's `postgres` driver works directly). You construct a client from connection options:
-
 ```ts
 import { DeltaT } from "@open-tap/client";
+```
 
+## Connect
+
+One `DeltaT` instance is one connection to one tenant. The `database` you pass is the tenant: pick a name and that tenant's data is isolated from the rest. Create the client once and reuse it.
+
+```ts
 const db = new DeltaT({
   host: "localhost",
   port: 5433,
-  database: "acme",
+  database: "default",
   password: "deltat",
 });
 ```
 
-The `database` field selects the tenant: Acme Tickets gets its own private database, and nobody else sees inside it. Defaults are `host: "localhost"`, `port: 5433`, `database: "default"`, `password: "deltat"`, so you only pass what differs.
+Those four values are the defaults, so locally you can write `new DeltaT()` and get exactly the same thing.
 
-> pgwire is the current, transitional transport, not the long-term core. It is why the connection looks like Postgres even though there is no Postgres underneath. For the why (and what replaces it), see [Protocol and engine](/docs/protocol-and-engine). You do not need to think about it to use the SDK: every verb below is a typed method, not raw SQL.
+A note on how this connects: Δt speaks the PostgreSQL wire protocol, so under the hood tap rides a normal Postgres driver. That is purely how the bytes get there. You never write SQL. You call typed verbs like `resources.create` and `availability.get`, and tap turns them into the right calls for you. (There is a raw `db.sql` escape hatch if you ever need it, but reach for it only when no verb covers what you want.)
 
-All times are Unix milliseconds. Intervals are half-open `[start, end)`.
+## Create a resource
 
-## 1. Create the resource
-
-A resource is anything you can book. Create the seat. Capacity defaults to `1`, which is exactly right for a single seat.
-
-```ts
-const seat = await db.resources.create({ name: "Seat 12" });
-```
-
-`create` returns the resource with its generated `ulid` id:
-
-```ts
-// { id: "01J...", parentId: null, name: "Seat 12", capacity: 1, bufferAfter: null }
-```
-
-Resources nest. To build the full Acme Tickets tree (Stadium > Section A > Seat 12), create the parents, read back their ids, then create the children. Children inherit open hours from their ancestors, so opening the Stadium's hours opens them for every seat inside it.
+A resource is anything bookable. Resources form a parent and child tree, and only the leaves carry a timeline. So Seat 12 is where the bookable time lives; Stadium and Section A are just structure above it.
 
 ```ts
 const stadium = await db.resources.create({ name: "Stadium" });
-const sectionA = await db.resources.create({ parentId: stadium.id, name: "Section A" });
-const seat12 = await db.resources.create({ parentId: sectionA.id, name: "Seat 12" });
+const section = await db.resources.create({
+  parentId: stadium.id,
+  name: "Section A",
+});
+const seat = await db.resources.create({
+  parentId: section.id,
+  name: "Seat 12",
+});
 ```
 
-## 2. Open the hours
+Each call returns one resource with a generated id. `capacity` defaults to 1, which is exactly right for a single seat. If you need to seed a whole tree at once, `resources.createMany` takes an array and applies the items in order, so a child can point at a parent created earlier in the same call.
 
-A rule is an open or closed region of time on the resource's line. A non-blocking rule (open hours) says "this is on sale"; a blocking rule (blackout) carves time back out. `create` takes one or many rules and treats `blocking` as `false` when omitted.
+## Open the hours
 
-Open Seat 12 for one show, say 8pm to 11pm tonight:
+Nothing is bookable until you say when it is on sale. You do that with rules. A plain rule opens time; a rule with `blocking: true` closes it (a blackout). Open hours and blackouts are the two layers that shape a resource's timeline.
+
+Here we open Seat 12 for a single match window:
 
 ```ts
-const [openHours] = await db.rules.create([
-  { resourceId: seat.id, start: 1719270000000, end: 1719280800000 },
+await db.rules.create([
+  { resourceId: seat.id, start: 1719223200000, end: 1719237600000 },
 ]);
 ```
 
-If you later need to swap the whole sale window without ever leaving the seat unsellable mid-change, use `replaceOpenHours`: it creates the new open-hours rules first, then deletes the stale ones, and leaves blocking rules and bookings untouched.
+Times are integer Unix milliseconds throughout. If you are reworking a resource's whole schedule (the "save my weekly hours" move), use `rules.replaceOpenHours`. It creates the new open-hours rules first and then deletes the stale ones, so a failure halfway through never leaves you with an empty schedule. It leaves blackouts and bookings alone.
 
-```ts
-await db.rules.replaceOpenHours(seat.id, [
-  { start: 1719270000000, end: 1719280800000 },
-]);
-```
+## Ask what is free
 
-## 3. Ask what is free
-
-Availability is derived, never stored. Δt computes it on demand as open windows, minus blocking rules, minus active allocations (bookings plus live holds), each allocation extended by its buffer. That is the "open minus blocked minus booked" subtraction, run for you.
+This is the verb you will reach for most. `availability.get` does not read a stored list; it computes the free gaps on demand. It takes the open windows, subtracts blackouts, and subtracts anything already taken (bookings plus live holds), then hands back the gaps that remain.
 
 ```ts
 const slots = await db.availability.get({
   resourceId: seat.id,
-  start: 1719270000000,
-  end: 1719280800000,
-});
-// [{ start: 1719270000000, end: 1719280800000 }]
-```
-
-Slots carry only `start` and `end`. Pass `minDuration` (in ms) to drop slots shorter than a threshold, for example a 30-minute minimum:
-
-```ts
-const usable = await db.availability.get({
-  resourceId: seat.id,
-  start: 1719270000000,
-  end: 1719280800000,
-  minDuration: 1800000,
+  start: 1719223200000,
+  end: 1719237600000,
 });
 ```
 
-## 4. Place a hold
+Each slot is just a `start` and an `end`. Pass `minDuration` to drop gaps shorter than you care about. Since the answer is always computed fresh, a hold placed a moment ago already shows up as taken, and an expired one already shows up as free again.
 
-When a buyer picks the seat, place a hold: a tentative allocation with a self-destruct timer. It counts as taken for everyone the instant it lands, and it releases itself if no one confirms. That tiny timer is what stops two buyers grabbing the same seat. `expiresAt` is an absolute Unix ms instant; expired holds are ignored by availability automatically.
+## Place a hold
+
+A hold is a tentative grab with a built-in timer. The moment it lands, the slot is blocked for everyone else. If nobody confirms before `expiresAt`, it frees itself. This is how you stop two buyers from grabbing Seat 12 at the same instant.
 
 ```ts
+const first = slots[0];
 const hold = await db.holds.place({
   resourceId: seat.id,
-  start: 1719270000000,
-  end: 1719280800000,
-  expiresAt: Date.now() + 120000, // 2-minute window to check out
+  start: first.start,
+  end: first.end,
+  expiresAt: Date.now() + 5 * 60 * 1000,
 });
 ```
 
-While the hold is live, step 3 run again returns no free slot for that seat. If the buyer walks away, the hold expires and the seat is free again with nothing to clean up. If you want to drop it early (for example the buyer cancelled), release it:
+`expiresAt` is an absolute Unix-ms timestamp, not a duration. You decide it; Δt stores it as given and stops counting the hold the moment that time passes.
+
+## Confirm the booking
+
+A booking is the permanent allocation. It stays on the timeline until you cancel it.
 
 ```ts
 await db.holds.release(hold.id);
-```
-
-## 5. Confirm the booking
-
-When the buyer pays, turn the seat into a real booking. `create` takes one or many bookings and returns them with generated `ulid` ids; `label` is optional.
-
-```ts
 const [booking] = await db.bookings.create([
   {
     resourceId: seat.id,
-    start: 1719270000000,
-    end: 1719280800000,
-    label: "Order #4821",
+    start: hold.start,
+    end: hold.end,
+    label: "Acme Tickets order #4012",
   },
 ]);
 ```
 
-That is the full path: a free seat is now a booked seat. To undo it:
+One honest caveat: turning a hold into a booking today is two steps, `holds.release` then `bookings.create`. There is no single commit verb yet, so there is a brief window between the two where the slot is open again. Worth knowing if you have heavy contention on the same seat.
 
-```ts
-await db.bookings.cancel(booking.id);
-```
+## Close
 
-> Today, hold-to-booking is two steps (release the hold, then create the booking) rather than one atomic operation. A single-lock commit is on the roadmap but not built yet; see [Protocol and engine](/docs/protocol-and-engine) for the current guarantees.
-
-## 6. Close the connection
-
-When you are done, close the underlying connection pool:
+When you are done, close the connection.
 
 ```ts
 await db.close();
@@ -147,55 +119,40 @@ await db.close();
 
 ## The whole flow
 
+Here it is end to end: open the seat, find a slot, hold it, book it, close.
+
 ```ts
 import { DeltaT } from "@open-tap/client";
 
-const db = new DeltaT({
-  host: "localhost",
-  port: 5433,
-  database: "acme",
-  password: "deltat",
-});
+const db = new DeltaT(); // localhost:5433, database "default"
 
-const seat = await db.resources.create({ name: "Seat 12" });
+const stadium = await db.resources.create({ name: "Stadium" });
+const section = await db.resources.create({ parentId: stadium.id, name: "Section A" });
+const seat = await db.resources.create({ parentId: section.id, name: "Seat 12" });
 
 await db.rules.create([
-  { resourceId: seat.id, start: 1719270000000, end: 1719280800000 },
+  { resourceId: seat.id, start: 1719223200000, end: 1719237600000 },
 ]);
 
 const slots = await db.availability.get({
   resourceId: seat.id,
-  start: 1719270000000,
-  end: 1719280800000,
+  start: 1719223200000,
+  end: 1719237600000,
 });
 
 const hold = await db.holds.place({
   resourceId: seat.id,
   start: slots[0].start,
   end: slots[0].end,
-  expiresAt: Date.now() + 120000,
+  expiresAt: Date.now() + 5 * 60 * 1000,
 });
 
+await db.holds.release(hold.id);
 const [booking] = await db.bookings.create([
-  { resourceId: seat.id, start: hold.start, end: hold.end, label: "Order #4821" },
+  { resourceId: seat.id, start: hold.start, end: hold.end, label: "order #4012" },
 ]);
 
 await db.close();
 ```
 
-## Next steps
-
-- **Every verb, every parameter:** the [SDK reference](/docs/sdk/reference) covers all namespaces (`resources`, `rules`, `bookings`, `holds`, `availability`, `events`), including batch reads (`getMany`) and combined availability across resources (`availability.getCombined`).
-- **Run your own deltat:** [Self-host](/docs/sdk/self-host) walks through starting the single-binary server, the data directory, and the connection settings used above.
-- **React to changes live:** subscribe to a resource with `events.listen` to get pushed every booking, hold, and rule change the instant it happens.
-
-```ts
-const stop = await db.events.listen(seat.id, (event) => {
-  console.log(event);
-});
-
-// later
-await stop();
-```
-
-Events bubble up the resource tree, so listening on Section A also surfaces changes to Seat 12 inside it.
+That is zero to a booking. From here, two conventions carry everywhere you go next: all times are integer Unix milliseconds, and intervals are half-open `[start, end)`, so a segment that ends exactly where the next one starts does not overlap. Calendars, timezones, and recurrence stay in your own code: expand them to plain instants and feed those in.

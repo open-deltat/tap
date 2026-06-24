@@ -1,67 +1,92 @@
-Δt is a database for time, and it ships as one thing: a single Rust binary. No external database sits underneath it. State lives in memory and is made durable by an append-only WAL, so self-hosting is a build, a directory, and a password. This is the zero-license, one-command default: you run it, you point the SDK at it, and you own all of it.
+Δt is one binary. No Postgres, no Redis, no sidecar to babysit. You build it, you run it, and it keeps your time-allocation state in memory while writing every change to a small append-only log on disk so a restart picks up exactly where it left off.
+
+If you can run a single process and give it a port and a folder, you can host it.
 
 ## Build and run
 
+It is a Rust binary, so a release build and a run is the whole story:
+
 ```bash
 cargo build --release
-DELTAT_PASSWORD=<choose-a-secret> cargo run
+DELTAT_PASSWORD=<your-password> ./target/release/deltat
 ```
 
-That is the whole story. The binary opens a TCP listener and speaks the wire protocol the tap SDK connects over. Set `DELTAT_PASSWORD` to a secret of your choosing before you run; if you omit it the binary falls back to its default, which is fine for a local scratch instance and wrong for anything reachable.
-
-## Configuration
-
-Everything is configured by environment variable. Set them before launch.
-
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `DELTAT_PORT` | `5433` | TCP port the listener binds. |
-| `DELTAT_BIND` | `0.0.0.0` | Bind address. |
-| `DELTAT_DATA_DIR` | `./data` | Directory that holds the WAL files. This is the on-disk home of all durable state. |
-| `DELTAT_PASSWORD` | (set this) | Cleartext password required on every connection. |
-| `DELTAT_GC_RETENTION_MS` | 7 days | How long past bookings and expired past holds are kept before garbage collection. Rules are never collected. |
-
-`DELTAT_DATA_DIR` is the only thing you need to persist. It is the WAL home: the append-only log with CRC framing and safe-truncation replay that reconstructs in-memory state on startup. Back it up, mount it on a volume, and the instance survives restarts. Delete it and you get a clean slate.
-
-## One binary, no external database
-
-There is no Postgres, no Redis, no sidecar. The engine is a self-contained Rust process: an in-memory state machine backed by the append-only WAL. Writes are group-committed, and on a WAL-append failure the in-memory state is not mutated, so a crash mid-write replays cleanly rather than corrupting state. The practical consequence for self-hosting: one process to run, one directory to keep.
-
-## Tenants
-
-A tenant is your own private database. Nobody else sees inside it. On the wire, the tenant is just the database name on the connection: when the SDK connects with `database: "acme"`, the binary serves the `acme` tenant.
+That starts the server listening on port 5433. Point the tap client at it and you are talking to it:
 
 ```ts
+import { DeltaT } from "@open-tap/client";
+
 const db = new DeltaT({
   host: "localhost",
   port: 5433,
-  database: "acme",
+  database: "acme-tickets",
   password: process.env.DELTAT_PASSWORD,
 });
 ```
 
-Each tenant gets its own Engine plus its own WAL, created lazily on first use and bounded. The tenant name is sanitized to `[A-Za-z0-9_-]` before it becomes a WAL filename, and an empty-after-sanitization name is rejected, which closes the path-traversal door. Tenant data isolation is enforced by this per-tenant Engine plus WAL split, not by a shared table with a tenant column. Authentication today is a single cleartext password checked on connect.
+The `database` value is the only thing that picks your tenant. More on that below.
 
-## What runs in the background
+## Configuration
 
-Each tenant spawns a background reaper alongside its Engine. It handles three jobs without any operator action:
+Everything is set through environment variables, and every one has a default. The defaults are fine for poking at it on your laptop. The one you must set for anything reachable over a network is the password.
 
-- Hold expiry. A hold is a tentative allocation with a self-destruct timer; once its `expiresAt` passes, the reaper clears it so the slot returns to free.
-- WAL compaction. The log is rewritten past a threshold so replay stays fast and the file does not grow without bound.
-- Interval garbage collection. Past bookings and expired past holds older than `DELTAT_GC_RETENTION_MS` are collected. Rules are never collected.
+| Variable | What it does | Default |
+| --- | --- | --- |
+| `DELTAT_PORT` | TCP port the server listens on | `5433` |
+| `DELTAT_BIND` | Address to bind to | `0.0.0.0` |
+| `DELTAT_DATA_DIR` | Folder where the write-ahead logs live | `./data` |
+| `DELTAT_PASSWORD` | The single cleartext password checked on every connection | (has a built-in default) |
+| `DELTAT_GC_RETENTION_MS` | How long past bookings and expired holds are kept before cleanup | `604800000` (7 days) |
 
-You do not schedule or trigger any of this. It is part of the binary.
+A note on `DELTAT_PASSWORD`: auth is a single shared password, sent in cleartext, checked when a client connects. If you leave it unset it falls back to a built-in default. That is harmless on localhost and wrong the moment the port is reachable by anyone else, so set it.
+
+## The data directory
+
+`DELTAT_DATA_DIR` is where durability lives. Each tenant gets its own append-only write-ahead log file in that folder. Every change is written to the log first and only then applied in memory, so the log is the source of truth and memory is just the fast projection of it.
+
+That makes backups boring in the best way: copy the data directory and you have copied the state. Delete it and you have a clean slate.
+
+## Tenants are just the database name
+
+There is no tenant table and no shared column to filter on. The `database` name on the connection *is* the tenant. The first time a client connects with a new database name, Δt creates a dedicated engine and its own log file for it, on the spot.
+
+```ts
+const acme = new DeltaT({ database: "acme-tickets", password: pw });
+const other = new DeltaT({ database: "another-org", password: pw });
+```
+
+Those two are fully isolated because they are backed by separate files, not by a query filter you have to remember to add. The name is sanitized down to letters, digits, underscores, and hyphens before it becomes a filename, so a tenant name can never wander out of the data directory.
+
+## Cleanup runs itself
+
+You do not schedule anything. A background reaper inside each tenant quietly handles three jobs on its own:
+
+- Hold expiry. A hold carries its own self-destruct time, so it stops blocking a slot the moment it expires whether or not anything has swept it yet. The reaper is just there to physically remove the dead ones so the list does not grow forever.
+- Log compaction. Once a log grows past a threshold it gets compacted in place.
+- Garbage collection. Past bookings and expired past holds older than `DELTAT_GC_RETENTION_MS` are collected. Rules are never collected, so your open-hours and blackout schedule always stays put.
 
 ## Docker Compose
 
-If you would rather not build locally, `tap/docker-compose.yaml` brings up the deltat binary and the examples app together. deltat builds straight from its Git URL, the demo reaches it over the internal compose network, and only the demo port is published.
+The repository ships a `docker-compose.yaml` that brings up Δt and the demo together. If you just want Δt on its own, a minimal service is enough: build it from the public source, publish the port, set the password, and mount a named volume at the data directory so state survives a container restart.
 
-```bash
-DELTAT_PASSWORD=<choose-a-secret> docker compose up --build -d
+```yaml
+services:
+  deltat:
+    build: https://github.com/open-tap/deltat.git#main
+    ports:
+      - "5433:5433"
+    environment:
+      DELTAT_PASSWORD: ${DELTAT_PASSWORD}
+      DELTAT_DATA_DIR: /data
+    volumes:
+      - deltat-data:/data
+
+volumes:
+  deltat-data: {}
 ```
 
-The compose file mounts a named volume at the data directory for WAL persistence. Drop that volume line for a fully ephemeral demo instance.
+`DELTAT_DATA_DIR` is set to match the mount, so the write-ahead logs ride on the named volume. Drop the volume for a fully ephemeral instance.
 
-## Next
+## What is not here yet
 
-The binary is now listening. Point the SDK at it and start creating resources, rules, bookings, and holds. See the [Quickstart](/docs/sdk/quickstart) for connecting the tap SDK.
+The transport today is the PostgreSQL wire protocol, which is why the tap client connects like a Postgres client would. That is transitional. HTTP and MCP adapters are planned but do not exist yet, so for now the wire protocol is the only way in.
