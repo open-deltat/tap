@@ -4,6 +4,8 @@ import Script from "next/script";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { NavHeader } from "@/components/nav-header";
+import { JsonLd } from "@/components/json-ld";
+import { SITE, organizationLd, websiteLd, softwareApplicationLd } from "@/lib/seo";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,8 +19,54 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Δt",
-  description: "Time-allocation calendar powered by Δt",
+  metadataBase: new URL(SITE.url),
+  title: {
+    default: SITE.defaultTitle,
+    template: "%s",
+  },
+  description: SITE.description,
+  applicationName: SITE.name,
+  keywords: [
+    "Δt",
+    "deltat",
+    "time allocation protocol",
+    "tap",
+    "scheduling database",
+    "booking database",
+    "availability engine",
+    "holds",
+    "real-time scheduling",
+    "self-hostable",
+  ],
+  authors: [{ name: SITE.org, url: SITE.github }],
+  creator: SITE.org,
+  publisher: SITE.org,
+  openGraph: {
+    type: "website",
+    siteName: SITE.name,
+    title: SITE.defaultTitle,
+    description: SITE.description,
+    url: SITE.url,
+    locale: "en_US",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: SITE.defaultTitle }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE.defaultTitle,
+    description: SITE.description,
+    images: ["/opengraph-image"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
 };
 
 export default function RootLayout({
@@ -38,6 +86,7 @@ export default function RootLayout({
           </div>
           <Toaster />
         </ThemeProvider>
+        <JsonLd graph={[organizationLd(), websiteLd(), softwareApplicationLd()]} />
         {process.env.NODE_ENV === "production" && (
           <Script
             defer
