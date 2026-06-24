@@ -1,4 +1,4 @@
-tap is the TypeScript way to talk to a Δt instance. You give it resources and time rules, and it tells you what is free, lets you hold a slot for a moment, and confirms a booking. This page takes you from nothing to a confirmed booking with as little ceremony as possible.
+This page takes you from nothing to a confirmed booking with as little ceremony as possible, using `@open-tap/client`, tap's TypeScript SDK, against a running Δt node. You create resources and time rules, ask what is free, hold a slot for a moment, then confirm the booking.
 
 We will use one running example: Acme Tickets sells seats in a stadium. The tree is Stadium, then Section A, then Seat 12. We will open Seat 12 for sale, find out when it is free, hold it, and book it.
 

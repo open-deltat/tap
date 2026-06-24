@@ -7,7 +7,7 @@ export const metadata = { title: "Self-host · tap docs" };
 export default function SelfHostPage() {
   return (
     <article className="mx-auto max-w-3xl">
-      <DocHeader eyebrow="tap · the SDK" title="Self-host" />
+      <DocHeader eyebrow="tap · the protocol" title="Self-host" />
       <Markdown>{docContent("sdk-self-host")}</Markdown>
     </article>
   );

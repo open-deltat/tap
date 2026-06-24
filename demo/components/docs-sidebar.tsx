@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-// The docs left rail: two sections that mirror the product split. Δt is the database, tap is how you
-// use it. Active link is an exact path match (every entry is its own page).
+// The docs left rail: two sections for two separate things. Δt is the database; tap is the Time
+// Allocation Protocol you reach it through. Active link is an exact path match.
 const SECTIONS: { title: string; links: { href: string; label: string }[] }[] = [
   {
     title: "Δt · the database",
@@ -17,7 +17,7 @@ const SECTIONS: { title: string; links: { href: string; label: string }[] }[] = 
     ],
   },
   {
-    title: "tap · the SDK",
+    title: "tap · the protocol",
     links: [
       { href: "/docs/sdk", label: "What is tap" },
       { href: "/docs/sdk/quickstart", label: "Quickstart" },
