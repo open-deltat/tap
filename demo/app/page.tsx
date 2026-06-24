@@ -24,8 +24,12 @@ export default function Home() {
             A database for time.
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-zinc-400">
-            Space has three dimensions; time is the fourth — a single line. Δt is the database for
-            that line, and tap is how you put anything on it. Every demo below runs on it, live.
+            Space has three dimensions; time is the fourth, a single line. Δt is the database for
+            that line, and{" "}
+            <a href="/demos/explainer" className="text-zinc-200 underline decoration-emerald-400/50 underline-offset-2 transition-colors hover:decoration-emerald-300">
+              tap
+            </a>{" "}
+            is how you manage time in one dimension. Every demo below runs on it, live.
           </p>
           <div className="mt-6">
             <a
