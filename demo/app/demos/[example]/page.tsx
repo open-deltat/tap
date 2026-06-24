@@ -1,6 +1,10 @@
 import type { ComponentType } from "react";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isExampleEnabled, enabledExampleIds } from "@/examples/config";
+import { enabledExamples } from "@/examples/manifest";
+import { JsonLd } from "@/components/json-ld";
+import { pageMetadata, webPageLd, breadcrumbLd } from "@/lib/seo";
 import Airline from "@/examples/airline";
 import Theater from "@/examples/theater";
 import Cinema from "@/examples/cinema";
@@ -33,9 +37,41 @@ export function generateStaticParams() {
   return enabledExampleIds().map((example) => ({ example }));
 }
 
+function demoSeo(label: string, tagline: string, example: string) {
+  return {
+    title: `${label}: a live demo on Δt`,
+    description: `${tagline}. An interactive demo running live on Δt, the open database for time.`,
+    path: `/demos/${example}`,
+  };
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ example: string }> }): Promise<Metadata> {
+  const { example } = await params;
+  const meta = enabledExamples().find((e) => e.id === example);
+  if (!meta) return {};
+  return pageMetadata({ ...demoSeo(meta.label, meta.tagline, example), ogType: "article" });
+}
+
 export default async function DemoPage({ params }: { params: Promise<{ example: string }> }) {
   const { example } = await params;
   const Example = COMPONENTS[example];
   if (!Example || !isExampleEnabled(example)) notFound();
-  return <Example />;
+  const meta = enabledExamples().find((e) => e.id === example);
+  const seo = meta ? demoSeo(meta.label, meta.tagline, example) : null;
+  return (
+    <>
+      {seo && meta && (
+        <JsonLd
+          graph={[
+            webPageLd(seo),
+            breadcrumbLd([
+              { name: "Home", path: "/" },
+              { name: meta.label, path: `/demos/${example}` },
+            ]),
+          ]}
+        />
+      )}
+      <Example />
+    </>
+  );
 }
