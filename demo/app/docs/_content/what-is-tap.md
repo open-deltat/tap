@@ -1,6 +1,18 @@
-Δt is the database for time. tap is how you talk to it.
+Δt is the database for time. tap is how you use it. They are two pieces on purpose, and the split between them is the whole idea.
 
-If Δt is the engine that decides when a thing is free or taken, tap is the small typed TypeScript layer you hold in your hands. It is a thin client: one class, a handful of namespaces, plain async methods. You give it resources and time rules, and it answers the only question that really matters: what is available, right now, and can I grab it before someone else does.
+Δt is the engine: it stores stretches of time, works out when they collide, and answers what is free, fast. tap is the small typed TypeScript client you actually hold in your hands: one class, a handful of namespaces, plain async methods. You give it resources and time rules, and it answers the question that matters, what is available right now and can I grab it before someone else does.
+
+## Why it complements Δt
+
+The two pieces divide the work cleanly, and that division is the point of having both.
+
+Δt is the kernel, and it is deliberately narrow. It has one job: keep stretches of time, detect when they overlap, and compute the gaps that are left. To stay that fast and that correct, it knows nothing about humans. It deals only in plain integer instants, Unix milliseconds on a single line. No timezones, no daylight saving, no notion of "every Tuesday."
+
+tap is the edge, and it is where the human world lives. Two kinds of thing belong here. First, ergonomics: typed verbs, so you call `availability.get` and `holds.place` instead of writing SQL or hand-rolling a wire protocol. Second, everything messy that Δt refuses to hold: timezones, calendars, recurring schedules, display formatting. You expand all of that into plain instants in your own code, then hand the numbers down.
+
+That is why they fit together. The database stays small, fast, and correct because it never has to guess what a human meant. The human complexity stays in your code, where it can change as fast as your product does without ever touching the engine. You get a kernel simple enough to trust and a client rich enough to build on.
+
+So if you have a weekly schedule, you expand it into concrete spans on your side and hand the database plain instants. If you want to show a time in someone's local zone, you format it on the way out. tap does ship a few helpers for the expansion work (turning a recurrence into concrete spans, day-of-week math), but they sit outside the core verb surface on purpose: they help you build the spans, they are not part of how you talk to the database.
 
 ## The mental model: time is a 1D line
 
@@ -8,17 +20,7 @@ There is one idea to internalize, and everything else follows from it.
 
 Time is a single number line. Every instant is an integer count of Unix milliseconds. Anything you place on a resource is a span on that line, written half-open as `[start, end)`. The start is included, the end is not, so two spans that touch end-to-start (one ends at `200`, the next starts at `200`) do not overlap. That one rule is what makes "is this slot free" a clean geometry question instead of a pile of edge cases.
 
-So a booking is a span. A hold is a span with an expiry. Open hours are spans. Blackouts are spans. Availability is just the open spans with the taken ones subtracted out. No calendars, no weekdays, no "9 to 5 except holidays" living inside the database. Just numbers on a line.
-
-## Humans live at the edge, not in the database
-
-This is the deal tap asks you to accept, and it is a good one.
-
-Δt only ever deals in plain Unix-millisecond instants. It does not know what a timezone is. It has never heard of daylight saving. It does not expand "every Tuesday" into actual Tuesdays. All of that, every timezone conversion, every calendar, every recurring schedule, every bit of display formatting, lives in your code, at the edge, in tap's world.
-
-That means if you have a weekly schedule, you expand it into concrete spans yourself and then hand the database plain instants. If you want to show a time in the user's local zone, you format it on the way out. The database stays small and fast and correct because it never has to guess what a human meant. You keep the human stuff close to the human.
-
-tap does ship a few helpers for the expansion work (turning a recurrence into concrete spans, day-of-week math, and so on), but they sit outside the core verb surface on purpose. They help you build the spans; they are not part of how you talk to the database.
+So a booking is a span. A hold is a span with an expiry. Open hours are spans. Blackouts are spans. Availability is just the open spans with the taken ones subtracted out. Just numbers on a line.
 
 ## What you actually work with
 
