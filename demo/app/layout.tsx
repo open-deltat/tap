@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 import { NavHeader } from "@/components/nav-header";
@@ -37,6 +38,13 @@ export default function RootLayout({
           </div>
           <Toaster />
         </ThemeProvider>
+        {process.env.NODE_ENV === "production" && (
+          <Script
+            defer
+            src="https://analytics.sorzel.com/script.js"
+            data-website-id="5a86f917-86a6-415d-a1d8-04a0fc5ec458"
+          />
+        )}
       </body>
     </html>
   );

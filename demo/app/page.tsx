@@ -21,12 +21,11 @@ export default function Home() {
         <header className="mx-auto max-w-2xl text-center">
           <div className="text-[11px] uppercase tracking-[0.25em] text-zinc-500">What is Δt?</div>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-100 sm:text-[2.6rem] sm:leading-[1.1]">
-            A database that stores time.
+            A database for time.
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-zinc-400">
-            Most databases store rows. Δt stores bookings on one line of time, so it keeps them
-            from colliding and answers what&apos;s free in well under a millisecond. Every demo below
-            runs on it, live.
+            Space has three dimensions; time is the fourth — a single line. Δt is the database for
+            that line, and tap is how you put anything on it. Every demo below runs on it, live.
           </p>
           <div className="mt-6">
             <a
