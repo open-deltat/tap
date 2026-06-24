@@ -1,4 +1,4 @@
-import { CollisionViz } from "@/examples/explainer/overview";
+import { CollisionToy } from "@/components/collision-toy";
 import { DocHeader } from "@/components/doc-header";
 import { Markdown } from "@/components/markdown";
 import { docContent } from "@/lib/docs-content";
@@ -10,7 +10,7 @@ export default function WhatIsDeltatPage() {
       <DocHeader eyebrow="Δt · the database" title="What is Δt" />
       <Markdown>{before}</Markdown>
       <div className="my-2">
-        <CollisionViz />
+        <CollisionToy />
       </div>
       <Markdown>{after}</Markdown>
     </article>
