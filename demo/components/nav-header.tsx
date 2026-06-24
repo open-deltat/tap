@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // A slim top bar on every page: the logo (back to the example gallery), a link to the
-// "How it works" explainer, and the theme toggle. The example list lives on the landing
-// gallery (/), not in a cramped row of links here.
+// docs, and the theme toggle. The example list lives on the landing gallery (/), not in a
+// cramped row of links here.
 export function NavHeader() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   // Embedded example previews (used inside the landing cards) render chrome-free.
   if (pathname?.startsWith("/embed")) return null;
-  const onExplainer = pathname.startsWith("/demos/explainer");
+  const onDocs = pathname.startsWith("/docs");
   const onGallery = pathname === "/";
 
   const link = (active: boolean) =>
@@ -33,8 +33,8 @@ export function NavHeader() {
         <a href="/" className={link(onGallery)}>
           Examples
         </a>
-        <a href="/demos/explainer" className={link(onExplainer)}>
-          How it works
+        <a href="/docs" className={link(onDocs)}>
+          Docs
         </a>
         <Button
           variant="ghost"

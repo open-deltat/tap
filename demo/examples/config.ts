@@ -20,7 +20,6 @@ export const ALL_EXAMPLE_IDS = [
   "meet",
   "live",
   "builder",
-  "explainer",
 ] as const;
 
 export type ExampleId = (typeof ALL_EXAMPLE_IDS)[number];

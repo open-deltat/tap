@@ -25,6 +25,4 @@ export const SEEDS: Record<ExampleId, () => Promise<unknown>> = {
   meet: ensureMeetFriends,
   live: seedLive,
   builder: ensureBuilderCalendar,
-  // The "How it works" landing is fully static — nothing to seed.
-  explainer: async () => {},
 };
