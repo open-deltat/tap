@@ -20,9 +20,11 @@ One detail worth internalizing early: a stretch is half-open, written `[start, e
 
 ## Collision, drawn
 
+Two bookings on one line of time. Drag the second one across the first and watch it flip between clear and colliding. There is no third state.
+
 <!--COLLISION-->
 
-Three things booked on one line of time: a flight, a hotel, and a dinner. The flight and the hotel cover some of the same hours, so they collide. The dinner sits clear of both. That overlap, two stretches sharing a moment, is the entire conflict model, and it is the same check Δt runs under every booking. The travel labels are just for this picture; every other page here uses the Seat 12 example.
+That single flip is the whole conflict model, and it is the same check Δt runs under every booking, millions of times. Notice that back-to-back is fine: because the end instant is not part of a stretch, two bookings that touch end to start do not collide. Only a genuinely shared moment does.
 
 ## Asking what is free
 

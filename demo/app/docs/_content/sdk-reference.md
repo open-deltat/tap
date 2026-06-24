@@ -2,6 +2,8 @@ This is the full verb surface of the tap TypeScript SDK, one entry per verb, gro
 
 The running example throughout is a ticketing setup: Acme Tickets owns a Stadium, the Stadium has Section A, and Section A has Seat 12. Resources nest like that, and only the leaves (the seats) carry a real timeline.
 
+New to the model these verbs act on? Start with [What is Δt](/docs), then the [Data model](/docs/data-model) and [Holds and availability](/docs/holds-and-availability).
+
 ## Three things to know first
 
 These hold for every verb, so they are stated once here.
@@ -48,7 +50,7 @@ await db.close();
 
 ## resources
 
-A resource is anything you can book. They form a tree: a resource can contain other resources, and only the leaves carry a timeline. Children inherit open hours from their ancestors (open hours override, nearest ancestor wins; blackouts accumulate down the tree).
+A resource is anything you can book. They form a tree: a resource can contain other resources, and only the leaves carry a timeline. Children inherit open hours from their ancestors (open hours override, nearest ancestor wins; blackouts accumulate down the tree). See the [Data model](/docs/data-model) for how that inheritance composes.
 
 ### create
 
@@ -280,7 +282,7 @@ const bySeat = await db.holds.getMany([seat11.id, seat12.id]);
 
 ## availability
 
-Availability is never stored, always computed on the spot: open hours, minus blackouts, minus active allocations (bookings plus live holds), with each allocation stretched by its `bufferAfter`. These reads give you the free gaps.
+Availability is never stored, always computed on the spot: open hours, minus blackouts, minus active allocations (bookings plus live holds), with each allocation stretched by its `bufferAfter`. These reads give you the free gaps. The [Holds and availability](/docs/holds-and-availability) page walks through how it is computed.
 
 ### get
 
