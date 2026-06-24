@@ -7,7 +7,7 @@ export const metadata = { title: "What is tap · tap docs" };
 export default function WhatIsTapPage() {
   return (
     <article className="mx-auto max-w-3xl">
-      <DocHeader eyebrow="tap · the SDK" title="What is tap" />
+      <DocHeader eyebrow="tap · the protocol" title="What is tap" />
       <Markdown>{docContent("what-is-tap")}</Markdown>
     </article>
   );
