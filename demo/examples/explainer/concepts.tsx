@@ -70,7 +70,7 @@ function Box({
   );
 }
 
-function HierarchyViz() {
+export function HierarchyViz() {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
       <Box kind="Tenant" name="Acme Tickets">
@@ -84,44 +84,12 @@ function HierarchyViz() {
   );
 }
 
-export function DataModelTopic() {
+// The open-minus-blocked-minus-booked-equals-free subtraction, drawn as one stacked sum.
+export function StorageDiagram() {
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">Data model</div>
-      <h2 className="mt-2 text-2xl font-semibold text-zinc-100">Where everything lives</h2>
-      <p className="mt-1 text-sm text-emerald-300/90">
-        A tenant holds resources, resources can hold resources, and the smallest one has a timeline.
-      </p>
-
-      <div className="mt-5">
-        <HierarchyViz />
-      </div>
-
-      <dl className="mt-4 space-y-1.5 text-[12.5px] leading-relaxed text-zinc-400">
-        <div>
-          <span className="font-medium text-zinc-200">Tenant</span> · your own private database. Nobody
-          else sees inside it.
-        </div>
-        <div>
-          <span className="font-medium text-zinc-200">Resource</span> · anything you can book. They can
-          sit inside each other.
-        </div>
-        <div>
-          <span className="font-medium text-zinc-200">Timeline</span> · each resource&apos;s own line of
-          time, where bookings live.
-        </div>
-      </dl>
-
-      <h3 className="mt-7 text-base font-semibold text-zinc-100">How time is stored</h3>
-      <p className="mt-1 text-[13px] leading-relaxed text-zinc-400">
-        Everything on a timeline is a labelled stretch. You store three kinds, and Δt works out the
-        fourth: open time, minus blocked, minus booked, leaves what is free.
-      </p>
-
-      <div className="mt-4">
-        <LabeledTimeline axisStart={0} axisEnd={100} rows={STORAGE_ROWS} />
-        <div className="mt-2 text-center text-[10px] text-zinc-500">free is open, minus blocked, minus booked</div>
-      </div>
+    <div className="my-2">
+      <LabeledTimeline axisStart={0} axisEnd={100} rows={STORAGE_ROWS} />
+      <div className="mt-2 text-center text-[10px] text-zinc-500">free is open, minus blocked, minus booked</div>
     </div>
   );
 }
