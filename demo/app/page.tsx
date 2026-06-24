@@ -1,9 +1,16 @@
 import type { ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { enabledExamples, type ExampleMeta } from "@/examples/manifest";
+import { pageMetadata, SITE } from "@/lib/seo";
+
+export const metadata = pageMetadata({
+  title: SITE.defaultTitle,
+  description: SITE.description,
+  path: "/",
+});
 
 // The landing page: a gallery of every example, grouped, with the headline demos featured large.
-// The top bar (root layout) carries the logo + "How it works"; this page is the example index.
+// The top bar (root layout) carries the logo + docs link; this page is the example index.
 export default function Home() {
   const all = enabledExamples();
   const featured = all.filter((e) => e.group === "featured");

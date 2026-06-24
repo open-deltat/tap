@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { isExampleEnabled } from "@/examples/config";
 import Availability from "@/examples/availability";
@@ -7,7 +8,12 @@ import Live from "@/examples/live";
 
 // Bare, chrome-free renders of the featured examples, used inside the landing gallery's preview
 // iframes (NavHeader hides itself on /embed; there's no session sidebar here). Same live component
-// as the real page, so the preview IS the example.
+// as the real page, so the preview IS the example. Kept out of search: these are duplicate,
+// chrome-free copies of the real demo pages.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 const EMBEDDABLE: Record<string, ComponentType> = {
   availability: Availability,
   meet: Meet,
