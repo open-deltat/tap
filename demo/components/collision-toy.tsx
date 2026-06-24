@@ -1,11 +1,13 @@
 "use client";
 
 import { useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { MoveHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Two stretches on one time line. The first is fixed; drag (or arrow-key) the second across it and
 // the overlap test flips between clear and colliding. That flip is the whole conflict model, so the
-// docs let you feel it rather than just read it.
+// docs let you feel it rather than just read it. The grip handle and the pulsing cue make it obvious
+// the green chip is the thing you move, which is not otherwise discoverable.
 const A_START = 24;
 const A_WIDTH = 28;
 const B_WIDTH = 26;
@@ -16,6 +18,7 @@ export function CollisionToy() {
   const trackRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const [bStart, setBStart] = useState(60);
+  const [touched, setTouched] = useState(false);
 
   const bEnd = bStart + B_WIDTH;
   const colliding = A_START < bEnd && bStart < A_END;
@@ -32,6 +35,7 @@ export function CollisionToy() {
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     dragging.current = true;
+    setTouched(true);
     e.currentTarget.setPointerCapture(e.pointerId);
     moveTo(e.clientX);
   };
@@ -42,14 +46,27 @@ export function CollisionToy() {
     dragging.current = false;
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "ArrowLeft") setBStart((s) => Math.max(0, s - 4));
-    else if (e.key === "ArrowRight") setBStart((s) => Math.min(MAX_B, s + 4));
+    if (e.key === "ArrowLeft") {
+      setTouched(true);
+      setBStart((s) => Math.max(0, s - 4));
+    } else if (e.key === "ArrowRight") {
+      setTouched(true);
+      setBStart((s) => Math.min(MAX_B, s + 4));
+    }
   };
 
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
       <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.18em]">
-        <span className="text-zinc-500">drag the second booking</span>
+        <span
+          className={cn(
+            "flex items-center gap-1.5 rounded-full px-2 py-0.5",
+            touched ? "text-zinc-500" : "animate-pulse bg-emerald-400/10 text-emerald-300"
+          )}
+        >
+          <MoveHorizontal className="h-3 w-3" />
+          drag the green booking
+        </span>
         <span className={cn("rounded px-1.5 py-0.5 font-medium", colliding ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300")}>
           {colliding ? "collision" : "clear"}
         </span>
@@ -94,11 +111,13 @@ export function CollisionToy() {
           aria-valuenow={Math.round(bStart)}
           onKeyDown={onKeyDown}
           className={cn(
-            "absolute bottom-3 flex h-6 items-center justify-center rounded border text-[10px] font-medium text-zinc-100 shadow-[0_0_0_1px_rgba(255,255,255,0.25)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
-            colliding ? "border-rose-400/60 bg-rose-500/40" : "border-emerald-400/50 bg-emerald-500/35"
+            "absolute bottom-3 flex h-6 cursor-grab items-center justify-center gap-1 rounded border text-[10px] font-medium text-zinc-100 shadow-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 active:cursor-grabbing",
+            colliding ? "border-rose-400/60 bg-rose-500/40" : "border-emerald-400/60 bg-emerald-500/40",
+            !touched && "ring-2 ring-white/40"
           )}
           style={{ left: `${bStart}%`, width: `${B_WIDTH}%` }}
         >
+          <MoveHorizontal className="h-3 w-3 opacity-80" />
           New booking
         </div>
       </div>
