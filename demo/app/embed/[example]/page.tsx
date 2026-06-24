@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { isExampleEnabled } from "@/examples/config";
 import Availability from "@/examples/availability";
 import Meet from "@/examples/meet";
-import Rules from "@/examples/rules";
 import Live from "@/examples/live";
 
 // Bare, chrome-free renders of the featured examples, used inside the landing gallery's preview
@@ -12,7 +11,6 @@ import Live from "@/examples/live";
 const EMBEDDABLE: Record<string, ComponentType> = {
   availability: Availability,
   meet: Meet,
-  rules: Rules,
   live: Live,
 };
 
