@@ -26,14 +26,14 @@ export default function Home() {
           <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-zinc-400">
             Space has three dimensions; time is the fourth, a single line. Δt is the database for
             that line, and{" "}
-            <a href="/demos/explainer" className="text-zinc-200 underline decoration-emerald-400/50 underline-offset-2 transition-colors hover:decoration-emerald-300">
+            <a href="/docs/sdk/quickstart" className="text-zinc-200 underline decoration-emerald-400/50 underline-offset-2 transition-colors hover:decoration-emerald-300">
               tap
             </a>{" "}
             is how you manage time in one dimension. Every demo below runs on it, live.
           </p>
           <div className="mt-6">
             <a
-              href="/demos/explainer"
+              href="/docs"
               className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-1.5 text-[13px] font-medium text-emerald-200 transition-colors hover:border-emerald-400/50 hover:bg-emerald-400/15"
             >
               How it works
