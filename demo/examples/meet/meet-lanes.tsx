@@ -27,8 +27,8 @@ interface MeetLanesProps {
 }
 
 /**
- * Three free-time lanes on ONE shared time ruler. The bottom (intersection) lane is the clickable
- * graph: click it to pick the nearest 30-min slot, shift/cmd-click to select several. Selected slots
+ * Free-time lanes on ONE shared time ruler. The emerald intersection lane is the clickable graph:
+ * click it to snap to the nearest bookable start, shift/cmd-click to select several. Selected slots
  * light up; faint ticks mark every bookable start.
  */
 export function MeetLanes({
@@ -47,12 +47,22 @@ export function MeetLanes({
   const ticks: number[] = [];
   for (let t = axisStart; t <= axisEnd; t += tickHours * 3_600_000) ticks.push(t);
 
+  // One gridline every tick interval, drawn as a single repeating gradient so every line is exactly
+  // evenly spaced — per-element 1px dividers drift visibly from sub-pixel rounding.
+  const tickPct = ((tickHours * 3_600_000) / range) * 100;
+  const gridBg = `repeating-linear-gradient(to right, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 1px, transparent ${tickPct}%)`;
+
+  const intersectionLabel = lanes.find((l) => l.intersection)?.label ?? "shared";
+
   function handleLaneClick(e: MouseEvent<HTMLDivElement>) {
     if (!onPickSlot || intersectionSlots.length === 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const t = axisStart + ((e.clientX - rect.left) / rect.width) * range;
-    let best: AvailabilitySlot | null = null;
-    let bestD = Infinity;
+    // Snap to the nearest bookable start. Slots are drawn start→end and overlap (30-min steps), so
+    // matching by nearest start — not "first span containing t" — picks the slot the click is closest
+    // to, and any click on the lane selects something (no dead zones near the edges).
+    let best = intersectionSlots[0];
+    let bestD = Math.abs(best.start - t);
     for (const s of intersectionSlots) {
       const d = Math.abs(s.start - t);
       if (d < bestD) {
@@ -60,7 +70,7 @@ export function MeetLanes({
         best = s;
       }
     }
-    if (best && bestD <= 45 * 60_000) onPickSlot(best, e.shiftKey || e.metaKey);
+    onPickSlot(best, e.shiftKey || e.metaKey);
   }
 
   return (
@@ -71,7 +81,7 @@ export function MeetLanes({
           <div
             key={t}
             className="absolute -translate-x-1/2 text-[10px] tabular-nums text-zinc-500"
-            style={{ left: `${pct(t)}%` }}
+            style={{ left: `${clampPct(pct(t))}%` }}
           >
             {formatTime(t)}
           </div>
@@ -97,18 +107,9 @@ export function MeetLanes({
                   "relative h-8 flex-1 overflow-hidden rounded-md bg-white/[0.03]",
                   clickable && "cursor-pointer"
                 )}
+                style={{ backgroundImage: gridBg }}
                 onClick={lane.intersection ? handleLaneClick : undefined}
               >
-                {/* gridlines */}
-                {ticks.map((t) => (
-                  <div
-                    key={t}
-                    aria-hidden
-                    className="absolute inset-y-0 w-px bg-white/[0.05]"
-                    style={{ left: `${pct(t)}%` }}
-                  />
-                ))}
-
                 {/* free windows (faint context) */}
                 {lane.slots.map((slot, i) => {
                   const left = clampPct(pct(slot.start));
@@ -160,7 +161,7 @@ export function MeetLanes({
 
       {onPickSlot && (
         <p className="mt-2 text-center text-[10.5px] text-zinc-500">
-          Click the <span className="text-emerald-300">Both free</span> lane to pick a time · shift-click to add more
+          Click the <span className="text-emerald-300">{intersectionLabel}</span> lane to pick a time
         </p>
       )}
     </div>

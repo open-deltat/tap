@@ -19,7 +19,6 @@ export const ALL_EXAMPLE_IDS = [
   "availability",
   "meet",
   "live",
-  "rules",
   "builder",
   "explainer",
 ] as const;

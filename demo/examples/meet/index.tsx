@@ -1,168 +1,184 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Stage } from "@/components/stage";
-import { DateNav } from "@/components/date-nav";
 import { Segmented } from "@/components/ui/segmented";
 import { BookButton } from "@/components/book-button";
+import { WeekTimeline, type WeekRow, type DayState } from "@/components/week-timeline";
 import { MeetLanes } from "./meet-lanes";
-import { NextAvailability } from "@/components/next-availability";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 import type { AvailabilitySlot, Resource } from "@/lib/schemas";
-import { toLocalDateString, formatTime } from "@/lib/time";
+import { formatTime } from "@/lib/time";
 
-import { ensureMeetCalendars } from "./seed";
+import { ensureMeetFriends } from "./seed";
 import { getAvailability, getCombinedAvailability } from "@/app/actions/availability";
 import { batchBookSlots } from "@/app/actions/bookings";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { formatError } from "@/lib/format-error";
 
+const H = 3_600_000;
+const DAY = 86_400_000;
+const HORIZON_DAYS = 21; // three weeks to scan
 const SLOT_STEP_MS = 30 * 60_000;
-const DAY_MS = 86_400_000;
-const HOUR_MS = 3_600_000;
-const AXIS_START_HOUR = 8;
-const AXIS_END_HOUR = 18;
-const DURATIONS = [30, 60] as const;
+const AXIS_START_HOUR = 16;
+const AXIS_END_HOUR = 24;
+const DURATIONS = [90, 120, 150] as const;
 type Duration = (typeof DURATIONS)[number];
+const durationLabel = (m: number) => (m % 60 === 0 ? `${m / 60} hr` : `${(m / 60).toFixed(1)} hr`);
 
-interface MeetIds {
-  janeId: string;
-  bobId: string;
+interface DayWindow {
+  start: number;
+  end: number;
+}
+interface Grid {
+  start: Date;
+  friends: DayState[][]; // per friend, free/busy per day
+  windowByDay: (DayWindow | undefined)[]; // largest shared window per day
+  perFriendSlots: AvailabilitySlot[][]; // per friend, free windows across the horizon
+  combined: AvailabilitySlot[]; // every shared window across the horizon
 }
 
 function asResource(id: string, name: string): Resource {
   return { id, parentId: null, name, capacity: 1, bufferAfter: null, slotMinutes: 30, price: null, bufferMinutes: 0 };
 }
 
+const dayLabel = (ms: number) => new Date(ms).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
 export default function MeetExample() {
-  const [ids, setIds] = useState<MeetIds | null>(null);
-  const [date, setDate] = useState(toLocalDateString(new Date()));
-  const [janeFree, setJaneFree] = useState<AvailabilitySlot[]>([]);
-  const [bobFree, setBobFree] = useState<AvailabilitySlot[]>([]);
-  const [bothFree, setBothFree] = useState<AvailabilitySlot[]>([]);
-  const [duration, setDuration] = useState<Duration>(30);
-  const [selectedStarts, setSelectedStarts] = useState<Set<number>>(new Set());
+  const [ids, setIds] = useState<string[] | null>(null);
+  const [grid, setGrid] = useState<Grid | null>(null);
+  const [duration, setDuration] = useState<Duration>(120);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedStart, setSelectedStart] = useState<number | null>(null);
   const [result, setResult] = useState<BookingResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
 
-  const dayStart = new Date(`${date}T00:00`).getTime();
-  const axisStart = dayStart + AXIS_START_HOUR * HOUR_MS;
-  const axisEnd = dayStart + AXIS_END_HOUR * HOUR_MS;
-  const durationMs = duration * 60_000;
+  const durMs = duration * 60_000;
 
-  // Discrete bookable start times across the both-free windows, at 30-min steps.
-  const slotOptions = useMemo<AvailabilitySlot[]>(() => {
-    const out: AvailabilitySlot[] = [];
-    for (const w of bothFree) {
-      for (let c = w.start; c + durationMs <= w.end; c += SLOT_STEP_MS) {
-        out.push({ start: c, end: c + durationMs });
-      }
-    }
-    return out;
-  }, [bothFree, durationMs]);
+  const load = useCallback(async (friendIds: string[]) => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const startMs = start.getTime();
+    const endMs = startMs + HORIZON_DAYS * DAY;
+    const dayIndex = (ms: number) => Math.floor((ms - startMs) / DAY);
 
-  const selectedSlots = useMemo(
-    () => slotOptions.filter((s) => selectedStarts.has(s.start)),
-    [slotOptions, selectedStarts]
-  );
-
-  const refresh = useCallback(async (calendars: MeetIds, day: string) => {
-    const ds = new Date(`${day}T00:00`).getTime();
-    const de = ds + DAY_MS;
-    const [jane, bob, both] = await Promise.all([
-      getAvailability(calendars.janeId, ds, de),
-      getAvailability(calendars.bobId, ds, de),
-      // min_available = 2 → the intersection: both Jane and Bob free.
-      getCombinedAvailability([calendars.janeId, calendars.bobId], ds, de, 2),
+    const [perFriendSlots, combined] = await Promise.all([
+      Promise.all(friendIds.map((id) => getAvailability(id, startMs, endMs))),
+      // min_available = all friends → the intersection: every evening they are all free at once.
+      getCombinedAvailability(friendIds, startMs, endMs, friendIds.length),
     ]);
-    setJaneFree(jane);
-    setBobFree(bob);
-    setBothFree(both);
-    setSelectedStarts(new Set());
+
+    const friends: DayState[][] = perFriendSlots.map((slots) => {
+      const free = new Set(slots.map((s) => dayIndex(s.start)));
+      return Array.from({ length: HORIZON_DAYS }, (_, i) => (free.has(i) ? "free" : "busy"));
+    });
+
+    // Largest shared window per day — the "Everyone" row and its day count derive from these, so they
+    // react to the duration toggle without re-reading.
+    const windowByDay: (DayWindow | undefined)[] = Array.from({ length: HORIZON_DAYS });
+    for (const s of combined) {
+      const i = dayIndex(s.start);
+      if (i < 0 || i >= HORIZON_DAYS) continue;
+      const cur = windowByDay[i];
+      if (!cur || s.end - s.start > cur.end - cur.start) windowByDay[i] = { start: s.start, end: s.end };
+    }
+
+    setGrid({ start, friends, windowByDay, perFriendSlots, combined });
   }, []);
 
   useEffect(() => {
     (async () => {
       try {
-        const got = await ensureMeetCalendars();
-        setIds(got);
-        await refresh(got, date);
+        const friendIds = await ensureMeetFriends();
+        setIds(friendIds);
+        await load(friendIds);
       } catch {
         toast.error("Failed to connect to Δt. Is it running?");
       } finally {
         setLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [load]);
 
-  function changeDate(d: string) {
-    setDate(d);
-    setSelectedStarts(new Set());
-    if (ids) startTransition(() => void refresh(ids, d));
+  // Live: re-read the grid on any booking/cancel from any of the five calendars.
+  const reload = useCallback(() => {
+    if (ids && !isPending) void load(ids);
+  }, [ids, isPending, load]);
+  useWebSocket(ids?.[0] ? { type: "subscribe", resourceId: ids[0], onEvent: reload } : null);
+  useWebSocket(ids?.[1] ? { type: "subscribe", resourceId: ids[1], onEvent: reload } : null);
+  useWebSocket(ids?.[2] ? { type: "subscribe", resourceId: ids[2], onEvent: reload } : null);
+  useWebSocket(ids?.[3] ? { type: "subscribe", resourceId: ids[3], onEvent: reload } : null);
+  useWebSocket(ids?.[4] ? { type: "subscribe", resourceId: ids[4], onEvent: reload } : null);
+
+  // The chosen evening: each friend's free band that night plus every shared window, sliced from the
+  // horizon data already loaded (no extra read).
+  const detail = useMemo(() => {
+    if (!grid || selectedDay == null) return null;
+    const ds = new Date(grid.start);
+    ds.setDate(ds.getDate() + selectedDay);
+    const dayStart = ds.getTime();
+    const dayEnd = dayStart + DAY;
+    const inDay = (s: AvailabilitySlot) => s.start < dayEnd && s.end > dayStart;
+    const clamp = (s: AvailabilitySlot) => ({ start: Math.max(s.start, dayStart), end: Math.min(s.end, dayEnd) });
+    const friendLanes = grid.perFriendSlots.map((slots, i) => ({
+      label: `Friend ${i + 1}`,
+      slots: slots.filter(inDay).map(clamp),
+    }));
+    const shared = grid.combined.filter(inDay).map(clamp);
+    return { dayStart, friendLanes, shared };
+  }, [grid, selectedDay]);
+
+  // Discrete bookable start times within the shared windows, at 30-min steps, for the chosen length.
+  const slotOptions = useMemo<AvailabilitySlot[]>(() => {
+    if (!detail) return [];
+    const out: AvailabilitySlot[] = [];
+    for (const w of detail.shared) {
+      for (let c = w.start; c + durMs <= w.end; c += SLOT_STEP_MS) out.push({ start: c, end: c + durMs });
+    }
+    return out;
+  }, [detail, durMs]);
+
+  const activeStart =
+    selectedStart != null && slotOptions.some((s) => s.start === selectedStart) ? selectedStart : slotOptions[0]?.start ?? null;
+  const selectedStarts = useMemo(() => new Set(activeStart != null ? [activeStart] : []), [activeStart]);
+
+  const everyoneStates = useMemo<DayState[]>(
+    () => (grid ? grid.windowByDay.map((w) => (w && w.end - w.start >= durMs ? "free" : "busy")) : []),
+    [grid, durMs]
+  );
+
+  const rows = useMemo<WeekRow[]>(() => {
+    if (!grid) return [];
+    return [...grid.friends.map((states, i) => ({ label: `Friend ${i + 1}`, states })), { label: "Everyone", states: everyoneStates, result: true }];
+  }, [grid, everyoneStates]);
+
+  const openCount = everyoneStates.filter((s) => s === "free").length;
+
+  function pickDay(i: number) {
+    setSelectedDay(i);
+    setSelectedStart(null);
   }
-
-  function shiftDay(delta: number) {
-    const d = new Date(`${date}T00:00`);
-    d.setDate(d.getDate() + delta);
-    changeDate(toLocalDateString(d));
-  }
-
-  // Default to the first joint-free slot so the page never looks empty.
-  useEffect(() => {
-    if (selectedStarts.size > 0 || slotOptions.length === 0) return;
-    setSelectedStarts(new Set([slotOptions[0].start]));
-  }, [slotOptions, selectedStarts]);
-
-  // Live: re-read both calendars on any booking/cancel from either side.
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const onWsEvent = useCallback(() => {
-    if (!ids) return;
-    if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    refreshTimer.current = setTimeout(() => void refresh(ids, date), 200);
-  }, [ids, date, refresh]);
-  useEffect(() => () => clearTimeout(refreshTimer.current), []);
-  useWebSocket(ids ? { type: "subscribe", resourceId: ids.janeId, onEvent: onWsEvent } : null);
-  useWebSocket(ids ? { type: "subscribe", resourceId: ids.bobId, onEvent: onWsEvent } : null);
-
-  function pickDuration(d: Duration) {
-    setDuration(d);
-    setSelectedStarts(new Set()); // slot grid changes — restart selection (default picks the first)
-  }
-
-  // Click a slot → select just it; shift/cmd-click → toggle it in the multi-selection.
-  function pick(slot: AvailabilitySlot, additive: boolean) {
-    setSelectedStarts((prev) => {
-      if (!additive) return new Set([slot.start]);
-      const next = new Set(prev);
-      if (next.has(slot.start)) next.delete(slot.start);
-      else next.add(slot.start);
-      return next;
-    });
+  function pickSlot(slot: AvailabilitySlot) {
+    setSelectedStart(slot.start);
   }
 
   function book() {
-    if (!ids || selectedSlots.length === 0) return;
-    const cal = ids;
-    const day = date;
-    const slots = selectedSlots;
+    if (!ids || activeStart == null) return;
+    const start = activeStart;
+    const end = start + durMs;
     startTransition(async () => {
       try {
-        const rows = slots.flatMap((s) => [
-          { resourceId: cal.janeId, start: s.start, end: s.end, label: "Meeting" },
-          { resourceId: cal.bobId, start: s.start, end: s.end, label: "Meeting" },
-        ]);
-        const created = await batchBookSlots(rows);
+        const created = await batchBookSlots(ids.map((id) => ({ resourceId: id, start, end, label: "Dinner" })));
         setResult({
-          title: `${slots.length} meeting${slots.length > 1 ? "s" : ""} · Jane + Bob`,
-          subtitle: slots.map((s) => formatTime(s.start)).join(" · "),
+          title: "Dinner booked",
+          subtitle: `${dayLabel(start)} · ${formatTime(start)} to ${formatTime(end)}`,
           bookings: created,
-          resources: [asResource(cal.janeId, "Jane"), asResource(cal.bobId, "Bob")],
+          resources: ids.map((id, i) => asResource(id, `Friend ${i + 1}`)),
         });
-        await refresh(cal, day);
+        await load(ids);
       } catch (err) {
         toast.error(formatError(err instanceof Error ? err.message : String(err)));
       }
@@ -180,93 +196,76 @@ export default function MeetExample() {
     );
   }
 
-  const today = toLocalDateString(new Date());
-  const dateLabel = new Date(`${date}T00:00`).toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
+  if (!grid) {
+    return <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-sm text-zinc-500">Could not reach Δt.</div>;
+  }
 
-  // Controls live in context, right above the lanes they drive — not stranded at the top of the page.
-  const controls = (
-    <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
-      <DateNav
-        label={dateLabel}
-        onPrev={() => shiftDay(-1)}
-        onNext={() => shiftDay(1)}
-        onToday={() => changeDate(today)}
-        showToday={date !== today}
-      />
-      <Segmented
-        items={DURATIONS.map((d) => ({ value: d, label: `${d} min` }))}
-        value={duration}
-        onChange={pickDuration}
-        ariaLabel="Meeting length"
-      />
-      <span className="text-[11px] text-zinc-500">
-        {bothFree.length === 0 ? "no shared time" : `${bothFree.length} shared window${bothFree.length > 1 ? "s" : ""}`}
-      </span>
-    </div>
-  );
-
-  const n = selectedSlots.length;
-  const noShared = bothFree.length === 0;
   const tray =
-    !noShared && n > 0 ? (
+    activeStart != null ? (
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex-1 text-sm text-zinc-300">
-          {n === 1
-            ? `Meeting · ${formatTime(selectedSlots[0].start)} to ${formatTime(selectedSlots[0].end)}`
-            : `${n} meetings selected`}
+          {dayLabel(activeStart)} · {formatTime(activeStart)} to {formatTime(activeStart + durMs)} · books all five at once
         </div>
         <BookButton onClick={book} loading={isPending}>
-          {n > 1 ? `Book ${n} meetings` : "Book both"}
+          Book dinner
         </BookButton>
       </div>
     ) : undefined;
 
   return (
     <>
-      <Stage
-        primitive={{ label: "Find a time two people share", specId: "AVAIL-08" }}
-        title="Find a meeting time"
-        tray={tray}
-      >
-        <div className="mx-auto max-w-3xl">
-          {controls}
-          <div className="relative">
-            <MeetLanes
-              axisStart={axisStart}
-              axisEnd={axisEnd}
-              intersectionSlots={slotOptions}
-              selectedStarts={selectedStarts}
-              onPickSlot={pick}
-              lanes={[
-                { label: "Jane", slots: janeFree },
-                { label: "Bob", slots: bobFree },
-                { label: "Both free", slots: bothFree, intersection: true },
-              ]}
-            />
-            {noShared && ids && (
-              <NextAvailability
-                resourceIds={[ids.janeId, ids.bobId]}
-                from={new Date(`${date}T00:00`)}
-                title="Bob and Jane have no shared free time today."
-                minAvailable={2}
-                minDurationMs={durationMs}
-                horizonDays={28}
-                onJump={(o) => changeDate(o.date)}
-              />
-            )}
+      <Stage primitive={{ label: "A time several calendars all share", specId: "AVAIL-08" }} title="Find a time the group shares" tray={tray}>
+        <div className="mx-auto max-w-2xl">
+          <div className="text-center">
+            <h3 className="text-sm font-semibold text-zinc-100">Dinner with five friends</h3>
+            <p className="mx-auto mt-1 max-w-lg text-[12px] leading-relaxed text-zinc-400">
+              The bottom row is when all five are free at once. Pick a length, a green{" "}
+              <span className="text-emerald-300">Everyone</span> evening, then a time.
+            </p>
           </div>
+
+          <div className="mb-3 mt-5 flex items-center justify-center gap-2">
+            <span className="text-[11px] text-zinc-500">Dinner length</span>
+            <Segmented
+              items={DURATIONS.map((m) => ({ value: m, label: durationLabel(m) }))}
+              value={duration}
+              onChange={(m) => {
+                setDuration(m);
+                setSelectedStart(null);
+              }}
+              ariaLabel="Dinner length"
+            />
+          </div>
+
+          <WeekTimeline start={grid.start} dayCount={HORIZON_DAYS} rows={rows} onPick={pickDay} selectedDay={selectedDay ?? undefined} labelWidth={52} />
+          <div className="mt-2 text-center text-[11px] text-zinc-500">
+            {openCount > 0
+              ? `${openCount} evening${openCount > 1 ? "s" : ""} fit a ${durationLabel(duration)} dinner for all five`
+              : `No evening fits a ${durationLabel(duration)} dinner for all five in the next three weeks`}
+          </div>
+
+          {detail && (
+            <div className="mt-5 rounded-lg border border-white/[0.07] bg-white/[0.02] p-4">
+              <div className="mb-3 text-center">
+                <div className="text-sm font-medium text-zinc-100">{dayLabel(detail.dayStart)}</div>
+                <div className="text-[12px] text-zinc-400">
+                  {slotOptions.length > 0 ? "Pick a start time on the All free lane" : `No ${durationLabel(duration)} window all five share this evening`}
+                </div>
+              </div>
+              <MeetLanes
+                axisStart={detail.dayStart + AXIS_START_HOUR * H}
+                axisEnd={detail.dayStart + AXIS_END_HOUR * H}
+                intersectionSlots={slotOptions}
+                selectedStarts={selectedStarts}
+                onPickSlot={pickSlot}
+                lanes={[...detail.friendLanes, { label: "All free", slots: detail.shared, intersection: true }]}
+              />
+            </div>
+          )}
         </div>
       </Stage>
 
-      <BookingConfirmedModal
-        result={result}
-        onClose={() => setResult(null)}
-        onBookAnother={() => setResult(null)}
-      />
+      <BookingConfirmedModal result={result} onClose={() => setResult(null)} onBookAnother={() => setResult(null)} />
 
       {isPending && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
