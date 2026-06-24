@@ -1,102 +1,87 @@
-Time is the fourth dimension, representable as a single line: the number line of Unix instants. On that one line a booking is a half-open segment `[start, end)`, a conflict is two segments overlapping, capacity is how many segments may stack on a point, and a buffer is a forced gap after a segment. A hold is the same segment wearing a self-destruct timer. Availability is the gaps between everything else.
+Two people open the same seat map and both reach for Seat 12. A **hold** is how Δt makes sure only one of them gets it. It is a tentative reservation with a short timer: it blocks the slot for everyone the instant it lands, and if nobody confirms, it quietly releases itself.
 
-Holds, capacity, and availability all live on one page because they are one primitive: a +1/-1 sweep over segments on the line. This page covers what a hold is, how the engine derives "what is free", how batch bookings stay atomic, how availability composes across resources, and how changes are pushed in real time.
+This page is about holds and the thing they affect most: **availability**, which is just the answer to "what is still free." Below you can watch a hold settle a race live, then see how free time is computed, how a multi-booking either all lands or none of it does, how you ask about several resources at once, and how changes reach you the moment they happen.
 
-## Holds and races
+## Watch a hold settle a race
 
-Two people, Bob and Jane, open the same live seat map. The story plays out as a tree: a shared starting state, one action, then one of three outcomes.
+Bob and Jane both want Seat 12 in Section A. Whoever places a hold first wins the slot. The other sees it disappear, in real time. Play with it:
 
 <!--HOLDS_WIDGET-->
 
-Placing and releasing a hold:
+Placing a hold is one call. You give it a slot and a moment to expire:
 
 ```ts
 const hold = await db.holds.place({
-  resourceId: seat.id,
+  resourceId: seat12.id,
   start: 1719216000000,
   end: 1719219600000,
-  expiresAt: Date.now() + 120_000, // Unix ms; the hold self-expires here
+  expiresAt: Date.now() + 120_000, // self-expires in two minutes
 });
 
-// Bob walks away: release early, or let the timer fire on its own.
+// Bob changes his mind. Release it now, or just let the timer fire.
 await db.holds.release(hold.id);
 ```
 
-### In kernel terms
+A hold counts against availability only while its `expiresAt` is still in the future. Once that moment passes, the slot is free again on the very next read, whether or not anything has cleaned the hold up yet. (A background sweep does eventually remove stale holds so the list stays small, but you never wait on it.)
 
-A hold is a self-expiring tentative allocation. The kernel stores it as an `IntervalKind::Hold { expires_at }` on the resource's interval list, exactly like a `Booking`, except it carries the `expires_at` timestamp.
+One thing worth knowing: **the expiry time is whatever the caller sends.** Δt trusts it and stores it as-is. It does not shorten a long timer or invent one for you. If you pass a far-future `expiresAt`, the slot stays held that long, so pick a window that matches how long a checkout should reasonably take.
 
-It counts toward availability and conflict only while `expires_at > now`. An expired hold is ignored on every read path: in `availability` (`engine/availability.rs`) the hold arm matches `Hold { expires_at } if *expires_at > now` and an expired one falls through to the `_ => {}` (no occupancy contributed); in `check_no_conflict` (`engine/conflict.rs`) an expired hold hits `Hold { expires_at } if *expires_at <= now => continue` and is skipped. No deletion is required for a hold to stop blocking, time alone is enough.
+## How "what is free" gets computed
 
-The reaper (`reaper.rs`) sweeps in the background and physically removes expired holds so the interval list does not grow without bound. Expiry semantics (a hold blocks iff `expires_at > now`) hold whether or not the reaper has run yet, because both read paths re-check the timestamp against the current clock.
+Availability is never stored. Every time you ask, Δt computes the gaps fresh. The rule is short:
 
-## The availability model: one place, derived
+> free is what is open, minus what is blocked, minus what is taken.
 
-Availability is never stored. It is derived on read by a sweep-line over the resource's intervals (`engine/queries.rs`, `compute_availability`). The formula is one line:
+In practice that means: start with the open hours, subtract any blackout windows, then subtract the active allocations (confirmed bookings and live holds). If a resource has a buffer (turnaround time after each allocation), that buffer extends the tail of each allocation, so the gap right after a booking stays blocked for cleanup or reset. A resource can also hold more than one thing at once if its capacity is above one, in which case a moment counts as free until it fills up.
 
-> free is open, minus blocked, minus booked.
-
-Concretely: **open windows, minus blocking rules, minus active allocations (bookings plus live holds), each allocation extended by `buffer_after`.**
-
-The pieces, in the order the sweep applies them:
-
-1. **Open windows.** Non-blocking rules define when the resource can be used at all. A resource with no open-hours rules of its own inherits the nearest ancestor's (override: first ancestor with non-blocking rules wins).
-2. **Minus blocking rules.** Blackout rules (blocking) are subtracted. Blocking accumulates down the tree: own blocking plus every ancestor's blocking.
-3. **Minus active allocations.** Bookings, and holds whose `expires_at > now`, are subtracted as occupied. Each is extended by `buffer_after`: the effective end is `span.end + buffer_after` (turnaround time), never the start. `buffer_after` is bounded and saturating at the write boundary, so the arithmetic cannot overflow.
-4. **Capacity.** `capacity` is a `u32` max-concurrent-allocations field on the resource. For `capacity > 1` the sweep is a +1/-1 occupancy count, and a moment is free while occupancy is below capacity. `capacity = 1` is the degenerate case: any overlapping allocation occupies it.
+Because nothing is cached, the answer is always current. A hold placed a millisecond ago already shrinks the next result. A hold that just expired already gives its slot back. There is no cache to invalidate.
 
 Reading availability for one resource:
 
 ```ts
 const slots = await db.availability.get({
-  resourceId: seat.id,
+  resourceId: seat12.id,
   start: 1719187200000,
   end: 1719273600000,
-  minDuration: 1_800_000, // optional: only slots at least 30 min long
+  minDuration: 1_800_000, // optional: ignore gaps shorter than 30 minutes
 });
 ```
 
-`get` returns `AvailabilitySlot[]` for the half-open window `[start, end)`. Because availability is derived, a live hold placed a millisecond ago already subtracts from the next read, and an expired hold already adds its slot back. There is no cache to invalidate, the gaps are recomputed each call. This is the sub-millisecond read characteristic: an in-region interval-tree query, roughly depth times ~100 ns, not a durable commit and not a cross-region round trip.
+You get back a list of free slots, each with a `start` and `end`, for the window you asked about. `minDuration` is handy when a sliver of free time is useless to you and you only care about gaps long enough to actually book.
 
-## Atomic batch bookings
+## Batch bookings are all-or-nothing
 
-Confirming several bookings as one unit is all-or-nothing. If any single booking in the batch conflicts, none are committed.
+Sometimes one purchase is really several bookings at once: two seats, or a seat plus parking. You want them to land together or not at all. Hand `bookings.create` an array and that is exactly what happens:
 
 ```ts
 const created = await db.bookings.create([
-  { resourceId: seatA.id, start: 1719216000000, end: 1719219600000, label: "A1" },
-  { resourceId: seatB.id, start: 1719216000000, end: 1719219600000, label: "B1" },
+  { resourceId: seat12.id, start: 1719216000000, end: 1719219600000, label: "A1" },
+  { resourceId: seat13.id, start: 1719216000000, end: 1719219600000, label: "A2" },
 ]);
-// either both rows exist, or neither does
+// both rows exist, or neither does
 ```
 
-The engine (`batch_confirm_bookings`, `engine/mutations.rs`) makes this safe across multiple resources:
+Δt checks the whole batch first. If any single item conflicts with something already booked (or with another item in the same batch), the entire request is rejected and nothing is written. You never end up holding seat 12 but not seat 13. Batches do have an upper size limit, so this is for grouping a real order, not for bulk-loading thousands of rows in one shot.
 
-1. **Sorted, deduped locks.** Resource ids are collected, sorted, and deduped, then write locks are acquired in that fixed order. A consistent lock order across all batches means two concurrent batches can never deadlock.
-2. **Phase 1, validate.** Every booking is checked against current committed state with `check_no_conflict`, and intra-batch members are checked against each other (capacity-aware: on a capacity-N resource the sweep allows up to N overlapping members in one batch).
-3. **Phase 2, commit.** Only if every booking validated does the engine persist and apply them. A conflict anywhere short-circuits before any write.
+## Asking across several resources at once
 
-The batch is bounded by the kernel batch size (`MAX_BATCH_SIZE`). The atomicity that binds independent timelines together under one set of locks is the load-bearing property here, it is what lets you treat N coupled 1-D lines as a single bookable unit.
+Often the question is not "is this exact seat free" but "is anything free." Δt can answer that across a set of resources in one call, and you decide what "free" should mean:
 
-## Composing availability across resources
-
-The same +1/-1 sweep that powers capacity also composes availability across independent resources. Per-resource free slots are fed into one sweep with a `minAvailable` threshold (`compute_multi_availability`, `engine/queries.rs`):
-
-- `minAvailable = N` (all resources, the default) gives the **intersection**: windows where every resource is free at once.
-- `minAvailable = 1` gives a **pool / union**: windows where at least one resource is free.
-- `minAvailable = k` gives **at least k free** at the same moment.
+- **All free:** every resource open at the same moment. This is the default.
+- **Any free (a pool):** at least one resource open. Good for "any of these three rooms."
+- **At least k free:** at least k of them open at once.
 
 ```ts
-// Any one of these rooms free (a pool):
+// Any one of these rooms free at the same time (a pool):
 const pool = await db.availability.getCombined({
   resourceIds: [roomA.id, roomB.id, roomC.id],
   start: 1719187200000,
   end: 1719273600000,
-  minAvailable: 1,
+  minAvailable: 1, // 1 = any, default = all, k = at least k
 });
 ```
 
-Combined slots carry no `resource_id` because the set is merged into one answer. If you instead want per-resource slots in one round-trip (rows stay tagged with their id), use `getMany`:
+Combined slots come back as one merged timeline with no resource id attached, because the answer is about the group, not any single member. When you instead want each resource's own slots in a single round-trip, reach for `getMany`, which keeps every result tagged by id:
 
 ```ts
 const byRoom = await db.availability.getMany({
@@ -107,36 +92,33 @@ const byRoom = await db.availability.getMany({
 // Record<resourceId, AvailabilitySlot[]>
 ```
 
-Composition is topology-free: the resource axis is an opaque categorical lock key, not a metric dimension, and the same sweep runs whether the resources sit in one engine or would be federated across homes. Nothing about where the resources live changes the math.
+## Live updates, the moment something changes
 
-## Real-time updates
-
-Changes are pushed the instant they happen, over a per-resource channel named `resource_{ULID}`. Events bubble up the parent tree: a change on a child resource also notifies subscribers of its ancestors, so a subscriber watching a section sees holds and bookings on every seat inside it.
+You do not have to poll to keep a seat map fresh. Subscribe to a resource and Δt pushes events the instant a hold is placed or released, or a booking is confirmed or cancelled:
 
 ```ts
-const stop = await db.events.listen(seat.id, (event) => {
-  // fires on hold placed/released, booking confirmed/cancelled, etc.
-  console.log(event);
+const stop = await db.events.listen(seat12.id, (event) => {
+  console.log(event); // hold placed/released, booking confirmed/cancelled, ...
 });
 
-// later
+// later, when you are done
 await stop();
 ```
 
-`listen` returns an async unsubscribe function. Malformed payloads are silently ignored.
+`listen` hands you back an async function to unsubscribe. Events also bubble up the resource tree, so a subscriber watching Section A hears about changes on every seat inside it, including Seat 12, without subscribing to each one. (Malformed event payloads are quietly skipped rather than thrown at you.)
 
-## Honest caveat: hold-to-confirm is not atomic today
+## Honest note: hold then book is two steps today
 
-The mental model above says a hold "becomes a real booking in one step, with no gap where anyone could slip in." That is the intended semantics and the right way to reason about the race. It is not yet what the engine does.
+The whole point of a hold is to reserve a slot while a customer finishes checkout, then turn it into a real booking. The clean version of that would be a single atomic step with no gap in between. That single step does not exist yet.
 
-There is **no atomic `CommitHold` at HEAD.** A single-lock hold-to-booking transition is specified but not built. Today, turning a hold into a booking is **release-then-book**: you call `holds.release(holdId)` and then `bookings.create(...)` as two separate operations.
+Today the flow is two separate calls: release the hold, then create the booking.
 
 ```ts
-// NOT atomic today: a real TOCTOU window sits between these two calls.
+// Two steps today, not atomic.
 await db.holds.release(hold.id);
-await db.bookings.create([{ resourceId: seat.id, start, end, label }]);
+await db.bookings.create([{ resourceId: seat12.id, start, end, label }]);
 ```
 
-Between the release and the create, the seat is genuinely free, so a competing request can slip in and take it. This is a real time-of-check-to-time-of-use window. The "one step, no gap" guarantee depends on `CommitHold`, which does not exist yet.
+Between those two calls the slot is genuinely free for an instant, which means a competing request could slip in and grab it. It is a small window, but it is real. For most flows it is fine, just know it is there. A one-step commit is on the roadmap and not built yet.
 
-One related sharp edge: **hold expiry is caller-supplied, not authority-assigned.** `holds.place` takes `expiresAt` as a Unix-ms timestamp from the client. The kernel trusts and stores it; it does not impose or clamp a server-side TTL. A caller that passes a far-future `expiresAt` holds the slot for that long.
+All of these calls speak in plain numbers: times are integer Unix milliseconds, and a slot `[start, end)` includes its start but not its end, so two slots that touch end-to-start do not overlap. Calendars, time zones, and recurring schedules are yours to expand into plain instants before you hand them to Δt.

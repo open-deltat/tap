@@ -1,7 +1,6 @@
-// The first page: why deltat exists, in plain language, using everyday examples.
-
-// Three things booked on one line of time; two of them collide, one sits clear.
-function CollisionViz() {
+// Three things booked on one line of time; two of them collide, one sits clear. Embedded on the
+// "What is Δt" docs page as the illustration of the overlap idea.
+export function CollisionViz() {
   const segs = [
     { label: "Flight", left: 8, width: 34, cls: "bg-sky-500/40 border-sky-400/40", row: 0 },
     { label: "Hotel", left: 30, width: 36, cls: "bg-rose-500/40 border-rose-400/40", row: 1 },
@@ -32,42 +31,6 @@ function CollisionViz() {
       <div className="absolute bottom-1 left-3 text-[9px] text-zinc-500">past</div>
       <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] text-zinc-500">time</div>
       <div className="absolute bottom-1 right-3 text-[9px] text-zinc-500">future</div>
-    </div>
-  );
-}
-
-export function OverviewTopic() {
-  return (
-    <div className="mx-auto max-w-2xl">
-      <div className="text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">Start here</div>
-      <h2 className="mt-2 text-2xl font-semibold text-zinc-100">Why Δt</h2>
-      <p className="mt-1 text-sm text-emerald-300/90">
-        Databases were built to store rows. They were never built for time.
-      </p>
-
-      <div className="mt-5 text-[13.5px] leading-relaxed text-zinc-400">
-        <p>
-          Normal databases store rows in tables, like a spreadsheet. To handle time you bolt on a
-          start and an end column and write tricky checks for overlaps. It works, but it stays slow,
-          because the database has no idea what time is.
-        </p>
-      </div>
-
-      <div className="mt-5">
-        <CollisionViz />
-      </div>
-
-      <div className="mt-5 text-[13.5px] leading-relaxed text-zinc-400">
-        <p>
-          Δt flips that. Time is the whole database. A booking is just a stretch on one line, and two
-          bookings collide when they cover the same moment, like the flight and the hotel above. That
-          is the whole idea, and it answers &quot;what is free?&quot; in well under a millisecond.
-        </p>
-      </div>
-
-      <p className="mt-5 text-[11px] text-zinc-500">
-        Next, the data model: how a booking, a blocked day, and free time all live on that one line.
-      </p>
     </div>
   );
 }
