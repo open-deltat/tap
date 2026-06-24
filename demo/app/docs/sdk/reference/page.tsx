@@ -7,7 +7,7 @@ export const metadata = { title: "SDK reference · tap docs" };
 export default function ReferencePage() {
   return (
     <article className="mx-auto max-w-3xl">
-      <DocHeader eyebrow="tap · the SDK" title="SDK reference" />
+      <DocHeader eyebrow="tap · the protocol" title="SDK reference" />
       <Markdown>{docContent("sdk-reference")}</Markdown>
     </article>
   );

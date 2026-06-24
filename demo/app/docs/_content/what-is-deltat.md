@@ -1,4 +1,4 @@
-Δt is a database built for one job: keeping track of when things are taken and when they are free. If you have ever wired a booking system on top of a general-purpose database and ended up hand-writing overlap checks, race guards, and "is this slot still open" queries, Δt is the thing that should have existed underneath you.
+Δt is a database for time: instead of storing rows and bolting overlap checks on top, it makes time itself the data, so the question every scheduling system fights with, what is still free, becomes a single instant answer. If you have ever wired a booking system on top of a general-purpose database and ended up hand-writing overlap checks, race guards, and "is this slot still open" queries, Δt is the thing that should have existed underneath you.
 
 It runs as a single binary with no other database behind it. You talk to it, you place bookings and holds, and you ask it what is free. That last question is the whole point, and Δt answers it fast.
 
@@ -83,4 +83,4 @@ And the way you connect today is the PostgreSQL wire protocol, which is transiti
 
 To see exactly what lives on the line (resources, rules, bookings, capacity, buffers, and how the tree composes), read the data model.
 
-To actually build against it in TypeScript, head to the tap side: the `@open-tap/client` SDK wraps all of this in plain verbs (resources, rules, holds, bookings, availability) so you never write the overlap check yourself.
+To actually build against it, head to the tap side. tap is the Time Allocation Protocol, the shared language for resources, rules, holds, bookings, and availability, and `@open-tap/client` is its TypeScript SDK, so you talk to Δt in plain verbs and never write the overlap check yourself.
