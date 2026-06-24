@@ -1,65 +1,69 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
-import { createVenue, addSchedule, findRootByName, baseMs } from "@/app/actions/seed-helpers";
+import { createVenue, addSchedule, daily, findRootByName, baseMs } from "@/app/actions/seed-helpers";
 
 const H = 3_600_000;
 const DAY = 86_400_000;
-const DAYS = 28; // four weeks of recurring availability + meetings
+const DAYS = 24; // a little over three weeks of evening availability to scan
 
-type Win = { h: number; m: number; dur: number };
-type Booking = { h: number; dur: number; label: string };
+// Five friends, five calendars: each free in the evenings, but each busy a different weeknight and
+// trimmed by a standing commitment, so the five-way intersection across three weeks is genuinely
+// sparse and its shared window differs night to night. The demo finds the evenings all five share.
 
-// A weekly OPEN-HOURS pattern (keyed by day-of-week 0=Sun..6=Sat) and a weekly MEETINGS pattern.
-// The two people work different hours and carry different recurring meetings, so every weekday
-// shows a genuinely different gap structure — and the both-free intersection differs each day,
-// instead of "free forever after today".
-async function ensurePerson(
+// An evening commitment that eats part of a friend's free band: dinner at home, kids, a standing call.
+interface Commitment {
+  h: [number, number]; // hours within the evening that are spoken for, e.g. [18, 19]
+  dows?: number[]; // only on these weekdays (0=Sun..6=Sat); omitted means every evening
+}
+
+// Day offset from today of the nth (1-based) upcoming occurrence of weekday `dow` (0=Sun..6=Sat).
+function nthDowOffset(dow: number, n: number): number {
+  const today = new Date(baseMs()).getDay();
+  return ((dow - today + 7) % 7) + (n - 1) * 7;
+}
+
+async function ensureFriend(
   name: string,
-  hours: Record<number, Win[]>,
-  meetings: Record<number, Booking[]>
+  open: [number, number], // evening band, e.g. [18, 23]
+  busyDows: number[], // weekdays (0=Sun..6=Sat) the whole evening is gone
+  commitments: Commitment[] = [], // partial-evening commitments that trim the free window
+  oneOffOffsets: number[] = [] // extra full evenings blocked, as day offsets from today
 ): Promise<string> {
   const existing = await findRootByName(name);
   if (existing) return existing;
 
-  const cal = await createVenue(name, { slotMinutes: 30, bufferMinutes: 0 });
-  await addSchedule(cal.id, baseMs(), DAYS, hours);
-
+  const r = await createVenue(name, { slotMinutes: 30, bufferMinutes: 0 });
   const base = baseMs();
-  const rows: { resourceId: string; start: number; end: number; label: string }[] = [];
+  await addSchedule(r.id, base, DAYS, daily([{ h: open[0], m: 0, dur: (open[1] - open[0]) * 60 }]));
+
+  const blocks: { resourceId: string; start: number; end: number; blocking: boolean }[] = [];
   for (let i = 0; i < DAYS; i++) {
     const dayMs = base + i * DAY;
     const dow = new Date(dayMs).getDay();
-    for (const b of meetings[dow] ?? []) {
-      const start = dayMs + b.h * H;
-      rows.push({ resourceId: cal.id, start, end: start + b.dur * H, label: b.label });
+    if (busyDows.includes(dow) || oneOffOffsets.includes(i)) {
+      blocks.push({ resourceId: r.id, start: dayMs + open[0] * H, end: dayMs + open[1] * H, blocking: true });
+      continue;
+    }
+    for (const c of commitments) {
+      if (c.dows && !c.dows.includes(dow)) continue;
+      blocks.push({ resourceId: r.id, start: dayMs + c.h[0] * H, end: dayMs + c.h[1] * H, blocking: true });
     }
   }
-  if (rows.length) await dt.bookings.create(rows);
-  return cal.id;
+  if (blocks.length) await dt.rules.create(blocks);
+  return r.id;
 }
 
-// Jane: Mon–Fri 09:00–17:00.   Bob: Mon–Fri 08:00–16:00 (earlier, so mornings/evenings differ).
-const JANE_HOURS: Record<number, Win[]> = { 1: [{ h: 9, m: 0, dur: 480 }], 2: [{ h: 9, m: 0, dur: 480 }], 3: [{ h: 9, m: 0, dur: 480 }], 4: [{ h: 9, m: 0, dur: 480 }], 5: [{ h: 9, m: 0, dur: 480 }] };
-const BOB_HOURS: Record<number, Win[]> = { 1: [{ h: 8, m: 0, dur: 480 }], 2: [{ h: 8, m: 0, dur: 480 }], 3: [{ h: 8, m: 0, dur: 480 }], 4: [{ h: 8, m: 0, dur: 480 }], 5: [{ h: 8, m: 0, dur: 480 }] };
-
-const JANE_MEETINGS: Record<number, Booking[]> = {
-  1: [{ h: 9, dur: 1, label: "Standup" }, { h: 14, dur: 1, label: "1:1" }],
-  2: [{ h: 11, dur: 1, label: "Design review" }],
-  3: [{ h: 9, dur: 2, label: "Workshop" }],
-  4: [{ h: 15, dur: 1, label: "Retro" }],
-  5: [{ h: 10, dur: 2, label: "Planning" }],
-};
-const BOB_MEETINGS: Record<number, Booking[]> = {
-  1: [{ h: 13, dur: 2, label: "Interviews" }],
-  2: [{ h: 8, dur: 1, label: "Standup" }, { h: 14, dur: 1, label: "Sync" }],
-  3: [{ h: 12, dur: 1, label: "Lunch & learn" }],
-  4: [{ h: 9, dur: 2, label: "Deep work" }],
-  5: [{ h: 14, dur: 2, label: "Demo" }],
-};
-
-export async function ensureMeetCalendars(): Promise<{ janeId: string; bobId: string }> {
-  const janeId = await ensurePerson("Jane", JANE_HOURS, JANE_MEETINGS);
-  const bobId = await ensurePerson("Bob", BOB_HOURS, BOB_MEETINGS);
-  return { janeId, bobId };
+// Five friends, each busy a different weeknight, each with a standing evening commitment that trims
+// their free band. The weekday blocks leave only weekends open; the commitments make the shared
+// window 19:00-21:30 on Saturdays but only 19:30-21:30 on Sundays, so a 2.5 hr dinner fits Saturdays
+// and not Sundays. Two one-offs knock out a weekend night apiece.
+export async function ensureMeetFriends(): Promise<string[]> {
+  return Promise.all([
+    ensureFriend("dinner-1", [18, 23], [1], [{ h: [18, 19] }], [nthDowOffset(0, 3)]), // busy Mon; eats in until 7; away the 3rd Sunday
+    ensureFriend("dinner-2", [17, 22], [2], [{ h: [21.5, 22] }]), // busy Tue; early night, gone by 9:30
+    ensureFriend("dinner-3", [18, 23], [3], [], [nthDowOffset(6, 2)]), // busy Wed; away the 2nd Saturday
+    ensureFriend("dinner-4", [18, 23], [4], [{ h: [18, 19.5], dows: [0] }]), // busy Thu; Sunday call until 7:30
+    ensureFriend("dinner-5", [18, 23], [5], [{ h: [22, 23] }]), // busy Fri; turns in at 10
+  ]);
 }

@@ -11,7 +11,6 @@ import Parking from "@/examples/parking";
 import Availability from "@/examples/availability";
 import Meet from "@/examples/meet";
 import Live from "@/examples/live";
-import Rules from "@/examples/rules";
 import Builder from "@/examples/builder";
 import Explainer from "@/examples/explainer";
 
@@ -28,7 +27,6 @@ const COMPONENTS: Record<string, ComponentType> = {
   availability: Availability,
   meet: Meet,
   live: Live,
-  rules: Rules,
   builder: Builder,
   explainer: Explainer,
 };
