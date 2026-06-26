@@ -27,7 +27,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "test": "bun test"
+    "test": "bun test",
+    "prepack": "tsc"
   },
   "dependencies": {
     "postgres": "^3.4.8",
