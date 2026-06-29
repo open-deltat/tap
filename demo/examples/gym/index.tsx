@@ -5,7 +5,6 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Stage } from "@/components/stage";
 import { Segmented } from "@/components/ui/segmented";
-import { EmbedSnippet } from "@/components/embed-snippet";
 import { formatTime } from "@/lib/time";
 import {
   CalendarBody,
@@ -54,13 +53,7 @@ const CAPTION: Record<View, string> = {
   staff: "Internal view — adds instructor, capacity, and class notes. Gate this behind auth in production.",
 };
 
-export default function GymExample({
-  showEmbed = false,
-  publicOnly = false,
-}: {
-  showEmbed?: boolean;
-  publicOnly?: boolean;
-}) {
+export default function GymExample({ publicOnly = false }: { publicOnly?: boolean }) {
   const [view, setView] = useState<View>("public");
   const [data, setData] = useState<GymData | null>(null);
   const [failed, setFailed] = useState(false);
@@ -96,7 +89,6 @@ export default function GymExample({
       <CalendarProvider startDay={1} className="w-full">
         <GymCalendar view={publicOnly ? "public" : view} data={data} failed={failed} />
       </CalendarProvider>
-      {showEmbed && <EmbedSnippet className="mt-6" example="gym" />}
     </Stage>
   );
 }
