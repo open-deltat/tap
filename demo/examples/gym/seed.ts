@@ -1,7 +1,6 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
-import * as store from "@/lib/store";
 import { addSchedule, findRootByName } from "@/app/actions/seed-helpers";
 import type { Rule } from "@open-tap/client";
 
@@ -15,22 +14,16 @@ export type GymCourse = { id: string; name: string; capacity: number };
 type CourseDef = {
   name: string;
   capacity: number;
-  instructor: string;
-  notes: string;
-  durationMinutes: number;
   schedule: Record<number, { h: number; m: number; dur: number }[]>;
 };
 
 // Each course is ONE capacity-N resource; the weekly slots become non-blocking rules (open class
 // windows). Enrollments are bookings inside those windows, so the capacity sweep gives per-class
-// spots-left for free. instructor + notes live in the sidecar store — deltat has no field for them.
+// spots-left for free.
 const COURSES: CourseDef[] = [
   {
     name: "Vinyasa Yoga",
     capacity: 12,
-    instructor: "Sam Rivera",
-    notes: "Heated studio. Mats provided; arrive 10 minutes early.",
-    durationMinutes: 60,
     schedule: {
       2: [{ h: 18, m: 0, dur: 60 }],
       4: [{ h: 18, m: 0, dur: 60 }],
@@ -40,9 +33,6 @@ const COURSES: CourseDef[] = [
   {
     name: "Spin",
     capacity: 20,
-    instructor: "Dana Cole",
-    notes: "Cleats at the front desk. Towel service included.",
-    durationMinutes: 45,
     schedule: {
       1: [{ h: 7, m: 0, dur: 45 }],
       3: [{ h: 7, m: 0, dur: 45 }],
@@ -52,9 +42,6 @@ const COURSES: CourseDef[] = [
   {
     name: "HIIT",
     capacity: 16,
-    instructor: "Marcus Lee",
-    notes: "High intensity. Modifications offered for every level.",
-    durationMinutes: 45,
     schedule: {
       1: [{ h: 18, m: 30, dur: 45 }],
       3: [{ h: 18, m: 30, dur: 45 }],
@@ -63,9 +50,6 @@ const COURSES: CourseDef[] = [
   {
     name: "Boxing",
     capacity: 10,
-    instructor: "Tariq Bello",
-    notes: "Hand wraps required. Gloves available to rent.",
-    durationMinutes: 60,
     schedule: {
       2: [{ h: 19, m: 30, dur: 60 }],
       6: [{ h: 10, m: 30, dur: 60 }],
@@ -74,9 +58,6 @@ const COURSES: CourseDef[] = [
   {
     name: "Reformer Pilates",
     capacity: 8,
-    instructor: "Nina Fox",
-    notes: "Reformer-based. Limited to 8 — book early.",
-    durationMinutes: 50,
     schedule: {
       2: [{ h: 9, m: 30, dur: 50 }],
       4: [{ h: 9, m: 30, dur: 50 }],
@@ -89,8 +70,8 @@ function monthStartMs(): number {
   return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 }
 
-// Deterministic per-class fill so the calendar reads as a real week — some full, some wide open,
-// most partway — without storing randomness (and without Math.random, which the seed must avoid).
+// Deterministic per-class fill so the calendar reads as a real week (some full, some wide open,
+// most partway) without storing randomness, and without Math.random, which the seed must avoid.
 function fillFor(seed: string, capacity: number): number {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) {
@@ -126,21 +107,6 @@ export async function ensureGym(): Promise<GymData> {
       dt.resources.get({ parentId: existingId }),
       dt.rules.get(existingId),
     ]);
-    // Self-heal the sidecar: instructor/notes live only on disk, so if that file was wiped while the
-    // deltat data survived, re-assert them from the course definitions (matched by name).
-    const byName = new Map(COURSES.map((d) => [d.name, d]));
-    for (const c of children) {
-      if (store.get(c.id)) continue;
-      const def = byName.get(c.name ?? "");
-      if (def) {
-        store.set(c.id, {
-          slotMinutes: def.durationMinutes,
-          price: null,
-          instructor: def.instructor,
-          notes: def.notes,
-        });
-      }
-    }
     return {
       rootId: existingId,
       courses: children.map((c) => ({ id: c.id, name: c.name ?? "Class", capacity: c.capacity })),
@@ -160,17 +126,10 @@ export async function ensureGym(): Promise<GymData> {
   const courses: GymCourse[] = [];
   for (const def of COURSES) {
     const r = await dt.resources.create({ parentId: gym.id, name: def.name, capacity: def.capacity });
-    store.set(r.id, {
-      slotMinutes: def.durationMinutes,
-      price: null,
-      instructor: def.instructor,
-      notes: def.notes,
-    });
-
     const occurrences = await addSchedule(r.id, base, SCHEDULE_DAYS, def.schedule);
 
     // Fill upcoming classes (through the enroll window) so spots-left varies across the visible
-    // month — including classes already past today, which otherwise read as uniformly wide-open.
+    // month, including classes already past today, which otherwise read as uniformly wide-open.
     for (const occ of occurrences) {
       if (occ.start > enrollUntil) continue;
       const fill = fillFor(`${def.name}:${occ.start}`, def.capacity);

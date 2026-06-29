@@ -34,7 +34,7 @@ export function EmbedSnippet({
       toast.success("Embed code copied");
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      toast.error("Copy failed — select and copy manually");
+      toast.error("Copy failed. Select and copy manually.");
     }
   }
 
@@ -44,7 +44,7 @@ export function EmbedSnippet({
         <div>
           <div className="text-sm font-medium text-zinc-200">Embed this schedule</div>
           <div className="text-[11px] text-zinc-500">
-            Paste it on any site. It loads the public view — read-only, no internal data.
+            Paste it on any site. It loads the read-only public schedule, no internal data.
           </div>
         </div>
         <button

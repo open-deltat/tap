@@ -1,6 +1,6 @@
 // A stand-in "partner website" that embeds the gym schedule exactly as a third party would: paste
 // the <iframe>, nothing else. Proves /embed/gym renders framed, chrome-free, and unauthenticated.
-// This page is NOT a demo example — it's the host you'd paste the snippet into.
+// This page is NOT a demo example. It's the host you'd paste the snippet into.
 export default function EmbedTestPage() {
   return (
     <div className="min-h-screen bg-zinc-100 text-zinc-900">
@@ -25,7 +25,7 @@ export default function EmbedTestPage() {
         <iframe
           src="/embed/gym"
           width="100%"
-          height={640}
+          height={820}
           style={{ border: 0, borderRadius: 12 }}
           loading="lazy"
           title="Class schedule"
@@ -33,7 +33,7 @@ export default function EmbedTestPage() {
 
         <p className="mt-6 text-xs text-zinc-400">
           This is a mock external site. The schedule above is the deltat demo&apos;s /embed/gym route
-          rendered in an iframe — read-only, public view only.
+          rendered in an iframe: a read-only public schedule.
         </p>
       </main>
     </div>

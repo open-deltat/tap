@@ -3,7 +3,7 @@ import { isExampleEnabled } from "@/examples/config";
 import { EmbedSnippet } from "@/components/embed-snippet";
 
 // The gym demo IS the embed: the schedule below is the real /embed/gym widget loaded through an
-// actual <iframe> — byte-for-byte the snippet you'd paste elsewhere — followed by that snippet to copy.
+// actual <iframe>, byte-for-byte the snippet you'd paste elsewhere, followed by that snippet to copy.
 const EMBED_HEIGHT = 820;
 
 export default function Page() {
@@ -17,7 +17,7 @@ export default function Page() {
           <p className="mt-2 max-w-xl text-xs leading-relaxed text-zinc-400">
             The schedule below is the real{" "}
             <code className="rounded bg-white/[0.06] px-1 py-px font-mono text-[11px]">/embed/gym</code>{" "}
-            widget loaded in an actual iframe — the read-only public view, exactly what visitors see.
+            widget loaded in an actual iframe, the read-only public schedule that visitors see.
             Copy the snippet underneath to drop it on any site.
           </p>
         </header>
