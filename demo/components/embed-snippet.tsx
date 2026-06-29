@@ -9,7 +9,15 @@ import { ACCENT_GHOST } from "@/lib/accent";
 // Shows the copy-paste <iframe> for an example's chrome-free /embed/<id> route. The origin is read
 // at runtime so the snippet is correct wherever the demo is deployed; before hydration it falls back
 // to a readable placeholder.
-export function EmbedSnippet({ example, className }: { example: string; className?: string }) {
+export function EmbedSnippet({
+  example,
+  className,
+  height = 820,
+}: {
+  example: string;
+  className?: string;
+  height?: number;
+}) {
   const [origin, setOrigin] = useState("https://your-deltat-demo");
   const [copied, setCopied] = useState(false);
 
@@ -17,7 +25,7 @@ export function EmbedSnippet({ example, className }: { example: string; classNam
     setOrigin(window.location.origin);
   }, []);
 
-  const snippet = `<iframe src="${origin}/embed/${example}" width="100%" height="640" style="border:0;border-radius:12px" loading="lazy" title="Class schedule"></iframe>`;
+  const snippet = `<iframe src="${origin}/embed/${example}" width="100%" height="${height}" style="border:0;border-radius:12px" loading="lazy" title="Class schedule"></iframe>`;
 
   async function copy() {
     try {
