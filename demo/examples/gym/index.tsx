@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Stage } from "@/components/stage";
-import { Segmented } from "@/components/ui/segmented";
 import { formatTime } from "@/lib/time";
 import {
   CalendarBody,
@@ -18,95 +17,57 @@ import {
   type CalendarState,
   type Feature,
 } from "@/components/ui/kibo-ui/calendar";
-import { ensureGym, type GymData } from "./seed";
-import {
-  getPublicSchedule,
-  getStaffSchedule,
-  type PublicClass,
-  type StaffClass,
-} from "@/app/actions/gym";
-
-type View = "public" | "staff";
-type GymClass = PublicClass | StaffClass;
+import { getPublicSchedule, getScheduleWindow, type PublicClass } from "@/app/actions/gym";
 
 const OPEN = "#34d399";
 const FILLING = "#fbbf24";
 const FULL = "#f87171";
 
-function colorFor(c: GymClass): string {
+function colorFor(c: PublicClass): string {
   if (c.full) return FULL;
   if (c.spotsLeft <= 3) return FILLING;
   return OPEN;
 }
 
-function isStaff(c: GymClass): c is StaffClass {
-  return "instructor" in c;
-}
+const CAPTION = "A read-only schedule anyone can embed: the class, its time, and how many spots are left.";
 
-const VIEW_ITEMS = [
-  { value: "public" as const, label: "Public view" },
-  { value: "staff" as const, label: "Staff view" },
-];
-
-const CAPTION: Record<View, string> = {
-  public: "What anyone embedding this schedule sees: the class, its time, and how many spots are left.",
-  staff: "Internal view — adds instructor, capacity, and class notes. Gate this behind auth in production.",
-};
-
-export default function GymExample({ publicOnly = false }: { publicOnly?: boolean }) {
-  const [view, setView] = useState<View>("public");
-  const [data, setData] = useState<GymData | null>(null);
+export default function GymExample() {
+  const [range, setRange] = useState<{ start: number; end: number } | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    ensureGym()
-      .then(setData)
+    getScheduleWindow()
+      .then(setRange)
       .catch(() => {
         setFailed(true);
         toast.error("Failed to connect to Δt. Is it running?");
       });
   }, []);
 
-  // The embed widget is the published, public artifact: no toggle, pinned to the public view, so it
-  // can never request or render staff fields. The full /demos/gym page keeps the toggle to show the
-  // redaction boundary side by side.
-  const ribbon = publicOnly ? (
-    <p className="max-w-md text-center text-[11px] leading-relaxed text-zinc-500">{CAPTION.public}</p>
-  ) : (
-    <div className="flex flex-col items-center gap-2">
-      <Segmented ariaLabel="Audience" items={VIEW_ITEMS} value={view} onChange={setView} />
-      <p className="max-w-md text-center text-[11px] leading-relaxed text-zinc-500">{CAPTION[view]}</p>
-    </div>
+  const ribbon = (
+    <p className="max-w-md text-center text-[11px] leading-relaxed text-zinc-500">{CAPTION}</p>
   );
 
   return (
     <Stage
-      primitive={{ label: "Published schedule, redacted at the edge", specId: "EDGE-03" }}
+      primitive={{ label: "Weekly classes, published read-only", specId: "EDGE-03" }}
       title="FitFlow Studio"
       ribbon={ribbon}
       contentMax="max-w-3xl"
     >
       <CalendarProvider startDay={1} className="w-full">
-        <GymCalendar view={publicOnly ? "public" : view} data={data} failed={failed} />
+        <GymCalendar range={range} failed={failed} />
       </CalendarProvider>
     </Stage>
   );
 }
 
-function GymCalendar({
-  view,
-  data,
-  failed,
-}: {
-  view: View;
-  data: GymData | null;
-  failed: boolean;
-}) {
+function GymCalendar({ range, failed }: { range: { start: number; end: number } | null; failed: boolean }) {
   const [month, setMonth] = useCalendarMonth();
   const [year, setYear] = useCalendarYear();
-  const ready = data !== null;
+  const ready = range !== null;
 
-  const [classes, setClasses] = useState<GymClass[]>([]);
+  const [classes, setClasses] = useState<PublicClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
@@ -121,9 +82,9 @@ function GymCalendar({
   // Clamp navigation to the months the seed actually covers, so the pager can never land on an empty
   // grid (the seeded window is fixed; "today" floats).
   const nav = useMemo(() => {
-    if (data) {
-      const s = new Date(data.window.start);
-      const e = new Date(data.window.end - 1);
+    if (range) {
+      const s = new Date(range.start);
+      const e = new Date(range.end - 1);
       return {
         min: new Date(s.getFullYear(), s.getMonth(), 1),
         max: new Date(e.getFullYear(), e.getMonth(), 1),
@@ -134,12 +95,12 @@ function GymCalendar({
       min: new Date(now.getFullYear(), now.getMonth(), 1),
       max: new Date(now.getFullYear(), now.getMonth() + 1, 1),
     };
-  }, [data]);
+  }, [range]);
 
-  // On load, snap the displayed month into the seeded range — today may sit outside it on a
+  // On load, snap the displayed month into the seeded range. Today may sit outside it on a
   // long-lived deployment, and this also clears any stale month left in the shared calendar state.
   useEffect(() => {
-    if (!data) return;
+    if (!range) return;
     const cur = new Date(year, month, 1).getTime();
     if (cur < nav.min.getTime()) {
       setYear(nav.min.getFullYear());
@@ -149,11 +110,10 @@ function GymCalendar({
       setMonth(nav.max.getMonth() as CalendarState["month"]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [range]);
 
-  // Selection + stale-data reset is keyed on the month only, NOT the view — flipping Public/Staff
-  // keeps the day you were looking at, while navigating months clears last month's classes (so the
-  // detail panel never shows them under a new month's heading) and re-defaults the selection.
+  // Navigating months clears last month's classes (so the detail panel never shows them under a new
+  // month's heading) and re-defaults the selection to today when it's in view.
   useEffect(() => {
     setClasses([]);
     const today = new Date();
@@ -165,15 +125,14 @@ function GymCalendar({
     if (!ready) return;
     let cancelled = false;
     setLoading(true);
-    const fetcher = view === "staff" ? getStaffSchedule : getPublicSchedule;
-    fetcher(windowStart, windowEnd)
+    getPublicSchedule(windowStart, windowEnd)
       .then((rows) => !cancelled && setClasses(rows))
       .catch(() => !cancelled && toast.error("Failed to load schedule"))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [ready, view, windowStart, windowEnd]);
+  }, [ready, windowStart, windowEnd]);
 
   const features: Feature[] = useMemo(
     () =>
@@ -286,16 +245,7 @@ function GymCalendar({
                           {c.spotsLeft} {c.spotsLeft === 1 ? "spot" : "spots"} left
                         </span>
                       )}
-                      {isStaff(c) && (
-                        <span className="text-zinc-500">
-                          {" · "}
-                          {c.instructor ?? "Unassigned"} · {c.booked}/{c.capacity} booked
-                        </span>
-                      )}
                     </div>
-                    {isStaff(c) && c.notes && (
-                      <div className="mt-1 text-[11px] leading-relaxed text-zinc-500">{c.notes}</div>
-                    )}
                   </div>
                 </li>
               ))}

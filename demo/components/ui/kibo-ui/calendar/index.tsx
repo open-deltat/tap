@@ -301,7 +301,7 @@ export type CalendarLabelProps = {
   className?: string;
 };
 
-/** The "June 2026" heading — replaces the upstream month/year combobox pickers. */
+/** The "June 2026" heading. Replaces the upstream month/year combobox pickers. */
 export const CalendarLabel = ({ className }: CalendarLabelProps) => {
   const [month] = useCalendarMonth();
   const [year] = useCalendarYear();

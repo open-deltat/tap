@@ -22,10 +22,6 @@ export interface ResourceMeta {
   price: number | null;
   maxGuests?: number;
   section?: SectionLayout;
-  /** Gym courses: who teaches the class. Staff-only — deltat has no kernel field for it. */
-  instructor?: string;
-  /** Gym courses: internal description shown only in the staff view. */
-  notes?: string;
 }
 
 // The demo's Resource = deltat Resource + app metadata + derived bufferMinutes

@@ -19,8 +19,7 @@ const EMBEDDABLE: Record<string, ComponentType> = {
   availability: Availability,
   meet: Meet,
   live: Live,
-  // Pinned to the public view: the embeddable widget must never expose the staff toggle.
-  gym: () => <Gym publicOnly />,
+  gym: Gym,
 };
 
 export default async function EmbedPage({ params }: { params: Promise<{ example: string }> }) {
