@@ -9,6 +9,7 @@ import {
   Clock,
   Users,
   Radio,
+  Dumbbell,
   CalendarCog,
   type LucideIcon,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const META: Record<ExampleId, Omit<ExampleMeta, "id" | "href">> = {
   availability: { label: "Appointments", icon: Clock, specId: "AVAIL-01", group: "featured", tagline: "Open hours, minus what is booked" },
   meet: { label: "Group bookings", icon: Users, specId: "AVAIL-08", group: "featured", tagline: "A time the whole group is free" },
   live: { label: "Realtime seats", icon: Radio, specId: "PROTO-01", group: "featured", tagline: "Holds that update live for everyone" },
+  gym: { label: "Embedded schedule", icon: Dumbbell, specId: "EDGE-03", group: "featured", tagline: "A read-only schedule you can embed" },
   airline: { label: "Flight seats", icon: Plane, specId: "AVAIL-02", group: "seats", tagline: "Pick a seat on a flight" },
   cinema: { label: "Movie seats", icon: Film, specId: "AVAIL-02", group: "seats", tagline: "Hold seats for a showtime" },
   theater: { label: "Theater seats", icon: Theater, specId: "AVAIL-02", group: "seats", tagline: "Pick your seats for a show" },

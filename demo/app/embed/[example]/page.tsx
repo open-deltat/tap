@@ -5,6 +5,7 @@ import { isExampleEnabled } from "@/examples/config";
 import Availability from "@/examples/availability";
 import Meet from "@/examples/meet";
 import Live from "@/examples/live";
+import Gym from "@/examples/gym";
 
 // Bare, chrome-free renders of the featured examples, used inside the landing gallery's preview
 // iframes (NavHeader hides itself on /embed; there's no session sidebar here). Same live component
@@ -18,6 +19,8 @@ const EMBEDDABLE: Record<string, ComponentType> = {
   availability: Availability,
   meet: Meet,
   live: Live,
+  // Pinned to the public view: the embeddable widget must never expose the staff toggle.
+  gym: () => <Gym publicOnly />,
 };
 
 export default async function EmbedPage({ params }: { params: Promise<{ example: string }> }) {

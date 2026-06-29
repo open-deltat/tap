@@ -8,6 +8,7 @@ import { seedParking } from "@/examples/parking/seed";
 import { seedAvailabilityScheduler } from "@/examples/availability/seed";
 import { ensureMeetFriends } from "@/examples/meet/seed";
 import { seedLive } from "@/examples/live/seed";
+import { ensureGym } from "@/examples/gym/seed";
 import { ensureBuilderCalendar } from "@/examples/builder/seed";
 import type { ExampleId } from "./config";
 
@@ -24,5 +25,6 @@ export const SEEDS: Record<ExampleId, () => Promise<unknown>> = {
   availability: seedAvailabilityScheduler,
   meet: ensureMeetFriends,
   live: seedLive,
+  gym: ensureGym,
   builder: ensureBuilderCalendar,
 };
