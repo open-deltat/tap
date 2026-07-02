@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-// A day-granularity timeline (one cell per day) for spans that run over weeks rather than hours —
+// A day-granularity timeline (one cell per day) for spans that run over weeks rather than hours,
 // the coarse counterpart to the hour-level LabeledTimeline. Rows share one date axis; cells are
 // grouped in sevens so the week structure reads at a glance. Reusable for any per-day availability
 // view (five friends' evenings, hotel rooms across nights, etc.).

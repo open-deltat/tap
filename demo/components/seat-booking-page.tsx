@@ -195,7 +195,7 @@ export function SeatBookingPage({
       ws.onerror = revertSelection;
       // The server rejects a hold as a {type:"error"} MESSAGE (not a transport error), so
       // onerror never fires for it. Without this, the optimistic green selection stays even
-      // though no hold exists — a phantom-held seat whose later Book then fails.
+      // though no hold exists, a phantom-held seat whose later Book then fails.
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(String(event.data));
@@ -205,7 +205,7 @@ export function SeatBookingPage({
             toast.error("That seat was just taken");
           }
         } catch {
-          // non-JSON / deltat event frame — ignore
+          // non-JSON / deltat event frame, ignore
         }
       };
       holdWsRef.current.set(seatId, ws);
@@ -246,7 +246,7 @@ export function SeatBookingPage({
           label: venue?.name ?? "Booking",
           calendar,
         });
-        closeAllHolds(); // sockets only — the holds were already released by bookHeldSeats
+        closeAllHolds(); // sockets only, the holds were already released by bookHeldSeats
         setSelectedSeats(new Set());
         // Success → the shared modal: human receipt + the verbatim deltat rows.
         setBookingResult({
@@ -315,7 +315,7 @@ export function SeatBookingPage({
     );
   }
 
-  // Selectors live in context, right above the seat map they filter — not stranded at the top.
+  // Selectors live in context, right above the seat map they filter, not stranded at the top.
   const controls =
     venues.length > 1 || venueSlots.length > 1 ? (
       <div className="mb-5 flex flex-col items-center gap-2">

@@ -9,9 +9,9 @@ const NAME = "Olympia Stadium";
 const EVENT_DUR = 210; // minutes
 
 // Concentric oval tiers. Each "section" is ONE resource:
-//   - pool tiers  → capacity-N  (general admission: book K of N — fungible)
-//   - premium     → capacity-1  (a box you reserve outright — assigned)
-// Capacities sum to ~80,000 across ~92 sections — a stadium as a handful of capacity numbers,
+//   - pool tiers  → capacity-N  (general admission: book K of N, fungible)
+//   - premium     → capacity-1  (a box you reserve outright, assigned)
+// Capacities sum to ~80,000 across ~92 sections, a stadium as a handful of capacity numbers,
 // not 80,000 individual seat rows.
 const TIERS: {
   name: string;

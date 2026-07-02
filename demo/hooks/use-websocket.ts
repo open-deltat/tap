@@ -16,7 +16,7 @@ export interface StreamControl {
 }
 
 /** App-defined close code the proxy uses when it pauses a stream by policy (age/idle). On this code
- *  the client must NOT auto-reconnect — otherwise it reconnect-storms and defeats the server guard. */
+ *  the client must NOT auto-reconnect, otherwise it reconnect-storms and defeats the server guard. */
 const POLICY_CLOSE = 4002;
 
 export function wsUrl(): string {
@@ -57,7 +57,7 @@ export function useWebSocket(options: SubscribeOptions | null): StreamControl {
         } catch {}
       };
 
-      // A policy pause is intentional — show "paused" and wait for the user, never auto-reconnect
+      // A policy pause is intentional: show "paused" and wait for the user, never auto-reconnect
       // (that would storm the server guard). A genuine drop (HMR, sleep/wake) reconnects with capped
       // backoff so live updates resume without hammering on a flapping connection.
       ws.onclose = (ev) => {

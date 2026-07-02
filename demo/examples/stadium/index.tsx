@@ -86,7 +86,7 @@ export default function StadiumExample() {
 
   const [bookingsBySection, setBookingsBySection] = useState<Map<string, Booking[]>>(new Map());
   // The stadium root id. Bookings on any section bubble up to it (event bubbling), so one
-  // subscription here streams every section's changes — the basis for live seat-flips.
+  // subscription here streams every section's changes: the basis for live seat-flips.
   const [rootId, setRootId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<number>>(new Set());
@@ -168,7 +168,7 @@ export default function StadiumExample() {
   }, []);
 
   // Once the canvas is mounted and measured, snap the overview (L0) to the real size so the
-  // whole stadium fits — the initial state used fallback dims before the host existed.
+  // whole stadium fits, the initial state used fallback dims before the host existed.
   useEffect(() => {
     if (loading) return;
     const { w, h } = canvasSize();
@@ -234,7 +234,7 @@ export default function StadiumExample() {
   );
 
   // Wheel step: move exactly one ladder level toward the cursor. Clamped to [0..3] and
-  // always reversible — wheel-out from any level/state steps back toward Overview.
+  // always reversible: wheel-out from any level/state steps back toward Overview.
   const onZoomStep = useCallback(
     (direction: 1 | -1, focusX: number, focusY: number) => {
       const { w, h } = canvasSize();
@@ -352,7 +352,7 @@ export default function StadiumExample() {
     const f = sectionFrame(best.ring, best.idx, best.ringCount, best.assigned);
     setSelectedId(best.id);
     // A premium box is one assignable unit (cell 0): pre-select it so the canvas highlight
-    // matches the "box selected" tray. GA sections land unselected — pick seats by tapping.
+    // matches the "box selected" tray. GA sections land unselected, pick seats by tapping.
     setSelectedCells(best.assigned ? new Set([0]) : new Set());
     goToLevel(SEAT_LEVEL, { x: f.cx, y: f.cy });
   }

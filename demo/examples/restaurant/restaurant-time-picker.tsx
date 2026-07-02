@@ -29,7 +29,7 @@ export function RestaurantTimePicker({ slots, selectedStart, onSelect }: TimePic
     return <div className="text-[11px] text-zinc-500">No available times today</div>;
   }
 
-  // One dropdown rather than a wall of pills — a 90-min seating starting at the chosen time.
+  // One dropdown rather than a wall of pills: a 90-min seating starting at the chosen time.
   return (
     <label className="flex items-center gap-2 text-[11px] text-zinc-500">
       Seating

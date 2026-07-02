@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 // One generic horizontal timeline track, used anywhere we draw time bands (rules, schedules, the
 // how-it-works diagrams). Minimalist: no border, a faint background, rounded bands whose corner
-// radius scales with the track height — so a thin display track and a thick clickable track look
+// radius scales with the track height, so a thin display track and a thick clickable track look
 // like the same component at different sizes.
 
 export type Tone = "open" | "free" | "busy" | "hold" | "selected" | "neutral";

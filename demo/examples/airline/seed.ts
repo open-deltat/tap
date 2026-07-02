@@ -18,7 +18,7 @@ export async function seedAirline(): Promise<string[]> {
   });
 
   // A wide-body layout per flight: First (2-2), Business (2-2), Economy (3-3) ≈ 150 seats,
-  // so the two flights total ~300 assigned (capacity-1) seats — the scale the spec calls for.
+  // so the two flights total ~300 assigned (capacity-1) seats, the scale the spec calls for.
   const ECON_ROWS = Array.from({ length: 21 }, (_, i) => 10 + i); // rows 10–30
 
   // AA-100 JFK → LAX (westward, 6h)
@@ -38,7 +38,7 @@ export async function seedAirline(): Promise<string[]> {
     { h: 14, m: 30, dur: 360 },
   ]));
 
-  // The 06:00 departure opens partly full — a first-class window seat and several economy seats taken.
+  // The 06:00 departure opens partly full: a first-class window seat and several economy seats taken.
   await prebookSeats(wFcSeats, 2, base + 6 * 3_600_000, 360, "Booked");
   await prebookSeats(wEconSeats, 28, base + 6 * 3_600_000, 360, "Booked");
 

@@ -10,7 +10,7 @@ export interface StagePrimitive {
 /**
  * The shared single-pane surface for every booking demo: one luminous panel centered on a
  * dark void, a quiet primitive header naming the deltat capability, an optional control
- * ribbon, and an optional floating action tray. There is no left/right chrome — the panel
+ * ribbon, and an optional floating action tray. There is no left/right chrome, the panel
  * IS the example.
  */
 export function Stage({
@@ -54,7 +54,7 @@ export function Stage({
         {ribbon && <div className="shrink-0 pb-4">{ribbon}</div>}
 
         {/* m-auto (not items-center) so a panel taller than the viewport top-anchors and stays
-            fully scrollable — items-center would clip the top out of reach. */}
+            fully scrollable, items-center would clip the top out of reach. */}
         <div className={`flex w-full flex-1 justify-center overflow-auto px-0 pb-28 sm:px-6 ${contentMax}`}>
           {/* On phones the panel goes edge-to-edge (no border/bg/padding) so the example uses the
               full viewport; sm: restores the floating panel, byte-identical to before. */}

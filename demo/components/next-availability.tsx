@@ -14,7 +14,7 @@ function dayLabel(ms: number): string {
 
 // The shared empty-state for any "find a time" demo. It sits as a semi-transparent overlay ON TOP of
 // the still-rendered empty day (the blank timeline shows through), and surfaces the soonest opening as
-// an explicit, labelled button — never a silent date jump, so it's always clear the opening is a
+// an explicit, labelled button, never a silent date jump, so it's always clear the opening is a
 // different day, not today. The parent must be position:relative.
 export function NextAvailability({
   resourceIds,

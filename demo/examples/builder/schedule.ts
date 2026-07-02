@@ -1,5 +1,5 @@
-// The weekly-availability model shared by the builder UI and its seed. Pure helpers only — no
-// server imports — so both the client editor and the "use server" seed can use it.
+// The weekly-availability model shared by the builder UI and its seed. Pure helpers only, no
+// server imports, so both the client editor and the "use server" seed can use it.
 
 export interface TimeRange {
   start: string; // "HH:MM"
@@ -48,7 +48,7 @@ export function weekToRanges(week: WeekHours): { dow: number; startTime: string;
 const pad = (n: number) => String(n).padStart(2, "0");
 const toDateStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-/** Four weeks from today — the window the recurrence is expanded over. */
+/** Four weeks from today, the window the recurrence is expanded over. */
 export function builderDateRange(): { fromDate: string; toDate: string } {
   const from = new Date();
   from.setHours(0, 0, 0, 0);
@@ -75,7 +75,7 @@ export const TIME_OPTIONS: string[] = Array.from({ length: 48 }, (_, i) => {
 
 /** Rebuild the weekly editor state from the concrete rules deltat stores, so the editor always
  * reflects what is actually saved. Each weekday's distinct time-of-day ranges are collected once
- * (the same range repeats every week). Blocking rules are ignored — this edits open hours only. */
+ * (the same range repeats every week). Blocking rules are ignored, this edits open hours only. */
 export function rulesToWeek(rules: { start: number; end: number; blocking?: boolean }[]): WeekHours {
   const week: WeekHours = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
   const seen: Record<number, Set<string>> = { 0: new Set(), 1: new Set(), 2: new Set(), 3: new Set(), 4: new Set(), 5: new Set(), 6: new Set() };

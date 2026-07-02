@@ -76,7 +76,7 @@ export default function MeetExample() {
       return Array.from({ length: HORIZON_DAYS }, (_, i) => (free.has(i) ? "free" : "busy"));
     });
 
-    // Largest shared window per day — the "Everyone" row and its day count derive from these, so they
+    // Largest shared window per day, the "Everyone" row and its day count derive from these, so they
     // react to the duration toggle without re-reading.
     const windowByDay: (DayWindow | undefined)[] = Array.from({ length: HORIZON_DAYS });
     for (const s of combined) {

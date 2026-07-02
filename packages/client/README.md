@@ -41,13 +41,13 @@ const slots = await dt.availability.get({
 
 ## API
 
-- **`resources`** — hierarchical create/update/delete/get
-- **`rules`** — batch `create(items[])`, update, delete, get (open hours and blocked windows)
-- **`bookings`** — batch `create(items[])`, cancel, get with an optional `{start, end}` filter
-- **`holds`** — place, release, get with an optional `{start, end}` filter
-- **`availability`** — single- and multi-resource queries (`min_available` for "any k of N free")
-- **`events`** — real-time LISTEN/NOTIFY subscriptions
-- **`expandRecurrence()`** — expand a recurring pattern (days of week, time range, date range, excludes) into concrete rule segments
+- **`resources`**: hierarchical create/update/delete/get
+- **`rules`**: batch `create(items[])`, update, delete, get (open hours and blocked windows)
+- **`bookings`**: batch `create(items[])`, cancel, get with an optional `{start, end}` filter
+- **`holds`**: place, release, get with an optional `{start, end}` filter
+- **`availability`**: single- and multi-resource queries (`min_available` for "any k of N free")
+- **`events`**: real-time LISTEN/NOTIFY subscriptions
+- **`expandRecurrence()`**: expand a recurring pattern (days of week, time range, date range, excludes) into concrete rule segments
 
 All times are Unix milliseconds. Intervals are half-open `[start, end)`; adjacent intervals do not collide.
 

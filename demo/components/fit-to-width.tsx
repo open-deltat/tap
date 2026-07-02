@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * Scales its children DOWN (never up) so their natural width fits the parent, preserving aspect
- * ratio — so a fixed-size grid (e.g. a seat map) shrinks to fit a phone while every cell keeps the
+ * ratio, so a fixed-size grid (e.g. a seat map) shrinks to fit a phone while every cell keeps the
  * exact same shape. When the parent is at least as wide as the content (desktop), the scale is 1, a
  * no-op: the transform is identity and the reserved height equals the natural height, so desktop
  * renders byte-identical. Centering matches the surrounding `items-center` layout via flex.

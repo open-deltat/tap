@@ -14,7 +14,7 @@ export interface BookHeldSeatsInput {
  *
  * deltat's conflict check treats an active hold as a conflict, so booking a seat that
  * still carries its own hold makes the atomic `batch_confirm_bookings` reject the whole
- * batch — and the booking silently fails to persist. The holds must therefore be released
+ * batch, and the booking silently fails to persist. The holds must therefore be released
  * BEFORE the booking, awaited in order, so the outcome is deterministic rather than a race
  * against an unawaited socket-close release.
  *
@@ -41,13 +41,13 @@ export async function releaseHoldsThenBook(
 
   // Mirror to the personal calendar as a best-effort REFLECTION, in a SEPARATE booking.
   // It must never be able to roll back the seat booking: the shared calendar is capacity-1,
-  // so it conflicts whenever you already have something at this time — which must not stop
+  // so it conflicts whenever you already have something at this time, which must not stop
   // you from holding a seat. A conflict here just means "already on your calendar".
   if (calendar) {
     try {
       await dt.bookings.create([{ resourceId: calendar.resourceId, start, end, label: calendar.label }]);
     } catch {
-      // calendar already occupied at this time — the seat booking still stands
+      // calendar already occupied at this time, the seat booking still stands
     }
   }
 

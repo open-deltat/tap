@@ -48,7 +48,7 @@ export function MeetLanes({
   for (let t = axisStart; t <= axisEnd; t += tickHours * 3_600_000) ticks.push(t);
 
   // One gridline every tick interval, drawn as a single repeating gradient so every line is exactly
-  // evenly spaced — per-element 1px dividers drift visibly from sub-pixel rounding.
+  // evenly spaced, per-element 1px dividers drift visibly from sub-pixel rounding.
   const tickPct = ((tickHours * 3_600_000) / range) * 100;
   const gridBg = `repeating-linear-gradient(to right, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 1px, transparent ${tickPct}%)`;
 
@@ -59,7 +59,7 @@ export function MeetLanes({
     const rect = e.currentTarget.getBoundingClientRect();
     const t = axisStart + ((e.clientX - rect.left) / rect.width) * range;
     // Snap to the nearest bookable start. Slots are drawn start→end and overlap (30-min steps), so
-    // matching by nearest start — not "first span containing t" — picks the slot the click is closest
+    // matching by nearest start (not "first span containing t") picks the slot the click is closest
     // to, and any click on the lane selects something (no dead zones near the edges).
     let best = intersectionSlots[0];
     let bestD = Math.abs(best.start - t);

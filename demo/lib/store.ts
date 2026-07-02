@@ -26,7 +26,7 @@ try {
     }
   }
 } catch {
-  // Corrupt or missing — start fresh
+  // Corrupt or missing: start fresh
 }
 
 function flush(): void {

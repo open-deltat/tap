@@ -2,7 +2,7 @@
  * Smoke test: the cross-schedule "2D math".
  *
  * Two people's calendars, each partly busy. We ask deltat for the times BOTH are free
- * (combined availability, minAvailable = 2 — the intersection), book a meeting in the
+ * (combined availability, minAvailable = 2, the intersection), book a meeting in the
  * overlap atomically on both calendars, and confirm the slot disappears from the overlap.
  * This exercises the real frontend path: @open-tap/client -> pgwire -> deltat engine.
  *
@@ -12,7 +12,7 @@ import { DeltaT } from "@open-tap/client";
 
 const PORT = Number(process.env.DELTAT_PORT ?? 5434);
 const H = 3_600_000;
-const D = 1_700_000_000_000; // a fixed instant — deterministic, no wall clock
+const D = 1_700_000_000_000; // a fixed instant, deterministic, no wall clock
 const at = (hour: number) => D + hour * H;
 const hrs = (ms: number) => (ms - D) / H;
 const fmt = (slots: { start: number; end: number }[]) =>
@@ -20,7 +20,7 @@ const fmt = (slots: { start: number; end: number }[]) =>
 
 let failures = 0;
 function check(name: string, cond: boolean, detail = "") {
-  console.log(`${cond ? "  ✓" : "  ✗ FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
+  console.log(`${cond ? "  ✓" : "  ✗ FAIL"} ${name}${detail ? `: ${detail}` : ""}`);
   if (!cond) failures++;
 }
 
@@ -72,7 +72,7 @@ try {
   }
   check("double-booking Alice 9–10 is rejected", conflicted);
 
-  console.log(`\n${failures === 0 ? "PASS — the 2D math works end-to-end." : `FAIL — ${failures} check(s) failed.`}\n`);
+  console.log(`\n${failures === 0 ? "PASS: the 2D math works end-to-end." : `FAIL: ${failures} check(s) failed.`}\n`);
 } finally {
   await dt.close();
 }

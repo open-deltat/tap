@@ -28,7 +28,7 @@ export class Rules {
       await this
         .sql`INSERT INTO rules (id, resource_id, start, "end", blocking) VALUES (${r.id}, ${r.resourceId}, ${r.start}, ${r.end}, ${r.blocking})`;
     } else {
-      // One multi-row INSERT — deltat now honors multi-row rule inserts (BatchInsertRules), so a
+      // One multi-row INSERT: deltat now honors multi-row rule inserts (BatchInsertRules), so a
       // 90-day schedule projection is a single round-trip instead of one INSERT per rule.
       const params: (string | number | boolean)[] = [];
       const valueRows: string[] = [];
@@ -46,7 +46,7 @@ export class Rules {
     return rules;
   }
 
-  // Replace a resource's open-hours (non-blocking) rules with `segments` — the cal.com-style
+  // Replace a resource's open-hours (non-blocking) rules with `segments`: the cal.com-style
   // "save my weekly hours" operation, mapped onto deltat primitives. Snapshots the existing
   // non-blocking rule ids, creates the new ones FIRST, then deletes the stale ones, so a mid-run
   // failure leaves the old hours (worst case: duplicate open rules, which merge in availability),

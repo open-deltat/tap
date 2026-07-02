@@ -86,7 +86,7 @@ export default function HotelPage() {
   }, []);
 
   // Live: every type bubbles to the hotel root, so one subscription re-reads occupancy whenever
-  // anyone books or cancels — debounced + ref-read so a burst coalesces with the latest types.
+  // anyone books or cancels, debounced + ref-read so a burst coalesces with the latest types.
   const typesRef = useRef(types);
   typesRef.current = types;
   const reloadTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -103,7 +103,7 @@ export default function HotelPage() {
     [selType, bookingsByType]
   );
 
-  // Per-night occupancy for the chosen type — validates the picked range and marks full nights.
+  // Per-night occupancy for the chosen type, validates the picked range and marks full nights.
   const occ = useMemo(() => occupancyByNight(selBookings), [selBookings]);
   const fullNights = useMemo(
     () => (selType ? bookedNightSets(selBookings, selType.capacity).full : []),
@@ -112,7 +112,7 @@ export default function HotelPage() {
 
   const cap = selType?.capacity ?? 1;
   const isFull = useCallback((t: number) => (occ.get(t)?.taken ?? 0) >= cap, [occ, cap]);
-  // First fully-booked night at or after `anchor` — the night you can't sleep, so it's the latest
+  // First fully-booked night at or after `anchor`: the night you can't sleep, so it's the latest
   // possible check-OUT (you leave that morning). null = no full night within the horizon.
   const firstFullFrom = useCallback(
     (anchor: number): number | null => {
@@ -151,7 +151,7 @@ export default function HotelPage() {
 
   // Two-anchor selection driven by the clicked day (not react-day-picker's range cycle, which
   // would keep `from` fixed when you click a later day and so freeze the amber boundary). While a
-  // check-in is set and you click a LATER open day, that's your check-out — clamped to the first
+  // check-in is set and you click a LATER open day, that's your check-out, clamped to the first
   // booked night (you leave that morning). Any other click re-anchors check-in, so the amber
   // "last bookable night" recomputes live on every pick.
   function onSelectRange(_sel: DateRange | undefined, triggerDate: Date) {
@@ -166,7 +166,7 @@ export default function HotelPage() {
       }
     }
     if (isFull(c)) {
-      toast.error("That night is booked — pick an open night to check in");
+      toast.error("That night is booked, pick an open night to check in");
       return;
     }
     setRange({ from: new Date(c) }); // fresh check-in → amber boundary recomputes
@@ -272,7 +272,7 @@ export default function HotelPage() {
         tray={tray}
       >
         <div className="grid grid-cols-1 gap-7 lg:grid-cols-2">
-          {/* Front desk — read-only occupancy overview + manage reservations */}
+          {/* Front desk: read-only occupancy overview + manage reservations */}
           <section>
             <header className="mb-4">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Front desk</h2>
@@ -322,7 +322,7 @@ export default function HotelPage() {
           </div>
         </section>
 
-          {/* Book a stay — pick a room, pick your dates, we validate against availability */}
+          {/* Book a stay: pick a room, pick your dates, we validate against availability */}
           <section>
             <header className="mb-4">
               <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Book a stay</h2>
@@ -349,7 +349,7 @@ export default function HotelPage() {
               />
             </div>
 
-          {/* Instant finders — the SYNC-01 capability surfaced as one-tap helpers */}
+          {/* Instant finders: the SYNC-01 capability surfaced as one-tap helpers */}
           <div className="mb-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -367,7 +367,7 @@ export default function HotelPage() {
             </button>
           </div>
 
-          {/* Range picker — two months; booked nights struck through, the check-out boundary amber */}
+          {/* Range picker: two months; booked nights struck through, the check-out boundary amber */}
           <div className="flex justify-center rounded-lg border border-white/10 bg-white/[0.02] p-2 [color-scheme:dark]">
             <Calendar
               mode="range"

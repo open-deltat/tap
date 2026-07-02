@@ -29,7 +29,7 @@ export async function GET(
 
   // Free-busy only: this feed is an unauthenticated public URL, so never emit
   // booking labels (PII). A published calendar shows *when* a resource is busy,
-  // not what for — matches the deltat export contract (ADAPTERS.md, lossy-by-design).
+  // not what for, matches the deltat export contract (ADAPTERS.md, lossy-by-design).
   const events: IcsEvent[] = bookings.map((b) => ({
     uid: `${b.id}@deltat`,
     start: b.start,
@@ -51,7 +51,7 @@ export async function GET(
   const name = resource.name ?? `deltat ${resourceId.slice(0, 8)}`;
   const body = renderCalendar({
     name,
-    description: "Published by deltat — deltat is the source of truth.",
+    description: "Published by deltat. deltat is the source of truth.",
     events,
     now,
   });

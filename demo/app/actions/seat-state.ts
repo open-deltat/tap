@@ -14,7 +14,7 @@ export interface SeatStateMaps {
 /**
  * Everything a seat map needs in ONE round-trip. The three reads run concurrently server-side, so
  * the client pays a single browser→server hop instead of three. (Next serializes separate server
- * actions, so the previous Promise.all of three actions cost three sequential round-trips — that
+ * actions, so the previous Promise.all of three actions cost three sequential round-trips, that
  * was the real latency, not the queries, which the engine answers in single-digit ms.)
  */
 export async function getSeatState(

@@ -9,7 +9,7 @@ import { trackBookings } from "./lib/session-bookings";
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT || "3000", 10);
 
-// Stream guard (server-authoritative — a browser timer can't be trusted). Each /ws stream is closed
+// Stream guard (server-authoritative, a browser timer can't be trusted). Each /ws stream is closed
 // after STREAM_MAX_AGE_MS so nobody can squat a live connection; the client is warned
 // STREAM_WARN_MS before so it can offer a one-tap "keep watching". Per-IP / total caps bound a
 // flood. 0 disables a limit. (deltat has its own per-connection guard for direct-pgwire attackers;
@@ -21,8 +21,8 @@ const MAX_WS_PER_IP = parseInt(process.env.MAX_WS_PER_IP || "20", 10);
 const MAX_WS_TOTAL = parseInt(process.env.MAX_WS_TOTAL || "800", 10);
 const POLICY_CLOSE = 4002; // app-defined close code: "closed by server stream policy" (don't auto-reconnect)
 // X-Forwarded-For is only trustworthy behind a proxy that overwrites it. The shipped compose
-// publishes port 3000 directly, so default to OFF and key the per-IP cap on the real socket address
-// — otherwise a single host forges a fresh XFF per upgrade and walks past MAX_WS_PER_IP.
+// publishes port 3000 directly, so default to OFF and key the per-IP cap on the real socket address,
+// otherwise a single host forges a fresh XFF per upgrade and walks past MAX_WS_PER_IP.
 const TRUST_PROXY = process.env.TRUST_PROXY === "1" || process.env.TRUST_PROXY === "true";
 
 const wsIp = new WeakMap<WebSocket, string>();

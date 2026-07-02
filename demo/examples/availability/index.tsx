@@ -69,7 +69,7 @@ export default function AvailabilityExample() {
   const windowStartMs = windowStart.getTime();
   const windowEndMs = windowEnd.getTime() + 86_400_000;
 
-  // Which days across the window have any bookable slot — used to grey out empty days (weekends,
+  // Which days across the window have any bookable slot, used to grey out empty days (weekends,
   // blocked days) in the picker so you can't land on a day with nothing open.
   const loadAvailableDays = useCallback(
     async (id: string): Promise<Set<number>> => {
@@ -199,7 +199,7 @@ export default function AvailabilityExample() {
     <>
       <Stage primitive={{ label: "Free time is open hours minus busy", specId: "AVAIL-01" }} title={NAME} contentMax="max-w-3xl" tray={tray}>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-[auto_1fr]">
-          {/* Date picker — greyed days have nothing open */}
+          {/* Date picker: greyed days have nothing open */}
           <div className="sm:border-r sm:border-white/[0.06] sm:pr-5 [color-scheme:dark]">
             <Calendar
               mode="single"

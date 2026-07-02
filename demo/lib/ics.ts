@@ -1,6 +1,6 @@
 /** RFC 5545 (iCalendar) serializer for publishing deltat spans as a subscribable feed.
  *  deltat Spans are half-open [start, end) in Unix ms, and RFC 5545 §3.8.2.2 defines DTEND as
- *  non-inclusive — so `end` maps to DTEND directly, with no ±1s adjustment (a classic importer bug). */
+ *  non-inclusive, so `end` maps to DTEND directly, with no ±1s adjustment (a classic importer bug). */
 
 export interface IcsEvent {
   uid: string;

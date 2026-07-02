@@ -17,7 +17,7 @@ const MAX_HORIZON_DAYS = 90;
 /**
  * The soonest opening at/after `from`, looking forward over a horizon. Because deltat's availability
  * query is already forward-looking, "the next available day" is just the day of the first returned
- * slot — one query, no day-by-day probing. Naturally handles weekends/days off (no rules that day)
+ * slot: one query, no day-by-day probing. Naturally handles weekends/days off (no rules that day)
  * and fully-booked days (today's slots are subtracted away, so the first free slot is later).
  *
  * Returns null when nothing is open within the horizon, so callers can show a graceful empty state.

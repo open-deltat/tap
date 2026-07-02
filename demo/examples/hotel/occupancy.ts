@@ -15,7 +15,7 @@ function nightStart(ms: number): number {
 
 /**
  * Tally rooms taken per NIGHT. A stay [check-in, check-out) sleeps the nights of its check-in day
- * through the day before check-out — independent of the actual check-in/out clock times (3 PM /
+ * through the day before check-out, independent of the actual check-in/out clock times (3 PM /
  * 11 AM), because we key by the check-in DATE and stop before the check-out date. So the nights
  * occupied are [date(check-in) .. date(check-out)), and the checkout morning never consumes a night.
  * (Date-cursor iteration, so it's DST-safe.)
@@ -23,7 +23,7 @@ function nightStart(ms: number): number {
 export function occupancyByNight(bookings: Booking[]): Map<number, NightOccupancy> {
   const nights = new Map<number, NightOccupancy>();
   for (const b of bookings) {
-    const endNight = nightStart(b.end); // check-out date — NOT slept
+    const endNight = nightStart(b.end); // check-out date, NOT slept
     const cursor = new Date(nightStart(b.start));
     while (cursor.getTime() < endNight) {
       const t = cursor.getTime();
@@ -44,7 +44,7 @@ export interface StableOpening {
 
 /**
  * SYNC-01 in the UI: find runs of `>= minNights` consecutive nights where occupancy stays below
- * capacity — i.e. a guest can book the WHOLE run on a single stable room without switching. This
+ * capacity, i.e. a guest can book the WHOLE run on a single stable room without switching. This
  * is just the per-night occupancy from the capacity sweep, scanned for long-enough open runs;
  * deltat already guarantees a booking that fits such a run lands on one room.
  */

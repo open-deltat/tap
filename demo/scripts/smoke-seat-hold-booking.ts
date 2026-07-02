@@ -22,7 +22,7 @@ const expiresAtMs = Date.now() + 300_000;
 
 let failures = 0;
 function check(name: string, condition: boolean, detail = "") {
-  console.log(`${condition ? "  ✓" : "  ✗ FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
+  console.log(`${condition ? "  ✓" : "  ✗ FAIL"} ${name}${detail ? `: ${detail}` : ""}`);
   if (!condition) failures++;
 }
 
@@ -74,7 +74,7 @@ try {
   check("seat C stays unbooked after the rejected batch", (await bookedCount(seatC)) === 0);
 
   // 3. A personal-calendar mirror that's ALREADY occupied at the slot must NOT block the
-  //    seat booking — the mirror is best-effort, the seats still persist.
+  //    seat booking, the mirror is best-effort, the seats still persist.
   const calendar = await freshOpenSeat("smoke-calendar");
   await dt.bookings.create([{ resourceId: calendar, start: START_MS, end: END_MS, label: "busy" }]); // pre-occupy
   const seatE = await freshOpenSeat("smoke-E");
@@ -88,7 +88,7 @@ try {
   });
   check("seat persists even when the calendar mirror conflicts", (await bookedCount(seatE)) === 1);
 
-  console.log(failures === 0 ? "\nPASS — hold→book persists.\n" : `\nFAIL — ${failures} check(s) failed.\n`);
+  console.log(failures === 0 ? "\nPASS: hold→book persists.\n" : `\nFAIL: ${failures} check(s) failed.\n`);
 } finally {
   await dt.close();
 }

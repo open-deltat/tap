@@ -1,4 +1,4 @@
-// Pure geometry for the canvas stadium. No React, no DOM — just the math that maps
+// Pure geometry for the canvas stadium. No React, no DOM, just the math that maps
 // sections onto concentric oval rings and converts between world/screen/section-local
 // frames. Kept separate so hit-testing and drawing share one source of truth.
 
@@ -15,12 +15,12 @@ export interface Transform {
 }
 
 // Discrete zoom ladder. Index into LEVELS, not a free scale.
-//   L0 Overview   — whole stadium fits, sections as blocks, no seats
-//   L1 Close-up   — one step in, bigger blocks, still no seats
-//   L2 Seats      — seats appear (this is SEAT_THRESHOLD)
-//   L3 Seats      — seats appear (this is SEAT_THRESHOLD)
-//   L4 Individual — one more step, seats large/clear
-//   L5 Seat IDs   — deepest step: seats big enough to carry a row/seat label
+//   L0 Overview   - whole stadium fits, sections as blocks, no seats
+//   L1 Close-up   - one step in, bigger blocks, still no seats
+//   L2 Seats      - seats appear (this is SEAT_THRESHOLD)
+//   L3 Seats      - seats appear (this is SEAT_THRESHOLD)
+//   L4 Individual - one more step, seats large/clear
+//   L5 Seat IDs   - deepest step: seats big enough to carry a row/seat label
 // The default (level 0) is the most zoomed-out "Stadium" view, centered with margin.
 export const SEAT_LEVEL = 3;
 
@@ -29,11 +29,11 @@ export const SEAT_LEVEL = 3;
 export function zoomLevels(viewW: number, viewH: number): number[] {
   const fit = fitScale(viewW, viewH);
   const l0 = Math.min(fit, SEAT_THRESHOLD * 0.5); // never start already near seats
-  const lWide = l0 * 0.72; // one more step out — the default, centered with margin
+  const lWide = l0 * 0.72; // one more step out, the default, centered with margin
   const l2 = SEAT_THRESHOLD;
   const l1 = Math.sqrt(l0 * l2); // geometric midpoint feels even between steps
   const l3 = SEAT_THRESHOLD * 1.6;
-  const l4 = SEAT_THRESHOLD * 3.5; // individual seats — large enough for an ID label
+  const l4 = SEAT_THRESHOLD * 3.5; // individual seats, large enough for an ID label
   return [lWide, l0, l1, l2, l3, l4];
 }
 
@@ -88,7 +88,7 @@ export interface SectionFrame {
   cx: number; // center in world space
   cy: number;
   angle: number; // rotation of the local frame (radians)
-  w: number; // local width  (tangential — seats per row spread along this)
+  w: number; // local width  (tangential, seats per row spread along this)
   h: number; // local height (radial)
 }
 
@@ -119,7 +119,7 @@ export function sectionFrame(
   const mid = (inner + outer) / 2;
   const theta = ((idx + 0.5) / ringCount) * Math.PI * 2 - Math.PI / 2;
 
-  // Ellipse aspect — stretches the ring horizontally to match the oval field.
+  // Ellipse aspect: stretches the ring horizontally to match the oval field.
   const aspect = FIELD.rx / FIELD.ry;
   const cx = FIELD.cx + mid * aspect * Math.cos(theta);
   const cy = FIELD.cy + mid * Math.sin(theta);
@@ -151,7 +151,7 @@ export function pointInRect(r: Rect, x: number, y: number): boolean {
   return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 }
 
-// Axis-aligned world bounding box of a rotated section frame — for cheap viewport culling.
+// Axis-aligned world bounding box of a rotated section frame, for cheap viewport culling.
 export function frameWorldBBox(f: SectionFrame): Rect {
   const hw = f.w / 2;
   const hh = f.h / 2;

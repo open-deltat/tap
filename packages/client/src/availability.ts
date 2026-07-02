@@ -32,7 +32,7 @@ export class Availability {
   }): Promise<AvailabilitySlot[]> {
     if (opts.resourceIds.length === 0) return [];
 
-    // Parameterized like every other SDK builder — never string-splice ids/values into SQL.
+    // Parameterized like every other SDK builder: never string-splice ids/values into SQL.
     const minAvail = opts.minAvailable ?? opts.resourceIds.length;
     const values: (string | number)[] = [...opts.resourceIds];
     const idPlaceholders = opts.resourceIds.map((_, i) => `$${i + 1}`).join(", ");
@@ -51,7 +51,7 @@ export class Availability {
     return rows.map(mapSlot);
   }
 
-  // Per-resource availability for several resources in ONE round-trip, grouped by resource id —
+  // Per-resource availability for several resources in ONE round-trip, grouped by resource id,
   // the analog of bookings/holds getMany. Omitting min_available routes to the engine's
   // per-resource path (rows tagged with resource_id), unlike getCombined which merges the set.
   async getMany(opts: {
@@ -64,7 +64,7 @@ export class Availability {
     for (const id of opts.resourceIds) grouped[id] = [];
     if (opts.resourceIds.length === 0) return grouped;
 
-    // Parameterized like every other SDK builder — never string-splice ids/values into SQL.
+    // Parameterized like every other SDK builder: never string-splice ids/values into SQL.
     const values: (string | number)[] = [...opts.resourceIds];
     const idPlaceholders = opts.resourceIds.map((_, i) => `$${i + 1}`).join(", ");
     const startParam = values.push(opts.start);

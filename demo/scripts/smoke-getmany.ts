@@ -18,7 +18,7 @@ const N = 40;
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail = "") => {
-  console.log(`${ok ? "  ✓" : "  ✗ FAIL"} ${name}${detail ? ` — ${detail}` : ""}`);
+  console.log(`${ok ? "  ✓" : "  ✗ FAIL"} ${name}${detail ? `: ${detail}` : ""}`);
   if (!ok) failures++;
 };
 
@@ -78,7 +78,7 @@ try {
   console.log(
     `\n  fan-out ${N} queries: ${fanMs.toFixed(1)} ms   |   getMany 1 query: ${manyMs.toFixed(1)} ms   |   ${(fanMs / manyMs).toFixed(1)}x faster\n`
   );
-  console.log(failures === 0 ? "PASS — getMany is correct and batched.\n" : `FAIL — ${failures} check(s) failed.\n`);
+  console.log(failures === 0 ? "PASS: getMany is correct and batched.\n" : `FAIL: ${failures} check(s) failed.\n`);
 } finally {
   await dt.close();
 }

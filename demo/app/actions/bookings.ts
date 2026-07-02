@@ -14,7 +14,7 @@ async function recordMine(bookings: Booking[]): Promise<void> {
     const sid = await getSessionId();
     if (sid) trackBookings(sid, bookings, Date.now());
   } catch {
-    /* no session cookie (e.g. a script) — nothing to track */
+    /* no session cookie (e.g. a script), nothing to track */
   }
 }
 

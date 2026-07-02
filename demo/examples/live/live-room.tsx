@@ -52,12 +52,12 @@ const ACCENT = {
 type Accent = keyof typeof ACCENT;
 
 /**
- * The same cinema showtime rendered as TWO independent bookers — "You" and "Viewer 1". Each is a
+ * The same cinema showtime rendered as TWO independent bookers: "You" and "Viewer 1". Each is a
  * fully separate client instance: its own venue subscription, its own seat-state read, its own
  * holds (open WS = hold, close = release) and its own atomic booking. Neither is read-only.
  *
  * Because both subscribe to the venue, any hold/booking on one emits a deltat NOTIFY that the other
- * re-reads from — so the other's holds show up amber within a moment, and if both grab the very same
+ * re-reads from, so the other's holds show up amber within a moment, and if both grab the very same
  * seat the loser's hold is rejected. This is the holds + race-condition + streaming demo in its
  * truest form: two real users racing on one source of truth.
  */
@@ -242,7 +242,7 @@ function Booker({
     };
     ws.onerror = revert;
     // The server rejects a hold with a {type:"error"} MESSAGE (not a transport error), so onerror
-    // never fires — without this the optimistic selection sticks on a seat that's actually taken.
+    // never fires, without this the optimistic selection sticks on a seat that's actually taken.
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(String(event.data));
@@ -252,7 +252,7 @@ function Booker({
           toast.error("That seat was just taken");
         }
       } catch {
-        // deltat event frame / non-JSON — ignore
+        // deltat event frame / non-JSON, ignore
       }
     };
     holdWsRef.current.set(seatId, ws);
@@ -405,7 +405,7 @@ function PerfBar({ perf }: { perf: { read?: number; book?: number; live?: number
         >
           <span className="text-[9px] text-zinc-500">{s.label}</span>
           <span className="font-mono text-[10px] font-semibold tabular-nums text-emerald-300">
-            {s.value != null ? fmtMs(s.value) : "—"}
+            {s.value != null ? fmtMs(s.value) : "n/a"}
           </span>
         </span>
       ))}

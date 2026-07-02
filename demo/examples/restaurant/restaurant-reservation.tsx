@@ -58,7 +58,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
   const [barSelected, setBarSelected] = useState(false);
   const [result, setResult] = useState<BookingResult | null>(null);
 
-  // Tables that fit the party + the bar — re-fetched when party size changes.
+  // Tables that fit the party + the bar, re-fetched when party size changes.
   useEffect(() => {
     getTablesForPartySize(restaurantId, partySize)
       .then(setTables)

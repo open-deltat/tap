@@ -14,7 +14,7 @@ function toDateStr(d: Date): string {
 
 /**
  * Replace the calendar's recurring open hours: expand the weekly pattern into concrete non-blocking
- * Rules over a 90-day horizon (the kernel never sees a recurrence pattern — EDGE-03). New hours are
+ * Rules over a 90-day horizon (the kernel never sees a recurrence pattern, EDGE-03). New hours are
  * added before the previous ones are removed, so a mid-run failure leaves the old schedule intact
  * rather than an empty one; duplicate open rules merge in availability. Blocking rules and bookings
  * are untouched.
@@ -37,6 +37,6 @@ export async function projectScheduleToRules(
   });
 
   // Shared with the demo's setWeeklyAvailability: snapshot existing open hours, create the new
-  // ones first, then delete the stale — so a mid-run failure never empties the schedule.
+  // ones first, then delete the stale, so a mid-run failure never empties the schedule.
   await dt.rules.replaceOpenHours(resourceId, segments);
 }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ACCENT_CTA } from "@/lib/accent";
 
-// The one and only "commit" button — the action that lives in the Stage tray on every example, so the
+// The one and only "commit" button: the action that lives in the Stage tray on every example, so the
 // booker looks and sits the same everywhere. `loading` swaps the label for a spinner and disables it.
 export function BookButton({
   children,

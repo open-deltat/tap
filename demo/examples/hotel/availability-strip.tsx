@@ -10,7 +10,7 @@ const fmt = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: 
 
 /**
  * A compact 30-night availability timeline for one room type: each night a bar (emerald = free,
- * amber = partly booked, rose = full), and below it the open WINDOWS — "available X → Y · Nn" —
+ * amber = partly booked, rose = full), and below it the open WINDOWS: "available X → Y · Nn",
  * the inverse of occupancy. Pass `onPick` to make the windows clickable (booking side); leave it
  * out for a read-only manager view. `minNights` filters/labels to stays of at least that length.
  */
@@ -49,7 +49,7 @@ export function AvailabilityStrip({
 
   return (
     <div>
-      {/* One column per night; each column is a stack of `capacity` pips (one per room) — booked
+      {/* One column per night; each column is a stack of `capacity` pips (one per room), booked
           rooms (rose) fill from the bottom, open rooms (emerald) on top. So you SEE "3 of 5 taken"
           without needing the word "partial". */}
       <div className="flex h-8 items-stretch gap-px">

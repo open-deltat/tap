@@ -42,7 +42,7 @@ export async function ensureHotel(): Promise<{ rootId: string; rooms: HotelRoomT
     // [day 15:00, (day+nights) 11:00). occupancyByNight keys by date, so it still counts exactly
     // `nights` nights and the checkout morning frees the room.
     const bookStays = async (id: string, stays: [number, number][]) => {
-      // Sequential single bookings — the capacity sweep accepts overlaps up to N per type.
+      // Sequential single bookings: the capacity sweep accepts overlaps up to N per type.
       for (const [off, nights] of stays) {
         await dt.bookings.create([
           {

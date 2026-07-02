@@ -15,7 +15,7 @@ import {
 const NAME = "Cineplex Odeon";
 
 // A multiplex: one cinema, four screens. Each screen shows a different film on its OWN
-// showtimes (a per-resource schedule), with its own seating — the deltat tree models this
+// showtimes (a per-resource schedule), with its own seating, the deltat tree models this
 // as Cinema → Screen → Seats, where seats inherit their screen's showtimes.
 const SCREENS = [
   { film: "Dune: Part Two", firstShow: 12, price: 17 },
@@ -29,7 +29,7 @@ const RUNTIME = 150; // minutes
 // Returns the SCREEN ids (not the cinema root): each screen is its own "venue" in the seat
 // booker, so its two showtimes become the selectable slot pills. Booking against the cinema
 // root instead would use its 08:00–01:00 umbrella window, under which no seat is free for the
-// whole slot — which is why every seat used to read unavailable.
+// whole slot, which is why every seat used to read unavailable.
 export async function seedCinema(): Promise<string[]> {
   const existing = await findRootByName(NAME);
   if (existing) {

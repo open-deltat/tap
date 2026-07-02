@@ -193,7 +193,7 @@ export default function BuilderExample() {
   });
 
   // Auto-fit the axis to the hours actually used this week (first availability to last), padded to
-  // whole hours, plus an hour ruler — so the strip zooms to the data instead of always showing 0-24h.
+  // whole hours, plus an hour ruler, so the strip zooms to the data instead of always showing 0-24h.
   const HOUR = 3_600_000;
   const allBoxes = stripRows.flatMap((r) => r.boxes);
   const lo = allBoxes.length ? Math.floor(Math.min(...allBoxes.map((b) => b.start)) / HOUR) * HOUR : 8 * HOUR;

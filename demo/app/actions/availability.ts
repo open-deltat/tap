@@ -16,7 +16,7 @@ export async function getMultiResourceAvailability(
   start: number,
   end: number
 ): Promise<Record<string, AvailabilitySlot[]>> {
-  // One round-trip (IN-clause) instead of one query per resource — this is the seat-map hot path,
+  // One round-trip (IN-clause) instead of one query per resource, this is the seat-map hot path,
   // re-run on every NOTIFY, so the fan-out mattered.
   return dt.availability.getMany({ resourceIds, start, end });
 }

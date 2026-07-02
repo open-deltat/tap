@@ -8,7 +8,7 @@ const NAME = "Downtown Garage";
 
 // A zone is ONE capacity-N resource (N = spots in the zone). Booking one car is one booking
 // on the zone; the engine's capacity sweep blocks the (N+1)th overlapping booking. Floors are
-// purely structural parents — only zones carry capacity.
+// purely structural parents, only zones carry capacity.
 const FLOORS: { name: string; zones: { name: string; capacity: number; price: number }[] }[] = [
   {
     name: "Floor 1 · Street",
@@ -55,7 +55,7 @@ export async function seedParking(): Promise<string[]> {
 
   // Open 24/7, inherited by every zone. dur 1440 (a full day) so consecutive days abut and merge
   // into one continuous window; 1439 left a 1-minute gap at every midnight, so any window crossing
-  // midnight (an evening park, or "All day" from the afternoon) found no covering slot — every zone
+  // midnight (an evening park, or "All day" from the afternoon) found no covering slot, every zone
   // wrongly read "closed".
   await addSchedule(garage.id, base, 30, daily([{ h: 0, m: 0, dur: 1440 }]));
 

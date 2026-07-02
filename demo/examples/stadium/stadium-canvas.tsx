@@ -32,13 +32,13 @@ export interface CanvasSection {
 }
 
 // Result of clicking the canvas while zoomed into seats: a single seat cell to toggle.
-// Clicks while zoomed out (Overview/Close-up) are ignored — zoom changes only via wheel/buttons.
+// Clicks while zoomed out (Overview/Close-up) are ignored, zoom changes only via wheel/buttons.
 export type CanvasHit = { kind: "cell"; section: CanvasSection; cell: number };
 
-// Availability ramp + categories — the one source of truth for both the canvas and the legend.
+// Availability ramp + categories: the one source of truth for both the canvas and the legend.
 // On-theme with the rest of the app's tone map: emerald = plenty free, amber = filling,
 // rose = nearly full, dark zinc = sold out. Premium boxes are a brighter mint so they read as
-// special; a picked seat is the seats you're holding — violet fill + white ring, matching the
+// special; a picked seat is the seats you're holding, violet fill + white ring, matching the
 // "Holding (you)" tone used across the seat-map examples.
 export const LEGEND_COLORS = {
   plenty: "#10b981", // emerald-500
@@ -46,7 +46,7 @@ export const LEGEND_COLORS = {
   nearlyFull: "#f43f5e", // rose-500
   premium: "#6ee7b7", // emerald-300 (premium box)
   soldOut: "#27272a", // zinc-800
-  selection: "#8b5cf6", // violet-500 — the seats you are holding
+  selection: "#8b5cf6", // violet-500, the seats you are holding
 } as const;
 
 const COLORS = {
@@ -111,7 +111,7 @@ export function StadiumCanvas({
   const selCellsRef = useRef(selectedCells);
   selCellsRef.current = selectedCells;
 
-  // Cached frames keyed by section id — geometry is stable for a given layout.
+  // Cached frames keyed by section id, geometry is stable for a given layout.
   const framesRef = useRef(new Map<string, ReturnType<typeof sectionFrame>>());
   useEffect(() => {
     const m = new Map<string, ReturnType<typeof sectionFrame>>();
@@ -295,7 +295,7 @@ export function StadiumCanvas({
     const sx = clientX - rect.left;
     const sy = clientY - rect.top;
     const t = tRef.current;
-    // Clicks only do something at the seat LOD — they never change zoom.
+    // Clicks only do something at the seat LOD, they never change zoom.
     if (t.scale < SEAT_THRESHOLD) return;
     const [wx, wy] = screenToWorld(t, sx, sy);
 
@@ -374,7 +374,7 @@ function drawSeats(
   ctx.globalAlpha = 1;
 
   // Deepest zoom: stamp each bookable seat's id (e.g. "B5"), upright. Counter-rotate the frame
-  // once, then place every label at its cell-center mapped back through the section's rotation —
+  // once, then place every label at its cell-center mapped back through the section's rotation,
   // cheaper than a save/rotate per cell. Only when cells are large enough to read.
   const cellScreen = Math.min(cw, ch) * t.scale;
   if (cellScreen > 22) {
@@ -400,7 +400,7 @@ function drawSeats(
 }
 
 // Section name, drawn upright (counter-rotating the section frame so text never reads sideways
-// around the oval) and fading in as the block grows on screen — present at the Close-up level,
+// around the oval) and fading in as the block grows on screen, present at the Close-up level,
 // gone once we switch to drawing seats. Gated on on-screen width so tiny far blocks stay clean.
 function drawSectionLabel(
   ctx: CanvasRenderingContext2D,
@@ -411,7 +411,7 @@ function drawSectionLabel(
 ) {
   if (!s.name) return;
   // Show labels from the close-up level up, so EVERY section is labelled at once (not just the big
-  // ones) — below that they'd be unreadable. Each label is scaled to fit its section's width.
+  // ones), below that they'd be unreadable. Each label is scaled to fit its section's width.
   if (t.scale < SEAT_THRESHOLD * 0.34) return;
   const screenW = r.w * t.scale;
   const fitPx = (screenW * 0.84) / Math.max(1, s.name.length * 0.58);

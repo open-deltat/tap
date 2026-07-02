@@ -46,4 +46,4 @@ for (const line of foldedIcs.split("\r\n")) {
 const unfolded = foldedIcs.split("\r\n ").join("");
 assert(unfolded.includes(`SUMMARY:${longSummary}`), "multibyte summary survives folding intact");
 
-console.log("OK — ics serializer");
+console.log("OK: ics serializer");
