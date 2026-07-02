@@ -130,7 +130,6 @@ function SectionGrid({
 }) {
   const aisleAfter = getAisleAfter(grid.columns);
 
-  // Count stats
   const stats = useMemo(() => {
     let available = 0;
     let booked = 0;
@@ -146,7 +145,6 @@ function SectionGrid({
 
   return (
     <div className="flex flex-col items-center">
-      {/* Section header */}
       <div className="mb-2 text-center">
         <div className="text-sm font-semibold text-zinc-100">{section.name}</div>
         <div className="text-xs text-zinc-500">
@@ -158,7 +156,6 @@ function SectionGrid({
         </div>
       </div>
 
-      {/* Column headers */}
       <div className="flex items-center gap-0.5">
         <div className="w-7" />
         {grid.columns.map((col, ci) => (
@@ -174,7 +171,6 @@ function SectionGrid({
         ))}
       </div>
 
-      {/* Seat rows */}
       {grid.rows.map((row, ri) => (
         <div key={ri} className="flex items-center gap-0.5">
           <div className="w-7 text-right text-[10px] font-medium text-zinc-600 pr-0.5">
@@ -271,13 +267,11 @@ export function SeatMap({
   onBookingClick,
   onHoldClick,
 }: SeatMapProps) {
-  // Build grids for each section
   const grids = useMemo(
     () => sections.map((s) => buildGrid(s.seats)),
     [sections]
   );
 
-  // Compute per-seat status across all sections
   const seatStatus = useMemo(() => {
     const now = Date.now();
     const status = new Map<string, SeatStatus>();
@@ -331,7 +325,6 @@ export function SeatMap({
         </div>
       </FitToWidth>
 
-      {/* Legend */}
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 mt-2 text-xs text-zinc-500">
         <div className="flex items-center gap-1">
           <div className="w-3.5 h-3.5 rounded bg-emerald-500/15 border border-emerald-400/30" />

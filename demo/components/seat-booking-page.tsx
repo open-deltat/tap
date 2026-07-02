@@ -62,7 +62,6 @@ export function SeatBookingPage({
     holdWsRef.current.clear();
   }
 
-  // Load venue availability when venue/date changes
   useEffect(() => {
     if (!venueId || !date) return;
     const dayStart = new Date(`${date}T00:00`).getTime();
@@ -125,7 +124,6 @@ export function SeatBookingPage({
     setSelectedSeats(new Set());
   }, [selectedSlot]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cleanup hold connections on unmount
   useEffect(() => {
     return () => closeAllHolds();
   }, []);
@@ -142,7 +140,6 @@ export function SeatBookingPage({
   }, [selectedSlot, venueId, resources, loadSeatData, isPending]);
   useWebSocket(venueId ? { type: "subscribe", resourceId: venueId, onEvent: onWsEvent } : null);
 
-  // Seed on mount
   useEffect(() => {
     async function init() {
       try {
