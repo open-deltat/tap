@@ -32,4 +32,18 @@ const empty = renderCalendar({
 });
 assert(!empty.includes("BEGIN:VEVENT"), "zero-duration span dropped (kernel-inadmissible)");
 
+// Folding is measured in UTF-8 octets, not UTF-16 units: a non-ASCII summary must stay
+// <=75 octets per line and survive unfolding without a multibyte char being split.
+const encoder = new TextEncoder();
+const longSummary = "Café ".repeat(30) + "🎉".repeat(10);
+const foldedIcs = renderCalendar({
+  name: "x",
+  events: [{ uid: "f@deltat", start, end, summary: longSummary }],
+});
+for (const line of foldedIcs.split("\r\n")) {
+  assert(encoder.encode(line).length <= 75, "each folded line stays within 75 octets");
+}
+const unfolded = foldedIcs.split("\r\n ").join("");
+assert(unfolded.includes(`SUMMARY:${longSummary}`), "multibyte summary survives folding intact");
+
 console.log("OK — ics serializer");
