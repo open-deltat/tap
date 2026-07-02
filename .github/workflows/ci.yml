@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.8
+      - run: bun install --frozen-lockfile
+      # Regression guard for the SDK and shared date logic (bun runs *.test.ts natively).
+      - run: bun test
+      # The published SDK must stay compilable and must not ship test files in dist.
+      - run: cd packages/client && bun run build
