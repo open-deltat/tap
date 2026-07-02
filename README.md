@@ -4,14 +4,14 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@open-tap/client"><img src="https://img.shields.io/npm/v/@open-tap/client.svg?logo=npm" alt="npm"></a>
-  <a href="https://github.com/open-tap/tap/actions/workflows/ci.yml"><img src="https://github.com/open-tap/tap/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/open-deltat/tap/actions/workflows/ci.yml"><img src="https://github.com/open-deltat/tap/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://delt.at"><img src="https://img.shields.io/badge/site-delt.at-4fe3a3.svg" alt="delt.at"></a>
 </p>
 
 ---
 
-TAP is the client layer for [deltat](https://github.com/open-tap/deltat), a time-first scheduling database. It is a typed TypeScript SDK plus a set of demo apps that show what deltat can do: seat maps, calendars, capacity pools, recurring schedules, and hold-to-book flows with live updates.
+TAP is the client layer for [deltat](https://github.com/open-deltat/deltat), a time-first scheduling database. It is a typed TypeScript SDK plus a set of demo apps that show what deltat can do: seat maps, calendars, capacity pools, recurring schedules, and hold-to-book flows with live updates.
 
 deltat handles the hard part (availability, conflicts, capacity, holds, buffers) as collision detection on the Unix-time number line. TAP gives you a clean way to talk to it from TypeScript.
 

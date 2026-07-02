@@ -7,7 +7,7 @@
   "homepage": "https://delt.at",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/open-tap/tap.git",
+    "url": "git+https://github.com/open-deltat/tap.git",
     "directory": "packages/client"
   },
   "keywords": ["scheduling", "availability", "booking", "calendar", "deltat"],

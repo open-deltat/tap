@@ -27,7 +27,7 @@ issues we particularly care about:
   the server.
 
 Vulnerabilities in the deltat kernel itself (availability correctness, denial of service, tenant
-isolation) belong in the [deltat](https://github.com/open-tap/deltat) repository's security process.
+isolation) belong in the [deltat](https://github.com/open-deltat/deltat) repository's security process.
 
 ## Supported versions
 

@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 export DELTAT_PASSWORD="${DELTAT_PASSWORD:-secret}"
 
-DELTAT_REPO="https://github.com/open-tap/deltat"
+DELTAT_REPO="https://github.com/open-deltat/deltat"
 DELTAT_VERSION_CACHE="$HOME/.cache/deltat-version"
 
 # Find deltat binary: $DELTAT_BIN, PATH, or cargo install location
@@ -15,7 +15,7 @@ if [ -z "$DELTAT_BIN" ] && [ -f "$HOME/.cargo/bin/deltat" ]; then
 fi
 
 # Check if installed version matches remote
-REMOTE_VERSION=$(curl -sf "https://raw.githubusercontent.com/open-tap/deltat/main/VERSION" || echo "")
+REMOTE_VERSION=$(curl -sf "https://raw.githubusercontent.com/open-deltat/deltat/main/VERSION" || echo "")
 LOCAL_VERSION=$(cat "$DELTAT_VERSION_CACHE" 2>/dev/null || echo "")
 
 if [ -z "$DELTAT_BIN" ] || { [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; }; then

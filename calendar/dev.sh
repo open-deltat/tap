@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 export DELTAT_PASSWORD="${DELTAT_PASSWORD:-secret}"
 
-DELTAT_REPO="https://github.com/open-tap/deltat"
+DELTAT_REPO="https://github.com/open-deltat/deltat"
 DELTAT_VERSION_CACHE="$HOME/.cache/deltat-version"
 
 DELTAT_BIN="${DELTAT_BIN:-$(command -v deltat 2>/dev/null || echo "")}"
@@ -13,7 +13,7 @@ if [ -z "$DELTAT_BIN" ] && [ -f "$HOME/.cargo/bin/deltat" ]; then
     DELTAT_BIN="$HOME/.cargo/bin/deltat"
 fi
 
-REMOTE_VERSION=$(curl -sf "https://raw.githubusercontent.com/open-tap/deltat/main/VERSION" || echo "")
+REMOTE_VERSION=$(curl -sf "https://raw.githubusercontent.com/open-deltat/deltat/main/VERSION" || echo "")
 LOCAL_VERSION=$(cat "$DELTAT_VERSION_CACHE" 2>/dev/null || echo "")
 
 if [ -z "$DELTAT_BIN" ] || { [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; }; then

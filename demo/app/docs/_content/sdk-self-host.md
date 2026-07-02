@@ -72,7 +72,7 @@ The repository ships a `docker-compose.yaml` that brings up Δt and the demo tog
 ```yaml
 services:
   deltat:
-    build: https://github.com/open-tap/deltat.git#main
+    build: https://github.com/open-deltat/deltat.git#main
     ports:
       - "5433:5433"
     environment:

@@ -1,6 +1,6 @@
 # @open-tap/client
 
-TypeScript SDK for [deltat](https://github.com/open-tap/deltat), a time-allocation database.
+TypeScript SDK for [deltat](https://github.com/open-deltat/deltat), a time-allocation database.
 
 deltat speaks the PostgreSQL wire protocol (a transitional transport; a v2 framed protocol with
 HTTP and MCP adapters is planned), so this SDK connects with a standard Postgres client and exposes

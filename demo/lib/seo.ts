@@ -7,9 +7,9 @@ export const SITE = {
   url: "https://delt.at",
   name: "Δt",
   altNames: ["deltat", "delta t"],
-  org: "open-tap",
-  github: "https://github.com/open-tap",
-  deltatRepo: "https://github.com/open-tap/deltat",
+  org: "open-deltat",
+  github: "https://github.com/open-deltat",
+  deltatRepo: "https://github.com/open-deltat/deltat",
   defaultTitle: "Δt: a database for time",
   description:
     "Δt is a database for time: it stores every booking as a stretch on one line, so finding what is free is one instant lookup. Open, self-hostable, and real-time.",

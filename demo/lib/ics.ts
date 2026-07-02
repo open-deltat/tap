@@ -59,7 +59,7 @@ export function renderCalendar(opts: {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//open-tap//deltat//EN",
+    "PRODID:-//open-deltat//deltat//EN",
     "CALSCALE:GREGORIAN",
     `X-WR-CALNAME:${escapeText(opts.name)}`,
     "REFRESH-INTERVAL;VALUE=DURATION:PT1H",

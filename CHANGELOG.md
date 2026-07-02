@@ -10,7 +10,7 @@ may still carry breaking changes.
 
 ## [0.2.1] - 2026-07-02
 
-The typed TypeScript SDK for [deltat](https://github.com/open-tap/deltat), a time-allocation
+The typed TypeScript SDK for [deltat](https://github.com/open-deltat/deltat), a time-allocation
 database, over its PostgreSQL wire protocol. All times are Unix milliseconds over half-open
 `[start, end)` intervals.
 
@@ -33,5 +33,5 @@ database, over its PostgreSQL wire protocol. All times are Unix milliseconds ove
 ### Security
 - All queries use positional (`$N`) parameters; caller ids and values are never spliced into SQL.
 
-[Unreleased]: https://github.com/open-tap/tap/compare/v0.2.1...HEAD
-[0.2.1]: https://github.com/open-tap/tap/releases/tag/v0.2.1
+[Unreleased]: https://github.com/open-deltat/tap/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/open-deltat/tap/releases/tag/v0.2.1

@@ -7,7 +7,7 @@
 # published; it reaches deltat over the internal compose network via pgwire.
 services:
   deltat:
-    build: https://github.com/open-tap/deltat.git#main
+    build: https://github.com/open-deltat/deltat.git#main
     restart: unless-stopped
     environment:
       DELTAT_PASSWORD: ${DELTAT_PASSWORD:-deltat}
