@@ -27,16 +27,26 @@ function escapeText(value: string): string {
     .replace(/\r?\n/g, "\\n");
 }
 
-/** Fold a content line to ≤75 octets per RFC 5545 §3.1; continuation lines begin with a space. */
+const encoder = new TextEncoder();
+
+/** Fold a content line to <=75 octets per RFC 5545 §3.1; continuation lines begin with a space.
+ *  Measured in UTF-8 octets over whole code points so a multibyte char is never split. */
 function fold(line: string): string {
-  if (line.length <= 75) return line;
-  const parts = [line.slice(0, 75)];
-  let rest = line.slice(75);
-  while (rest.length > 0) {
-    parts.push(" " + rest.slice(0, 74));
-    rest = rest.slice(74);
+  const lines: string[] = [];
+  let current = "";
+  let used = 0;
+  for (const ch of line) {
+    const size = encoder.encode(ch).length;
+    if (used + size > 75) {
+      lines.push(current);
+      current = " ";
+      used = 1;
+    }
+    current += ch;
+    used += size;
   }
-  return parts.join("\r\n");
+  lines.push(current);
+  return lines.join("\r\n");
 }
 
 export function renderCalendar(opts: {
