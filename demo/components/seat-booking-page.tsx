@@ -95,7 +95,7 @@ export function SeatBookingPage({
         setAvailability(new Map(Object.entries(availMap)));
         const filteredBookings = new Map<string, Booking[]>();
         for (const [id, bks] of Object.entries(bookMap)) {
-          filteredBookings.set(id, (bks as Booking[]).filter((b) => b.start < end && b.end > start));
+          filteredBookings.set(id, bks.filter((b) => b.start < end && b.end > start));
         }
         setBookings(filteredBookings);
         const now = Date.now();
@@ -103,7 +103,7 @@ export function SeatBookingPage({
         for (const [id, hs] of Object.entries(holdMap)) {
           filteredHolds.set(
             id,
-            (hs as Hold[]).filter((h) => h.start < end && h.end > start && h.expiresAt > now)
+            hs.filter((h) => h.start < end && h.end > start && h.expiresAt > now)
           );
         }
         setHolds(filteredHolds);

@@ -58,11 +58,13 @@ interface Grid {
   rowLabels: string[];
 }
 
+type ParsedSeat = SeatInfo & { parsed: { row: string; col: string } };
+
 function buildGrid(seats: SeatInfo[]): Grid {
   const parsed = seats.map((s) => ({ ...s, parsed: parseSeatName(s.name) }));
-  const hasParsed = parsed.every((p) => p.parsed !== null);
+  const resolved = parsed.filter((p): p is ParsedSeat => p.parsed !== null);
 
-  if (!hasParsed || seats.length === 0) {
+  if (resolved.length !== parsed.length || seats.length === 0) {
     const cols = Math.min(seats.length, 8);
     const rows: SeatInfo[][] = [];
     for (let i = 0; i < parsed.length; i += cols) {
@@ -75,12 +77,12 @@ function buildGrid(seats: SeatInfo[]): Grid {
     };
   }
 
-  const allCols = [...new Set(parsed.map((p) => p.parsed!.col))].sort(sortMixed);
-  const allRows = [...new Set(parsed.map((p) => p.parsed!.row))].sort(sortMixed);
+  const allCols = [...new Set(resolved.map((p) => p.parsed.col))].sort(sortMixed);
+  const allRows = [...new Set(resolved.map((p) => p.parsed.row))].sort(sortMixed);
 
   const seatByPos = new Map<string, SeatInfo>();
-  for (const p of parsed) {
-    seatByPos.set(`${p.parsed!.row}-${p.parsed!.col}`, { id: p.id, name: p.name });
+  for (const p of resolved) {
+    seatByPos.set(`${p.parsed.row}-${p.parsed.col}`, { id: p.id, name: p.name });
   }
 
   const gridRows: (SeatInfo | null)[][] = allRows.map((row) =>

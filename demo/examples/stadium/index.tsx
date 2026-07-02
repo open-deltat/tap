@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Stage } from "@/components/stage";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
-import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
+import type { Resource, SectionLayout, AvailabilitySlot, Booking } from "@/lib/schemas";
 import { toLocalDateString, formatTime } from "@/lib/time";
 import { useWebSocket } from "@/hooks/use-websocket";
 
@@ -108,9 +108,9 @@ export default function StadiumExample() {
   const sections: Section[] = useMemo(
     () =>
       resources
-        .filter((r) => r.section != null)
+        .filter((r): r is Resource & { section: SectionLayout } => r.section != null)
         .map((r) => {
-          const layout = r.section!;
+          const layout = r.section;
           const bks = bookingsBySection.get(r.id) ?? [];
           const cols = sectionCols(layout.ring, layout.idx, layout.ringCount, layout.assigned, r.capacity);
           const taken = bks.length;
