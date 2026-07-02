@@ -13,7 +13,7 @@ export default function DashboardPage() {
 
   const loadWeek = useCallback(async (date: Date) => {
     const start = getWeekStart(date).getTime();
-    const end = getWeekEnd(date).getTime() + 1;
+    const end = getWeekEnd(date).getTime();
     const data = await getWeekData(start, end);
     setAvailability(data.availability);
     setBookings(data.bookings);
