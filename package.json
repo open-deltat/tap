@@ -1,5 +1,6 @@
 {
   "private": true,
+  "homepage": "https://delt.at",
   "workspaces": ["packages/*", "demo", "calendar"],
   "scripts": {
     "dev": "cd demo && ./dev.sh"

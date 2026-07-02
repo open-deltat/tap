@@ -1,35 +1,47 @@
-# TAP — Time Allocation Protocol
+<p align="center">
+  <img src=".github/social-preview.png" alt="tap: the time allocation protocol" width="860">
+</p>
 
-SDK and demo applications for [deltat](https://github.com/open-tap/deltat), a time-allocation database.
+<p align="center">
+  <a href="https://www.npmjs.com/package/@open-tap/client"><img src="https://img.shields.io/npm/v/@open-tap/client.svg?logo=npm" alt="npm"></a>
+  <a href="https://github.com/open-tap/tap/actions/workflows/ci.yml"><img src="https://github.com/open-tap/tap/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://delt.at"><img src="https://img.shields.io/badge/site-delt.at-4fe3a3.svg" alt="delt.at"></a>
+</p>
 
-## Structure
+---
 
-```
-packages/client/   @open-tap/client — TypeScript SDK wrapping deltat's pgwire SQL
-demo/              Next.js app — interactive demos for holds, calendars, seat maps, etc.
+tap is the client layer for [deltat](https://github.com/open-tap/deltat), a time-first scheduling database. It is a typed TypeScript SDK plus a set of demo apps that show what deltat can do: seat maps, calendars, capacity pools, recurring schedules, and hold-to-book flows with live updates.
+
+deltat handles the hard part (availability, conflicts, capacity, holds, buffers) as collision detection on the Unix-time number line. tap gives you a clean way to talk to it from TypeScript.
+
+## Install
+
+```bash
+npm install @open-tap/client
+# or: bun add @open-tap/client
 ```
 
 ## SDK
 
-`@open-tap/client` provides a typed interface to deltat:
+`@open-tap/client` is a typed interface to deltat:
 
-- **Resources** — hierarchical create/update/delete/get
-- **Rules** — batch `create(items[])`, update, delete, get
-- **Bookings** — batch `create(items[])`, cancel, get with optional `{start, end}` filter
-- **Holds** — place, release, get with optional `{start, end}` filter
-- **Availability** — single and combined multi-resource queries
-- **Events** — real-time LISTEN/NOTIFY subscriptions
-- **`expandRecurrence()`** — expand recurring patterns (days of week, time range, date range, excludes) into concrete rule segments
-
-> deltat's current transport is the PostgreSQL wire protocol, a transitional choice; a v2 framed protocol with HTTP and MCP adapters is planned (see deltat `docs/REQUIREMENTS.md`, PROTO-01/02). The typed API above is designed to outlast that swap.
+- **Resources** - hierarchical create / update / delete / get
+- **Rules** - batch `create(items[])`, update, delete, get
+- **Bookings** - batch `create(items[])`, cancel, get with an optional `{start, end}` window
+- **Holds** - place, release, get with an optional `{start, end}` window
+- **Availability** - single-resource and combined multi-resource queries
+- **Events** - real-time LISTEN/NOTIFY subscriptions
+- **`expandRecurrence()`** - turn a recurring pattern (days of week, time range, date range, exclusions) into concrete rule segments
 
 ```ts
 import { DeltaT, expandRecurrence } from "@open-tap/client";
 
 const dt = new DeltaT({ host: "localhost", port: 5433 });
 
-const resource = await dt.resources.create({ name: "Room A" });
+const room = await dt.resources.create({ name: "Room A" });
 
+// Open weekdays 9 to 5 for the first quarter, as concrete rules.
 const segments = expandRecurrence({
   daysOfWeek: [1, 2, 3, 4, 5],
   startTime: "09:00",
@@ -37,47 +49,53 @@ const segments = expandRecurrence({
   fromDate: "2025-01-01",
   toDate: "2025-03-31",
 });
-
-await dt.rules.create(
-  segments.map((s) => ({ resourceId: resource.id, ...s }))
-);
+await dt.rules.create(segments.map((s) => ({ resourceId: room.id, ...s })));
 
 const slots = await dt.availability.get({
-  resourceId: resource.id,
+  resourceId: room.id,
   start: Date.now(),
   end: Date.now() + 86_400_000,
 });
 ```
 
+> deltat's current transport is the PostgreSQL wire protocol, a transitional choice. A v2 framed protocol with HTTP and MCP adapters is planned (see deltat's `docs/REQUIREMENTS.md`, PROTO-01/02). The typed API above is built to outlast that swap.
+
 ## Demos
 
-| Demo | Description |
-|------|-------------|
+| Demo | What it shows |
+|------|----------------|
 | **Airline** | Split-screen dual-client seat booking with real-time holds |
 | **Theater** | Single-venue seat map with section pricing |
 | **Stadium** | Large-venue seat selection with timed events |
-| **Calendar** | Resource management with weekly/daily views and recurring rules |
+| **Calendar** | Resource management with weekly and daily views and recurring rules |
 | **Scheduling** | Multi-resource availability finder with threshold modes |
-| **Availability** | Calendly-style owner/booker flow with hold-to-confirm |
-| **Restaurant** | Party size → floor plan → time slot → reservation |
+| **Availability** | Calendly-style owner and booker flow with hold-to-confirm |
+| **Restaurant** | Party size to floor plan to time slot to reservation |
 | **Parking** | Multi-floor garage with zone grids and duration-based booking |
 
-All demos use WebSocket connections for real-time updates. Hold-based demos use a connection-lifecycle pattern: opening a WS places a hold, sending `{type: "confirm"}` atomically books, closing the WS releases the hold.
+Every demo uses a WebSocket for live updates. The hold-based ones follow a connection-lifecycle pattern: opening a socket places a hold, sending `{type: "confirm"}` books it atomically, and closing the socket releases it.
 
-### Prerequisites
+## Run the demos
 
-- [Bun](https://bun.sh)
-
-### Run
+Requires [Bun](https://bun.sh).
 
 ```bash
 cd demo
 bun install
-bun dev      # starts deltat + Next.js dev server
+bun dev      # starts deltat and the Next.js dev server
 ```
 
-The dev script auto-installs deltat via `cargo install` if not found or outdated.
+The dev script installs deltat via `cargo install` if it is missing or out of date.
+
+## Repository
+
+```
+packages/client/   @open-tap/client, the TypeScript SDK over deltat's wire protocol
+packages/shared/   date and week helpers shared by the apps
+demo/              Next.js app with the interactive examples above
+calendar/          standalone booking-calendar app
+```
 
 ## License
 
-MIT
+[MIT](LICENSE)

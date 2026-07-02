@@ -4,7 +4,7 @@
   "description": "TypeScript SDK for deltat, a time-allocation database: resources, rules, bookings, holds, availability, and recurrence expansion over the PostgreSQL wire protocol.",
   "license": "MIT",
   "author": "Simon Orzel",
-  "homepage": "https://github.com/open-tap/tap",
+  "homepage": "https://delt.at",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/open-tap/tap.git",
