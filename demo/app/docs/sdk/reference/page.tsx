@@ -5,7 +5,7 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "tap SDK reference (@open-tap/client)",
+  title: "TAP SDK reference (@open-tap/client)",
   description:
     "The complete @open-tap/client verb surface: resources, rules, bookings, holds, availability, and events, each with its TypeScript signature and a short example.",
   path: "/docs/sdk/reference",
@@ -21,12 +21,12 @@ export default function ReferencePage() {
           techArticleLd(SEO),
           breadcrumbLd([
             { name: "Home", path: "/" },
-            { name: "What is tap", path: "/docs/sdk" },
+            { name: "What is TAP", path: "/docs/sdk" },
             { name: "SDK reference", path: "/docs/sdk/reference" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="tap · the protocol" title="SDK reference" />
+      <DocHeader eyebrow="TAP · the protocol" title="SDK reference" />
       <Markdown>{docContent("sdk-reference")}</Markdown>
     </article>
   );

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-// The docs left rail: two sections for two separate things. Δt is the database; tap is the Time
+// The docs left rail: two sections for two separate things. Δt is the database; TAP is the Time
 // Allocation Protocol you reach it through. Active link is an exact path match.
 const SECTIONS: { title: string; links: { href: string; label: string }[] }[] = [
   {
@@ -17,9 +17,9 @@ const SECTIONS: { title: string; links: { href: string; label: string }[] }[] = 
     ],
   },
   {
-    title: "tap · the protocol",
+    title: "TAP · the protocol",
     links: [
-      { href: "/docs/sdk", label: "What is tap" },
+      { href: "/docs/sdk", label: "What is TAP" },
       { href: "/docs/sdk/quickstart", label: "Quickstart" },
       { href: "/docs/sdk/reference", label: "SDK reference" },
       { href: "/docs/sdk/self-host", label: "Self-host" },

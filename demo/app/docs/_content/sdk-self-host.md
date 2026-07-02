@@ -11,7 +11,7 @@ cargo build --release
 DELTAT_PASSWORD=<your-password> ./target/release/deltat
 ```
 
-That starts the server listening on port 5433. Point the tap client at it and you are talking to it:
+That starts the server listening on port 5433. Point the TAP client at it and you are talking to it:
 
 ```ts
 import { DeltaT } from "@open-tap/client";
@@ -89,4 +89,4 @@ volumes:
 
 ## What is not here yet
 
-The transport today is the PostgreSQL wire protocol, which is why the tap client connects like a Postgres client would. That is transitional. HTTP and MCP adapters are planned but do not exist yet, so for now the wire protocol is the only way in.
+The transport today is the PostgreSQL wire protocol, which is why the TAP client connects like a Postgres client would. That is transitional. HTTP and MCP adapters are planned but do not exist yet, so for now the wire protocol is the only way in.

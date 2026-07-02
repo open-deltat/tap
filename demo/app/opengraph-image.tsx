@@ -34,7 +34,7 @@ export default function OpengraphImage() {
         <div style={{ fontSize: 230, fontWeight: 700, lineHeight: 1, letterSpacing: -4 }}>Δt</div>
         <div style={{ fontSize: 54, marginTop: 24, color: "#e4e4e7" }}>a database for time</div>
         <div style={{ fontSize: 30, marginTop: 40, color: "#6ee7b7" }}>
-          tap · the Time Allocation Protocol
+          TAP · the Time Allocation Protocol
         </div>
         <div style={{ position: "absolute", bottom: 48, fontSize: 26, color: "#71717a" }}>delt.at</div>
       </div>

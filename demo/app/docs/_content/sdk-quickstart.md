@@ -1,4 +1,4 @@
-This page takes you from nothing to a confirmed booking with as little ceremony as possible, using `@open-tap/client`, tap's TypeScript SDK, against a running Δt node. You create resources and time rules, ask what is free, hold a slot for a moment, then confirm the booking.
+This page takes you from nothing to a confirmed booking with as little ceremony as possible, using `@open-tap/client`, TAP's TypeScript SDK, against a running Δt node. You create resources and time rules, ask what is free, hold a slot for a moment, then confirm the booking.
 
 We will use one running example: Acme Tickets sells seats in a stadium. The tree is Stadium, then Section A, then Seat 12. We will open Seat 12 for sale, find out when it is free, hold it, and book it.
 
@@ -27,7 +27,7 @@ const db = new DeltaT({
 
 Those four values are the defaults, so locally you can write `new DeltaT()` and get exactly the same thing.
 
-A note on how this connects: Δt speaks the PostgreSQL wire protocol, so under the hood tap rides a normal Postgres driver. That is purely how the bytes get there. You never write SQL. You call typed verbs like `resources.create` and `availability.get`, and tap turns them into the right calls for you. (There is a raw `db.sql` escape hatch if you ever need it, but reach for it only when no verb covers what you want.)
+A note on how this connects: Δt speaks the PostgreSQL wire protocol, so under the hood TAP rides a normal Postgres driver. That is purely how the bytes get there. You never write SQL. You call typed verbs like `resources.create` and `availability.get`, and TAP turns them into the right calls for you. (There is a raw `db.sql` escape hatch if you ever need it, but reach for it only when no verb covers what you want.)
 
 ## Create a resource
 

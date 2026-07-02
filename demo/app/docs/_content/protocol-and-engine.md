@@ -12,7 +12,7 @@ In practice that means there is exactly one thing to back up: the data directory
 
 ## It speaks Postgres, for now
 
-Today Δt talks to clients over the PostgreSQL wire protocol. That is the one detail that explains the SDK: there is no Postgres underneath, but Δt answers the same handshake a Postgres server would, so a normal Postgres client can connect to it. The tap client wraps exactly such a connection, which is why opening a database looks like this:
+Today Δt talks to clients over the PostgreSQL wire protocol. That is the one detail that explains the SDK: there is no Postgres underneath, but Δt answers the same handshake a Postgres server would, so a normal Postgres client can connect to it. The TAP client wraps exactly such a connection, which is why opening a database looks like this:
 
 ```ts
 const db = new DeltaT({ host: "localhost", port: 5433, database: "acme", password: "deltat" });

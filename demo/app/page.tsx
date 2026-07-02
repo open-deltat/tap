@@ -34,7 +34,7 @@ export default function Home() {
             Space has three dimensions; time is the fourth, a single line. Δt is the database for
             that line, and{" "}
             <a href="/docs/sdk/quickstart" className="text-zinc-200 underline decoration-emerald-400/50 underline-offset-2 transition-colors hover:decoration-emerald-300">
-              tap
+              TAP
             </a>{" "}
             is how you manage time in one dimension. Every demo below runs on it, live.
           </p>
@@ -50,7 +50,7 @@ export default function Home() {
               href="/docs/sdk"
               className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.03] px-4 py-1.5 text-[13px] font-medium text-zinc-300 transition-colors hover:border-white/25 hover:text-zinc-100"
             >
-              What is tap
+              What is TAP
               <ArrowRight className="h-3.5 w-3.5" />
             </a>
           </div>

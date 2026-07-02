@@ -4,7 +4,7 @@ import { DocsSidebar } from "@/components/docs-sidebar";
 
 export const metadata: Metadata = {
   title: "Docs · Δt",
-  description: "Δt is a database for time; tap is how you use it. Data model, holds, the SDK, and self-hosting.",
+  description: "Δt is a database for time; TAP is how you use it. Data model, holds, the SDK, and self-hosting.",
 };
 
 // A static docs section that inherits the root layout (NavHeader + theme), with a two-group left rail.

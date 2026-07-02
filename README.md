@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/social-preview.png" alt="tap: the time allocation protocol" width="860">
+  <img src=".github/social-preview.png" alt="TAP: the time allocation protocol" width="860">
 </p>
 
 <p align="center">
@@ -11,9 +11,9 @@
 
 ---
 
-tap is the client layer for [deltat](https://github.com/open-tap/deltat), a time-first scheduling database. It is a typed TypeScript SDK plus a set of demo apps that show what deltat can do: seat maps, calendars, capacity pools, recurring schedules, and hold-to-book flows with live updates.
+TAP is the client layer for [deltat](https://github.com/open-tap/deltat), a time-first scheduling database. It is a typed TypeScript SDK plus a set of demo apps that show what deltat can do: seat maps, calendars, capacity pools, recurring schedules, and hold-to-book flows with live updates.
 
-deltat handles the hard part (availability, conflicts, capacity, holds, buffers) as collision detection on the Unix-time number line. tap gives you a clean way to talk to it from TypeScript.
+deltat handles the hard part (availability, conflicts, capacity, holds, buffers) as collision detection on the Unix-time number line. TAP gives you a clean way to talk to it from TypeScript.
 
 ## Install
 

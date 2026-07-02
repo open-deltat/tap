@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     "Δt",
     "deltat",
     "time allocation protocol",
-    "tap",
+    "TAP",
     "scheduling database",
     "booking database",
     "availability engine",

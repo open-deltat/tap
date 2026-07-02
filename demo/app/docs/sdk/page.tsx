@@ -5,9 +5,9 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "What is tap? The Time Allocation Protocol",
+  title: "What is TAP? The Time Allocation Protocol",
   description:
-    "tap is the Time Allocation Protocol: one shared way to describe and access time, scheduling, booking, and availability, with a typed TypeScript SDK to speak it.",
+    "TAP is the Time Allocation Protocol: one shared way to describe and access time, scheduling, booking, and availability, with a typed TypeScript SDK to speak it.",
   path: "/docs/sdk",
 };
 
@@ -21,11 +21,11 @@ export default function WhatIsTapPage() {
           techArticleLd(SEO),
           breadcrumbLd([
             { name: "Home", path: "/" },
-            { name: "What is tap", path: "/docs/sdk" },
+            { name: "What is TAP", path: "/docs/sdk" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="tap · the protocol" title="What is tap" />
+      <DocHeader eyebrow="TAP · the protocol" title="What is TAP" />
       <Markdown>{docContent("what-is-tap")}</Markdown>
     </article>
   );

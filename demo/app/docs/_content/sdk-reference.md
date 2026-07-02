@@ -1,4 +1,4 @@
-This is the full verb surface of the tap TypeScript SDK, one entry per verb, grouped by namespace. Each entry has a signature, a line on what it does, and a tiny example. If a method is not on this page, it is not a verb.
+This is the full verb surface of the TAP TypeScript SDK, one entry per verb, grouped by namespace. Each entry has a signature, a line on what it does, and a tiny example. If a method is not on this page, it is not a verb.
 
 The running example throughout is a ticketing setup: Acme Tickets owns a Stadium, the Stadium has Section A, and Section A has Seat 12. Resources nest like that, and only the leaves (the seats) carry a real timeline.
 
