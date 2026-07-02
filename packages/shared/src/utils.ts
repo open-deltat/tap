@@ -18,11 +18,11 @@ export function weekStart(date: Date): Date {
   return d;
 }
 
+/** Exclusive end of the week: the half-open bound [weekStart, weekEnd). */
 export function weekEnd(date: Date): Date {
   const start = weekStart(date);
   const end = new Date(start);
   end.setDate(end.getDate() + 7);
-  end.setMilliseconds(-1);
   return end;
 }
 
