@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useTransition, useRef } from "react";
+import { useEffect, useState, useCallback, useTransition } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Segmented } from "@/components/ui/segmented";
@@ -14,7 +14,8 @@ import type { Hold } from "@open-tap/client";
 import { toLocalDateString, formatTime } from "@/lib/time";
 import { buildSections, allSeatIds } from "@/lib/seat-sections";
 import { usePersonalCalendar } from "@/components/personal-calendar-provider";
-import { useWebSocket, wsUrl } from "@/hooks/use-websocket";
+import { useWebSocket } from "@/hooks/use-websocket";
+import { useSeatHolds } from "@/hooks/use-seat-holds";
 
 import { getResources } from "@/app/actions/resources";
 import { getAvailability } from "@/app/actions/availability";
@@ -44,23 +45,16 @@ export function SeatBookingPage({
   const [availability, setAvailability] = useState<Map<string, AvailabilitySlot[]>>(new Map());
   const [bookings, setBookings] = useState<Map<string, Booking[]>>(new Map());
   const [holds, setHolds] = useState<Map<string, Hold[]>>(new Map());
-  const [selectedSeats, setSelectedSeats] = useState<Set<string>>(new Set());
 
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
   const [bookingResult, setBookingResult] = useState<BookingResult | null>(null);
 
-  // Per-seat hold WS connections: open WS = hold active, close WS = hold released
-  const holdWsRef = useRef(new Map<string, WebSocket>());
+  const { selectedSeats, toggleSeat, clearSelection } = useSeatHolds();
 
   const venue = resources.find((r) => r.id === venueId) ?? null;
   const sections = venueId ? buildSections(venueId, resources) : [];
   const venues = resources.filter((r) => venueIds.includes(r.id));
-
-  function closeAllHolds() {
-    for (const ws of holdWsRef.current.values()) ws.close();
-    holdWsRef.current.clear();
-  }
 
   useEffect(() => {
     if (!venueId || !date) return;
@@ -75,14 +69,13 @@ export function SeatBookingPage({
         setAvailability(new Map());
         setBookings(new Map());
         setHolds(new Map());
-        closeAllHolds();
-        setSelectedSeats(new Set());
+        clearSelection();
       })
       .catch((err) => {
         console.error("Failed to get venue availability:", err);
         setVenueSlots([]);
       });
-  }, [venueId, date, resources]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [venueId, date, resources, clearSelection]);
 
   // Load seat data (availability, bookings, holds) for a time range
   const loadSeatData = useCallback(
@@ -114,19 +107,15 @@ export function SeatBookingPage({
     []
   );
 
-  // Reload seat data when slot changes
   useEffect(() => {
     if (!selectedSlot || !venueId) return;
     const seatIds = allSeatIds(buildSections(venueId, resources));
     if (seatIds.length === 0) return;
     loadSeatData(seatIds, selectedSlot.start, selectedSlot.end);
-    closeAllHolds();
-    setSelectedSeats(new Set());
+    clearSelection();
+    // Only the slot is a dep: venueId/resources reload through their own effects, so listing them
+    // here would double-load whenever they change.
   }, [selectedSlot]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    return () => closeAllHolds();
-  }, []);
 
   // Real-time updates via WebSocket (venue-level subscription)
   const onWsEvent = useCallback(() => {
@@ -156,58 +145,12 @@ export function SeatBookingPage({
       }
     }
     init();
+    // Seed once on mount; re-running on a new seedFn identity would reseed the venue.
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleToggleSeat(seatId: string) {
     if (!selectedSlot) return;
-
-    if (selectedSeats.has(seatId)) {
-      // Deselect: close WS → server releases hold
-      const ws = holdWsRef.current.get(seatId);
-      if (ws) { ws.close(); holdWsRef.current.delete(seatId); }
-      setSelectedSeats((prev) => {
-        const next = new Set(prev);
-        next.delete(seatId);
-        return next;
-      });
-    } else {
-      // Select: open WS → server places hold
-      const ws = new WebSocket(wsUrl());
-      const revertSelection = () => {
-        holdWsRef.current.delete(seatId);
-        setSelectedSeats((prev) => {
-          const next = new Set(prev);
-          next.delete(seatId);
-          return next;
-        });
-      };
-      ws.onopen = () => {
-        ws.send(JSON.stringify({
-          type: "hold",
-          resourceId: seatId,
-          start: selectedSlot.start,
-          end: selectedSlot.end,
-        }));
-      };
-      ws.onerror = revertSelection;
-      // The server rejects a hold as a {type:"error"} MESSAGE (not a transport error), so
-      // onerror never fires for it. Without this, the optimistic green selection stays even
-      // though no hold exists, a phantom-held seat whose later Book then fails.
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(String(event.data));
-          if (data?.type === "error") {
-            ws.close();
-            revertSelection();
-            toast.error("That seat was just taken");
-          }
-        } catch {
-          // non-JSON / deltat event frame, ignore
-        }
-      };
-      holdWsRef.current.set(seatId, ws);
-      setSelectedSeats((prev) => new Set(prev).add(seatId));
-    }
+    toggleSeat(seatId, selectedSlot);
   }
 
   function getSeatSection(seatId: string): SeatSection | undefined {
@@ -234,8 +177,8 @@ export function SeatBookingPage({
             }
           : undefined;
         // bookHeldSeats releases each seat's hold server-side BEFORE booking, so the atomic
-        // batch can't conflict with the client's own holds. The prior closeAllHolds()+book
-        // raced the unawaited socket-close release and intermittently lost the whole booking.
+        // batch can't conflict with the client's own holds. Closing the sockets first and then
+        // booking raced the unawaited socket-close release and intermittently lost the booking.
         const created = await bookHeldSeats({
           seatIds: seatList,
           start: slotStart,
@@ -243,8 +186,8 @@ export function SeatBookingPage({
           label: venue?.name ?? "Booking",
           calendar,
         });
-        closeAllHolds(); // sockets only, the holds were already released by bookHeldSeats
-        setSelectedSeats(new Set());
+        // The holds were already released server-side by bookHeldSeats; this only closes the sockets.
+        clearSelection();
         // Success → the shared modal: human receipt + the verbatim deltat rows.
         setBookingResult({
           title: `${seatList.length} seat${seatList.length > 1 ? "s" : ""} · ${venue?.name ?? "Booking"}`,
@@ -292,11 +235,11 @@ export function SeatBookingPage({
     return seatId;
   }
 
-  // Filter out my holds so they show as selected (green) not held (amber)
-  const myHeldSeatIds = new Set(holdWsRef.current.keys());
+  // Filter out my own holds so they show as selected (green) not held (amber). selectedSeats mirrors
+  // the open hold sockets, so it is the set of seats I hold.
   const otherHolds = new Map<string, Hold[]>();
   for (const [seatId, seatHolds] of holds) {
-    if (!myHeldSeatIds.has(seatId)) {
+    if (!selectedSeats.has(seatId)) {
       otherHolds.set(seatId, seatHolds);
     }
   }
