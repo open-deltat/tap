@@ -172,6 +172,10 @@ wss.on("connection", (ws) => {
         initStarted = true;
         await handleInit(ws, state, InitMessage.parse(json));
         initialized = true;
+        // If the socket closed while init was awaiting, ws.on("close") already ran against an
+        // unpopulated state and released nothing; clean up the now-assigned hold/listener here so
+        // neither leaks until expiry.
+        if (ws.readyState !== ws.OPEN) await handleClose(state);
         return;
       }
 

@@ -31,13 +31,13 @@ export function SlotPicker({ slug, slotMinutes }: SlotPickerProps) {
   }, [loadSlots]);
 
   function prevDay() {
-    const d = new Date(date);
+    const d = new Date(date + "T00:00:00");
     d.setDate(d.getDate() - 1);
     setDate(toLocalDateString(d));
   }
 
   function nextDay() {
-    const d = new Date(date);
+    const d = new Date(date + "T00:00:00");
     d.setDate(d.getDate() + 1);
     setDate(toLocalDateString(d));
   }
