@@ -1,15 +1,15 @@
-This page takes you from nothing to a confirmed booking with as little ceremony as possible, using `@open-tap/client`, TAP's TypeScript SDK, against a running Δt node. You create resources and time rules, ask what is free, hold a slot for a moment, then confirm the booking.
+This page takes you from nothing to a confirmed booking with as little ceremony as possible, using `@open-deltat/client`, TAP's TypeScript SDK, against a running Δt node. You create resources and time rules, ask what is free, hold a slot for a moment, then confirm the booking.
 
 We will use one running example: Acme Tickets sells seats in a stadium. The tree is Stadium, then Section A, then Seat 12. We will open Seat 12 for sale, find out when it is free, hold it, and book it.
 
 ## Install
 
 ```bash
-bun add @open-tap/client
+bun add @open-deltat/client
 ```
 
 ```ts
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 ```
 
 ## Connect
@@ -122,7 +122,7 @@ await db.close();
 Here it is end to end: open the seat, find a slot, hold it, book it, close.
 
 ```ts
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 
 const db = new DeltaT(); // localhost:5433, database "default"
 

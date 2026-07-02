@@ -4,7 +4,7 @@
  *
  * Run against a local deltat:  DELTAT_PORT=5435 bun scripts/smoke-getmany.ts
  */
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 
 const PORT = Number(process.env.DELTAT_PORT ?? 5435);
 const dt = new DeltaT({ port: PORT, password: "secret", database: "demo" });

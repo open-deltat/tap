@@ -2,7 +2,7 @@
 
 import { dt } from "@/lib/deltat";
 import { addSchedule, findRootByName } from "@/app/actions/seed-helpers";
-import type { Rule } from "@open-tap/client";
+import type { Rule } from "@open-deltat/client";
 
 const NAME = "FitFlow Studio";
 const DAY = 86_400_000;

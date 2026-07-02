@@ -9,7 +9,7 @@ The `database` name on your connection picks the tenant. Each tenant is fully se
 In practice you make one client per tenant and reuse it:
 
 ```ts
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 
 const db = new DeltaT({
   host: "localhost",

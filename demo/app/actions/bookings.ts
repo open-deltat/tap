@@ -5,7 +5,7 @@ import { BookSlotInput } from "@/lib/schemas";
 import { releaseHoldsThenBook, type BookHeldSeatsInput } from "@/lib/booking-flow";
 import { getSessionId } from "@/lib/session";
 import { trackBookings, untrack } from "@/lib/session-bookings";
-import type { Booking } from "@open-tap/client";
+import type { Booking } from "@open-deltat/client";
 
 // Register the bookings the visitor just made so the sidebar can show them and the reaper can
 // auto-clear them after the TTL. Best-effort: never let tracking failure break a booking.

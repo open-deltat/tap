@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { DeltaTEvent } from "@open-tap/client";
+import type { DeltaTEvent } from "@open-deltat/client";
 
 interface SubscribeOptions {
   type: "subscribe";

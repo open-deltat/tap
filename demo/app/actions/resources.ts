@@ -3,7 +3,7 @@
 import { dt } from "@/lib/deltat";
 import * as store from "@/lib/store";
 import { CreateResourcesInput, type Resource, type ResourceMeta } from "@/lib/schemas";
-import type { Resource as DeltaTResource } from "@open-tap/client";
+import type { Resource as DeltaTResource } from "@open-deltat/client";
 
 function toResource(r: DeltaTResource, meta?: ResourceMeta): Resource {
   return {

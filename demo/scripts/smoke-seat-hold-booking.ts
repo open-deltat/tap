@@ -8,7 +8,7 @@
  *
  * Run against a local deltat:  DELTAT_PORT=5434 bun scripts/smoke-seat-hold-booking.ts
  */
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 import { releaseHoldsThenBook } from "../lib/booking-flow";
 
 const PORT = Number(process.env.DELTAT_PORT ?? 5434);

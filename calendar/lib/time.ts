@@ -1,1 +1,1 @@
-export * from "@open-tap/shared/time";
+export * from "@open-deltat/shared/time";

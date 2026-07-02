@@ -1,12 +1,12 @@
 import { z } from "zod";
-import type { Resource as DeltaTResource } from "@open-tap/client";
+import type { Resource as DeltaTResource } from "@open-deltat/client";
 
 export type {
   Rule,
   Booking,
   Hold,
   AvailabilitySlot,
-} from "@open-tap/client";
+} from "@open-deltat/client";
 
 /** Oval-layout descriptor for stadium sections (a UI concern deltat doesn't track). */
 export interface SectionLayout {

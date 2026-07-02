@@ -1,7 +1,7 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
-import type { AvailabilitySlot } from "@open-tap/client";
+import type { AvailabilitySlot } from "@open-deltat/client";
 
 export async function getAvailability(
   resourceId: string,

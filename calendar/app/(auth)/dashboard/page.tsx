@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { WeekCalendar } from "@/components/week-calendar";
 import { getWeekData } from "@/app/actions/calendar";
 import { weekStart as getWeekStart, weekEnd as getWeekEnd } from "@/lib/utils";
-import type { AvailabilitySlot, Booking } from "@open-tap/client";
+import type { AvailabilitySlot, Booking } from "@open-deltat/client";
 
 export default function DashboardPage() {
   const [weekOf, setWeekOf] = useState(() => new Date());

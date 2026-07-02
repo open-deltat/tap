@@ -1,6 +1,6 @@
 "use server";
 
-import type { AvailabilitySlot, Booking, Hold } from "@open-tap/client";
+import type { AvailabilitySlot, Booking, Hold } from "@open-deltat/client";
 import { getMultiResourceAvailability } from "./availability";
 import { getMultiResourceBookings } from "./bookings";
 import { getMultiResourceHolds } from "./holds";

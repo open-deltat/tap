@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@open-tap/client"><img src="https://img.shields.io/npm/v/@open-tap/client.svg?logo=npm" alt="npm"></a>
+  <a href="https://www.npmjs.com/package/@open-deltat/client"><img src="https://img.shields.io/npm/v/@open-deltat/client.svg?logo=npm" alt="npm"></a>
   <a href="https://github.com/open-deltat/tap/actions/workflows/ci.yml"><img src="https://github.com/open-deltat/tap/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
   <a href="https://delt.at"><img src="https://img.shields.io/badge/site-delt.at-4fe3a3.svg" alt="delt.at"></a>
@@ -18,13 +18,13 @@ deltat handles the hard part (availability, conflicts, capacity, holds, buffers)
 ## Install
 
 ```bash
-npm install @open-tap/client
-# or: bun add @open-tap/client
+npm install @open-deltat/client
+# or: bun add @open-deltat/client
 ```
 
 ## SDK
 
-`@open-tap/client` is a typed interface to deltat:
+`@open-deltat/client` is a typed interface to deltat:
 
 - **Resources** - hierarchical create / update / delete / get
 - **Rules** - batch `create(items[])`, update, delete, get
@@ -35,7 +35,7 @@ npm install @open-tap/client
 - **`expandRecurrence()`** - turn a recurring pattern (days of week, time range, date range, exclusions) into concrete rule segments
 
 ```ts
-import { DeltaT, expandRecurrence } from "@open-tap/client";
+import { DeltaT, expandRecurrence } from "@open-deltat/client";
 
 const dt = new DeltaT({ host: "localhost", port: 5433 });
 
@@ -90,7 +90,7 @@ The dev script installs deltat via `cargo install` if it is missing or out of da
 ## Repository
 
 ```
-packages/client/   @open-tap/client, the TypeScript SDK over deltat's wire protocol
+packages/client/   @open-deltat/client, the TypeScript SDK over deltat's wire protocol
 packages/shared/   date and week helpers shared by the apps
 demo/              Next.js app with the interactive examples above
 calendar/          standalone booking-calendar app

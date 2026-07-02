@@ -1,9 +1,9 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
-import { expandRecurrence } from "@open-tap/client";
+import { expandRecurrence } from "@open-deltat/client";
 import { AddRuleInput, RecurringRuleInput } from "@/lib/schemas";
-import type { Rule } from "@open-tap/client";
+import type { Rule } from "@open-deltat/client";
 
 export async function addRule(input: {
   resourceId: string;

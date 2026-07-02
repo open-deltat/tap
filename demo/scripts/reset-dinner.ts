@@ -1,4 +1,4 @@
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 
 // Drops the dinner-* friend resources so ensureRulesExample() reseeds them with the current schedules.
 // Run from tap/demo: DELTAT_PORT=5434 DELTAT_PASSWORD=secret bun scripts/reset-dinner.ts

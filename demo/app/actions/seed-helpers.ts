@@ -1,7 +1,7 @@
 import { dt } from "@/lib/deltat";
 import * as store from "@/lib/store";
 import type { Resource, ResourceMeta } from "@/lib/schemas";
-import type { Rule } from "@open-tap/client";
+import type { Rule } from "@open-deltat/client";
 
 const DAY = 86_400_000;
 

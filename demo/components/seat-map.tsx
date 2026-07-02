@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { FitToWidth } from "@/components/fit-to-width";
 import type { AvailabilitySlot, Booking } from "@/lib/schemas";
-import type { Hold } from "@open-tap/client";
+import type { Hold } from "@open-deltat/client";
 
 interface SeatInfo {
   id: string;

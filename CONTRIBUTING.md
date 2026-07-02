@@ -1,7 +1,7 @@
 # Contributing to tap
 
 Thanks for your interest. tap is the TypeScript client layer for [deltat](https://github.com/open-deltat/deltat):
-a typed SDK (`@open-tap/client`) plus demo apps. Contributions are held to a high correctness and
+a typed SDK (`@open-deltat/client`) plus demo apps. Contributions are held to a high correctness and
 clarity bar.
 
 ## Ground rules

@@ -5,9 +5,9 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "TAP SDK reference (@open-tap/client)",
+  title: "TAP SDK reference (@open-deltat/client)",
   description:
-    "The complete @open-tap/client verb surface: resources, rules, bookings, holds, availability, and events, each with its TypeScript signature and a short example.",
+    "The complete @open-deltat/client verb surface: resources, rules, bookings, holds, availability, and events, each with its TypeScript signature and a short example.",
   path: "/docs/sdk/reference",
 };
 

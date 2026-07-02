@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatTime } from "@/lib/time";
 import { getBookings, cancelBooking } from "@/app/actions/bookings";
-import type { Booking } from "@open-tap/client";
+import type { Booking } from "@open-deltat/client";
 
 function parseLabel(label: string | null): { name: string; email: string | null } {
   if (!label) return { name: "Unknown", email: null };

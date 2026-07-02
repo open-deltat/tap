@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { DayName } from "@open-tap/client";
+import type { DayName } from "@open-deltat/client";
 
 // The owner's recurring weekly availability. This is the edge's recurrence definition; deltat only
 // ever stores its concrete projection as Rules (EDGE-01/EDGE-03), so the pattern itself lives here.

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveSchedule } from "@/app/actions/setup";
-import type { DayName } from "@open-tap/client";
+import type { DayName } from "@open-deltat/client";
 
 const DAYS: { label: string; value: DayName }[] = [
   { label: "Sun", value: "sun" },

@@ -18,7 +18,7 @@ Please give us a reasonable window to address the issue before any public disclo
 
 ## Scope
 
-tap is the client layer for deltat. The SDK (`@open-tap/client`) builds SQL sent over the wire, so
+tap is the client layer for deltat. The SDK (`@open-deltat/client`) builds SQL sent over the wire, so
 issues we particularly care about:
 - any SDK path that string-splices caller-supplied ids or values into SQL instead of using
   positional (`$N`) params,
@@ -31,5 +31,5 @@ isolation) belong in the [deltat](https://github.com/open-deltat/deltat) reposit
 
 ## Supported versions
 
-tap is pre-1.0; fixes land on `main` and ship in the next `@open-tap/client` release. Pin an exact
+tap is pre-1.0; fixes land on `main` and ship in the next `@open-deltat/client` release. Pin an exact
 version for reproducible builds until the API is frozen for 1.0.

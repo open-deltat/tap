@@ -10,7 +10,7 @@ import { CancelBookingDialog } from "@/components/booking-dialog";
 import { Stage, type StagePrimitive } from "@/components/stage";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
-import type { Hold } from "@open-tap/client";
+import type { Hold } from "@open-deltat/client";
 import { toLocalDateString, formatTime } from "@/lib/time";
 import { buildSections, allSeatIds } from "@/lib/seat-sections";
 import { usePersonalCalendar } from "@/components/personal-calendar-provider";

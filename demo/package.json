@@ -9,8 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@open-tap/client": "workspace:*",
-    "@open-tap/shared": "workspace:*",
+    "@open-deltat/client": "workspace:*",
+    "@open-deltat/shared": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",

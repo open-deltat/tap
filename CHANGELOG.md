@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@open-tap/client` are documented here.
+All notable changes to `@open-deltat/client` are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Being pre-1.0, minor versions
@@ -13,6 +13,10 @@ may still carry breaking changes.
 The typed TypeScript SDK for [deltat](https://github.com/open-deltat/deltat), a time-allocation
 database, over its PostgreSQL wire protocol. All times are Unix milliseconds over half-open
 `[start, end)` intervals.
+
+### Changed
+- Renamed from `@open-tap/client` to `@open-deltat/client`, matching the `open-deltat` GitHub
+  organization. The old `@open-tap/client` (0.2.0) is deprecated; install `@open-deltat/client`.
 
 ### Added
 - `DeltaT` client: one connection exposing `resources`, `rules`, `bookings`, `holds`,

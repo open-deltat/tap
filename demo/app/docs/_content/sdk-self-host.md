@@ -14,7 +14,7 @@ DELTAT_PASSWORD=<your-password> ./target/release/deltat
 That starts the server listening on port 5433. Point the TAP client at it and you are talking to it:
 
 ```ts
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 
 const db = new DeltaT({
   host: "localhost",

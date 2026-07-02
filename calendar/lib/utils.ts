@@ -1,1 +1,1 @@
-export * from "@open-tap/shared/utils";
+export * from "@open-deltat/shared/utils";

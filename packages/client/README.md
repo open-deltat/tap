@@ -1,4 +1,4 @@
-# @open-tap/client
+# @open-deltat/client
 
 TypeScript SDK for [deltat](https://github.com/open-deltat/deltat), a time-allocation database.
 
@@ -9,14 +9,14 @@ a typed interface over it.
 ## Install
 
 ```bash
-bun add @open-tap/client
-# or: npm install @open-tap/client
+bun add @open-deltat/client
+# or: npm install @open-deltat/client
 ```
 
 ## Usage
 
 ```ts
-import { DeltaT, expandRecurrence } from "@open-tap/client";
+import { DeltaT, expandRecurrence } from "@open-deltat/client";
 
 const dt = new DeltaT({ host: "localhost", port: 5433, database: "default", password: "..." });
 

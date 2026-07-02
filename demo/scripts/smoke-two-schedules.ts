@@ -4,11 +4,11 @@
  * Two people's calendars, each partly busy. We ask deltat for the times BOTH are free
  * (combined availability, minAvailable = 2, the intersection), book a meeting in the
  * overlap atomically on both calendars, and confirm the slot disappears from the overlap.
- * This exercises the real frontend path: @open-tap/client -> pgwire -> deltat engine.
+ * This exercises the real frontend path: @open-deltat/client -> pgwire -> deltat engine.
  *
  * Run against a local deltat:  DELTAT_PORT=5434 bun scripts/smoke-two-schedules.ts
  */
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 
 const PORT = Number(process.env.DELTAT_PORT ?? 5434);
 const H = 3_600_000;

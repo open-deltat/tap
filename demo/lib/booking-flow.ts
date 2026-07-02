@@ -1,4 +1,4 @@
-import type { DeltaT, Booking } from "@open-tap/client";
+import type { DeltaT, Booking } from "@open-deltat/client";
 
 export interface BookHeldSeatsInput {
   seatIds: string[];

@@ -1,7 +1,7 @@
 "use server";
 
 import { dt } from "@/lib/deltat";
-import type { Hold } from "@open-tap/client";
+import type { Hold } from "@open-deltat/client";
 
 export async function getHoldsForResource(
   resourceId: string

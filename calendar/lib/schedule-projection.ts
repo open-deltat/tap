@@ -1,5 +1,5 @@
 import { dt } from "@/lib/deltat";
-import { expandRecurrence, type DayName } from "@open-tap/client";
+import { expandRecurrence, type DayName } from "@open-deltat/client";
 import type { WeeklySchedule } from "@/lib/schedule-store";
 
 const HORIZON_DAYS = 90;

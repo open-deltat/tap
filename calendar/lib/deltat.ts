@@ -1,4 +1,4 @@
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 import { DEV_DELTAT_PASSWORD } from "./config";
 
 export const dt = new DeltaT({

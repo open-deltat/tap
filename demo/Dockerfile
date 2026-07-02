@@ -1,6 +1,6 @@
 # Build and run the deltat examples app (a bun-workspace member) with its custom Next.js +
 # WebSocket server. The build CONTEXT is the repo ROOT, because the workspace lockfile and the
-# workspace deps (@open-tap/client, @open-tap/shared in packages/*) live there. The compose uses
+# workspace deps (@open-deltat/client, @open-deltat/shared in packages/*) live there. The compose uses
 # { context: ., dockerfile: demo/Dockerfile } so these COPY paths resolve from the root.
 FROM oven/bun:1
 
@@ -13,8 +13,8 @@ WORKDIR /app
 COPY . .
 RUN bun install
 
-# @open-tap/client publishes from dist/ (tsc output, gitignored), so it isn't in the clone and
-# `bun install` only symlinks it. Build it before the app imports it. (@open-tap/shared ships
+# @open-deltat/client publishes from dist/ (tsc output, gitignored), so it isn't in the clone and
+# `bun install` only symlinks it. Build it before the app imports it. (@open-deltat/shared ships
 # raw .ts and needs no build.)
 RUN cd packages/client && bun run build
 

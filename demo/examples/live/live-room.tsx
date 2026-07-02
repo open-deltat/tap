@@ -11,7 +11,7 @@ import { SeatMap } from "@/components/seat-map";
 import { useWebSocket, wsUrl, type StreamStatus } from "@/hooks/use-websocket";
 import { buildSections, allSeatIds } from "@/lib/seat-sections";
 import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
-import type { Hold } from "@open-tap/client";
+import type { Hold } from "@open-deltat/client";
 import { dayBounds, formatTime } from "@/lib/time";
 import { formatError } from "@/lib/format-error";
 

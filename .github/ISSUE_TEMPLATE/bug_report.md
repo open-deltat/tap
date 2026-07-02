@@ -17,7 +17,7 @@ Steps or a minimal snippet. For the SDK, the smallest sequence of calls that sho
 ```
 
 **Environment**
-- `@open-tap/client` version:
+- `@open-deltat/client` version:
 - deltat version / commit:
 - runtime (bun / node) and version:
 - OS:

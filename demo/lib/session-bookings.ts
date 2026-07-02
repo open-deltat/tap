@@ -1,5 +1,5 @@
 import { dt } from "@/lib/deltat";
-import type { Booking } from "@open-tap/client";
+import type { Booking } from "@open-deltat/client";
 
 // Ephemeral demo bookings. Every booking a visitor makes is registered here with a short TTL;
 // a module-level reaper cancels expired ones so the shared examples self-clean even if the

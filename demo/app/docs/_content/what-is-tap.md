@@ -1,6 +1,6 @@
 TAP is the Time Allocation Protocol: one shared way to describe and access time, scheduling, booking, and availability, so any app, service, or agent can ask the same question, what is free, and can I claim it before someone else does.
 
-That makes TAP a protocol in its own right, not a library and not a database. It is a small, open model of time allocation (resources that hold time, rules that open and close it, holds and bookings that claim it, and availability as whatever is left) together with a set of verbs for reading and changing that state over a connection. Anything that speaks TAP can be talked to the same way. You meet it in practice as `@open-tap/client`, a typed TypeScript SDK, but the model is the point, and the model is portable.
+That makes TAP a protocol in its own right, not a library and not a database. It is a small, open model of time allocation (resources that hold time, rules that open and close it, holds and bookings that claim it, and availability as whatever is left) together with a set of verbs for reading and changing that state over a connection. Anything that speaks TAP can be talked to the same way. You meet it in practice as `@open-deltat/client`, a typed TypeScript SDK, but the model is the point, and the model is portable.
 
 ## A protocol, not a database
 
@@ -21,7 +21,7 @@ So a booking is a span. A hold is a span with an expiry. Open hours are spans. B
 You open one client per backend and reuse it. Assuming a node is already running:
 
 ```ts
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 
 const db = new DeltaT({
   host: "localhost",

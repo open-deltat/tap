@@ -1,4 +1,4 @@
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 
 export const dt = new DeltaT({
   host: process.env.DELTAT_HOST ?? "localhost",

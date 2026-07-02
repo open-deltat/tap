@@ -4,7 +4,7 @@ import { Fragment, useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, weekDays, formatDayShort, formatSlotTime, dayHourMs } from "@/lib/utils";
-import type { AvailabilitySlot, Booking } from "@open-tap/client";
+import type { AvailabilitySlot, Booking } from "@open-deltat/client";
 
 interface WeekCalendarProps {
   weekOf: Date;

@@ -7,8 +7,8 @@
       "name": "calendar",
       "version": "0.1.0",
       "dependencies": {
-        "@open-tap/client": "workspace:*",
-        "@open-tap/shared": "workspace:*",
+        "@open-deltat/client": "workspace:*",
+        "@open-deltat/shared": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lucide-react": "^0.563.0",
@@ -39,8 +39,8 @@
       "name": "demo",
       "version": "0.1.0",
       "dependencies": {
-        "@open-tap/client": "workspace:*",
-        "@open-tap/shared": "workspace:*",
+        "@open-deltat/client": "workspace:*",
+        "@open-deltat/shared": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "date-fns": "^4.4.0",
@@ -75,7 +75,7 @@
       },
     },
     "packages/client": {
-      "name": "@open-tap/client",
+      "name": "@open-deltat/client",
       "version": "0.2.1",
       "dependencies": {
         "postgres": "^3.4.8",
@@ -86,7 +86,7 @@
       },
     },
     "packages/shared": {
-      "name": "@open-tap/shared",
+      "name": "@open-deltat/shared",
       "version": "0.1.0",
       "dependencies": {
         "clsx": "^2.1.1",
@@ -321,15 +321,15 @@
 
     "@nolyfill/is-core-module": ["@nolyfill/is-core-module@1.0.39", "", {}, "sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA=="],
 
+    "@open-deltat/client": ["@open-deltat/client@workspace:packages/client"],
+
+    "@open-deltat/shared": ["@open-deltat/shared@workspace:packages/shared"],
+
     "@open-draft/deferred-promise": ["@open-draft/deferred-promise@2.2.0", "", {}, "sha512-CecwLWx3rhxVQF6V4bAgPS5t+So2sTbPgAzafKkVizyi7tlwpcFpdFqq+wqF2OwNBmqFuu6tOyouTuxgpMfzmA=="],
 
     "@open-draft/logger": ["@open-draft/logger@0.3.0", "", { "dependencies": { "is-node-process": "^1.2.0", "outvariant": "^1.4.0" } }, "sha512-X2g45fzhxH238HKO4xbSr7+wBS8Fvw6ixhTDuvLd5mqh6bJJCFAPwU9mPDxbcrRtfxv4u5IHCEH77BmxvXmmxQ=="],
 
     "@open-draft/until": ["@open-draft/until@2.1.0", "", {}, "sha512-U69T3ItWHvLwGg5eJ0n3I62nWuE6ilHlmz7zM0npLBRvPRd7e6NYmg54vvRtP5mZG7kZqZCFVdsTWo7BPtBujg=="],
-
-    "@open-tap/client": ["@open-tap/client@workspace:packages/client"],
-
-    "@open-tap/shared": ["@open-tap/shared@workspace:packages/shared"],
 
     "@radix-ui/number": ["@radix-ui/number@1.1.2", "", {}, "sha512-ceTwaxc4I5IOi97DgCotl3pqiyRGvffcc0oOsE2dQYaJOFIDsDt4VWG6xEbg1QePv9QWausCEIppud/tJ1wNig=="],
 

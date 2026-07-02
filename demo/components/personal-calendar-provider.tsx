@@ -6,7 +6,7 @@ import { getBookingsForResource } from "@/app/actions/bookings";
 import { getHoldsForResource } from "@/app/actions/holds";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { dayBounds } from "@/lib/time";
-import type { Booking, Hold } from "@open-tap/client";
+import type { Booking, Hold } from "@open-deltat/client";
 
 interface PersonalCalendarContextValue {
   calendarId: string | null;

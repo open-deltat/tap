@@ -15,7 +15,7 @@ These hold for every verb, so they are stated once here.
 ## Setup
 
 ```ts
-import { DeltaT } from "@open-tap/client";
+import { DeltaT } from "@open-deltat/client";
 
 const db = new DeltaT({ host: "localhost", port: 5433, database: "acme", password: "deltat" });
 ```
