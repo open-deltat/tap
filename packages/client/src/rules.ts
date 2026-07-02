@@ -5,6 +5,11 @@ import type { Rule } from "./types.js";
 export class Rules {
   constructor(private readonly sql: Sql) {}
 
+  /**
+   * Create one or more rules in a single round-trip. `blocking` defaults to false (an open-hours
+   * window); a blocking rule subtracts from availability. Takes an array, unlike `Resources.create`
+   * which is single-item. Times are Unix ms over `[start, end)`.
+   */
   async create(
     items: {
       resourceId: string;
@@ -46,12 +51,12 @@ export class Rules {
     return rules;
   }
 
-  // Replace a resource's open-hours (non-blocking) rules with `segments`: the cal.com-style
-  // "save my weekly hours" operation, mapped onto deltat primitives. Snapshots the existing
-  // non-blocking rule ids, creates the new ones FIRST, then deletes the stale ones, so a mid-run
-  // failure leaves the old hours (worst case: duplicate open rules, which merge in availability),
-  // never an empty schedule. Blocking rules and bookings are untouched. Callers expand their own
-  // recurrence into `segments`.
+  /**
+   * Replace a resource's non-blocking (open-hours) rules with `segments`, the cal.com-style "save my
+   * weekly hours". Creates the new rules before deleting the old, so a mid-run failure leaves the
+   * previous hours (worst case, duplicate open rules that merge in availability) rather than an empty
+   * schedule. Blocking rules and bookings are untouched; callers expand their own recurrence first.
+   */
   async replaceOpenHours(
     resourceId: string,
     segments: { start: number; end: number }[]
@@ -66,6 +71,7 @@ export class Rules {
     return created;
   }
 
+  /** Overwrite a rule's window and blocking flag by id. */
   async update(
     id: string,
     opts: { start: number; end: number; blocking: boolean }
@@ -76,10 +82,12 @@ export class Rules {
     );
   }
 
+  /** Delete a rule by id. */
   async delete(id: string): Promise<void> {
     await this.sql`DELETE FROM rules WHERE id = ${id}`;
   }
 
+  /** All rules for a resource, open-hours and blocking alike. */
   async get(resourceId: string): Promise<Rule[]> {
     const rows = await this
       .sql`SELECT * FROM rules WHERE resource_id = ${resourceId}`;

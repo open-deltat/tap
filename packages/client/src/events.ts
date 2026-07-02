@@ -4,6 +4,10 @@ import type { DeltaTEvent } from "./types.js";
 export class Events {
   constructor(private readonly sql: Sql) {}
 
+  /**
+   * Subscribe to a resource's change stream over LISTEN/NOTIFY. Resolves to an unsubscribe function;
+   * await it to stop listening. Malformed payloads are skipped rather than thrown to the callback.
+   */
   async listen(
     resourceId: string,
     callback: (event: DeltaTEvent) => void

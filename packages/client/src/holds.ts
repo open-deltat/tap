@@ -6,6 +6,11 @@ import type { Hold } from "./types.js";
 export class Holds {
   constructor(private readonly sql: Sql) {}
 
+  /**
+   * Place a hold over `[start, end)` that reserves the resource until `expiresAt` (Unix ms), when the
+   * server reaper releases it automatically. A hold removes availability but is not a booking; to
+   * keep the slot, create a booking and then release the hold.
+   */
   async place(opts: {
     resourceId: string;
     start: number;
@@ -26,10 +31,16 @@ export class Holds {
     };
   }
 
+  /** Release a hold by id before it expires. Expiry is otherwise automatic via the server reaper. */
   async release(id: string): Promise<void> {
     await this.sql`DELETE FROM holds WHERE id = ${id}`;
   }
 
+  /**
+   * Holds for one resource, optionally filtered client-side to those overlapping a half-open
+   * `{ start, end }` window (the kernel ignores range predicates in SELECTs). Not-yet-reaped expired
+   * holds can still appear; check `expiresAt` if that matters.
+   */
   async get(
     resourceId: string,
     filter?: { start?: number; end?: number }

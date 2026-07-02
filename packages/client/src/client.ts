@@ -14,6 +14,11 @@ export interface DeltaTOptions {
   password?: string;
 }
 
+/**
+ * Entry point to a deltat database. Holds one pgwire connection and exposes the typed sub-APIs
+ * (`resources`, `rules`, `bookings`, `holds`, `availability`, `events`) over it. Pass connection
+ * options, or an existing postgres `Sql` to reuse a pool.
+ */
 export class DeltaT {
   readonly sql: Sql;
   readonly resources: Resources;
@@ -47,6 +52,7 @@ export class DeltaT {
     this.events = new Events(this.sql);
   }
 
+  /** Close the underlying connection. The instance is unusable afterward, so call it once at shutdown. */
   async close(): Promise<void> {
     await this.sql.end();
   }

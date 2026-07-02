@@ -5,6 +5,10 @@ import type { Resource } from "./types.js";
 export class Resources {
   constructor(private readonly sql: Sql) {}
 
+  /**
+   * Create a single resource under an optional parent. `capacity` defaults to 1 (a booking takes the
+   * whole resource); a higher capacity lets that many bookings overlap. Use `createMany` for batches.
+   */
   async create(opts?: {
     parentId?: string | null;
     name?: string | null;
@@ -23,10 +27,12 @@ export class Resources {
     return { id, parentId, name, capacity, bufferAfter };
   }
 
-  // Create several resources in ONE round-trip (deltat now honors multi-row resource inserts via
-  // BatchInsertResources). Applied in order, so an item may reference a parent created earlier in
-  // the same call. Returns the created resources in input order. Bounded by the kernel's batch
-  // size (1000); callers seeding more should chunk.
+  /**
+   * Create several resources in one round-trip, applied in input order so an item may reference a
+   * parent created earlier in the same call. Returns them in that order. Resources splits single
+   * `create` from batch `createMany`, unlike `rules`/`bookings` whose `create` is always a batch.
+   * The kernel batch size is 1000; chunk larger seeds.
+   */
   async createMany(
     items: {
       parentId?: string | null;
@@ -66,6 +72,7 @@ export class Resources {
     return resources;
   }
 
+  /** Patch a resource in place. Only the fields you pass change; a call with no fields is a no-op. */
   async update(
     id: string,
     opts: {
@@ -97,10 +104,12 @@ export class Resources {
     await this.sql.unsafe(sql, values);
   }
 
+  /** Delete a resource by id. */
   async delete(id: string): Promise<void> {
     await this.sql`DELETE FROM resources WHERE id = ${id}`;
   }
 
+  /** List resources: all of them, only roots (`{ roots: true }`), or the direct children of a parent. */
   async get(
     filter?: { parentId: string } | { roots: true }
   ): Promise<Resource[]> {

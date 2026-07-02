@@ -22,6 +22,11 @@ function isExplicitArray(
   return Array.isArray(input);
 }
 
+/**
+ * Expand a recurring pattern into concrete `[start, end)` rule segments in Unix ms. The kernel
+ * stores only flat segments, so recurrence is materialized here at the edge rather than in deltat.
+ * An array of explicit segments passes through unchanged, with `blocking` defaulted to false.
+ */
 export function expandRecurrence(
   input: RecurrencePattern | ExplicitSegment[]
 ): RuleSegment[] {

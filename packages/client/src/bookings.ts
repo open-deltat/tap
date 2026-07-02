@@ -6,6 +6,11 @@ import type { Booking } from "./types.js";
 export class Bookings {
   constructor(private readonly sql: Sql) {}
 
+  /**
+   * Create one or more bookings in a single round-trip. All-or-nothing: if any item conflicts, the
+   * whole batch is rejected and nothing persists, so a multi-seat purchase can't half-commit. Times
+   * are Unix ms over `[start, end)`.
+   */
   async create(
     items: {
       resourceId: string;
@@ -51,10 +56,16 @@ export class Bookings {
     return bookings;
   }
 
+  /** Cancel (delete) a booking by id. */
   async cancel(id: string): Promise<void> {
     await this.sql`DELETE FROM bookings WHERE id = ${id}`;
   }
 
+  /**
+   * Bookings for one resource. An optional `{ start, end }` keeps only those overlapping the
+   * half-open window; it's applied client-side because the kernel ignores range predicates in
+   * SELECTs.
+   */
   async get(
     resourceId: string,
     filter?: { start?: number; end?: number }

@@ -4,6 +4,10 @@ import type { AvailabilitySlot } from "./types.js";
 export class Availability {
   constructor(private readonly sql: Sql) {}
 
+  /**
+   * Free `[start, end)` slots for one resource inside the window (Unix ms). `minDuration` drops
+   * openings shorter than that many ms, so a 90-minute service can ask for only slots it fits.
+   */
   async get(opts: {
     resourceId: string;
     start: number;
@@ -23,6 +27,11 @@ export class Availability {
     return rows.map(mapSlot);
   }
 
+  /**
+   * Availability across several resources merged into one timeline. `minAvailable` sets how many must
+   * be free at once: default all (intersection), 1 for a pool (union), or k for "any k of N". Rows
+   * carry no resource id because the set is combined; use `getMany` to keep them separate.
+   */
   async getCombined(opts: {
     resourceIds: string[];
     start: number;
@@ -51,9 +60,11 @@ export class Availability {
     return rows.map(mapSlot);
   }
 
-  // Per-resource availability for several resources in ONE round-trip, grouped by resource id,
-  // the analog of bookings/holds getMany. Omitting min_available routes to the engine's
-  // per-resource path (rows tagged with resource_id), unlike getCombined which merges the set.
+  /**
+   * Per-resource availability for several resources in one round-trip, grouped by id (the analog of
+   * `bookings`/`holds` getMany). Every requested id is present, empty when it has none. Rows stay
+   * tagged per resource, unlike `getCombined` which merges the set.
+   */
   async getMany(opts: {
     resourceIds: string[];
     start: number;
