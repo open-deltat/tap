@@ -13,12 +13,14 @@ export class Events {
     const meta = await this.sql.listen(
       channel,
       (payload: string) => {
+        let event: DeltaTEvent;
         try {
-          const event = JSON.parse(payload) as DeltaTEvent;
-          callback(event);
+          event = JSON.parse(payload) as DeltaTEvent;
         } catch {
-          // Ignore malformed payloads
+          // Ignore malformed payloads; do not swallow errors from the subscriber below.
+          return;
         }
+        callback(event);
       }
     );
 

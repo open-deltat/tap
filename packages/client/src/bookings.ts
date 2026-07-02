@@ -1,5 +1,6 @@
 import type { Sql } from "postgres";
 import { ulid } from "ulid";
+import { MAX_IN_CLAUSE_IDS, chunk } from "./chunk.js";
 import type { Booking } from "./types.js";
 
 export class Bookings {
@@ -25,7 +26,7 @@ export class Bookings {
 
     if (bookings.length === 1) {
       const b = bookings[0];
-      if (b.label) {
+      if (b.label != null) {
         await this
           .sql`INSERT INTO bookings (id, resource_id, start, "end", label) VALUES (${b.id}, ${b.resourceId}, ${b.start}, ${b.end}, ${b.label})`;
       } else {
@@ -58,16 +59,17 @@ export class Bookings {
     resourceId: string,
     filter?: { start?: number; end?: number }
   ): Promise<Booking[]> {
-    if (filter?.start != null && filter?.end != null) {
-      const rows = await this.sql.unsafe(
-        `SELECT * FROM bookings WHERE resource_id = $1 AND start < $2 AND "end" > $3`,
-        [resourceId, filter.end, filter.start]
-      );
-      return rows.map(mapBooking);
-    }
+    // The kernel ignores range predicates in bookings SELECTs, so window with the half-open
+    // overlap [start, end) client-side rather than emit SQL the parser silently drops.
     const rows = await this
       .sql`SELECT * FROM bookings WHERE resource_id = ${resourceId}`;
-    return rows.map(mapBooking);
+    const bookings = rows.map(mapBooking);
+    const start = filter?.start;
+    const end = filter?.end;
+    if (start != null && end != null) {
+      return bookings.filter((b) => b.start < end && b.end > start);
+    }
+    return bookings;
   }
 
   /** Bookings for many resources in one round-trip, grouped by resource id. Every requested id is
@@ -78,14 +80,20 @@ export class Bookings {
     for (const id of resourceIds) grouped[id] = [];
     if (resourceIds.length === 0) return grouped;
 
-    const placeholders = resourceIds.map((_, i) => `$${i + 1}`).join(", ");
-    const rows = await this.sql.unsafe(
-      `SELECT * FROM bookings WHERE resource_id IN (${placeholders})`,
-      [...resourceIds]
+    const batches = await Promise.all(
+      chunk(resourceIds, MAX_IN_CLAUSE_IDS).map((ids) => {
+        const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
+        return this.sql.unsafe(
+          `SELECT * FROM bookings WHERE resource_id IN (${placeholders})`,
+          [...ids]
+        );
+      })
     );
-    for (const row of rows) {
-      const b = mapBooking(row);
-      (grouped[b.resourceId] ??= []).push(b);
+    for (const rows of batches) {
+      for (const row of rows) {
+        const b = mapBooking(row);
+        (grouped[b.resourceId] ??= []).push(b);
+      }
     }
     return grouped;
   }
