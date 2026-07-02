@@ -1,5 +1,6 @@
 import type { Sql } from "postgres";
 import { ulid } from "ulid";
+import { MAX_IN_CLAUSE_IDS, chunk } from "./chunk.js";
 import type { Hold } from "./types.js";
 
 export class Holds {
@@ -33,16 +34,17 @@ export class Holds {
     resourceId: string,
     filter?: { start?: number; end?: number }
   ): Promise<Hold[]> {
-    if (filter?.start != null && filter?.end != null) {
-      const rows = await this.sql.unsafe(
-        `SELECT * FROM holds WHERE resource_id = $1 AND start < $2 AND "end" > $3`,
-        [resourceId, filter.end, filter.start]
-      );
-      return rows.map(mapHold);
-    }
+    // The kernel ignores range predicates in holds SELECTs, so window with the half-open
+    // overlap [start, end) client-side rather than emit SQL the parser silently drops.
     const rows = await this
       .sql`SELECT * FROM holds WHERE resource_id = ${resourceId}`;
-    return rows.map(mapHold);
+    const holds = rows.map(mapHold);
+    const start = filter?.start;
+    const end = filter?.end;
+    if (start != null && end != null) {
+      return holds.filter((h) => h.start < end && h.end > start);
+    }
+    return holds;
   }
 
   /** Holds for many resources in one round-trip, grouped by resource id. Every requested id is
@@ -53,14 +55,20 @@ export class Holds {
     for (const id of resourceIds) grouped[id] = [];
     if (resourceIds.length === 0) return grouped;
 
-    const placeholders = resourceIds.map((_, i) => `$${i + 1}`).join(", ");
-    const rows = await this.sql.unsafe(
-      `SELECT * FROM holds WHERE resource_id IN (${placeholders})`,
-      [...resourceIds]
+    const batches = await Promise.all(
+      chunk(resourceIds, MAX_IN_CLAUSE_IDS).map((ids) => {
+        const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
+        return this.sql.unsafe(
+          `SELECT * FROM holds WHERE resource_id IN (${placeholders})`,
+          [...ids]
+        );
+      })
     );
-    for (const row of rows) {
-      const h = mapHold(row);
-      (grouped[h.resourceId] ??= []).push(h);
+    for (const rows of batches) {
+      for (const row of rows) {
+        const h = mapHold(row);
+        (grouped[h.resourceId] ??= []).push(h);
+      }
     }
     return grouped;
   }
