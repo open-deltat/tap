@@ -69,7 +69,7 @@ export function AvailabilityStrip({
         ))}
       </div>
 
-      <div className="mt-2 flex flex-wrap gap-1">
+      <div className="mt-2 flex min-h-[2.75rem] flex-wrap gap-1">
         {openings.length === 0 ? (
           <span className="text-[11px] text-zinc-600">
             no {minNights > 1 ? `${minNights}-night ` : ""}opening in {days} days

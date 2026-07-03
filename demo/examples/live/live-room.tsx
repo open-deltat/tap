@@ -330,7 +330,7 @@ function Booker({
             )}
           >
             <Wifi className="h-2.5 w-2.5" />
-            {live ? "notify" : "live"}
+            <span className="inline-block w-[2.75rem] text-center">{live ? "notify" : "live"}</span>
           </span>
         </div>
 
@@ -354,25 +354,30 @@ function Booker({
           )}
         </div>
 
-        {slot && selectedSeats.size > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2">
-            <div className="flex flex-1 flex-wrap items-center gap-1.5">
-              {Array.from(selectedSeats)
-                .map((id) => ({ id, name: seatName(id), price: sectionOf(id)?.price }))
-                .sort((x, y) => x.name.localeCompare(y.name))
-                .map(({ id, name, price }) => (
-                  <span key={id} className="rounded bg-emerald-400/15 px-1.5 py-0.5 text-xs font-medium text-emerald-200">
-                    {name}
-                    {price != null && <span className="ml-0.5 text-emerald-300/70">${price}</span>}
-                  </span>
-                ))}
-            </div>
-            <BookButton onClick={handleBookHeld} loading={isPending}>
-              Book {selectedSeats.size}
-              {selectedTotal > 0 && ` · $${selectedTotal.toLocaleString()}`}
-            </BookButton>
-          </div>
-        )}
+        {/* Always reserved so selecting a seat never grows the card. Empty state holds the space. */}
+        <div className="mt-2 flex min-h-[2.5rem] flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2">
+          {slot && selectedSeats.size > 0 ? (
+            <>
+              <div className="flex flex-1 flex-wrap items-center gap-1.5">
+                {Array.from(selectedSeats)
+                  .map((id) => ({ id, name: seatName(id), price: sectionOf(id)?.price }))
+                  .sort((x, y) => x.name.localeCompare(y.name))
+                  .map(({ id, name, price }) => (
+                    <span key={id} className="rounded bg-emerald-400/15 px-1.5 py-0.5 text-xs font-medium text-emerald-200">
+                      {name}
+                      {price != null && <span className="ml-0.5 text-emerald-300/70">${price}</span>}
+                    </span>
+                  ))}
+              </div>
+              <BookButton onClick={handleBookHeld} loading={isPending}>
+                Book {selectedSeats.size}
+                {selectedTotal > 0 && ` · $${selectedTotal.toLocaleString()}`}
+              </BookButton>
+            </>
+          ) : (
+            <span className="text-[11px] text-zinc-600">Tap a free seat to hold it, then book.</span>
+          )}
+        </div>
       </div>
 
       <BookingConfirmedModal result={result} onClose={() => setResult(null)} onBookAnother={() => setResult(null)} />
@@ -404,7 +409,7 @@ function PerfBar({ perf }: { perf: { read?: number; book?: number; live?: number
           title={s.hint}
         >
           <span className="text-[9px] text-zinc-500">{s.label}</span>
-          <span className="font-mono text-[10px] font-semibold tabular-nums text-emerald-300">
+          <span className="inline-block min-w-[3rem] text-right font-mono text-[10px] font-semibold tabular-nums text-emerald-300">
             {s.value != null ? fmtMs(s.value) : "n/a"}
           </span>
         </span>

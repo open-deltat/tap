@@ -214,14 +214,16 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
         </div>
       </div>
 
-      {selectedLabel && (
-        <div className="mt-5">
-          <div className="mb-3 text-sm font-medium text-zinc-200">{selectedLabel}</div>
-          {selectedClasses.length === 0 ? (
-            <div className="text-xs text-zinc-500">No classes scheduled.</div>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {selectedClasses.map((c) => (
+      {/* Reserved so day-select and month navigation swap content in place instead of growing. */}
+      <div className="mt-5 min-h-[16rem]">
+        {selectedLabel ? (
+          <>
+            <div className="mb-3 text-sm font-medium text-zinc-200">{selectedLabel}</div>
+            {selectedClasses.length === 0 ? (
+              <div className="text-xs text-zinc-500">No classes scheduled.</div>
+            ) : (
+              <ul className="flex max-h-[13rem] flex-col gap-2 overflow-y-auto">
+                {selectedClasses.map((c) => (
                 <li
                   key={c.id}
                   className="flex items-start gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
@@ -249,10 +251,15 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
                   </div>
                 </li>
               ))}
-            </ul>
-          )}
-        </div>
-      )}
+              </ul>
+            )}
+          </>
+        ) : (
+          <div className="flex min-h-[16rem] items-center justify-center text-sm text-zinc-500">
+            Pick a day to see classes
+          </div>
+        )}
+      </div>
     </div>
   );
 }

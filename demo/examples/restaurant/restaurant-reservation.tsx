@@ -325,21 +325,27 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
       </div>
     ) : undefined;
 
-  const surface =
-    timeSlots.length === 0 ? (
-      <div className="py-16 text-center text-sm text-zinc-400">No service today.</div>
-    ) : tables.length === 0 && !bar ? (
-      <div className="py-16 text-center text-sm text-zinc-400">No tables fit a party of {partySize}.</div>
-    ) : (
-      <RestaurantFloorPlan
-        tables={floorTables}
-        bar={floorBar}
-        selectedTableId={selectedTableId}
-        barSelected={barSelected}
-        onSelectTable={pickTable}
-        onSelectBar={pickBar}
-      />
-    );
+  const surface = (
+    // Reserved so swapping between an empty state and the floor plan does not collapse the panel.
+    <div className="min-h-[26rem]">
+      {timeSlots.length === 0 ? (
+        <div className="flex min-h-[26rem] items-center justify-center text-sm text-zinc-400">No service today.</div>
+      ) : tables.length === 0 && !bar ? (
+        <div className="flex min-h-[26rem] items-center justify-center text-sm text-zinc-400">
+          No tables fit a party of {partySize}.
+        </div>
+      ) : (
+        <RestaurantFloorPlan
+          tables={floorTables}
+          bar={floorBar}
+          selectedTableId={selectedTableId}
+          barSelected={barSelected}
+          onSelectTable={pickTable}
+          onSelectBar={pickBar}
+        />
+      )}
+    </div>
+  );
 
   return (
     <>

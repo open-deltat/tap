@@ -512,11 +512,16 @@ export default function StadiumExample() {
             <span className="sm:hidden">pinch to zoom · drag to pan</span>
           </div>
 
-          {seatLOD && (
-            <div className="pointer-events-none mt-2 text-center text-[11px] text-zinc-600">
-              Tap a free seat to select · book the batch below
-            </div>
-          )}
+          {/* Always rendered; opacity toggles so zooming to seat level never adds height. */}
+          <div
+            className={cn(
+              "pointer-events-none mt-2 text-center text-[11px] text-zinc-600 transition-opacity",
+              seatLOD ? "opacity-100" : "opacity-0"
+            )}
+            aria-hidden={!seatLOD}
+          >
+            Tap a free seat to select · book the batch below
+          </div>
         </div>
       </Stage>
 

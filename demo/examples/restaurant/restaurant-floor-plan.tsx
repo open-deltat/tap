@@ -74,9 +74,10 @@ export function RestaurantFloorPlan({
                   >
                     <div className="text-sm font-semibold">{table.name}</div>
                     <div className="mt-0.5 text-[10px] text-zinc-500">{table.maxGuests} guests</div>
-                    {!table.available && (
-                      <div className="mt-0.5 text-[10px] font-medium text-rose-400/80">unavailable</div>
-                    )}
+                    {/* Always rendered so available and unavailable tiles are the same height. */}
+                    <div className={cn("mt-0.5 text-[10px] font-medium text-rose-400/80", table.available && "invisible")}>
+                      unavailable
+                    </div>
                   </button>
                 );
               })}

@@ -243,7 +243,7 @@ export default function BuilderExample() {
                 const ranges = week[dow] ?? [];
                 const on = ranges.length > 0;
                 return (
-                  <div key={dow} className="flex items-start gap-3 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+                  <div key={dow} className="flex min-h-[4.5rem] items-start gap-3 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
                     <div className="flex w-14 shrink-0 flex-col items-start gap-1.5">
                       <span className="text-[12px] font-medium text-zinc-200">{DOW_LABEL[dow]}</span>
                       <Toggle

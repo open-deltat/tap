@@ -244,24 +244,31 @@ export default function MeetExample() {
               : `No evening fits a ${durationLabel(duration)} dinner for all five in the next three weeks`}
           </div>
 
-          {detail && (
-            <div className="mt-5 rounded-lg border border-white/[0.07] bg-white/[0.02] p-4">
-              <div className="mb-3 text-center">
-                <div className="text-sm font-medium text-zinc-100">{dayLabel(detail.dayStart)}</div>
-                <div className="text-[12px] text-zinc-400">
-                  {slotOptions.length > 0 ? "Pick a start time on the All free lane" : `No ${durationLabel(duration)} window all five share this evening`}
+          {/* Reserved so picking a day swaps content in place instead of growing the panel. */}
+          <div className="mt-5 min-h-[23rem] rounded-lg border border-white/[0.07] bg-white/[0.02] p-4">
+            {detail ? (
+              <>
+                <div className="mb-3 text-center">
+                  <div className="text-sm font-medium text-zinc-100">{dayLabel(detail.dayStart)}</div>
+                  <div className="text-[12px] text-zinc-400">
+                    {slotOptions.length > 0 ? "Pick a start time on the All free lane" : `No ${durationLabel(duration)} window all five share this evening`}
+                  </div>
                 </div>
+                <MeetLanes
+                  axisStart={detail.dayStart + AXIS_START_HOUR * H}
+                  axisEnd={detail.dayStart + AXIS_END_HOUR * H}
+                  intersectionSlots={slotOptions}
+                  selectedStarts={selectedStarts}
+                  onPickSlot={pickSlot}
+                  lanes={[...detail.friendLanes, { label: "All free", slots: detail.shared, intersection: true }]}
+                />
+              </>
+            ) : (
+              <div className="flex min-h-[21rem] items-center justify-center text-center text-sm text-zinc-500">
+                Pick a day to see common times
               </div>
-              <MeetLanes
-                axisStart={detail.dayStart + AXIS_START_HOUR * H}
-                axisEnd={detail.dayStart + AXIS_END_HOUR * H}
-                intersectionSlots={slotOptions}
-                selectedStarts={selectedStarts}
-                onPickSlot={pickSlot}
-                lanes={[...detail.friendLanes, { label: "All free", slots: detail.shared, intersection: true }]}
-              />
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </Stage>
 

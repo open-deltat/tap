@@ -290,8 +290,10 @@ export default function HotelPage() {
                   <div className="mt-3">
                     <AvailabilityStrip capacity={rt.capacity} bookings={all} fromMs={todayMs} />
                   </div>
-                  {sorted.length > 0 && (
-                    <ul className="mt-3 space-y-1">
+                  {/* Reserved baseline so booking/cancelling a room does not shove the next card. */}
+                  <div className="mt-3 min-h-[3.5rem]">
+                    {sorted.length > 0 && (
+                    <ul className="space-y-1">
                       {sorted.slice(0, 6).map((b) => (
                         <li
                           key={b.id}
@@ -315,7 +317,8 @@ export default function HotelPage() {
                         </li>
                       ))}
                     </ul>
-                  )}
+                    )}
+                  </div>
                 </div>
               );
             })}
