@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Github } from "lucide-react";
 import { enabledExamples, type ExampleMeta } from "@/examples/manifest";
 import { pageMetadata, SITE } from "@/lib/seo";
 
@@ -52,6 +52,30 @@ export default function Home() {
             >
               What is TAP
               <ArrowRight className="h-3.5 w-3.5" />
+            </a>
+          </div>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-3.5 gap-y-2 text-[12px] text-zinc-500">
+            <a
+              href={SITE.github}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 transition-colors hover:text-zinc-300"
+            >
+              <Github className="h-3.5 w-3.5" />
+              Open source
+            </a>
+            <span className="text-zinc-700">·</span>
+            <code className="rounded bg-white/[0.04] px-2 py-0.5 font-mono text-[11.5px] text-zinc-400">
+              npm i @open-deltat/client
+            </code>
+            <span className="text-zinc-700">·</span>
+            <a
+              href="https://crates.io/crates/deltat"
+              target="_blank"
+              rel="noreferrer"
+              className="transition-colors hover:text-zinc-300"
+            >
+              deltat on crates.io
             </a>
           </div>
         </header>
