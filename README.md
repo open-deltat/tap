@@ -11,9 +11,9 @@
 
 ---
 
-TAP is the client layer for [deltat](https://github.com/open-deltat/deltat), a time-first scheduling database. It is a typed TypeScript SDK plus a set of demo apps that show what deltat can do: seat maps, calendars, capacity pools, recurring schedules, and hold-to-book flows with live updates.
+TAP is the Time Allocation Protocol, an open standard for scheduling, booking, and availability: one shared way to describe time and ask "what is free, and can I claim it before someone else does?", so any app, service, or agent speaks it the same way.
 
-deltat handles the hard part (availability, conflicts, capacity, holds, buffers) as collision detection on the Unix-time number line. TAP gives you a clean way to talk to it from TypeScript.
+This repo is TAP in practice: its typed TypeScript SDK (`@open-deltat/client`) and a set of demo apps (seat maps, calendars, capacity pools, recurring schedules, and hold-to-book flows with live updates). The SDK points at [deltat](https://github.com/open-deltat/deltat), the database built to speak TAP, which treats availability as collision detection on the Unix-time number line. The protocol does not depend on it: any backend that implements TAP can be talked to the same way.
 
 ## Install
 

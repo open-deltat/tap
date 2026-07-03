@@ -1,6 +1,6 @@
 # @open-deltat/client
 
-TypeScript SDK for [deltat](https://github.com/open-deltat/deltat), a time-allocation database.
+The TypeScript SDK for **TAP**, the Time Allocation Protocol: an open standard for scheduling, booking, and availability. It points at [deltat](https://github.com/open-deltat/deltat), the database built to speak TAP, though any backend that implements the protocol works the same way.
 
 deltat speaks the PostgreSQL wire protocol (a transitional transport; a v2 framed protocol with
 HTTP and MCP adapters is planned), so this SDK connects with a standard Postgres client and exposes
