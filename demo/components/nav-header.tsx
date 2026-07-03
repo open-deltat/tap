@@ -2,9 +2,10 @@
 
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { SITE } from "@/lib/seo";
 
 // A slim top bar on every page: the logo (back to the example gallery), a link to the
 // docs, and the theme toggle. The example list lives on the landing gallery (/), not in a
@@ -35,6 +36,15 @@ export function NavHeader() {
         </a>
         <a href="/docs" className={link(onDocs)}>
           Docs
+        </a>
+        <a
+          href={SITE.github}
+          target="_blank"
+          rel="noreferrer"
+          aria-label="open-deltat on GitHub"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+        >
+          <Github className="h-4 w-4" />
         </a>
         <Button
           variant="ghost"
