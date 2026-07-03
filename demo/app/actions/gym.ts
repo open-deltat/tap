@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { dt } from "@/lib/deltat";
 import { ensureGym } from "@/examples/gym/seed";
 
@@ -46,4 +47,44 @@ export async function getPublicSchedule(start: number, end: number): Promise<Pub
 export async function getScheduleWindow(): Promise<{ start: number; end: number }> {
   const { window } = await ensureGym();
   return window;
+}
+
+// A demo-grade guard against a public bookable embed: cap bookings per client IP. In-memory and
+// single-instance, enough to keep the demo standing under a crowd. A real deployment would swap this
+// for a shared store plus a confirm-time identity or deposit (the no-show fix, VIS-08).
+const recentBookings = new Map<string, number[]>();
+function withinRateLimit(ip: string, max = 6, windowMs = 60_000): boolean {
+  const now = Date.now();
+  const hits = (recentBookings.get(ip) ?? []).filter((t) => now - t < windowMs);
+  if (hits.length >= max) return false;
+  hits.push(now);
+  recentBookings.set(ip, hits);
+  return true;
+}
+
+// Book one spot in a class. The client only knows the rule (class occurrence) id; the course id and
+// its capacity stay on the server, so booking cannot leak the roster any more than the read does.
+// deltat's capacity-aware conflict check is the real overbooking guard: if the class filled between
+// the read and here, create() rejects it and we surface that.
+export async function bookGymClass(ruleId: string, name?: string): Promise<{ spotsLeft: number; full: boolean }> {
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  if (!withinRateLimit(ip)) throw new Error("Too many bookings from here just now. Give it a minute.");
+
+  const { courses } = await ensureGym();
+  for (const course of courses) {
+    const rules = await dt.rules.get(course.id);
+    const rule = rules.find((r) => r.id === ruleId && !r.blocking);
+    if (!rule) continue;
+
+    const bookings = await dt.bookings.get(course.id, { start: rule.start, end: rule.end });
+    const booked = bookings.filter((b) => b.start < rule.end && b.end > rule.start).length;
+    if (booked >= course.capacity) throw new Error("That class just filled up.");
+
+    await dt.bookings.create([
+      { resourceId: course.id, start: rule.start, end: rule.end, label: name?.trim() || "Guest" },
+    ]);
+    const spotsLeft = Math.max(0, course.capacity - booked - 1);
+    return { spotsLeft, full: spotsLeft === 0 };
+  }
+  throw new Error("Class not found.");
 }

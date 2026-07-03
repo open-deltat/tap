@@ -17,7 +17,7 @@ import {
   type CalendarState,
   type Feature,
 } from "@/components/ui/kibo-ui/calendar";
-import { getPublicSchedule, getScheduleWindow, type PublicClass } from "@/app/actions/gym";
+import { getPublicSchedule, getScheduleWindow, bookGymClass, type PublicClass } from "@/app/actions/gym";
 
 const OPEN = "#34d399";
 const FILLING = "#fbbf24";
@@ -29,7 +29,7 @@ function colorFor(c: PublicClass): string {
   return OPEN;
 }
 
-const CAPTION = "A read-only schedule anyone can embed: the class, its time, and how many spots are left.";
+const CAPTION = "A schedule anyone can embed and book from. Capacity and the roster stay on the server; the widget shows only spots left.";
 
 export default function GymExample() {
   const [range, setRange] = useState<{ start: number; end: number } | null>(null);
@@ -50,7 +50,7 @@ export default function GymExample() {
 
   return (
     <Stage
-      primitive={{ label: "Weekly classes, published read-only", specId: "EDGE-03" }}
+      primitive={{ label: "Weekly classes, embeddable and bookable", specId: "EDGE-03" }}
       title="FitFlow Studio"
       ribbon={ribbon}
       contentMax="max-w-3xl"
@@ -70,6 +70,7 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
   const [classes, setClasses] = useState<PublicClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [bookingId, setBookingId] = useState<string | null>(null);
 
   const { windowStart, windowEnd } = useMemo(
     () => ({
@@ -164,6 +165,24 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
         })
       : null;
 
+  async function refresh() {
+    setClasses(await getPublicSchedule(windowStart, windowEnd));
+  }
+
+  async function book(ruleId: string) {
+    setBookingId(ruleId);
+    try {
+      await bookGymClass(ruleId);
+      toast.success("Booked. See you in class.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not book.");
+    } finally {
+      // Refresh either way: on success spots drop, on a "just filled up" error the count corrects.
+      await refresh();
+      setBookingId(null);
+    }
+  }
+
   if (failed) {
     return (
       <div className="flex min-h-[20rem] items-center justify-center text-sm text-zinc-400">
@@ -249,6 +268,16 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
                       )}
                     </div>
                   </div>
+                  {!c.full && (
+                    <button
+                      type="button"
+                      onClick={() => book(c.id)}
+                      disabled={bookingId !== null}
+                      className="inline-flex min-w-[3.5rem] shrink-0 items-center justify-center gap-1 self-center rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200 transition-colors hover:border-emerald-400/50 hover:bg-emerald-400/15 disabled:opacity-50"
+                    >
+                      {bookingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Book"}
+                    </button>
+                  )}
                 </li>
               ))}
               </ul>
