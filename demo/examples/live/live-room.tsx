@@ -312,7 +312,7 @@ function Booker({
 
   return (
     <>
-      <div className={cn("relative rounded-xl border bg-white/[0.02] p-2 pb-16 transition-colors sm:p-3 sm:pb-16", a.border, live && a.borderLive)}>
+      <div className={cn("rounded-xl border bg-white/[0.02] p-2 transition-colors sm:p-3", a.border, live && a.borderLive)}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 text-xs font-medium text-zinc-200">
             <span className={cn("h-2 w-2 rounded-full", a.dot)} />
@@ -354,35 +354,30 @@ function Booker({
           )}
         </div>
 
-        {/* The action bar floats as an overlay (absolute, out of flow), so it never changes the card
-            height no matter how many seat chips wrap. The card reserves bottom room (pb-16) for it.
-            Same fixed-footer principle the seat-booking demos use via Stage's tray. */}
-        {slot && selectedSeats.size === 0 && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-5 text-center text-[11px] text-zinc-600">
-            Tap a free seat to hold it, then book.
+        {/* Always rendered, so the 0-to-1 selection never changes the card height: the Book button
+            (fixed h-10) is always present, and the chips replace the hint in the same row. It only
+            grows if many chips wrap, which is genuine content, not a pop-in. */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2">
+          <div className="flex flex-1 flex-wrap items-center gap-1.5">
+            {slot && selectedSeats.size > 0 ? (
+              Array.from(selectedSeats)
+                .map((id) => ({ id, name: seatName(id), price: sectionOf(id)?.price }))
+                .sort((x, y) => x.name.localeCompare(y.name))
+                .map(({ id, name, price }) => (
+                  <span key={id} className="rounded bg-emerald-400/15 px-1.5 py-0.5 text-xs font-medium text-emerald-200">
+                    {name}
+                    {price != null && <span className="ml-0.5 text-emerald-300/70">${price}</span>}
+                  </span>
+                ))
+            ) : (
+              <span className="text-[11px] text-zinc-600">Tap a free seat to hold it, then book.</span>
+            )}
           </div>
-        )}
-        {slot && selectedSeats.size > 0 && (
-          <div className="absolute inset-x-2 bottom-2 sm:inset-x-3 sm:bottom-3">
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-zinc-900/90 p-2 shadow-lg shadow-black/40 backdrop-blur">
-              <div className="flex flex-1 flex-wrap items-center gap-1.5">
-                {Array.from(selectedSeats)
-                  .map((id) => ({ id, name: seatName(id), price: sectionOf(id)?.price }))
-                  .sort((x, y) => x.name.localeCompare(y.name))
-                  .map(({ id, name, price }) => (
-                    <span key={id} className="rounded bg-emerald-400/15 px-1.5 py-0.5 text-xs font-medium text-emerald-200">
-                      {name}
-                      {price != null && <span className="ml-0.5 text-emerald-300/70">${price}</span>}
-                    </span>
-                  ))}
-              </div>
-              <BookButton onClick={handleBookHeld} loading={isPending}>
-                Book {selectedSeats.size}
-                {selectedTotal > 0 && ` · $${selectedTotal.toLocaleString()}`}
-              </BookButton>
-            </div>
-          </div>
-        )}
+          <BookButton onClick={handleBookHeld} loading={isPending} disabled={selectedSeats.size === 0}>
+            Book{selectedSeats.size > 0 ? ` ${selectedSeats.size}` : ""}
+            {selectedTotal > 0 && ` · $${selectedTotal.toLocaleString()}`}
+          </BookButton>
+        </div>
       </div>
 
       <BookingConfirmedModal result={result} onClose={() => setResult(null)} onBookAnother={() => setResult(null)} />
