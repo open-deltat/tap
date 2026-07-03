@@ -312,7 +312,7 @@ function Booker({
 
   return (
     <>
-      <div className={cn("rounded-xl border bg-white/[0.02] p-2 transition-colors sm:p-3", a.border, live && a.borderLive)}>
+      <div className={cn("relative rounded-xl border bg-white/[0.02] p-2 pb-16 transition-colors sm:p-3 sm:pb-16", a.border, live && a.borderLive)}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 text-xs font-medium text-zinc-200">
             <span className={cn("h-2 w-2 rounded-full", a.dot)} />
@@ -354,10 +354,17 @@ function Booker({
           )}
         </div>
 
-        {/* Always reserved so selecting a seat never grows the card. Empty state holds the space. */}
-        <div className="mt-2 flex min-h-[2.5rem] flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2">
-          {slot && selectedSeats.size > 0 ? (
-            <>
+        {/* The action bar floats as an overlay (absolute, out of flow), so it never changes the card
+            height no matter how many seat chips wrap. The card reserves bottom room (pb-16) for it.
+            Same fixed-footer principle the seat-booking demos use via Stage's tray. */}
+        {slot && selectedSeats.size === 0 && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-5 text-center text-[11px] text-zinc-600">
+            Tap a free seat to hold it, then book.
+          </div>
+        )}
+        {slot && selectedSeats.size > 0 && (
+          <div className="absolute inset-x-2 bottom-2 sm:inset-x-3 sm:bottom-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-zinc-900/90 p-2 shadow-lg shadow-black/40 backdrop-blur">
               <div className="flex flex-1 flex-wrap items-center gap-1.5">
                 {Array.from(selectedSeats)
                   .map((id) => ({ id, name: seatName(id), price: sectionOf(id)?.price }))
@@ -373,11 +380,9 @@ function Booker({
                 Book {selectedSeats.size}
                 {selectedTotal > 0 && ` · $${selectedTotal.toLocaleString()}`}
               </BookButton>
-            </>
-          ) : (
-            <span className="text-[11px] text-zinc-600">Tap a free seat to hold it, then book.</span>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <BookingConfirmedModal result={result} onClose={() => setResult(null)} onBookAnother={() => setResult(null)} />
