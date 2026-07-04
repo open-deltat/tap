@@ -91,11 +91,74 @@ The dev script installs deltat via `cargo install` if it is missing or out of da
 ## Repository
 
 ```
-packages/client/   @open-deltat/client, the TypeScript SDK over deltat's wire protocol
-packages/shared/   date and week helpers shared by the apps
-demo/              Next.js app with the interactive examples above
-calendar/          standalone booking-calendar app
+packages/client/     @open-deltat/client, the TypeScript SDK over deltat's wire protocol
+packages/examples/   @open-deltat/examples, the booking modules (components + "use server" actions) shared by every app
+packages/shared/     date and week helpers shared by the apps
+demo/                Next.js gallery of the interactive examples above
+calendar/            standalone booking app with env-based owner login
 ```
+
+## Shared examples package
+
+The booking demos are not welded to the demo site. Every example, its React components, its `"use server"` actions, the deltat client, the seed and booking helpers, and the shared booker UI, lives in one workspace package: `@open-deltat/examples`. Two kinds of app consume the same package with no duplication:
+
+- **`demo/`** renders them as a gallery ([delt.at](https://delt.at)). It stays a pure gallery: it shows the examples, it never becomes one of them.
+- **A standalone app** (see below) imports the same modules as its own booking surface and adds its own chrome, login, and tenant.
+
+The package ships raw source that carries `"use client"` / `"use server"` directives, so a consuming Next.js app must transpile it:
+
+```ts
+// next.config.ts
+export default { transpilePackages: ["@open-deltat/examples"] };
+```
+
+Then import a whole example, or the pieces beneath it, by subpath:
+
+```ts
+import Gym from "@open-deltat/examples/gym";                    // a full example component
+import { Stage } from "@open-deltat/examples/components/stage"; // shared booker UI
+import { dt } from "@open-deltat/examples/lib/deltat";          // the deltat client
+import { enabledExampleIds } from "@open-deltat/examples/config";
+```
+
+## Deploying a standalone app with env-based auth
+
+`calendar/` is the reference for a single-tenant deployable app: a public booking page plus an owner dashboard behind a login. It needs no user database and no identity provider. The owner credentials, the cookie-signing secret, and the deltat tenant all come from the environment, so a deployment is one image plus its env.
+
+**Login model.** One operator signs in with `CAL_USER` / `CAL_PASS`. On success the app sets an `httpOnly` session cookie signed with `CAL_SECRET` (HMAC-SHA256, constant-time verified, with a 7-day server-enforced expiry so a copied cookie still ages out). There is no user table. Every authenticated Server Action calls `requireSession()` as its first line, because a Server Action is an independent POST endpoint that a layout redirect does not protect.
+
+**Environment.**
+
+| Variable | Purpose |
+|---|---|
+| `CAL_USER`, `CAL_PASS` | owner login credentials |
+| `CAL_SECRET` | HMAC key that signs the session cookie |
+| `CAL_DISPLAY_NAME`, `CAL_SLUG` | public business name and booking path (`/book/<slug>`) |
+| `DELTAT_HOST`, `DELTAT_PORT`, `DELTAT_PASSWORD` | the deltat instance to talk to |
+| `DELTAT_DB` | this deployment's tenant, its isolated data |
+
+**Production safety.** In production the app refuses to authenticate while `CAL_PASS`, `CAL_SECRET`, or `DELTAT_PASSWORD` are still the in-repo defaults (`assertProductionSecrets()`), so a deploy can never ship a forgeable session or a public database password.
+
+**Example.** Build a standalone image from `calendar/` (Next server output, the way `demo/` does), then run it with this deployment's env and tenant:
+
+```yaml
+services:
+  fitflow:
+    image: your-registry/tap-calendar:latest   # built from calendar/
+    environment:
+      CAL_USER: owner
+      CAL_PASS: ${CAL_PASS}          # from a secret store, never committed
+      CAL_SECRET: ${CAL_SECRET}      # e.g. openssl rand -hex 32
+      CAL_DISPLAY_NAME: "FitFlow Studio"
+      CAL_SLUG: fitflow
+      DELTAT_HOST: deltat
+      DELTAT_PORT: "5433"
+      DELTAT_DB: fitflow             # this tenant's isolated store
+      DELTAT_PASSWORD: ${DELTAT_PASSWORD}
+    ports: ["3000:3000"]
+```
+
+Point `DELTAT_DB` at a distinct database name per deployment and deltat provisions an isolated store on first connect, so two operators never share data. Generate `CAL_SECRET` with `openssl rand -hex 32` and keep it in your secret store, never in the compose file.
 
 ## License
 
