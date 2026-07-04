@@ -2,6 +2,7 @@
   "name": "@open-deltat/shared",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "exports": {
     "./utils": "./src/utils.ts",

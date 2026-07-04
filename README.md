@@ -5,7 +5,8 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/@open-deltat/client"><img src="https://img.shields.io/npm/v/@open-deltat/client.svg?logo=npm" alt="npm"></a>
   <a href="https://github.com/open-deltat/tap/actions/workflows/ci.yml"><img src="https://github.com/open-deltat/tap/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/SDK-MIT-blue.svg" alt="SDK: MIT"></a>
+  <a href="demo/LICENSE"><img src="https://img.shields.io/badge/apps-AGPL--3.0-orange.svg" alt="Apps: AGPL-3.0"></a>
   <a href="https://delt.at"><img src="https://img.shields.io/badge/site-delt.at-4fe3a3.svg" alt="delt.at"></a>
 </p>
 
@@ -98,4 +99,9 @@ calendar/          standalone booking-calendar app
 
 ## License
 
-[MIT](LICENSE)
+Licensed by directory:
+
+- **SDK and shared helpers** (`packages/`): [MIT](LICENSE). Use them anywhere, in any project, open or closed. This is what the npm package ships under.
+- **Applications** (`demo/`, `calendar/`): [AGPL-3.0-or-later](demo/LICENSE). They are meant to be self-hosted and deployed; if you run a modified version as a network service, you must offer that version's source under the same license.
+
+GitHub shows the root MIT license in the sidebar because it only reads the top-level file; the AGPL applies to the app directories regardless, via their own `LICENSE` files.

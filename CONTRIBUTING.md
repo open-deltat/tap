@@ -1,8 +1,8 @@
 # Contributing to tap
 
-Thanks for your interest. tap is the TypeScript client layer for [deltat](https://github.com/open-deltat/deltat):
-a typed SDK (`@open-deltat/client`) plus demo apps. Contributions are held to a high correctness and
-clarity bar.
+Thanks for your interest. tap is the Time Allocation Protocol, an open standard for scheduling, booking,
+and availability: its typed TypeScript SDK (`@open-deltat/client`) plus demo apps, speaking to
+[deltat](https://github.com/open-deltat/deltat). Contributions are held to a high correctness and clarity bar.
 
 ## Ground rules
 
@@ -38,3 +38,12 @@ CI runs `bun test` and the SDK build on every push and pull request.
 - One logical change per PR; keep the diff focused.
 - Match the surrounding code: naming, comment density, idiom.
 - Update the SDK `README.md` and `CHANGELOG.md` when the public surface changes.
+
+## Licensing of contributions
+
+This repo is licensed by directory, so a contribution is licensed under whichever part it touches:
+
+- Changes under `packages/` (the SDK and shared helpers) are **MIT**.
+- Changes under `demo/` or `calendar/` (the applications) are **AGPL-3.0-or-later**.
+
+By opening a pull request you agree to license your contribution under the license of the directory it lands in.
