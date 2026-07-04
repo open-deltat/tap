@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* The example components live in the @open-deltat/examples package; Tailwind must scan their source
+   for class names or they render unstyled. */
+@source "../../packages/examples/src";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

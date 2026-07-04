@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { ThemeProvider } from "next-themes";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@open-deltat/examples/components/ui/sonner";
 import { NavHeader } from "@/components/nav-header";
 import { JsonLd } from "@/components/json-ld";
 import { SITE, organizationLd, websiteLd, softwareApplicationLd } from "@/lib/seo";

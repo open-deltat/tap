@@ -1,0 +1,56 @@
+{
+  "name": "@open-deltat/examples",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    "./config": "./src/examples/config.ts",
+    "./manifest": "./src/examples/manifest.ts",
+    "./seeds": "./src/examples/seeds.ts",
+    "./airline": "./src/examples/airline/index.tsx",
+    "./availability": "./src/examples/availability/index.tsx",
+    "./builder": "./src/examples/builder/index.tsx",
+    "./cinema": "./src/examples/cinema/index.tsx",
+    "./gym": "./src/examples/gym/index.tsx",
+    "./hotel": "./src/examples/hotel/index.tsx",
+    "./live": "./src/examples/live/index.tsx",
+    "./meet": "./src/examples/meet/index.tsx",
+    "./parking": "./src/examples/parking/index.tsx",
+    "./restaurant": "./src/examples/restaurant/index.tsx",
+    "./stadium": "./src/examples/stadium/index.tsx",
+    "./theater": "./src/examples/theater/index.tsx",
+    "./components/ui/kibo-ui/calendar": "./src/components/ui/kibo-ui/calendar/index.tsx",
+    "./components/*": "./src/components/*.tsx",
+    "./lib/*": "./src/lib/*.ts",
+    "./actions/*": "./src/actions/*.ts",
+    "./hooks/*": "./src/hooks/*.ts"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-dom": "*",
+    "next": "*",
+    "next-themes": "^0.4.6",
+    "sonner": "^2.0.7"
+  },
+  "dependencies": {
+    "@open-deltat/client": "workspace:*",
+    "@open-deltat/shared": "workspace:*",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "jotai": "^2.18.0",
+    "lucide-react": "^0.563.0",
+    "radix-ui": "^1.6.0",
+    "react-day-picker": "^10.0.1",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}

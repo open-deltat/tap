@@ -1,4 +1,4 @@
-import { PersonalCalendarProvider } from "@/components/personal-calendar-provider";
+import { PersonalCalendarProvider } from "@open-deltat/examples/components/personal-calendar-provider";
 import { SessionSidebar } from "@/components/session-sidebar";
 
 // A persistent left sidebar shows the visitor's own bookings + a countdown to their auto-clear;

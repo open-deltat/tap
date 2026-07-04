@@ -1,11 +1,11 @@
 import type { ComponentType } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isExampleEnabled } from "@/examples/config";
-import Availability from "@/examples/availability";
-import Meet from "@/examples/meet";
-import Live from "@/examples/live";
-import Gym from "@/examples/gym";
+import { isExampleEnabled } from "@open-deltat/examples/config";
+import Availability from "@open-deltat/examples/availability";
+import Meet from "@open-deltat/examples/meet";
+import Live from "@open-deltat/examples/live";
+import Gym from "@open-deltat/examples/gym";
 
 // Bare, chrome-free renders of the featured examples, used inside the landing gallery's preview
 // iframes (NavHeader hides itself on /embed; there's no session sidebar here). Same live component

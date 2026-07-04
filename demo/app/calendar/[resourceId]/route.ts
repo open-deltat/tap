@@ -1,4 +1,4 @@
-import { dt } from "@/lib/deltat";
+import { dt } from "@open-deltat/examples/lib/deltat";
 import { renderCalendar, type IcsEvent } from "@/lib/ics";
 
 export const runtime = "nodejs";

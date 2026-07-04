@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { VISITOR_COOKIE, VISITOR_TTL_SECONDS } from "./lib/visitor";
+import { VISITOR_COOKIE, VISITOR_TTL_SECONDS } from "@open-deltat/examples/lib/visitor";
 
 export function proxy(req: NextRequest) {
   if (req.cookies.get(VISITOR_COOKIE)?.value) return NextResponse.next();

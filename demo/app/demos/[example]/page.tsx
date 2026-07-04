@@ -1,21 +1,21 @@
 import type { ComponentType } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { isExampleEnabled, enabledExampleIds } from "@/examples/config";
-import { enabledExamples } from "@/examples/manifest";
+import { isExampleEnabled, enabledExampleIds } from "@open-deltat/examples/config";
+import { enabledExamples } from "@open-deltat/examples/manifest";
 import { JsonLd } from "@/components/json-ld";
 import { pageMetadata, webPageLd, breadcrumbLd } from "@/lib/seo";
-import Airline from "@/examples/airline";
-import Theater from "@/examples/theater";
-import Cinema from "@/examples/cinema";
-import Stadium from "@/examples/stadium";
-import Hotel from "@/examples/hotel";
-import Restaurant from "@/examples/restaurant";
-import Parking from "@/examples/parking";
-import Availability from "@/examples/availability";
-import Meet from "@/examples/meet";
-import Live from "@/examples/live";
-import Builder from "@/examples/builder";
+import Airline from "@open-deltat/examples/airline";
+import Theater from "@open-deltat/examples/theater";
+import Cinema from "@open-deltat/examples/cinema";
+import Stadium from "@open-deltat/examples/stadium";
+import Hotel from "@open-deltat/examples/hotel";
+import Restaurant from "@open-deltat/examples/restaurant";
+import Parking from "@open-deltat/examples/parking";
+import Availability from "@open-deltat/examples/availability";
+import Meet from "@open-deltat/examples/meet";
+import Live from "@open-deltat/examples/live";
+import Builder from "@open-deltat/examples/builder";
 
 // One route for every example, keyed by id, replacing the per-example page shims. The same live
 // component renders here as before; only the routing boilerplate is shared.

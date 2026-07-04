@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { isExampleEnabled } from "@/examples/config";
+import { isExampleEnabled } from "@open-deltat/examples/config";
 import { EmbedSnippet } from "@/components/embed-snippet";
 
 // The gym demo IS the embed: the schedule below is the real /embed/gym widget loaded through an

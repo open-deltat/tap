@@ -1,7 +1,7 @@
 // The data model page: tenant, resource, timeline, shown as a nesting, plus how time is stored.
 
 import { cn } from "@/lib/utils";
-import { LabeledTimeline, type TimelineRow } from "@/components/labeled-timeline";
+import { LabeledTimeline, type TimelineRow } from "@open-deltat/examples/components/labeled-timeline";
 
 // Open time, minus blocked, minus booked, equals free, read as one sum.
 const STORAGE_ROWS: TimelineRow[] = [

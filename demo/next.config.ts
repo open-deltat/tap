@@ -9,6 +9,9 @@ const FRAME_ANCESTORS = `'self' ${process.env.EMBED_FRAME_ANCESTORS ?? "*"}`;
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The examples (components + their "use server" actions) live in a workspace package. Next only
+  // honors the "use server"/"use client" directives in packages it transpiles, so this is required.
+  transpilePackages: ["@open-deltat/examples"],
   // The "How it works" explainer is now folded into /docs; keep old deep links working.
   async redirects() {
     return [{ source: "/demos/explainer", destination: "/docs", permanent: true }];
