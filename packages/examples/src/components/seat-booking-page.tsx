@@ -3,25 +3,26 @@
 import { useEffect, useState, useCallback, useTransition } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Segmented } from "@/components/ui/segmented";
-import { BookButton } from "@/components/book-button";
-import { SeatMap, type SeatSection } from "@/components/seat-map";
-import { CancelBookingDialog } from "@/components/booking-dialog";
-import { Stage, type StagePrimitive } from "@/components/stage";
-import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
-import type { Resource, AvailabilitySlot, Booking } from "@open-deltat/examples/lib/schemas";
+import { Segmented } from "./ui/segmented";
+import { BookButton } from "./book-button";
+import { SeatMap } from "./seat-map";
+import { CancelBookingDialog } from "./booking-dialog";
+import { Stage, type StagePrimitive } from "./stage";
+import { BookingConfirmedModal, type BookingResult } from "./booking-confirmed-modal";
+import type { Resource, AvailabilitySlot, Booking } from "../lib/schemas";
+import type { SeatSection } from "../lib/seat-sections";
 import type { Hold } from "@open-deltat/client";
-import { toLocalDateString, formatTime } from "@/lib/time";
-import { buildSections, allSeatIds } from "@/lib/seat-sections";
-import { usePersonalCalendar } from "@/components/personal-calendar-provider";
-import { useWebSocket } from "@/hooks/use-websocket";
-import { useSeatHolds } from "@/hooks/use-seat-holds";
+import { toLocalDateString, formatTime } from "@open-deltat/shared/time";
+import { buildSections, allSeatIds } from "../lib/seat-sections";
+import { usePersonalCalendar } from "./personal-calendar-provider";
+import { useWebSocket } from "../hooks/use-websocket";
+import { useSeatHolds } from "../hooks/use-seat-holds";
 
-import { getResources } from "@open-deltat/examples/actions/resources";
-import { getAvailability } from "@open-deltat/examples/actions/availability";
-import { bookHeldSeats, cancelBooking, cancelBookingWithMirror } from "@open-deltat/examples/actions/bookings";
-import { getSeatState } from "@open-deltat/examples/actions/seat-state";
-import { formatError } from "@open-deltat/examples/lib/format-error";
+import { getResources } from "../actions/resources";
+import { getAvailability } from "../actions/availability";
+import { bookHeldSeats, cancelBooking, cancelBookingWithMirror } from "../actions/bookings";
+import { getSeatState } from "../actions/seat-state";
+import { formatError } from "../lib/format-error";
 
 export function SeatBookingPage({
   seedFn,

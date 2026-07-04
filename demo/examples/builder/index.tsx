@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Loader2, Plus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Toggle } from "@/components/ui/toggle";
-import { Stage } from "@/components/stage";
+import { Button } from "@open-deltat/examples/components/ui/button";
+import { Toggle } from "@open-deltat/examples/components/ui/toggle";
+import { Stage } from "@open-deltat/examples/components/stage";
 import { cn } from "@/lib/utils";
-import { LabeledTimeline, type TimelineRow, type TimelineBox } from "@/components/labeled-timeline";
-import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
+import { LabeledTimeline, type TimelineRow, type TimelineBox } from "@open-deltat/examples/components/labeled-timeline";
+import { BookingConfirmedModal, type BookingResult } from "@open-deltat/examples/components/booking-confirmed-modal";
 import type { Resource, Booking, AvailabilitySlot } from "@open-deltat/examples/lib/schemas";
 import { formatTime } from "@/lib/time";
 import { formatError } from "@open-deltat/examples/lib/format-error";
@@ -29,7 +29,7 @@ import { setWeeklyAvailability, getRulesForResource } from "@open-deltat/example
 import { getResources } from "@open-deltat/examples/actions/resources";
 import { getAvailability } from "@open-deltat/examples/actions/availability";
 import { getMultiResourceBookings, batchBookSlots } from "@open-deltat/examples/actions/bookings";
-import { useWebSocket } from "@/hooks/use-websocket";
+import { useWebSocket } from "@open-deltat/examples/hooks/use-websocket";
 
 const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;

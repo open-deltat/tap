@@ -17,8 +17,8 @@ import {
   useContext,
   useMemo,
 } from "react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "../../button";
+import { cn } from "@open-deltat/shared/utils";
 
 export type CalendarState = {
   month: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;

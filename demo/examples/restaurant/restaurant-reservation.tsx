@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback, useTransition } from "react";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Loader2, Minus, Plus, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@open-deltat/examples/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Stage } from "@/components/stage";
-import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
+import { Stage } from "@open-deltat/examples/components/stage";
+import { BookingConfirmedModal, type BookingResult } from "@open-deltat/examples/components/booking-confirmed-modal";
 import { RestaurantFloorPlan, type FloorTable, type FloorBar } from "./restaurant-floor-plan";
 import { RestaurantTimePicker, restaurantTimeSlots } from "./restaurant-time-picker";
 import { toLocalDateString, formatTime, dayBounds } from "@/lib/time";
@@ -17,7 +17,7 @@ import { getTablesForPartySize, getBar } from "./actions";
 import { getResources } from "@open-deltat/examples/actions/resources";
 import { getAvailability, getMultiResourceAvailability } from "@open-deltat/examples/actions/availability";
 import { getBookingsForResource, batchBookSlots } from "@open-deltat/examples/actions/bookings";
-import { useWebSocket } from "@/hooks/use-websocket";
+import { useWebSocket } from "@open-deltat/examples/hooks/use-websocket";
 
 const MAX_PARTY = 8;
 

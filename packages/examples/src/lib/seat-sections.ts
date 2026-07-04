@@ -1,5 +1,16 @@
-import type { SeatSection } from "@/components/seat-map";
-import type { Resource } from "@open-deltat/examples/lib/schemas";
+import type { Resource } from "./schemas";
+
+export interface SeatInfo {
+  id: string;
+  name: string;
+}
+
+export interface SeatSection {
+  id: string;
+  name: string;
+  price: number | null;
+  seats: SeatInfo[];
+}
 
 export function buildSections(venueId: string, resources: Resource[]): SeatSection[] {
   const children = resources.filter((r) => r.parentId === venueId);

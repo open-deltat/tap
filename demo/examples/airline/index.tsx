@@ -1,6 +1,6 @@
 "use client";
 
-import { SeatBookingPage } from "@/components/seat-booking-page";
+import { SeatBookingPage } from "@open-deltat/examples/components/seat-booking-page";
 import { seedAirline } from "./seed";
 
 export default function AirlineExample() {

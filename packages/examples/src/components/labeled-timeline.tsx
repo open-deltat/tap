@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@open-deltat/shared/utils";
 
 // The richer "Why deltat" look, made reusable: rows of labeled, coloured boxes on a shared time
 // axis, with text inside each box and optional past/future arrows. For diagrams where you want a

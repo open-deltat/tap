@@ -1,4 +1,4 @@
-import { SeatBookingPage } from "@/components/seat-booking-page";
+import { SeatBookingPage } from "@open-deltat/examples/components/seat-booking-page";
 import { seedCinema } from "./seed";
 
 export default function CinemaExample() {

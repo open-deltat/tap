@@ -7,10 +7,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { formatTime } from "@/lib/time";
-import type { Booking, Resource } from "@open-deltat/examples/lib/schemas";
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { formatTime } from "@open-deltat/shared/time";
+import type { Booking, Resource } from "../lib/schemas";
 
 export interface BookingResult {
   /** Human headline, e.g. "2 seats · AA-100 JFK → LAX". */

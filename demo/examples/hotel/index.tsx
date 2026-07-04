@@ -4,17 +4,17 @@ import { useEffect, useState, useTransition, useCallback, useMemo, useRef } from
 import { toast } from "sonner";
 import { Loader2, X, CalendarRange, Wand2 } from "lucide-react";
 import type { DateRange } from "react-day-picker";
-import { Calendar } from "@/components/ui/calendar";
-import { Segmented } from "@/components/ui/segmented";
-import { Stage } from "@/components/stage";
-import { BookButton } from "@/components/book-button";
+import { Calendar } from "@open-deltat/examples/components/ui/calendar";
+import { Segmented } from "@open-deltat/examples/components/ui/segmented";
+import { Stage } from "@open-deltat/examples/components/stage";
+import { BookButton } from "@open-deltat/examples/components/book-button";
 import type { Booking, Resource } from "@open-deltat/examples/lib/schemas";
-import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
+import { BookingConfirmedModal, type BookingResult } from "@open-deltat/examples/components/booking-confirmed-modal";
 
 import { ensureHotel, type HotelRoomType } from "./seed";
 import { CHECK_IN_HOUR, CHECK_OUT_HOUR } from "./policy";
 import { batchBookSlots, getBookingsForResource, cancelBooking } from "@open-deltat/examples/actions/bookings";
-import { useWebSocket } from "@/hooks/use-websocket";
+import { useWebSocket } from "@open-deltat/examples/hooks/use-websocket";
 import { formatError } from "@open-deltat/examples/lib/format-error";
 import { AvailabilityStrip } from "./availability-strip";
 import { occupancyByNight, bookedNightSets, stableOpenings } from "./occupancy";

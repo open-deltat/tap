@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { wsUrl } from "@/hooks/use-websocket";
+import { wsUrl } from "./use-websocket";
 
 type Slot = { start: number; end: number };
 

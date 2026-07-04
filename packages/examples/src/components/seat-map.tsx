@@ -1,22 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { cn } from "@/lib/utils";
-import { FitToWidth } from "@/components/fit-to-width";
-import type { AvailabilitySlot, Booking } from "@open-deltat/examples/lib/schemas";
+import { cn } from "@open-deltat/shared/utils";
+import { FitToWidth } from "./fit-to-width";
+import type { SeatInfo, SeatSection } from "../lib/seat-sections";
+import type { AvailabilitySlot, Booking } from "../lib/schemas";
 import type { Hold } from "@open-deltat/client";
-
-interface SeatInfo {
-  id: string;
-  name: string;
-}
-
-export interface SeatSection {
-  id: string;
-  name: string;
-  price: number | null;
-  seats: SeatInfo[];
-}
 
 type SeatStatus = "available" | "booked" | "held" | "unavailable";
 

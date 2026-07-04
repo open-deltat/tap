@@ -3,13 +3,13 @@
 import { useEffect, useState, useCallback, useTransition, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { Loader2, ZoomIn, ZoomOut, Maximize, Locate } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@open-deltat/examples/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Stage } from "@/components/stage";
-import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
+import { Stage } from "@open-deltat/examples/components/stage";
+import { BookingConfirmedModal, type BookingResult } from "@open-deltat/examples/components/booking-confirmed-modal";
 import type { Resource, SectionLayout, AvailabilitySlot, Booking } from "@open-deltat/examples/lib/schemas";
 import { toLocalDateString, formatTime } from "@/lib/time";
-import { useWebSocket } from "@/hooks/use-websocket";
+import { useWebSocket } from "@open-deltat/examples/hooks/use-websocket";
 
 import { seedStadium } from "./seed";
 import { getResources } from "@open-deltat/examples/actions/resources";

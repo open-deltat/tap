@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@open-deltat/examples/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // The shared day stepper for every "find a time" ribbon: ‹ label › with an optional quiet "Today"

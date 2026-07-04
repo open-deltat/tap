@@ -1,6 +1,6 @@
 "use client";
 
-import { Input } from "@/components/ui/input";
+import { Input } from "@open-deltat/examples/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export const DURATIONS = [

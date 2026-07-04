@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Stage } from "@/components/stage";
+import { Stage } from "@open-deltat/examples/components/stage";
 import { formatTime } from "@/lib/time";
 import {
   CalendarBody,
@@ -16,7 +16,7 @@ import {
   useCalendarYear,
   type CalendarState,
   type Feature,
-} from "@/components/ui/kibo-ui/calendar";
+} from "@open-deltat/examples/components/ui/kibo-ui/calendar";
 import { getPublicSchedule, getScheduleWindow, bookGymClass, type PublicClass } from "@/app/actions/gym";
 
 const OPEN = "#34d399";

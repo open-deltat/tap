@@ -3,9 +3,9 @@
 import { useEffect, useState, useCallback, useTransition } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Stage } from "@/components/stage";
-import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
+import { Button } from "@open-deltat/examples/components/ui/button";
+import { Stage } from "@open-deltat/examples/components/stage";
+import { BookingConfirmedModal, type BookingResult } from "@open-deltat/examples/components/booking-confirmed-modal";
 import { ParkingControls, DURATIONS } from "./parking-controls";
 import { ParkingGrid, type ZoneTile } from "./parking-grid";
 import { toLocalDateString, formatTime } from "@/lib/time";

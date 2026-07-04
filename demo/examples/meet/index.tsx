@@ -3,19 +3,19 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Stage } from "@/components/stage";
-import { Segmented } from "@/components/ui/segmented";
-import { BookButton } from "@/components/book-button";
-import { WeekTimeline, type WeekRow, type DayState } from "@/components/week-timeline";
+import { Stage } from "@open-deltat/examples/components/stage";
+import { Segmented } from "@open-deltat/examples/components/ui/segmented";
+import { BookButton } from "@open-deltat/examples/components/book-button";
+import { WeekTimeline, type WeekRow, type DayState } from "@open-deltat/examples/components/week-timeline";
 import { MeetLanes } from "./meet-lanes";
-import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
+import { BookingConfirmedModal, type BookingResult } from "@open-deltat/examples/components/booking-confirmed-modal";
 import type { AvailabilitySlot, Resource } from "@open-deltat/examples/lib/schemas";
 import { formatTime } from "@/lib/time";
 
 import { ensureMeetFriends } from "./seed";
 import { getAvailability, getCombinedAvailability } from "@open-deltat/examples/actions/availability";
 import { batchBookSlots } from "@open-deltat/examples/actions/bookings";
-import { useWebSocket } from "@/hooks/use-websocket";
+import { useWebSocket } from "@open-deltat/examples/hooks/use-websocket";
 import { formatError } from "@open-deltat/examples/lib/format-error";
 
 const H = 3_600_000;

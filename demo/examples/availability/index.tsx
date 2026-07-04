@@ -3,13 +3,13 @@
 import { useEffect, useState, useCallback, useTransition, useMemo } from "react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar } from "@open-deltat/examples/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { Stage } from "@/components/stage";
-import { BookButton } from "@/components/book-button";
+import { Stage } from "@open-deltat/examples/components/stage";
+import { BookButton } from "@open-deltat/examples/components/book-button";
 import { PILL_ACTIVE } from "@open-deltat/examples/lib/accent";
-import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
-import { NextAvailability } from "@/components/next-availability";
+import { BookingConfirmedModal, type BookingResult } from "@open-deltat/examples/components/booking-confirmed-modal";
+import { NextAvailability } from "@open-deltat/examples/components/next-availability";
 import { formatTime, dayBounds } from "@/lib/time";
 import { formatError } from "@open-deltat/examples/lib/format-error";
 import type { AvailabilitySlot, Resource } from "@open-deltat/examples/lib/schemas";
@@ -17,7 +17,7 @@ import type { AvailabilitySlot, Resource } from "@open-deltat/examples/lib/schem
 import { seedAvailabilityScheduler } from "./seed";
 import { getAvailability } from "@open-deltat/examples/actions/availability";
 import { bookSlot } from "@open-deltat/examples/actions/bookings";
-import { useWebSocket } from "@/hooks/use-websocket";
+import { useWebSocket } from "@open-deltat/examples/hooks/use-websocket";
 
 const SLOT_MS = 30 * 60_000;
 const NAME = "Dr. Sarah Chen";
