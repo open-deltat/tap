@@ -1,5 +1,5 @@
 import type { SeatSection } from "@/components/seat-map";
-import type { Resource } from "@/lib/schemas";
+import type { Resource } from "@open-deltat/examples/lib/schemas";
 
 export function buildSections(venueId: string, resources: Resource[]): SeatSection[] {
   const children = resources.filter((r) => r.parentId === venueId);

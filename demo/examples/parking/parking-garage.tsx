@@ -9,12 +9,12 @@ import { BookingConfirmedModal, type BookingResult } from "@/components/booking-
 import { ParkingControls, DURATIONS } from "./parking-controls";
 import { ParkingGrid, type ZoneTile } from "./parking-grid";
 import { toLocalDateString, formatTime } from "@/lib/time";
-import { formatError } from "@/lib/format-error";
-import type { Resource } from "@/lib/schemas";
+import { formatError } from "@open-deltat/examples/lib/format-error";
+import type { Resource } from "@open-deltat/examples/lib/schemas";
 
-import { getResources } from "@/app/actions/resources";
-import { getAvailability } from "@/app/actions/availability";
-import { getMultiResourceBookings, bookSlot } from "@/app/actions/bookings";
+import { getResources } from "@open-deltat/examples/actions/resources";
+import { getAvailability } from "@open-deltat/examples/actions/availability";
+import { getMultiResourceBookings, bookSlot } from "@open-deltat/examples/actions/bookings";
 
 function nowTime(): string {
   const now = new Date();

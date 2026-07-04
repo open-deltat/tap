@@ -9,14 +9,14 @@ import { BookButton } from "@/components/book-button";
 import { WeekTimeline, type WeekRow, type DayState } from "@/components/week-timeline";
 import { MeetLanes } from "./meet-lanes";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
-import type { AvailabilitySlot, Resource } from "@/lib/schemas";
+import type { AvailabilitySlot, Resource } from "@open-deltat/examples/lib/schemas";
 import { formatTime } from "@/lib/time";
 
 import { ensureMeetFriends } from "./seed";
-import { getAvailability, getCombinedAvailability } from "@/app/actions/availability";
-import { batchBookSlots } from "@/app/actions/bookings";
+import { getAvailability, getCombinedAvailability } from "@open-deltat/examples/actions/availability";
+import { batchBookSlots } from "@open-deltat/examples/actions/bookings";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { formatError } from "@/lib/format-error";
+import { formatError } from "@open-deltat/examples/lib/format-error";
 
 const H = 3_600_000;
 const DAY = 86_400_000;

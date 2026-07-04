@@ -1,9 +1,9 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { ensurePersonalCalendar } from "@/app/actions/seed-personal-calendar";
-import { getBookingsForResource } from "@/app/actions/bookings";
-import { getHoldsForResource } from "@/app/actions/holds";
+import { ensurePersonalCalendar } from "@open-deltat/examples/actions/seed-personal-calendar";
+import { getBookingsForResource } from "@open-deltat/examples/actions/bookings";
+import { getHoldsForResource } from "@open-deltat/examples/actions/holds";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { dayBounds } from "@/lib/time";
 import type { Booking, Hold } from "@open-deltat/client";

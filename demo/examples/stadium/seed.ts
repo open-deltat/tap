@@ -1,9 +1,9 @@
 "use server";
 
-import { dt } from "@/lib/deltat";
-import * as store from "@/lib/store";
-import type { SectionLayout } from "@/lib/schemas";
-import { addSchedule, daily, findRootByName, baseMs } from "@/app/actions/seed-helpers";
+import { dt } from "@open-deltat/examples/lib/deltat";
+import * as store from "@open-deltat/examples/lib/store";
+import type { SectionLayout } from "@open-deltat/examples/lib/schemas";
+import { addSchedule, daily, findRootByName, baseMs } from "@open-deltat/examples/actions/seed-helpers";
 
 const NAME = "Olympia Stadium";
 const EVENT_DUR = 210; // minutes

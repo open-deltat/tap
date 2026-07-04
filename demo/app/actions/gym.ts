@@ -1,7 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
-import { dt } from "@/lib/deltat";
+import { dt } from "@open-deltat/examples/lib/deltat";
 import { ensureGym } from "@/examples/gym/seed";
 
 // The published schedule: the class, when it runs, and how many spots are left, a free count and

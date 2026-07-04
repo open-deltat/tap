@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ACCENT_GHOST } from "@/lib/accent";
+import { ACCENT_GHOST } from "@open-deltat/examples/lib/accent";
 
 // Shows the copy-paste <iframe> for an example's chrome-free /embed/<id> route. The origin is read
 // at runtime so the snippet is correct wherever the demo is deployed; before hydration it falls back

@@ -3,8 +3,8 @@ import { parse } from "node:url";
 import next from "next";
 import { WebSocketServer, type WebSocket } from "ws";
 import { z } from "zod";
-import { dt } from "./lib/deltat";
-import { trackBookings } from "./lib/session-bookings";
+import { dt } from "@open-deltat/examples/lib/deltat";
+import { trackBookings } from "@open-deltat/examples/lib/session-bookings";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT || "3000", 10);

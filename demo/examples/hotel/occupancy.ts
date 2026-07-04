@@ -1,4 +1,4 @@
-import type { Booking } from "@/lib/schemas";
+import type { Booking } from "@open-deltat/examples/lib/schemas";
 
 /** A night, keyed by its 00:00 local timestamp, with how many rooms are taken. */
 export interface NightOccupancy {

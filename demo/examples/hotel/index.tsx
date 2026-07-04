@@ -8,14 +8,14 @@ import { Calendar } from "@/components/ui/calendar";
 import { Segmented } from "@/components/ui/segmented";
 import { Stage } from "@/components/stage";
 import { BookButton } from "@/components/book-button";
-import type { Booking, Resource } from "@/lib/schemas";
+import type { Booking, Resource } from "@open-deltat/examples/lib/schemas";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 
 import { ensureHotel, type HotelRoomType } from "./seed";
 import { CHECK_IN_HOUR, CHECK_OUT_HOUR } from "./policy";
-import { batchBookSlots, getBookingsForResource, cancelBooking } from "@/app/actions/bookings";
+import { batchBookSlots, getBookingsForResource, cancelBooking } from "@open-deltat/examples/actions/bookings";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { formatError } from "@/lib/format-error";
+import { formatError } from "@open-deltat/examples/lib/format-error";
 import { AvailabilityStrip } from "./availability-strip";
 import { occupancyByNight, bookedNightSets, stableOpenings } from "./occupancy";
 

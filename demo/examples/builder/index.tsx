@@ -9,9 +9,9 @@ import { Stage } from "@/components/stage";
 import { cn } from "@/lib/utils";
 import { LabeledTimeline, type TimelineRow, type TimelineBox } from "@/components/labeled-timeline";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
-import type { Resource, Booking, AvailabilitySlot } from "@/lib/schemas";
+import type { Resource, Booking, AvailabilitySlot } from "@open-deltat/examples/lib/schemas";
 import { formatTime } from "@/lib/time";
-import { formatError } from "@/lib/format-error";
+import { formatError } from "@open-deltat/examples/lib/format-error";
 
 import {
   DEFAULT_WEEK,
@@ -25,10 +25,10 @@ import {
   type WeekHours,
 } from "./schedule";
 import { ensureBuilderCalendar } from "./seed";
-import { setWeeklyAvailability, getRulesForResource } from "@/app/actions/rules";
-import { getResources } from "@/app/actions/resources";
-import { getAvailability } from "@/app/actions/availability";
-import { getMultiResourceBookings, batchBookSlots } from "@/app/actions/bookings";
+import { setWeeklyAvailability, getRulesForResource } from "@open-deltat/examples/actions/rules";
+import { getResources } from "@open-deltat/examples/actions/resources";
+import { getAvailability } from "@open-deltat/examples/actions/availability";
+import { getMultiResourceBookings, batchBookSlots } from "@open-deltat/examples/actions/bookings";
 import { useWebSocket } from "@/hooks/use-websocket";
 
 const HOUR_MS = 3_600_000;

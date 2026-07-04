@@ -1,7 +1,7 @@
 "use server";
 
-import { dt } from "@/lib/deltat";
-import { findRootByName, baseMs } from "@/app/actions/seed-helpers";
+import { dt } from "@open-deltat/examples/lib/deltat";
+import { findRootByName, baseMs } from "@open-deltat/examples/actions/seed-helpers";
 
 import { CHECK_IN_HOUR, CHECK_OUT_HOUR } from "./policy";
 

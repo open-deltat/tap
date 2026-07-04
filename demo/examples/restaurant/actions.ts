@@ -1,7 +1,7 @@
 "use server";
 
-import { dt } from "@/lib/deltat";
-import * as store from "@/lib/store";
+import { dt } from "@open-deltat/examples/lib/deltat";
+import * as store from "@open-deltat/examples/lib/store";
 
 const BAR_SECTION = "Bar";
 

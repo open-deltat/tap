@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { Loader2, CalendarClock, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ACCENT_GHOST } from "@/lib/accent";
-import { findNextAvailable, type NextOpening } from "@/lib/first-available";
+import { ACCENT_GHOST } from "@open-deltat/examples/lib/accent";
+import { findNextAvailable, type NextOpening } from "@open-deltat/examples/lib/first-available";
 import { formatTime } from "@/lib/time";
 
 function dayLabel(ms: number): string {

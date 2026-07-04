@@ -1,7 +1,7 @@
 "use server";
 
-import { getSessionId } from "@/lib/session";
-import { listBookings, clearSession, BOOKING_TTL_MS } from "@/lib/session-bookings";
+import { getSessionId } from "@open-deltat/examples/lib/session";
+import { listBookings, clearSession, BOOKING_TTL_MS } from "@open-deltat/examples/lib/session-bookings";
 import type { Booking } from "@open-deltat/client";
 
 export async function getMyBookings(): Promise<{

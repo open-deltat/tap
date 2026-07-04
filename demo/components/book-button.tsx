@@ -4,7 +4,7 @@ import type { ComponentProps } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ACCENT_CTA } from "@/lib/accent";
+import { ACCENT_CTA } from "@open-deltat/examples/lib/accent";
 
 // The one and only "commit" button: the action that lives in the Stage tray on every example, so the
 // booker looks and sits the same everywhere. `loading` swaps the label for a spinner and disables it.

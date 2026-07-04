@@ -1,7 +1,7 @@
 "use server";
 
-import { dt } from "@/lib/deltat";
-import { createVenue, addSchedule, daily, findRootByName, baseMs } from "@/app/actions/seed-helpers";
+import { dt } from "@open-deltat/examples/lib/deltat";
+import { createVenue, addSchedule, daily, findRootByName, baseMs } from "@open-deltat/examples/actions/seed-helpers";
 
 const H = 3_600_000;
 const DAY = 86_400_000;

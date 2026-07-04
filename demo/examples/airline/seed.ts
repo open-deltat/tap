@@ -1,6 +1,6 @@
 "use server";
 
-import { createVenue, createSection, createSeats, addSchedule, daily, prebookSeats, findRootByName, baseMs } from "@/app/actions/seed-helpers";
+import { createVenue, createSection, createSeats, addSchedule, daily, prebookSeats, findRootByName, baseMs } from "@open-deltat/examples/actions/seed-helpers";
 
 const W_NAME = "AA-100 JFK → LAX";
 const E_NAME = "AA-205 LAX → JFK";

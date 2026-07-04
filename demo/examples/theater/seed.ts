@@ -1,6 +1,6 @@
 "use server";
 
-import { createVenue, createSection, createSeats, addSchedule, findRootByName, baseMs } from "@/app/actions/seed-helpers";
+import { createVenue, createSection, createSeats, addSchedule, findRootByName, baseMs } from "@open-deltat/examples/actions/seed-helpers";
 
 const NAME = "Hamilton";
 

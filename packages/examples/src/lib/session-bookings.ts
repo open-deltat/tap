@@ -1,4 +1,4 @@
-import { dt } from "@/lib/deltat";
+import { dt } from "./deltat";
 import type { Booking } from "@open-deltat/client";
 
 // Ephemeral demo bookings. Every booking a visitor makes is registered here with a short TTL;

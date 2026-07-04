@@ -9,7 +9,7 @@
  */
 import { enabledExampleIds } from "@/examples/config";
 import { SEEDS } from "@/examples/seeds";
-import { getResources } from "@/app/actions/resources";
+import { getResources } from "@open-deltat/examples/actions/resources";
 
 const ids = enabledExampleIds();
 console.log(`Seeding ${ids.length} example(s): ${ids.join(", ")}\n`);

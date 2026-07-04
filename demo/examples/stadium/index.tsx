@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Stage } from "@/components/stage";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
-import type { Resource, SectionLayout, AvailabilitySlot, Booking } from "@/lib/schemas";
+import type { Resource, SectionLayout, AvailabilitySlot, Booking } from "@open-deltat/examples/lib/schemas";
 import { toLocalDateString, formatTime } from "@/lib/time";
 import { useWebSocket } from "@/hooks/use-websocket";
 
 import { seedStadium } from "./seed";
-import { getResources } from "@/app/actions/resources";
-import { getAvailability } from "@/app/actions/availability";
-import { getMultiResourceBookings, batchBookSlots } from "@/app/actions/bookings";
-import { formatError } from "@/lib/format-error";
+import { getResources } from "@open-deltat/examples/actions/resources";
+import { getAvailability } from "@open-deltat/examples/actions/availability";
+import { getMultiResourceBookings, batchBookSlots } from "@open-deltat/examples/actions/bookings";
+import { formatError } from "@open-deltat/examples/lib/format-error";
 
 import { StadiumCanvas, LEGEND_COLORS, type CanvasSection, type CanvasHit } from "./stadium-canvas";
 import {

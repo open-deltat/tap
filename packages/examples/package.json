@@ -21,8 +21,8 @@
     "./stadium": "./src/examples/stadium/index.tsx",
     "./theater": "./src/examples/theater/index.tsx",
     "./components/*": "./src/components/*",
-    "./lib/*": "./src/lib/*",
-    "./actions/*": "./src/actions/*",
+    "./lib/*": "./src/lib/*.ts",
+    "./actions/*": "./src/actions/*.ts",
     "./hooks/*": "./src/hooks/*"
   },
   "peerDependencies": {

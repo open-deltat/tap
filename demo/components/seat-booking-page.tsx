@@ -9,7 +9,7 @@ import { SeatMap, type SeatSection } from "@/components/seat-map";
 import { CancelBookingDialog } from "@/components/booking-dialog";
 import { Stage, type StagePrimitive } from "@/components/stage";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
-import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
+import type { Resource, AvailabilitySlot, Booking } from "@open-deltat/examples/lib/schemas";
 import type { Hold } from "@open-deltat/client";
 import { toLocalDateString, formatTime } from "@/lib/time";
 import { buildSections, allSeatIds } from "@/lib/seat-sections";
@@ -17,11 +17,11 @@ import { usePersonalCalendar } from "@/components/personal-calendar-provider";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useSeatHolds } from "@/hooks/use-seat-holds";
 
-import { getResources } from "@/app/actions/resources";
-import { getAvailability } from "@/app/actions/availability";
-import { bookHeldSeats, cancelBooking, cancelBookingWithMirror } from "@/app/actions/bookings";
-import { getSeatState } from "@/app/actions/seat-state";
-import { formatError } from "@/lib/format-error";
+import { getResources } from "@open-deltat/examples/actions/resources";
+import { getAvailability } from "@open-deltat/examples/actions/availability";
+import { bookHeldSeats, cancelBooking, cancelBookingWithMirror } from "@open-deltat/examples/actions/bookings";
+import { getSeatState } from "@open-deltat/examples/actions/seat-state";
+import { formatError } from "@open-deltat/examples/lib/format-error";
 
 export function SeatBookingPage({
   seedFn,

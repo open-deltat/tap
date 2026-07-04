@@ -1,7 +1,7 @@
 "use client";
 
 import { formatTime } from "@/lib/time";
-import type { AvailabilitySlot } from "@/lib/schemas";
+import type { AvailabilitySlot } from "@open-deltat/examples/lib/schemas";
 
 const SLOT_DURATION = 90 * 60_000;
 const SLOT_STEP = 30 * 60_000;

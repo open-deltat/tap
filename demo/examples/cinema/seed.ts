@@ -1,6 +1,6 @@
 "use server";
 
-import { dt } from "@/lib/deltat";
+import { dt } from "@open-deltat/examples/lib/deltat";
 import {
   createVenue,
   createSection,
@@ -10,7 +10,7 @@ import {
   prebookSeats,
   findRootByName,
   baseMs,
-} from "@/app/actions/seed-helpers";
+} from "@open-deltat/examples/actions/seed-helpers";
 
 const NAME = "Cineplex Odeon";
 

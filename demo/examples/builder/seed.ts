@@ -1,7 +1,7 @@
 "use server";
 
-import { createVenue, findRootByName } from "@/app/actions/seed-helpers";
-import { setWeeklyAvailability } from "@/app/actions/rules";
+import { createVenue, findRootByName } from "@open-deltat/examples/actions/seed-helpers";
+import { setWeeklyAvailability } from "@open-deltat/examples/actions/rules";
 import { DEFAULT_WEEK, weekToRanges, builderDateRange } from "./schedule";
 
 // One calendar the builder edits. Starts with the default weekday 9-to-5 schedule so the page has

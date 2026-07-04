@@ -10,16 +10,16 @@ import { Stage } from "@/components/stage";
 import { SeatMap } from "@/components/seat-map";
 import { useWebSocket, wsUrl, type StreamStatus } from "@/hooks/use-websocket";
 import { buildSections, allSeatIds } from "@/lib/seat-sections";
-import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
+import type { Resource, AvailabilitySlot, Booking } from "@open-deltat/examples/lib/schemas";
 import type { Hold } from "@open-deltat/client";
 import { dayBounds, formatTime } from "@/lib/time";
-import { formatError } from "@/lib/format-error";
+import { formatError } from "@open-deltat/examples/lib/format-error";
 
 import { seedLive } from "./seed";
-import { getResources } from "@/app/actions/resources";
-import { getAvailability } from "@/app/actions/availability";
-import { bookHeldSeats } from "@/app/actions/bookings";
-import { getSeatState } from "@/app/actions/seat-state";
+import { getResources } from "@open-deltat/examples/actions/resources";
+import { getAvailability } from "@open-deltat/examples/actions/availability";
+import { bookHeldSeats } from "@open-deltat/examples/actions/bookings";
+import { getSeatState } from "@open-deltat/examples/actions/seat-state";
 
 type Sections = ReturnType<typeof buildSections>;
 

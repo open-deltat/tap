@@ -1,5 +1,5 @@
-import { getAvailability, getCombinedAvailability } from "@/app/actions/availability";
-import { toLocalDateString } from "@/lib/time";
+import { getAvailability, getCombinedAvailability } from "../actions/availability";
+import { toLocalDateString } from "@open-deltat/shared/time";
 
 const DAY_MS = 86_400_000;
 

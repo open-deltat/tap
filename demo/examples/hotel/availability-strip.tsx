@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import type { Booking } from "@/lib/schemas";
+import type { Booking } from "@open-deltat/examples/lib/schemas";
 import { occupancyByNight, stableOpenings } from "./occupancy";
 
 const DAY = 86_400_000;

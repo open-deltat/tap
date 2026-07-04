@@ -10,13 +10,13 @@ import { BookingConfirmedModal, type BookingResult } from "@/components/booking-
 import { RestaurantFloorPlan, type FloorTable, type FloorBar } from "./restaurant-floor-plan";
 import { RestaurantTimePicker, restaurantTimeSlots } from "./restaurant-time-picker";
 import { toLocalDateString, formatTime, dayBounds } from "@/lib/time";
-import { formatError } from "@/lib/format-error";
-import type { Resource, AvailabilitySlot, Booking } from "@/lib/schemas";
+import { formatError } from "@open-deltat/examples/lib/format-error";
+import type { Resource, AvailabilitySlot, Booking } from "@open-deltat/examples/lib/schemas";
 
 import { getTablesForPartySize, getBar } from "./actions";
-import { getResources } from "@/app/actions/resources";
-import { getAvailability, getMultiResourceAvailability } from "@/app/actions/availability";
-import { getBookingsForResource, batchBookSlots } from "@/app/actions/bookings";
+import { getResources } from "@open-deltat/examples/actions/resources";
+import { getAvailability, getMultiResourceAvailability } from "@open-deltat/examples/actions/availability";
+import { getBookingsForResource, batchBookSlots } from "@open-deltat/examples/actions/bookings";
 import { useWebSocket } from "@/hooks/use-websocket";
 
 const MAX_PARTY = 8;

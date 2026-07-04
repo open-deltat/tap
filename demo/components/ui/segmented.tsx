@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { PILL_ACTIVE, PILL_BASE, PILL_IDLE } from "@/lib/accent";
+import { PILL_ACTIVE, PILL_BASE, PILL_IDLE } from "@open-deltat/examples/lib/accent";
 
 export interface SegmentedItem<T> {
   value: T;

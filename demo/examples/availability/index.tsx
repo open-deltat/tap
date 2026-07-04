@@ -7,16 +7,16 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { Stage } from "@/components/stage";
 import { BookButton } from "@/components/book-button";
-import { PILL_ACTIVE } from "@/lib/accent";
+import { PILL_ACTIVE } from "@open-deltat/examples/lib/accent";
 import { BookingConfirmedModal, type BookingResult } from "@/components/booking-confirmed-modal";
 import { NextAvailability } from "@/components/next-availability";
 import { formatTime, dayBounds } from "@/lib/time";
-import { formatError } from "@/lib/format-error";
-import type { AvailabilitySlot, Resource } from "@/lib/schemas";
+import { formatError } from "@open-deltat/examples/lib/format-error";
+import type { AvailabilitySlot, Resource } from "@open-deltat/examples/lib/schemas";
 
 import { seedAvailabilityScheduler } from "./seed";
-import { getAvailability } from "@/app/actions/availability";
-import { bookSlot } from "@/app/actions/bookings";
+import { getAvailability } from "@open-deltat/examples/actions/availability";
+import { bookSlot } from "@open-deltat/examples/actions/bookings";
 import { useWebSocket } from "@/hooks/use-websocket";
 
 const SLOT_MS = 30 * 60_000;

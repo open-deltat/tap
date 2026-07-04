@@ -3,7 +3,7 @@
 import type { MouseEvent } from "react";
 import { cn } from "@/lib/utils";
 import { formatTime } from "@/lib/time";
-import type { AvailabilitySlot } from "@/lib/schemas";
+import type { AvailabilitySlot } from "@open-deltat/examples/lib/schemas";
 
 export interface MeetLane {
   label: string;

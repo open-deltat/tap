@@ -1,8 +1,8 @@
 "use server";
 
-import { dt } from "@/lib/deltat";
+import { dt } from "../lib/deltat";
 import { expandRecurrence } from "@open-deltat/client";
-import { AddRuleInput, RecurringRuleInput } from "@/lib/schemas";
+import { AddRuleInput, RecurringRuleInput } from "../lib/schemas";
 import type { Rule } from "@open-deltat/client";
 
 export async function addRule(input: {

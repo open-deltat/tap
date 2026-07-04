@@ -1,7 +1,7 @@
 "use server";
 
-import { dt } from "@/lib/deltat";
-import { addSchedule, findRootByName } from "@/app/actions/seed-helpers";
+import { dt } from "@open-deltat/examples/lib/deltat";
+import { addSchedule, findRootByName } from "@open-deltat/examples/actions/seed-helpers";
 import type { Rule } from "@open-deltat/client";
 
 const NAME = "FitFlow Studio";
