@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { enabledExampleIds } from "@/examples/config";
+import { enabledExampleIds } from "@open-deltat/examples/config";
 import { SITE } from "@/lib/seo";
 
 // Indexable surface only: the landing, the docs, and every enabled demo. /embed and /calendar are

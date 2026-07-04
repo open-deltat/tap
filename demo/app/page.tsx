@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Github } from "lucide-react";
-import { enabledExamples, type ExampleMeta } from "@/examples/manifest";
+import { enabledExamples, type ExampleMeta } from "@open-deltat/examples/manifest";
 import { pageMetadata, SITE } from "@/lib/seo";
 
 export const metadata = pageMetadata({

@@ -7,8 +7,8 @@
  * Each seed is idempotent (no-ops if its root already exists), so this is safe to re-run.
  * Which examples run is governed entirely by DEMO_EXAMPLES (see examples/config.ts).
  */
-import { enabledExampleIds } from "@/examples/config";
-import { SEEDS } from "@/examples/seeds";
+import { enabledExampleIds } from "@open-deltat/examples/config";
+import { SEEDS } from "@open-deltat/examples/seeds";
 import { getResources } from "@open-deltat/examples/actions/resources";
 
 const ids = enabledExampleIds();
