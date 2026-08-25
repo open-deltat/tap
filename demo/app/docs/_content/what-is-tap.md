@@ -80,6 +80,7 @@ And the transport today is the PostgreSQL wire protocol, which is why the client
 
 ## Where to go next
 
-- **Quickstart** to install the SDK, connect to a node, and run the availability to hold to booking flow start to finish.
-- **SDK reference** for every namespace, verb, and option, written out in full.
-- **Self-host** to stand up a node of your own: Δt is a single binary, no Postgres underneath, configured entirely through environment variables.
+- **[Quickstart](/docs/sdk/quickstart)** to install the SDK, connect to a node, and run the availability to hold to booking flow start to finish.
+- **[SDK reference](/docs/sdk/reference)** for every namespace, verb, and option, written out in full.
+- **[Self-host](/docs/sdk/self-host)** to stand up a node of your own: Δt is a single binary, no Postgres underneath, configured entirely through environment variables.
+- **The guides** for the problems these verbs exist to solve: [double bookings](/docs/guides/prevent-double-booking), [holds](/docs/guides/booking-holds), [capacity](/docs/guides/capacity), [recurring availability](/docs/guides/recurring-availability).
