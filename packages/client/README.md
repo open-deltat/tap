@@ -23,12 +23,15 @@ const dt = new DeltaT({ host: "localhost", port: 5433, database: "default", pass
 const room = await dt.resources.create({ name: "Room A" });
 
 // Expand a recurring pattern into concrete rule segments, then store them as open hours.
+// Wall-clock times are interpreted in the given IANA timeZone (default "UTC") and stay
+// correct across DST transitions.
 const segments = expandRecurrence({
   daysOfWeek: [1, 2, 3, 4, 5],
   startTime: "09:00",
   endTime: "17:00",
   fromDate: "2025-01-01",
   toDate: "2025-03-31",
+  timeZone: "Europe/Berlin",
 });
 await dt.rules.create(segments.map((s) => ({ resourceId: room.id, ...s })));
 
@@ -47,7 +50,7 @@ const slots = await dt.availability.get({
 - **`holds`**: place, release, get with an optional `{start, end}` filter
 - **`availability`**: single- and multi-resource queries (`min_available` for "any k of N free")
 - **`events`**: real-time LISTEN/NOTIFY subscriptions
-- **`expandRecurrence()`**: expand a recurring pattern (days of week, time range, date range, excludes) into concrete rule segments
+- **`expandRecurrence()`**: expand a recurring pattern (days of week, time range, date range, excludes) into concrete rule segments, DST-safe in an explicit IANA `timeZone` (default UTC); overnight and until-midnight (`"24:00"`) windows supported
 
 All times are Unix milliseconds. Intervals are half-open `[start, end)`; adjacent intervals do not collide.
 
