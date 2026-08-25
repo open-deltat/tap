@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
+
 // A stand-in "partner website" that embeds the gym schedule exactly as a third party would: paste
 // the <iframe>, nothing else. Proves /embed/gym renders framed, chrome-free, and unauthenticated.
-// This page is NOT a demo example. It's the host you'd paste the snippet into.
+// This page is NOT a demo example. It's the host you'd paste the snippet into, so it stays out of
+// search (robots.ts disallows it too): a fake fitness studio must never rank as a real page.
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default function EmbedTestPage() {
   return (
     <div className="min-h-screen bg-zinc-100 text-zinc-900">

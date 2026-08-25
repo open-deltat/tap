@@ -5,15 +5,15 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "Under the hood: one binary, no Postgres",
+  title: "How to prevent double bookings",
   description:
-    "Under the hood: Δt is one Rust binary, kept durable by an append-only log, speaking the Postgres wire today, with every tenant isolated by its database name.",
-  path: "/docs/protocol-and-engine",
+    "A double booking is a race: two requests both told a slot was free. What constraints and locks cover, and how a write that is its own conflict check closes the gap.",
+  path: "/docs/guides/prevent-double-booking",
 };
 
 export const metadata = pageMetadata({ ...SEO, ogType: "article" });
 
-export default function UnderTheHoodPage() {
+export default function PreventDoubleBookingPage() {
   return (
     <article className="mx-auto max-w-3xl">
       <JsonLd
@@ -22,12 +22,12 @@ export default function UnderTheHoodPage() {
           breadcrumbLd([
             { name: "Home", path: "/" },
             { name: "What is Δt", path: "/docs" },
-            { name: "Under the hood", path: "/docs/protocol-and-engine" },
+            { name: "Preventing double bookings", path: "/docs/guides/prevent-double-booking" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="Δt · the database" title="Under the hood" />
-      <Markdown>{docContent("protocol-and-engine")}</Markdown>
+      <DocHeader eyebrow="Guides · in practice" title="Preventing double bookings" />
+      <Markdown>{docContent("guides/prevent-double-booking")}</Markdown>
     </article>
   );
 }

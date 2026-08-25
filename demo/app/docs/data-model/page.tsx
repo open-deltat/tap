@@ -6,7 +6,7 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "Δt data model: resources, rules, availability",
+  title: "Data model: resources, rules, availability",
   description:
     "How Δt shapes data: a tenant, a tree of resources, open hours, blackouts, and bookings on one timeline, with free derived as open minus blocked minus booked.",
   path: "/docs/data-model",

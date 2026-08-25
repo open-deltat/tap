@@ -84,3 +84,5 @@ And the way you connect today is the PostgreSQL wire protocol, which is transiti
 To see exactly what lives on the line (resources, rules, bookings, capacity, buffers, and how the tree composes), read the data model.
 
 To actually build against it, head to the TAP side. TAP is the Time Allocation Protocol, the shared language for resources, rules, holds, bookings, and availability, and `@open-deltat/client` is its TypeScript SDK, so you talk to Δt in plain verbs and never write the overlap check yourself.
+
+And if you arrived here carrying a specific problem, the guides take them one at a time: [preventing double bookings](/docs/guides/prevent-double-booking), [booking holds](/docs/guides/booking-holds), [capacity and pools](/docs/guides/capacity), [buffer time](/docs/guides/buffer-time), [recurring availability](/docs/guides/recurring-availability), and [whether you need a scheduling database at all](/docs/guides/scheduling-database).

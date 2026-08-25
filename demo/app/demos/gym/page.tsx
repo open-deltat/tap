@@ -1,16 +1,39 @@
 import { notFound } from "next/navigation";
 import { isExampleEnabled } from "@open-deltat/examples/config";
 import { EmbedSnippet } from "@/components/embed-snippet";
+import { JsonLd } from "@/components/json-ld";
+import { pageMetadata, webPageLd, breadcrumbLd } from "@/lib/seo";
 
 // The gym demo IS the embed: the schedule below is the real /embed/gym widget loaded through an
 // actual <iframe>, byte-for-byte the snippet you'd paste elsewhere, followed by that snippet to copy.
 const EMBED_HEIGHT = 820;
+
+// This route is hand-rolled (not /demos/[example]) because it wraps the embed, so it carries the
+// same SEO shape the shared demo route generates: without it the page falls back to the root
+// layout's default title and duplicates the landing page in search.
+const SEO = {
+  title: "Embedded schedule: a live demo",
+  description:
+    "A read-only schedule you can embed. An interactive demo running live on Δt, the open database for time.",
+  path: "/demos/gym",
+};
+
+export const metadata = pageMetadata({ ...SEO, ogType: "article" });
 
 export default function Page() {
   if (!isExampleEnabled("gym")) notFound();
 
   return (
     <div className="h-full overflow-auto bg-[#0a0a0c] text-zinc-100">
+      <JsonLd
+        graph={[
+          webPageLd(SEO),
+          breadcrumbLd([
+            { name: "Home", path: "/" },
+            { name: "Embedded schedule", path: "/demos/gym" },
+          ]),
+        ]}
+      />
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <header className="mb-5">
           <div className="text-[10.5px] uppercase tracking-[0.2em] text-emerald-300/70">Live embed</div>

@@ -39,7 +39,7 @@ export function generateStaticParams() {
 
 function demoSeo(label: string, tagline: string, example: string) {
   return {
-    title: `${label}: a live demo on Δt`,
+    title: `${label}: a live demo`,
     description: `${tagline}. An interactive demo running live on Δt, the open database for time.`,
     path: `/demos/${example}`,
   };

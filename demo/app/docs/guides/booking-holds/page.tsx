@@ -5,15 +5,15 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "Under the hood: one binary, no Postgres",
+  title: "What is a booking hold?",
   description:
-    "Under the hood: Δt is one Rust binary, kept durable by an append-only log, speaking the Postgres wire today, with every tenant isolated by its database name.",
-  path: "/docs/protocol-and-engine",
+    "A hold is a tentative claim on a slot with a self-destruct timer: it blocks instantly and frees itself if nobody confirms. How hold-to-book checkout flows work.",
+  path: "/docs/guides/booking-holds",
 };
 
 export const metadata = pageMetadata({ ...SEO, ogType: "article" });
 
-export default function UnderTheHoodPage() {
+export default function BookingHoldsPage() {
   return (
     <article className="mx-auto max-w-3xl">
       <JsonLd
@@ -22,12 +22,12 @@ export default function UnderTheHoodPage() {
           breadcrumbLd([
             { name: "Home", path: "/" },
             { name: "What is Δt", path: "/docs" },
-            { name: "Under the hood", path: "/docs/protocol-and-engine" },
+            { name: "Booking holds", path: "/docs/guides/booking-holds" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="Δt · the database" title="Under the hood" />
-      <Markdown>{docContent("protocol-and-engine")}</Markdown>
+      <DocHeader eyebrow="Guides · in practice" title="Booking holds" />
+      <Markdown>{docContent("guides/booking-holds")}</Markdown>
     </article>
   );
 }

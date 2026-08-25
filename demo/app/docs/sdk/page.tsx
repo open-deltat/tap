@@ -11,7 +11,7 @@ const SEO = {
   path: "/docs/sdk",
 };
 
-export const metadata = pageMetadata({ ...SEO, ogType: "article" });
+export const metadata = pageMetadata({ ...SEO, ogType: "article", absoluteTitle: true });
 
 export default function WhatIsTapPage() {
   return (

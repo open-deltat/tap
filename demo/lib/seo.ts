@@ -15,6 +15,11 @@ export const SITE = {
     "Δt is a database for time: it stores every booking as a stretch on one line, so finding what is free is one instant lookup. Open, self-hostable, and real-time.",
 } as const;
 
+// The brand suffix every page title carries. A layout that defines its own `title` replaces the
+// parent's title object INCLUDING its template, which silently drops the suffix for everything
+// beneath it; any layout that sets a title must re-state this template alongside it.
+export const TITLE_TEMPLATE = "%s · Δt";
+
 export const OG_IMAGE_PATH = "/opengraph-image";
 
 // Page openGraph overrides the layout's, which drops the file-convention image, so every helper sets
@@ -25,15 +30,18 @@ function abs(path: string): string {
   return path === "/" ? SITE.url : `${SITE.url}${path}`;
 }
 
+// `absoluteTitle` opts a page out of the root layout's "%s · Δt" template. Reserved for the pages
+// whose subject IS the brand (the landing, What is Δt, What is TAP), where a suffix would stutter.
 export function pageMetadata(opts: {
   title: string;
   description: string;
   path: string;
   ogType?: "website" | "article";
+  absoluteTitle?: boolean;
 }): Metadata {
   const url = abs(opts.path);
   return {
-    title: opts.title,
+    title: opts.absoluteTitle ? { absolute: opts.title } : opts.title,
     description: opts.description,
     alternates: { canonical: opts.path },
     openGraph: {
