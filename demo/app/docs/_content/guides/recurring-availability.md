@@ -31,7 +31,7 @@ await db.rules.create(
 );
 ```
 
-That is one quarter of weekday hours, about 65 segments, created in one round-trip. The pieces:
+That is one quarter of weekday hours, 63 segments, created in one round-trip. The pieces:
 
 - `daysOfWeek` uses JavaScript's day numbering, Sunday as 0.
 - `startTime` and `endTime` are `"HH:MM"` within each matched day.

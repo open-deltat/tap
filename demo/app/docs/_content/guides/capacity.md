@@ -60,7 +60,7 @@ A pool query finds the window; a per-resource query picks the member; the bookin
 
 ## A worked shape: the parking garage
 
-The [parking demo](/demos/parking) puts both ideas side by side. Each zone is a resource whose capacity is its spot count, so a car entering is a booking that overlaps everyone else in the zone, and the zone reads full exactly when the count says so. The garage's floors group the zones in the resource tree. "Any spot on floor 2" is a pool query across that floor's zones; "zone B is full" is capacity doing the counting.
+The [parking demo](/demos/parking) shows the capacity half live. Each zone is a resource whose capacity is its spot count, so a car entering is a booking that overlaps everyone else in the zone, and the zone reads full exactly when the count says so. The garage's floors group the zones in the resource tree. "Any spot on floor 2" would be a pool query across that floor's zones; the demo itself reads each zone's own availability, and "zone B is full" is capacity doing the counting.
 
 The same shape fits a gym's class schedule, a restaurant's bar, a rental fleet, a co-working floor. Capacity for the identical units, resources for the distinct ones, pool queries across whichever set the customer is indifferent about.
 
