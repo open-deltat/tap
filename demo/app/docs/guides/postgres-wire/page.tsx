@@ -5,15 +5,15 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "Under the hood: one binary, no Postgres",
+  title: "Connect with any Postgres client",
   description:
-    "Under the hood: Δt is one Rust binary, kept durable by an append-only log, speaking the Postgres wire today, with every tenant isolated by its database name.",
-  path: "/docs/protocol-and-engine",
+    "Δt answers the PostgreSQL wire protocol with no Postgres underneath: psql and ordinary drivers just connect. The whole SQL surface, tenants, and the limits.",
+  path: "/docs/guides/postgres-wire",
 };
 
 export const metadata = pageMetadata({ ...SEO, ogType: "article" });
 
-export default function UnderTheHoodPage() {
+export default function PostgresWirePage() {
   return (
     <article className="mx-auto max-w-3xl">
       <JsonLd
@@ -22,12 +22,12 @@ export default function UnderTheHoodPage() {
           breadcrumbLd([
             { name: "Home", path: "/" },
             { name: "What is Δt", path: "/docs" },
-            { name: "Under the hood", path: "/docs/protocol-and-engine" },
+            { name: "Any Postgres client", path: "/docs/guides/postgres-wire" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="Δt · the database" title="Under the hood" />
-      <Markdown>{docContent("protocol-and-engine")}</Markdown>
+      <DocHeader eyebrow="Guides · in practice" title="Any Postgres client" />
+      <Markdown>{docContent("guides/postgres-wire")}</Markdown>
     </article>
   );
 }

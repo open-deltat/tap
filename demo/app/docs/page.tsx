@@ -12,7 +12,7 @@ const SEO = {
   path: "/docs",
 };
 
-export const metadata = pageMetadata({ ...SEO, ogType: "article" });
+export const metadata = pageMetadata({ ...SEO, ogType: "article", absoluteTitle: true });
 
 export default function WhatIsDeltatPage() {
   const [before, after] = docContent("what-is-deltat").split("<!--COLLISION-->");

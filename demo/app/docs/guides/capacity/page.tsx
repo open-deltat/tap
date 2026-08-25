@@ -5,15 +5,15 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "Under the hood: one binary, no Postgres",
+  title: "Capacity, pools, and shared resources",
   description:
-    "Under the hood: Δt is one Rust binary, kept durable by an append-only log, speaking the Postgres wire today, with every tenant isolated by its database name.",
-  path: "/docs/protocol-and-engine",
+    "How capacity lets bookings stack on one resource until it is full, when to model seats as child resources instead, and how pool queries answer if anything is free.",
+  path: "/docs/guides/capacity",
 };
 
 export const metadata = pageMetadata({ ...SEO, ogType: "article" });
 
-export default function UnderTheHoodPage() {
+export default function CapacityPage() {
   return (
     <article className="mx-auto max-w-3xl">
       <JsonLd
@@ -22,12 +22,12 @@ export default function UnderTheHoodPage() {
           breadcrumbLd([
             { name: "Home", path: "/" },
             { name: "What is Δt", path: "/docs" },
-            { name: "Under the hood", path: "/docs/protocol-and-engine" },
+            { name: "Capacity and pools", path: "/docs/guides/capacity" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="Δt · the database" title="Under the hood" />
-      <Markdown>{docContent("protocol-and-engine")}</Markdown>
+      <DocHeader eyebrow="Guides · in practice" title="Capacity and pools" />
+      <Markdown>{docContent("guides/capacity")}</Markdown>
     </article>
   );
 }

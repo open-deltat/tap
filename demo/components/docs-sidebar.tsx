@@ -2,37 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { DOCS_SECTIONS } from "@/lib/docs-nav";
 import { cn } from "@/lib/utils";
 
-// The docs left rail: two sections for two separate things. Δt is the database; TAP is the Time
-// Allocation Protocol you reach it through. Active link is an exact path match.
-const SECTIONS: { title: string; links: { href: string; label: string }[] }[] = [
-  {
-    title: "Δt · the database",
-    links: [
-      { href: "/docs", label: "What is Δt" },
-      { href: "/docs/data-model", label: "Data model" },
-      { href: "/docs/holds-and-availability", label: "Holds and availability" },
-      { href: "/docs/protocol-and-engine", label: "Under the hood" },
-    ],
-  },
-  {
-    title: "TAP · the protocol",
-    links: [
-      { href: "/docs/sdk", label: "What is TAP" },
-      { href: "/docs/sdk/quickstart", label: "Quickstart" },
-      { href: "/docs/sdk/reference", label: "SDK reference" },
-      { href: "/docs/sdk/self-host", label: "Self-host" },
-    ],
-  },
-];
+// The docs left rail. Δt is the database; TAP is the Time Allocation Protocol you reach it
+// through; guides apply both to real scheduling problems. The tree itself lives in lib/docs-nav
+// (shared with the sitemap). Active link is an exact path match.
 
 export function DocsSidebar() {
   const pathname = usePathname();
   return (
     <aside className="w-full shrink-0 sm:w-56">
       <div className="flex gap-6 overflow-x-auto pb-2 sm:block sm:space-y-6 sm:overflow-visible sm:pb-0">
-        {SECTIONS.map((section) => (
+        {DOCS_SECTIONS.map((section) => (
           <div key={section.title} className="shrink-0">
             <div className="mb-2 px-2 text-[11px] uppercase tracking-[0.18em] text-zinc-500">{section.title}</div>
             <nav className="flex gap-1 sm:block sm:space-y-0.5">

@@ -7,6 +7,7 @@ export const metadata = pageMetadata({
   title: SITE.defaultTitle,
   description: SITE.description,
   path: "/",
+  absoluteTitle: true,
 });
 
 // The landing page: a gallery of every example, grouped, with the headline demos featured large.

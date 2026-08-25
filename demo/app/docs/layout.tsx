@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { DocsSidebar } from "@/components/docs-sidebar";
+import { TITLE_TEMPLATE } from "@/lib/seo";
 
+// Defining a title here replaces the root layout's title object, template included, so the
+// template must be re-stated or every docs page below would lose its brand suffix.
 export const metadata: Metadata = {
-  title: "Docs · Δt",
+  title: { default: "Docs", template: TITLE_TEMPLATE },
   description: "Δt is a database for time; TAP is how you use it. Data model, holds, the SDK, and self-hosting.",
 };
 

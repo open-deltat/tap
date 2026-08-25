@@ -5,7 +5,7 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "Self-host Δt: run your own node",
+  title: "Self-host: run your own node",
   description:
     "Run your own Δt node: one Rust binary, no Postgres underneath, configured entirely through environment variables, with a background reaper that cleans up.",
   path: "/docs/sdk/self-host",

@@ -121,4 +121,6 @@ await db.bookings.create([{ resourceId: seat12.id, start, end, label }]);
 
 Between those two calls the slot is genuinely free for an instant, which means a competing request could slip in and grab it. It is a small window, but it is real. For most flows it is fine, just know it is there. A one-step commit is on the roadmap and not built yet.
 
-All of these calls speak in plain numbers: times are integer Unix milliseconds, and a slot `[start, end)` includes its start but not its end, so two slots that touch end-to-start do not overlap. Calendars, time zones, and recurring schedules are yours to expand into plain instants before you hand them to Δt.
+All of these calls speak in plain numbers: times are integer Unix milliseconds, and a slot `[start, end)` includes its start but not its end, so two slots that touch end-to-start do not overlap. Calendars, time zones, and recurring schedules are yours to expand into plain instants before you hand them to Δt ([how that expansion works](/docs/guides/recurring-availability)).
+
+For the applied versions of this page, see the guides on [preventing double bookings](/docs/guides/prevent-double-booking) and [hold-to-book checkout flows](/docs/guides/booking-holds).

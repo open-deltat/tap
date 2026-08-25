@@ -5,15 +5,15 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "Under the hood: one binary, no Postgres",
+  title: "Do you need a scheduling database?",
   description:
-    "Under the hood: Δt is one Rust binary, kept durable by an append-only log, speaking the Postgres wire today, with every tenant isolated by its database name.",
-  path: "/docs/protocol-and-engine",
+    "You can build bookings on Postgres, and sometimes you should. What exclusion constraints solve, where holds, capacity, and availability get steep, and what changes.",
+  path: "/docs/guides/scheduling-database",
 };
 
 export const metadata = pageMetadata({ ...SEO, ogType: "article" });
 
-export default function UnderTheHoodPage() {
+export default function SchedulingDatabasePage() {
   return (
     <article className="mx-auto max-w-3xl">
       <JsonLd
@@ -22,12 +22,12 @@ export default function UnderTheHoodPage() {
           breadcrumbLd([
             { name: "Home", path: "/" },
             { name: "What is Δt", path: "/docs" },
-            { name: "Under the hood", path: "/docs/protocol-and-engine" },
+            { name: "Do you need a scheduling database?", path: "/docs/guides/scheduling-database" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="Δt · the database" title="Under the hood" />
-      <Markdown>{docContent("protocol-and-engine")}</Markdown>
+      <DocHeader eyebrow="Guides · in practice" title="Do you need a scheduling database?" />
+      <Markdown>{docContent("guides/scheduling-database")}</Markdown>
     </article>
   );
 }
