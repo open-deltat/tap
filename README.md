@@ -76,7 +76,7 @@ const slots = await dt.availability.get({
 | **Restaurant** | Party size to floor plan to time slot to reservation |
 | **Parking** | Multi-floor garage with zone grids and duration-based booking |
 
-Every demo uses a WebSocket for live updates. The hold-based ones follow a connection-lifecycle pattern: opening a socket places a hold, sending `{type: "confirm"}` books it atomically, and closing the socket releases it.
+Every demo uses a WebSocket for live updates. The hold-based ones follow a connection-lifecycle pattern: opening a socket places a hold, sending `{type: "confirm"}` converts it into a booking, and closing the socket releases it. (The demo server still confirms with a release-then-book two-step; it moves to the SDK's atomic `holds.commit` once a deltat release ships the commit surface.)
 
 ## Run the demos
 
