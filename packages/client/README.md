@@ -42,12 +42,37 @@ const slots = await dt.availability.get({
 });
 ```
 
+## Holds: reserve, then commit
+
+A hold takes a span out of availability while your user decides. To keep the slot, commit the
+hold: the server converts it into a booking in a single atomic statement, so no competing writer
+can steal the span in between. (Do not release the hold and re-insert a booking yourself; that
+two-step leaves a window where another client can win the very slot the hold protected.)
+
+```ts
+const hold = await dt.holds.place({
+  resourceId: room.id,
+  start,
+  end,
+  expiresAt: Date.now() + 600_000, // requested, see below
+});
+
+const { bookingId } = await dt.holds.commit(hold.id, { label: "seat 14F" });
+```
+
+`expiresAt` is a request, not an assignment: the server clamps it to its own clock plus a maximum
+hold TTL (`DELTAT_MAX_HOLD_TTL_MS`, default 1 hour), and the clamped value is what conflict
+checks, availability, and the reaper use. The `Hold` returned by `place` echoes what you asked
+for, so read the hold back with `holds.get` when you need the effective expiry (countdown UIs,
+renewal logic). A hold that must outlive the cap has to be re-placed or renewed before it expires.
+`commit` rejects if the hold is unknown, already released, or expired; place a new hold and retry.
+
 ## API
 
 - **`resources`**: hierarchical create/update/delete/get
 - **`rules`**: batch `create(items[])`, update, delete, get (open hours and blocked windows)
 - **`bookings`**: batch `create(items[])`, cancel, get with an optional `{start, end}` filter
-- **`holds`**: place, release, get with an optional `{start, end}` filter
+- **`holds`**: place, commit (atomic hold-to-booking conversion), release, get with an optional `{start, end}` filter
 - **`availability`**: single- and multi-resource queries (`min_available` for "any k of N free")
 - **`events`**: real-time LISTEN/NOTIFY subscriptions
 - **`expandRecurrence()`**: expand a recurring pattern (days of week, time range, date range, excludes) into concrete rule segments, DST-safe in an explicit IANA `timeZone` (default UTC); overnight and until-midnight (`"24:00"`) windows supported

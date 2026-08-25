@@ -30,7 +30,7 @@ npm install @open-deltat/client
 - **Resources** - hierarchical create / update / delete / get
 - **Rules** - batch `create(items[])`, update, delete, get
 - **Bookings** - batch `create(items[])`, cancel, get with an optional `{start, end}` window
-- **Holds** - place, release, get with an optional `{start, end}` window
+- **Holds** - place, commit (atomic hold-to-booking conversion), release, get with an optional `{start, end}` window
 - **Availability** - single-resource and combined multi-resource queries
 - **Events** - real-time LISTEN/NOTIFY subscriptions
 - **`expandRecurrence()`** - turn a recurring pattern (days of week, time range, date range, exclusions) into concrete rule segments, DST-safe in an explicit IANA `timeZone` (default UTC)
