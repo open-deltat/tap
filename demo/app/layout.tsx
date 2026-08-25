@@ -5,7 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@open-deltat/examples/components/ui/sonner";
 import { NavHeader } from "@/components/nav-header";
 import { JsonLd } from "@/components/json-ld";
-import { SITE, organizationLd, websiteLd, softwareApplicationLd } from "@/lib/seo";
+import { SITE, TITLE_TEMPLATE, organizationLd, websiteLd, softwareApplicationLd } from "@/lib/seo";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: {
     default: SITE.defaultTitle,
-    template: "%s",
+    template: TITLE_TEMPLATE,
   },
   description: SITE.description,
   applicationName: SITE.name,

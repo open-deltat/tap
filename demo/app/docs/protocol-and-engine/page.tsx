@@ -5,7 +5,7 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "Under the hood: the Δt engine",
+  title: "Under the hood: one binary, no Postgres",
   description:
     "Under the hood: Δt is one Rust binary, kept durable by an append-only log, speaking the Postgres wire today, with every tenant isolated by its database name.",
   path: "/docs/protocol-and-engine",
