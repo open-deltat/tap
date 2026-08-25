@@ -95,6 +95,26 @@ test("a throwing onError hook is contained too", async () => {
   expect(() => handlerFor(handlers, "r1")(deletedPayload("r1"))).not.toThrow();
 });
 
+test("ResourceUpdated from a partial update carries null for unmentioned fields", async () => {
+  const { sql, handlers } = stubListenSql();
+  const seen: DeltaTEvent[] = [];
+  await new Events(sql).listen("01HRES", (event) => seen.push(event));
+
+  // Exact serde_json output of deltat's Event::ResourceUpdated for a name-only UPDATE: the enum
+  // has no skip_serializing_if, so fields the UPDATE did not mention arrive as JSON null. The
+  // literal below also pins this at the type level: it must be assignable to DeltaTEvent.
+  const wirePayload: DeltaTEvent = {
+    ResourceUpdated: { id: "01HRES", name: "studio-2", capacity: null, buffer_after: null },
+  };
+  handlerFor(handlers, "01HRES")(JSON.stringify(wirePayload));
+
+  const event = seen[0];
+  if (!event || !("ResourceUpdated" in event)) throw new Error("expected a ResourceUpdated event");
+  expect(event.ResourceUpdated.name).toBe("studio-2");
+  expect(event.ResourceUpdated.capacity).toBeNull();
+  expect(event.ResourceUpdated.buffer_after).toBeNull();
+});
+
 test("malformed payloads are skipped without invoking the subscriber", async () => {
   const { sql, handlers } = stubListenSql();
   const seen: DeltaTEvent[] = [];
