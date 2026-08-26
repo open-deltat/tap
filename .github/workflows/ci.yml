@@ -30,7 +30,7 @@ jobs:
       # The published crate is the server the SDK ships against. Tests for newer capabilities
       # (e.g. holds.commit) probe at startup and skip when this version predates them; bump the
       # pin when a new deltat release lands.
-      DELTAT_CRATE_VERSION: 0.2.0
+      DELTAT_CRATE_VERSION: 0.3.0
       # deltat 0.2.0 generates a random password when DELTAT_PASSWORD is unset, so the
       # server and the suite have to agree on one explicitly. Not a secret: it exists for
       # the length of one job against a loopback-bound server with an empty data dir.
