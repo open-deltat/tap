@@ -1,7 +1,7 @@
 "use server";
 
 import { dt } from "../../lib/deltat";
-import { findRootByName, baseMs } from "../../actions/seed-helpers";
+import { findRootByName, baseMs, ensureOpenWindow } from "../../actions/seed-helpers";
 
 import { CHECK_IN_HOUR, CHECK_OUT_HOUR } from "./policy";
 
@@ -26,8 +26,7 @@ export async function ensureHotel(): Promise<{ rootId: string; rooms: HotelRoomT
     const hotel = await dt.resources.create({ name: NAME });
     hotelId = hotel.id;
     // One long "always open" rule on the hotel; room types inherit it from the parent.
-    const start = baseMs();
-    await dt.rules.create([{ resourceId: hotelId, start, end: start + 60 * DAY, blocking: false }]);
+    await ensureOpenWindow(hotelId);
 
     const created: HotelRoomType[] = [];
     for (const t of TYPES) {
@@ -74,6 +73,7 @@ export async function ensureHotel(): Promise<{ rootId: string; rooms: HotelRoomT
     return { rootId: hotelId, rooms: created };
   }
 
+  await ensureOpenWindow(hotelId);
   const children = await dt.resources.get({ parentId: hotelId });
   return {
     rootId: hotelId,

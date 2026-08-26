@@ -1,14 +1,27 @@
 "use server";
 
-import { createVenue, createSection, createSeats, addSchedule, daily, prebookSeats, findRootByName, baseMs } from "../../actions/seed-helpers";
+import { createVenue, createSection, createSeats, ensureSchedule, daily, prebookSeats, findRootByName, baseMs } from "../../actions/seed-helpers";
 
 const W_NAME = "AA-100 JFK → LAX";
 const E_NAME = "AA-205 LAX → JFK";
 
+// Two departures a day per flight, inherited by every seat.
+const W_DEPARTURES = daily([
+  { h: 6, m: 0, dur: 360 },
+  { h: 14, m: 30, dur: 360 },
+]);
+const E_DEPARTURES = daily([
+  { h: 8, m: 0, dur: 300 },
+  { h: 16, m: 0, dur: 300 },
+]);
+
 export async function seedAirline(): Promise<string[]> {
   const wId = await findRootByName(W_NAME);
   const eId = await findRootByName(E_NAME);
-  if (wId && eId) return [wId, eId];
+  if (wId && eId) {
+    await Promise.all([ensureSchedule(wId, W_DEPARTURES), ensureSchedule(eId, E_DEPARTURES)]);
+    return [wId, eId];
+  }
 
   const base = baseMs();
   const flightOpts = (dur: number, price: number) => ({
@@ -33,10 +46,7 @@ export async function seedAirline(): Promise<string[]> {
   const wEcon = await createSection(w.id, "Economy", flightOpts(360, 220));
   const wEconSeats = await createSeats(wEcon.id, ECON_ROWS, ["A", "B", "C", "D", "E", "F"], flightOpts(360, 220));
 
-  await addSchedule(w.id, base, 14, daily([
-    { h: 6, m: 0, dur: 360 },
-    { h: 14, m: 30, dur: 360 },
-  ]));
+  await ensureSchedule(w.id, W_DEPARTURES);
 
   // The 06:00 departure opens partly full: a first-class window seat and several economy seats taken.
   await prebookSeats(wFcSeats, 2, base + 6 * 3_600_000, 360, "Booked");
@@ -54,10 +64,7 @@ export async function seedAirline(): Promise<string[]> {
   const eEcon = await createSection(e.id, "Economy", flightOpts(300, 189));
   const eEconSeats = await createSeats(eEcon.id, ECON_ROWS, ["A", "B", "C", "D", "E", "F"], flightOpts(300, 189));
 
-  await addSchedule(e.id, base, 14, daily([
-    { h: 8, m: 0, dur: 300 },
-    { h: 16, m: 0, dur: 300 },
-  ]));
+  await ensureSchedule(e.id, E_DEPARTURES);
 
   // The 08:00 departure opens lightly booked.
   await prebookSeats(eEconSeats, 14, base + 8 * 3_600_000, 300, "Booked");

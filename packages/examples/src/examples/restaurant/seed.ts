@@ -2,9 +2,12 @@
 
 import { dt } from "../../lib/deltat";
 import * as store from "../../lib/store";
-import { addSchedule, daily, findRootByName, baseMs } from "../../actions/seed-helpers";
+import { ensureSchedule, daily, findRootByName, baseMs } from "../../actions/seed-helpers";
 
 const NAME = "Bella Cucina";
+
+// Open 11:00–22:00 daily, expanded into rules at the edge (no kernel Schedule primitive).
+const SERVICE_HOURS = daily([{ h: 11, m: 0, dur: 660 }]);
 
 // The dining table closed for tonight's service, to demo "block a table tonight".
 const BLOCKED_TABLE = "D1";
@@ -50,13 +53,15 @@ const SECTIONS: { name: string; tables: TableDef[] }[] = [
 
 export async function seedRestaurant(): Promise<string> {
   const existing = await findRootByName(NAME);
-  if (existing) return existing;
+  if (existing) {
+    await ensureSchedule(existing, SERVICE_HOURS);
+    return existing;
+  }
 
   const restaurant = await dt.resources.create({ name: NAME, bufferAfter: 30 * 60_000 });
   store.set(restaurant.id, { slotMinutes: 90, price: null });
 
-  // Open 11:00–22:00 daily, expanded into rules at the edge (no kernel Schedule primitive).
-  await addSchedule(restaurant.id, baseMs(), 30, daily([{ h: 11, m: 0, dur: 660 }]));
+  await ensureSchedule(restaurant.id, SERVICE_HOURS);
 
   let blockedTableId: string | null = null;
 

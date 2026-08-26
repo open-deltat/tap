@@ -2,8 +2,16 @@ import { dt } from "../lib/deltat";
 import * as store from "../lib/store";
 import type { Resource, ResourceMeta } from "../lib/schemas";
 import type { Rule } from "@open-deltat/client";
+import {
+  addLocalDays,
+  coveredThrough,
+  HORIZON_DAYS,
+  scheduleOccurrences,
+  startOfLocalDay,
+  type DaySchedule,
+} from "./schedule-window";
 
-const DAY = 86_400_000;
+export { addLocalDays, coveredThrough, startOfLocalDay, type DaySchedule };
 
 function toMeta(opts: { slotMinutes: number; price: number | null }): ResourceMeta {
   return { slotMinutes: opts.slotMinutes, price: opts.price };
@@ -78,31 +86,65 @@ export async function prebookSeats(
   }
 }
 
-export async function addSchedule(
+/**
+ * Extend `resourceId`'s open hours so they run from today to today + `horizonDays`, creating only
+ * the occurrences that are missing.
+ *
+ * Safe to call on every page view, which is the point: a seed guarded only by "does this root
+ * exist" freezes its open hours on the day it first ran, and the demo goes dark the moment that
+ * window lapses. Asking about coverage instead makes the first seed and every later top-up the
+ * same call.
+ *
+ * Returns the occurrences it created (empty when coverage was already sufficient), so a caller
+ * that decorates its schedule (enrollments, sold seats) can decorate exactly the new days.
+ */
+export async function ensureSchedule(
   resourceId: string,
-  baseMs: number,
-  days: number,
-  schedule: Record<number, { h: number; m: number; dur: number }[]>
-): Promise<Rule[]> {
-  const items: { resourceId: string; start: number; end: number; blocking: boolean }[] = [];
-  for (let i = 0; i < days; i++) {
-    const dayMs = baseMs + i * DAY;
-    const dow = new Date(dayMs).getDay();
-    const shows = schedule[dow];
-    if (!shows) continue;
-    for (const { h, m, dur } of shows) {
-      const start = dayMs + h * 3_600_000 + m * 60_000;
-      const end = start + dur * 60_000;
-      items.push({ resourceId, start, end, blocking: false });
-    }
-  }
-  if (items.length === 0) return [];
-  return dt.rules.create(items);
+  schedule: DaySchedule,
+  opts: { horizonDays?: number; from?: number } = {}
+): Promise<{ start: number; end: number }[]> {
+  const occurrences = scheduleOccurrences(schedule, {
+    today: baseMs(),
+    coveredThrough: coveredThrough(await dt.rules.get(resourceId)),
+    horizonDays: opts.horizonDays ?? HORIZON_DAYS,
+    from: opts.from,
+  });
+  if (occurrences.length === 0) return [];
+  await dt.rules.create(
+    occurrences.map((o) => ({ resourceId, start: o.start, end: o.end, blocking: false }))
+  );
+  return occurrences;
 }
 
-export function daily(
-  shows: { h: number; m: number; dur: number }[]
-): Record<number, { h: number; m: number; dur: number }[]> {
+/**
+ * Keep a single "always open" umbrella rule stretched to today + `horizonDays`. For venues whose
+ * children carry the real schedule (a hotel's room types, a gym's courses) and whose own window
+ * exists only to be a roof over them.
+ *
+ * Widens the existing rule rather than appending a second one, so a deployment that has been up
+ * for a year still has exactly one umbrella instead of 365 abutting slivers.
+ */
+export async function ensureOpenWindow(
+  resourceId: string,
+  opts: { horizonDays?: number; from?: number } = {}
+): Promise<{ start: number; end: number }> {
+  const until = addLocalDays(baseMs(), opts.horizonDays ?? HORIZON_DAYS);
+  const open = (await dt.rules.get(resourceId)).filter((r) => !r.blocking);
+  const widest = open.reduce<Rule | null>((best, r) => (!best || r.end > best.end ? r : best), null);
+
+  if (!widest) {
+    const start = opts.from ?? baseMs();
+    await dt.rules.create([{ resourceId, start, end: until, blocking: false }]);
+    return { start, end: until };
+  }
+  if (widest.end < until) {
+    await dt.rules.update(widest.id, { start: widest.start, end: until, blocking: false });
+  }
+  const start = open.reduce((lo, r) => Math.min(lo, r.start), widest.start);
+  return { start, end: Math.max(widest.end, until) };
+}
+
+export function daily(shows: { h: number; m: number; dur: number }[]): DaySchedule {
   return Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, shows]));
 }
 

@@ -2,9 +2,15 @@
 
 import { dt } from "../../lib/deltat";
 import * as store from "../../lib/store";
-import { addSchedule, daily, findRootByName, baseMs } from "../../actions/seed-helpers";
+import { ensureSchedule, daily, findRootByName, baseMs } from "../../actions/seed-helpers";
 
 const NAME = "Downtown Garage";
+
+// Open 24/7, inherited by every zone. dur 1440 (a full day) so consecutive days abut and merge
+// into one continuous window; 1439 left a 1-minute gap at every midnight, so any window crossing
+// midnight (an evening park, or "All day" from the afternoon) found no covering slot, every zone
+// wrongly read "closed".
+const ALWAYS_OPEN = daily([{ h: 0, m: 0, dur: 1440 }]);
 
 // A zone is ONE capacity-N resource (N = spots in the zone). Booking one car is one booking
 // on the zone; the engine's capacity sweep blocks the (N+1)th overlapping booking. Floors are
@@ -47,17 +53,16 @@ const MAINTENANCE_ZONE = "Zone E";
 
 export async function seedParking(): Promise<string[]> {
   const existing = await findRootByName(NAME);
-  if (existing) return [existing];
+  if (existing) {
+    await ensureSchedule(existing, ALWAYS_OPEN);
+    return [existing];
+  }
 
   const base = baseMs();
   const garage = await dt.resources.create({ name: NAME });
   store.set(garage.id, { slotMinutes: 60, price: null });
 
-  // Open 24/7, inherited by every zone. dur 1440 (a full day) so consecutive days abut and merge
-  // into one continuous window; 1439 left a 1-minute gap at every midnight, so any window crossing
-  // midnight (an evening park, or "All day" from the afternoon) found no covering slot, every zone
-  // wrongly read "closed".
-  await addSchedule(garage.id, base, 30, daily([{ h: 0, m: 0, dur: 1440 }]));
+  await ensureSchedule(garage.id, ALWAYS_OPEN);
 
   let maintenanceZoneId: string | null = null;
 

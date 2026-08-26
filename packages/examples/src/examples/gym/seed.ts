@@ -1,12 +1,10 @@
 "use server";
 
 import { dt } from "../../lib/deltat";
-import { addSchedule, findRootByName } from "../../actions/seed-helpers";
-import type { Rule } from "@open-deltat/client";
+import { ensureSchedule, ensureOpenWindow, findRootByName } from "../../actions/seed-helpers";
 
 const NAME = "FitFlow Studio";
 const DAY = 86_400_000;
-const SCHEDULE_DAYS = 70; // current month + next, expanded into rules at the edge (EDGE-03)
 const ENROLL_WINDOW_DAYS = 35; // only fill upcoming classes, so "spots left" varies where it matters
 
 export type GymCourse = { id: string; name: string; capacity: number };
@@ -84,68 +82,76 @@ function fillFor(seed: string, capacity: number): number {
   return Math.min(capacity, 1 + (r % capacity)); // the rest partway full
 }
 
-// The seeded coverage window, read back from the gym's "always open" rule(s) so the UI can clamp
-// navigation to months that actually have data.
-function windowFromRootRules(rules: Rule[]): { start: number; end: number } {
-  const open = rules.filter((r) => !r.blocking);
-  if (open.length === 0) {
-    const base = monthStartMs();
-    return { start: base, end: base + (SCHEDULE_DAYS + 1) * DAY };
+/**
+ * Enroll members into `occurrences`, deterministically, so spots-left varies across the calendar.
+ * Only ever handed the classes this run created, so a top-up fills the newly opened days and
+ * leaves every existing class's roster alone.
+ */
+async function fillClasses(
+  resourceId: string,
+  def: CourseDef,
+  occurrences: { start: number; end: number }[]
+): Promise<void> {
+  if (occurrences.length === 0) return;
+  const enrollUntil = Date.now() + ENROLL_WINDOW_DAYS * DAY;
+
+  // Two page views can open the same day at the same moment. Enrolling into a class that already
+  // has its members would push it past capacity and fail the whole seed, taking the page with it,
+  // so treat "already has members" as done.
+  const enrolled = new Set((await dt.bookings.get(resourceId)).map((b) => b.start));
+
+  for (const occ of occurrences) {
+    if (occ.start > enrollUntil || enrolled.has(occ.start)) continue;
+    const fill = fillFor(`${def.name}:${occ.start}`, def.capacity);
+    if (fill === 0) continue;
+    await dt.bookings.create(
+      Array.from({ length: fill }, () => ({
+        resourceId,
+        start: occ.start,
+        end: occ.end,
+        label: "Member",
+      }))
+    );
   }
-  return {
-    start: Math.min(...open.map((r) => r.start)),
-    end: Math.max(...open.map((r) => r.end)),
-  };
 }
 
 export type GymData = { rootId: string; courses: GymCourse[]; window: { start: number; end: number } };
 
 export async function ensureGym(): Promise<GymData> {
+  // Classes reach back to the 1st so the visible month reads as lived-in rather than starting
+  // mid-page; the horizon still rolls forward from today.
+  const from = monthStartMs();
   const existingId = await findRootByName(NAME);
+
   if (existingId) {
-    const [children, rootRules] = await Promise.all([
-      dt.resources.get({ parentId: existingId }),
-      dt.rules.get(existingId),
-    ]);
+    const children = await dt.resources.get({ parentId: existingId });
+    // Roof before rooms (SQLSTATE 23514), then top up each course and enroll into what opened.
+    const window = await ensureOpenWindow(existingId, { from });
+    for (const child of children) {
+      const def = COURSES.find((c) => c.name === child.name);
+      if (!def) continue;
+      const opened = await ensureSchedule(child.id, def.schedule, { from });
+      await fillClasses(child.id, def, opened);
+    }
     return {
       rootId: existingId,
       courses: children.map((c) => ({ id: c.id, name: c.name ?? "Class", capacity: c.capacity })),
-      window: windowFromRootRules(rootRules),
+      window,
     };
   }
 
   const gym = await dt.resources.create({ name: NAME });
-  const base = monthStartMs();
-  const windowEnd = base + (SCHEDULE_DAYS + 1) * DAY;
-  const enrollUntil = Date.now() + ENROLL_WINDOW_DAYS * DAY;
-
-  // One long "always open" rule on the gym itself. deltat requires a child's open-hours rules to be
-  // covered by the parent's availability, so each course's class windows inherit from this.
-  await dt.rules.create([{ resourceId: gym.id, start: base, end: windowEnd, blocking: false }]);
+  // One long "always open" rule on the gym itself. deltat rejects a child's open-hours rule that
+  // the parent's availability does not cover (SQLSTATE 23514), so this roof goes up first.
+  const window = await ensureOpenWindow(gym.id, { from });
 
   const courses: GymCourse[] = [];
   for (const def of COURSES) {
     const r = await dt.resources.create({ parentId: gym.id, name: def.name, capacity: def.capacity });
-    const occurrences = await addSchedule(r.id, base, SCHEDULE_DAYS, def.schedule);
-
-    // Fill upcoming classes (through the enroll window) so spots-left varies across the visible
-    // month, including classes already past today, which otherwise read as uniformly wide-open.
-    for (const occ of occurrences) {
-      if (occ.start > enrollUntil) continue;
-      const fill = fillFor(`${def.name}:${occ.start}`, def.capacity);
-      if (fill === 0) continue;
-      await dt.bookings.create(
-        Array.from({ length: fill }, () => ({
-          resourceId: r.id,
-          start: occ.start,
-          end: occ.end,
-          label: "Member",
-        }))
-      );
-    }
-
+    const opened = await ensureSchedule(r.id, def.schedule, { from });
+    await fillClasses(r.id, def, opened);
     courses.push({ id: r.id, name: def.name, capacity: def.capacity });
   }
 
-  return { rootId: gym.id, courses, window: { start: base, end: windowEnd } };
+  return { rootId: gym.id, courses, window };
 }
