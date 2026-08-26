@@ -32,12 +32,15 @@ export async function addRecurringRules(input: {
 }): Promise<Rule[]> {
   const parsed = RecurringRuleInput.parse(input);
 
+  // The demo UIs enter and display host-local wall times, so expand in the host zone explicitly
+  // (expandRecurrence itself defaults to UTC).
   const segments = expandRecurrence({
     daysOfWeek: parsed.daysOfWeek,
     startTime: parsed.startTime,
     endTime: parsed.endTime,
     fromDate: parsed.fromDate,
     toDate: parsed.toDate,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     blocking: parsed.blocking,
   });
 
@@ -71,6 +74,7 @@ export async function setWeeklyAvailability(input: {
       endTime: rg.endTime,
       fromDate: input.fromDate,
       toDate: input.toDate,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       blocking: false,
     })
   );

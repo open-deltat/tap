@@ -8,6 +8,21 @@ may still carry breaking changes.
 
 ## [Unreleased]
 
+### Changed
+- **Breaking**: `expandRecurrence` now interprets `startTime` and `endTime` as wall-clock times in
+  the pattern's IANA `timeZone` (new optional field, default `"UTC"`) instead of the process's
+  local timezone. The same pattern now yields the same absolute segments on every machine, and
+  wall times stay correct across DST transitions: a nonexistent spring-forward time shifts forward
+  by the gap, and an ambiguous fall-back time resolves to the earlier instant.
+- **Breaking**: `expandRecurrence` throws on malformed `startTime`/`endTime`/`fromDate`/`toDate`,
+  on `endTime` equal to `startTime`, and on an unknown `timeZone`, instead of silently expanding
+  to an empty or host-dependent schedule.
+
+### Added
+- `expandRecurrence` supports until-midnight windows (`endTime: "00:00"` or `"24:00"`) and
+  overnight windows (an `endTime` before `startTime` rolls into the next day, e.g. 22:00 to
+  02:00). These previously produced no segments, silently.
+
 ## [0.2.1] - 2026-07-02
 
 The typed TypeScript SDK for [deltat](https://github.com/open-deltat/deltat), a time-allocation

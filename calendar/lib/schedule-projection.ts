@@ -27,12 +27,15 @@ export async function projectScheduleToRules(
   const horizon = new Date(today);
   horizon.setDate(horizon.getDate() + HORIZON_DAYS);
 
+  // The calendar's dates and wall times are host-local, so expand in the host zone explicitly
+  // (expandRecurrence itself defaults to UTC).
   const segments = expandRecurrence({
     daysOfWeek: schedule.days.map((d) => DAY_NUMBER[d]),
     startTime: schedule.startTime,
     endTime: schedule.endTime,
     fromDate: toDateStr(today),
     toDate: toDateStr(horizon),
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     blocking: false,
   });
 

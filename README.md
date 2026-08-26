@@ -30,10 +30,10 @@ npm install @open-deltat/client
 - **Resources** - hierarchical create / update / delete / get
 - **Rules** - batch `create(items[])`, update, delete, get
 - **Bookings** - batch `create(items[])`, cancel, get with an optional `{start, end}` window
-- **Holds** - place, release, get with an optional `{start, end}` window
+- **Holds** - place, commit (atomic hold-to-booking conversion), release, get with an optional `{start, end}` window
 - **Availability** - single-resource and combined multi-resource queries
 - **Events** - real-time LISTEN/NOTIFY subscriptions
-- **`expandRecurrence()`** - turn a recurring pattern (days of week, time range, date range, exclusions) into concrete rule segments
+- **`expandRecurrence()`** - turn a recurring pattern (days of week, time range, date range, exclusions) into concrete rule segments, DST-safe in an explicit IANA `timeZone` (default UTC)
 
 ```ts
 import { DeltaT, expandRecurrence } from "@open-deltat/client";
@@ -42,13 +42,15 @@ const dt = new DeltaT({ host: "localhost", port: 5433 });
 
 const room = await dt.resources.create({ name: "Room A" });
 
-// Open weekdays 9 to 5 for the first quarter, as concrete rules.
+// Open weekdays 9 to 5 for the first quarter, as concrete rules. Wall-clock times are
+// interpreted in the given IANA timeZone (default "UTC") and stay correct across DST.
 const segments = expandRecurrence({
   daysOfWeek: [1, 2, 3, 4, 5],
   startTime: "09:00",
   endTime: "17:00",
   fromDate: "2025-01-01",
   toDate: "2025-03-31",
+  timeZone: "Europe/Berlin",
 });
 await dt.rules.create(segments.map((s) => ({ resourceId: room.id, ...s })));
 
@@ -74,7 +76,7 @@ const slots = await dt.availability.get({
 | **Restaurant** | Party size to floor plan to time slot to reservation |
 | **Parking** | Multi-floor garage with zone grids and duration-based booking |
 
-Every demo uses a WebSocket for live updates. The hold-based ones follow a connection-lifecycle pattern: opening a socket places a hold, sending `{type: "confirm"}` books it atomically, and closing the socket releases it.
+Every demo uses a WebSocket for live updates. The hold-based ones follow a connection-lifecycle pattern: opening a socket places a hold, sending `{type: "confirm"}` converts it into a booking, and closing the socket releases it. (The demo server still confirms with a release-then-book two-step; it moves to the SDK's atomic `holds.commit` once a deltat release ships the commit surface.)
 
 ## Run the demos
 

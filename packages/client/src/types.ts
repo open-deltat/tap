@@ -55,10 +55,16 @@ export type DeltaTEvent =
       };
     }
   | {
+      /**
+       * A partial update: a field is null when the UPDATE did not mention that column (the server
+       * serializes absent fields as JSON null, so every key is always present). For the nullable
+       * columns (name, buffer_after) the wire cannot distinguish "unchanged" from "set to NULL";
+       * re-read the resource when that difference matters.
+       */
       ResourceUpdated: {
         id: string;
         name: string | null;
-        capacity: number;
+        capacity: number | null;
         buffer_after: number | null;
       };
     }
