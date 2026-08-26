@@ -14,13 +14,22 @@ if [ -z "$DELTAT_BIN" ] && [ -f "$HOME/.cargo/bin/deltat" ]; then
     DELTAT_BIN="$HOME/.cargo/bin/deltat"
 fi
 
-# Check if installed version matches remote
-REMOTE_VERSION=$(curl -sf "https://raw.githubusercontent.com/open-deltat/deltat/main/VERSION" || echo "")
+# Track the published crate, which is the server the SDK ships against and what CI installs.
+# The old check read a VERSION file that no longer exists in the deltat repo, so it always came
+# back empty and an already-installed binary was never upgraded again.
+# crates.io rejects requests without a User-Agent, and curl -f hides that as an empty body.
+REMOTE_VERSION=$(curl -sf -H "User-Agent: deltat-demo-dev-script" "https://crates.io/api/v1/crates/deltat" \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["crate"]["max_version"])' 2>/dev/null || echo "")
 LOCAL_VERSION=$(cat "$DELTAT_VERSION_CACHE" 2>/dev/null || echo "")
 
 if [ -z "$DELTAT_BIN" ] || { [ -n "$REMOTE_VERSION" ] && [ "$REMOTE_VERSION" != "$LOCAL_VERSION" ]; }; then
-    echo "Installing deltat${REMOTE_VERSION:+ v${REMOTE_VERSION}}..."
-    cargo install --git "$DELTAT_REPO" --force
+    if [ -n "$REMOTE_VERSION" ]; then
+        echo "Installing deltat v${REMOTE_VERSION}..."
+        cargo install deltat --version "$REMOTE_VERSION" --locked --force
+    else
+        echo "crates.io unreachable; installing deltat from git..."
+        cargo install --git "$DELTAT_REPO" --force
+    fi
     DELTAT_BIN="$HOME/.cargo/bin/deltat"
     mkdir -p "$(dirname "$DELTAT_VERSION_CACHE")"
     echo "$REMOTE_VERSION" > "$DELTAT_VERSION_CACHE"
