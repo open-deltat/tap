@@ -5,7 +5,7 @@ import {
   createVenue,
   createSection,
   createSeats,
-  addSchedule,
+  ensureSchedule,
   daily,
   prebookSeats,
   findRootByName,
@@ -26,6 +26,14 @@ const SCREENS = [
 
 const RUNTIME = 150; // minutes
 
+// The cinema is open 08:00–01:00; each screen runs two staggered showtimes inside that.
+const HOUSE_HOURS = daily([{ h: 8, m: 0, dur: 1020 }]);
+const showtimes = (firstShow: number) =>
+  daily([
+    { h: firstShow, m: 0, dur: RUNTIME },
+    { h: firstShow + 4, m: 0, dur: RUNTIME },
+  ]);
+
 // Returns the SCREEN ids (not the cinema root): each screen is its own "venue" in the seat
 // booker, so its two showtimes become the selectable slot pills. Booking against the cinema
 // root instead would use its 08:00–01:00 umbrella window, under which no seat is free for the
@@ -34,15 +42,19 @@ export async function seedCinema(): Promise<string[]> {
   const existing = await findRootByName(NAME);
   if (existing) {
     const screens = await dt.resources.get({ parentId: existing });
+    // Roof before rooms: extend the cinema's umbrella window before the screens that sit under it.
+    await ensureSchedule(existing, HOUSE_HOURS);
+    for (const screen of screens) {
+      const def = SCREENS.find((s) => screen.name?.endsWith(s.film));
+      if (def) await ensureSchedule(screen.id, showtimes(def.firstShow));
+    }
     return screens.map((s) => s.id);
   }
 
   const base = baseMs();
   const cinema = await createVenue(NAME, { slotMinutes: RUNTIME, bufferMinutes: 30 });
 
-  // The cinema is open 08:00–01:00. deltat requires a child's rules to be covered by the
-  // parent's availability, so each screen's showtimes must nest inside this window.
-  await addSchedule(cinema.id, base, 14, daily([{ h: 8, m: 0, dur: 1020 }]));
+  await ensureSchedule(cinema.id, HOUSE_HOURS);
 
   const screenIds: string[] = [];
   for (let i = 0; i < SCREENS.length; i++) {
@@ -59,16 +71,7 @@ export async function seedCinema(): Promise<string[]> {
       [1, 2, 3, 4, 5, 6, 7, 8],
       { slotMinutes: RUNTIME, bufferMinutes: 30, price }
     );
-    // Two showtimes a day, staggered per screen.
-    await addSchedule(
-      screen.id,
-      base,
-      14,
-      daily([
-        { h: firstShow, m: 0, dur: RUNTIME },
-        { h: firstShow + 4, m: 0, dur: RUNTIME },
-      ])
-    );
+    await ensureSchedule(screen.id, showtimes(firstShow));
     // Each screen's first showtime opens partly sold.
     await prebookSeats(seats, 6 + i * 2, base + firstShow * 3_600_000, RUNTIME, "Sold");
   }

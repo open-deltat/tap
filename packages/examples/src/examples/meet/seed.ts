@@ -1,11 +1,17 @@
 "use server";
 
 import { dt } from "../../lib/deltat";
-import { createVenue, addSchedule, daily, findRootByName, baseMs } from "../../actions/seed-helpers";
+import {
+  createVenue,
+  ensureSchedule,
+  daily,
+  findRootByName,
+  baseMs,
+  addLocalDays,
+  startOfLocalDay,
+} from "../../actions/seed-helpers";
 
 const H = 3_600_000;
-const DAY = 86_400_000;
-const DAYS = 24; // a little over three weeks of evening availability to scan
 
 // Five friends, five calendars: each free in the evenings, but each busy a different weeknight and
 // trimmed by a standing commitment, so the five-way intersection across three weeks is genuinely
@@ -31,27 +37,28 @@ async function ensureFriend(
   oneOffOffsets: number[] = [] // extra full evenings blocked, as day offsets from today
 ): Promise<string> {
   const existing = await findRootByName(name);
-  if (existing) return existing;
+  const id = existing ?? (await createVenue(name, { slotMinutes: 30, bufferMinutes: 0 })).id;
 
-  const r = await createVenue(name, { slotMinutes: 30, bufferMinutes: 0 });
-  const base = baseMs();
-  await addSchedule(r.id, base, DAYS, daily([{ h: open[0], m: 0, dur: (open[1] - open[0]) * 60 }]));
+  // Block only the evenings this call actually opened. That keeps a top-up from re-blocking days
+  // it already blocked, and stops newly opened evenings from reading as suspiciously wide open,
+  // which would quietly turn the five-way intersection into a trivial one.
+  const opened = await ensureSchedule(id, daily([{ h: open[0], m: 0, dur: (open[1] - open[0]) * 60 }]));
 
-  const blocks: { resourceId: string; start: number; end: number; blocking: boolean }[] = [];
-  for (let i = 0; i < DAYS; i++) {
-    const dayMs = base + i * DAY;
-    const dow = new Date(dayMs).getDay();
-    if (busyDows.includes(dow) || oneOffOffsets.includes(i)) {
-      blocks.push({ resourceId: r.id, start: dayMs + open[0] * H, end: dayMs + open[1] * H, blocking: true });
-      continue;
+  // One-offs are "the 3rd Sunday from today", so they only make sense on the first seed.
+  const oneOffDays = existing ? [] : oneOffOffsets.map((i) => addLocalDays(baseMs(), i));
+
+  const blocks = opened.flatMap((evening) => {
+    const day = startOfLocalDay(evening.start);
+    const dow = new Date(day).getDay();
+    if (busyDows.includes(dow) || oneOffDays.includes(day)) {
+      return [{ resourceId: id, start: evening.start, end: evening.end, blocking: true }];
     }
-    for (const c of commitments) {
-      if (c.dows && !c.dows.includes(dow)) continue;
-      blocks.push({ resourceId: r.id, start: dayMs + c.h[0] * H, end: dayMs + c.h[1] * H, blocking: true });
-    }
-  }
+    return commitments
+      .filter((c) => !c.dows || c.dows.includes(dow))
+      .map((c) => ({ resourceId: id, start: day + c.h[0] * H, end: day + c.h[1] * H, blocking: true }));
+  });
   if (blocks.length) await dt.rules.create(blocks);
-  return r.id;
+  return id;
 }
 
 // Five friends, each busy a different weeknight, each with a standing evening commitment that trims

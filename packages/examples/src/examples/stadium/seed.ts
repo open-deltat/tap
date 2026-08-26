@@ -3,7 +3,7 @@
 import { dt } from "../../lib/deltat";
 import * as store from "../../lib/store";
 import type { SectionLayout } from "../../lib/schemas";
-import { addSchedule, daily, findRootByName, baseMs } from "../../actions/seed-helpers";
+import { ensureSchedule, daily, findRootByName } from "../../actions/seed-helpers";
 
 const NAME = "Olympia Stadium";
 const EVENT_DUR = 210; // minutes
@@ -26,24 +26,23 @@ const TIERS: {
   { name: "Premium Boxes", sections: 8, capacity: 1, price: 1200, assigned: true },
 ];
 
+// Two events a day, inherited by every section.
+const EVENT_DAYS = daily([
+  { h: 13, m: 0, dur: EVENT_DUR },
+  { h: 19, m: 0, dur: EVENT_DUR },
+]);
+
 export async function seedStadium(): Promise<string[]> {
   const existing = await findRootByName(NAME);
-  if (existing) return [existing];
+  if (existing) {
+    await ensureSchedule(existing, EVENT_DAYS);
+    return [existing];
+  }
 
-  const base = baseMs();
   const stadium = await dt.resources.create({ name: NAME });
   store.set(stadium.id, { slotMinutes: EVENT_DUR, price: null });
 
-  // Two events a day, inherited by every section.
-  await addSchedule(
-    stadium.id,
-    base,
-    30,
-    daily([
-      { h: 13, m: 0, dur: EVENT_DUR },
-      { h: 19, m: 0, dur: EVENT_DUR },
-    ])
-  );
+  await ensureSchedule(stadium.id, EVENT_DAYS);
 
   for (let ring = 0; ring < TIERS.length; ring++) {
     const tier = TIERS[ring];

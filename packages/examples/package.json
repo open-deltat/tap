@@ -51,6 +51,7 @@
     "@types/react-dom": "^19"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "TZ=Europe/Berlin bun test"
   }
 }
