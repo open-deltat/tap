@@ -7,9 +7,16 @@ export class Holds {
   constructor(private readonly sql: Sql) {}
 
   /**
-   * Place a hold over `[start, end)` that reserves the resource until `expiresAt` (Unix ms), when the
-   * server reaper releases it automatically. A hold removes availability but is not a booking; to
-   * keep the slot, create a booking and then release the hold.
+   * Place a hold over `[start, end)` that reserves the resource until it expires, when the server
+   * reaper releases it automatically. A hold removes availability but is not a booking; to keep
+   * the slot, convert the hold with {@link commit}.
+   *
+   * `expiresAt` (Unix ms) is a request, not an assignment: the server clamps it to its own clock
+   * plus a maximum hold TTL (`DELTAT_MAX_HOLD_TTL_MS`, default 1 hour). The returned `Hold` echoes
+   * the requested value, so for countdown UIs and renewal logic read the hold back with
+   * {@link get} and trust the server's `expiresAt`; a far-future request silently comes back as
+   * now plus the cap. A hold that must outlive the cap has to be re-placed or renewed before it
+   * expires.
    */
   async place(opts: {
     resourceId: string;
@@ -31,6 +38,28 @@ export class Holds {
     };
   }
 
+  /**
+   * Convert a live hold into a booking in one atomic server-side statement. The booking takes over
+   * the hold's resource and span, and the hold is consumed, so no competing writer can grab the
+   * span in between; this replaces the old two-step of releasing the hold and re-inserting a
+   * booking, which left a window where the holder could lose the very slot the hold protected.
+   * Rejects if the hold is unknown, already released, or expired (place a new hold and retry).
+   */
+  async commit(holdId: string, opts?: { label?: string }): Promise<{ bookingId: string }> {
+    const bookingId = ulid();
+    const label = opts?.label;
+
+    if (label != null) {
+      await this
+        .sql`UPDATE holds SET booking_id = ${bookingId}, label = ${label} WHERE id = ${holdId}`;
+    } else {
+      await this
+        .sql`UPDATE holds SET booking_id = ${bookingId} WHERE id = ${holdId}`;
+    }
+
+    return { bookingId };
+  }
+
   /** Release a hold by id before it expires. Expiry is otherwise automatic via the server reaper. */
   async release(id: string): Promise<void> {
     await this.sql`DELETE FROM holds WHERE id = ${id}`;
@@ -38,8 +67,10 @@ export class Holds {
 
   /**
    * Holds for one resource, optionally filtered client-side to those overlapping a half-open
-   * `{ start, end }` window (the kernel ignores range predicates in SELECTs). Not-yet-reaped expired
-   * holds can still appear; check `expiresAt` if that matters.
+   * `{ start, end }` window (the kernel ignores range predicates in SELECTs). Rows carry the
+   * server's effective `expiresAt` (possibly clamped below what {@link place} requested), so this
+   * is the authoritative read for countdowns and renewals. Not-yet-reaped expired holds can still
+   * appear; check `expiresAt` if that matters.
    */
   async get(
     resourceId: string,
