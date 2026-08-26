@@ -30,7 +30,7 @@ jobs:
       # The published crate is the server the SDK ships against. Tests for newer capabilities
       # (e.g. holds.commit) probe at startup and skip when this version predates them; bump the
       # pin when a new deltat release lands.
-      DELTAT_CRATE_VERSION: 0.1.0
+      DELTAT_CRATE_VERSION: 0.2.0
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
