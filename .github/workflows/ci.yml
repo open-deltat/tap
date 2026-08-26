@@ -30,7 +30,11 @@ jobs:
       # The published crate is the server the SDK ships against. Tests for newer capabilities
       # (e.g. holds.commit) probe at startup and skip when this version predates them; bump the
       # pin when a new deltat release lands.
-      DELTAT_CRATE_VERSION: 0.1.0
+      DELTAT_CRATE_VERSION: 0.2.0
+      # deltat 0.2.0 generates a random password when DELTAT_PASSWORD is unset, so the
+      # server and the suite have to agree on one explicitly. Not a secret: it exists for
+      # the length of one job against a loopback-bound server with an empty data dir.
+      DELTAT_PASSWORD: ci-integration
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -49,6 +53,7 @@ jobs:
       - name: Start deltat
         run: |
           DELTAT_BIND=127.0.0.1 DELTAT_DATA_DIR="$RUNNER_TEMP/deltat-data" \
+          DELTAT_PASSWORD="$DELTAT_PASSWORD" \
             deltat > "$RUNNER_TEMP/deltat.log" 2>&1 &
           echo $! > "$RUNNER_TEMP/deltat.pid"
           for _ in $(seq 1 30); do
@@ -59,7 +64,10 @@ jobs:
           cat "$RUNNER_TEMP/deltat.log"
           exit 1
       - name: Run the live-server contract suite
-        run: DELTAT_INTEGRATION_PORT=5433 bun test packages/client/integration/
+        run: |
+          DELTAT_INTEGRATION_PORT=5433 \
+          DELTAT_INTEGRATION_PASSWORD="$DELTAT_PASSWORD" \
+            bun test packages/client/integration/
       - name: Print the server log
         if: failure()
         run: cat "$RUNNER_TEMP/deltat.log"
