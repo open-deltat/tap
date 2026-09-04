@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Sun, Moon, Github } from "lucide-react";
@@ -17,6 +18,7 @@ export function NavHeader() {
   if (pathname?.startsWith("/embed")) return null;
   const onDocs = pathname.startsWith("/docs");
   const onGallery = pathname === "/";
+  const onNew = pathname === "/new";
 
   const link = (active: boolean) =>
     cn(
@@ -26,17 +28,20 @@ export function NavHeader() {
 
   return (
     <header className="flex shrink-0 items-center justify-between border-b px-4 py-1.5">
-      <a href="/" className="select-none text-sm font-semibold tracking-tight">
+      <Link href="/" className="select-none text-sm font-semibold tracking-tight">
         Δt
-      </a>
+      </Link>
 
       <div className="flex items-center gap-1">
-        <a href="/" className={link(onGallery)}>
+        <Link href="/" className={link(onGallery)}>
           Examples
-        </a>
-        <a href="/docs" className={link(onDocs)}>
+        </Link>
+        <Link href="/docs" className={link(onDocs)}>
           Docs
-        </a>
+        </Link>
+        <Link href="/new" className={link(onNew)}>
+          Make one
+        </Link>
         <a
           href={SITE.github}
           target="_blank"

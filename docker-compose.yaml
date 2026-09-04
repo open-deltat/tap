@@ -23,13 +23,28 @@ services:
     environment:
       DELTAT_HOST: deltat
       DELTAT_PORT: "5433"
+      # Two tenants on one deltat: the curated demos we seed, and the bookables strangers create
+      # through /new. Separate engines, separate WALs, so public traffic cannot slow or bloat the
+      # demos.
       DELTAT_DB: demo
+      DELTAT_PUBLIC_DB: public
       DELTAT_PASSWORD: ${DELTAT_PASSWORD:-deltat}
       PORT: "3000"
     ports:
       - "3000:3000"
+    volumes:
+      # Ownership of a public bookable lives in a file here, not in deltat (NOT-02 keeps identity
+      # out of the kernel). Without this volume every redeploy would strand every bookable people
+      # created: the resource survives in the WAL, the key that manages it does not. The same
+      # volume also persists the demos' app-level resource metadata.
+      #
+      # This is what pins the app to ONE replica. A second container would keep its own copy of the
+      # registry and the two would overwrite each other. Scaling out means moving the registry to a
+      # shared store first.
+      - demo-data:/app/demo/data
     depends_on:
       - deltat
 
 volumes:
   deltat-data: {}
+  demo-data: {}

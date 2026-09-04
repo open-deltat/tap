@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
-import { Toggle } from "../../components/ui/toggle";
 import { Stage } from "../../components/stage";
+import { WeekHoursEditor } from "../../components/week-hours-editor";
 import { cn } from "@open-deltat/shared/utils";
 import { LabeledTimeline, type TimelineRow, type TimelineBox } from "../../components/labeled-timeline";
 import { BookingConfirmedModal, type BookingResult } from "../../components/booking-confirmed-modal";
@@ -15,9 +15,7 @@ import { formatError } from "../../lib/format-error";
 
 import {
   DEFAULT_WEEK,
-  DOW_ORDER,
   DOW_LABEL,
-  TIME_OPTIONS,
   weekToRanges,
   rulesToWeek,
   builderDateRange,
@@ -42,7 +40,6 @@ interface DayResult {
   booked: Booking[];
 }
 
-const DEFAULT_RANGE = { start: "09:00", end: "17:00" };
 
 export default function BuilderExample() {
   const [resourceId, setResourceId] = useState<string | null>(null);
@@ -107,17 +104,6 @@ export default function BuilderExample() {
   }, [loadStrip]);
 
   useWebSocket(resourceId ? { type: "subscribe", resourceId, onEvent: () => resourceId && loadStrip(resourceId) } : null);
-
-  // ── editor mutations ──
-  const setRanges = (dow: number, ranges: { start: string; end: string }[]) =>
-    setWeek((w) => ({ ...w, [dow]: ranges }));
-  const toggleDay = (dow: number) =>
-    setWeek((w) => ({ ...w, [dow]: (w[dow]?.length ?? 0) > 0 ? [] : [{ ...DEFAULT_RANGE }] }));
-  const addRange = (dow: number) => setRanges(dow, [...(week[dow] ?? []), { ...DEFAULT_RANGE }]);
-  const removeRange = (dow: number, idx: number) =>
-    setRanges(dow, (week[dow] ?? []).filter((_, i) => i !== idx));
-  const editRange = (dow: number, idx: number, field: "start" | "end", value: string) =>
-    setRanges(dow, (week[dow] ?? []).map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
 
   function save() {
     if (!resourceId) return;
@@ -238,55 +224,7 @@ export default function BuilderExample() {
         <div className="grid gap-7 lg:grid-cols-2">
           <div>
             <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">Weekly hours</div>
-            <div className="space-y-1.5">
-              {DOW_ORDER.map((dow) => {
-                const ranges = week[dow] ?? [];
-                const on = ranges.length > 0;
-                return (
-                  <div key={dow} className="flex min-h-[4.5rem] items-start gap-3 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
-                    <div className="flex w-14 shrink-0 flex-col items-start gap-1.5">
-                      <span className="text-[12px] font-medium text-zinc-200">{DOW_LABEL[dow]}</span>
-                      <Toggle
-                        size="sm"
-                        pressed={on}
-                        onPressedChange={() => toggleDay(dow)}
-                        aria-label={`${on ? "Disable" : "Enable"} ${DOW_LABEL[dow]}`}
-                      >
-                        {on ? "Open" : "Off"}
-                      </Toggle>
-                    </div>
-                    {on ? (
-                      <div className="flex flex-1 flex-col gap-1.5">
-                        {ranges.map((r, idx) => (
-                          <div key={idx} className="flex flex-wrap items-center gap-1.5">
-                            <TimeSelect value={r.start} onChange={(v) => editRange(dow, idx, "start", v)} />
-                            <span className="text-zinc-500">to</span>
-                            <TimeSelect value={r.end} onChange={(v) => editRange(dow, idx, "end", v)} />
-                            <button
-                              type="button"
-                              onClick={() => removeRange(dow, idx)}
-                              className="ml-0.5 rounded p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-300"
-                              aria-label="Remove range"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                        <button
-                          type="button"
-                          onClick={() => addRange(dow)}
-                          className="flex w-fit items-center gap-1 rounded px-1 py-0.5 text-[11px] text-emerald-300/80 hover:text-emerald-200"
-                        >
-                          <Plus className="h-3 w-3" /> Add a range
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex-1 self-center text-[12px] text-zinc-600">Closed</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <WeekHoursEditor week={week} onChange={setWeek} />
           </div>
 
           <div>
@@ -305,18 +243,3 @@ export default function BuilderExample() {
   );
 }
 
-function TimeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[12px] text-zinc-200 outline-none focus:border-emerald-400/40"
-    >
-      {TIME_OPTIONS.map((t) => (
-        <option key={t} value={t} className="bg-zinc-900">
-          {t}
-        </option>
-      ))}
-    </select>
-  );
-}
