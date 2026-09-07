@@ -1,7 +1,8 @@
 "use server";
 
-import { headers } from "next/headers";
 import { dt } from "../../lib/deltat";
+import { callerIp } from "../../lib/caller";
+import { createRateLimiter } from "../../lib/rate-limit";
 import { ensureGym } from "./seed";
 
 // The published schedule: the class, when it runs, and how many spots are left, a free count and
@@ -52,23 +53,16 @@ export async function getScheduleWindow(): Promise<{ start: number; end: number 
 // A demo-grade guard against a public bookable embed: cap bookings per client IP. In-memory and
 // single-instance, enough to keep the demo standing under a crowd. A real deployment would swap this
 // for a shared store plus a confirm-time identity or deposit (the no-show fix, VIS-08).
-const recentBookings = new Map<string, number[]>();
-function withinRateLimit(ip: string, max = 6, windowMs = 60_000): boolean {
-  const now = Date.now();
-  const hits = (recentBookings.get(ip) ?? []).filter((t) => now - t < windowMs);
-  if (hits.length >= max) return false;
-  hits.push(now);
-  recentBookings.set(ip, hits);
-  return true;
-}
+const gymBookings = createRateLimiter({ limit: 6, windowMs: 60_000 });
 
 // Book one spot in a class. The client only knows the rule (class occurrence) id; the course id and
 // its capacity stay on the server, so booking cannot leak the roster any more than the read does.
 // deltat's capacity-aware conflict check is the real overbooking guard: if the class filled between
 // the read and here, create() rejects it and we surface that.
 export async function bookGymClass(ruleId: string, name?: string): Promise<{ spotsLeft: number; full: boolean }> {
-  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  if (!withinRateLimit(ip)) throw new Error("Too many bookings from here just now. Give it a minute.");
+  if (!gymBookings.check(await callerIp()).allowed) {
+    throw new Error("Too many bookings from here just now. Give it a minute.");
+  }
 
   const { courses } = await ensureGym();
   for (const course of courses) {

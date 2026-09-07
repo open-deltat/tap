@@ -48,13 +48,18 @@ export function weekToRanges(week: WeekHours): { dow: number; startTime: string;
 const pad = (n: number) => String(n).padStart(2, "0");
 const toDateStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-/** Four weeks from today, the window the recurrence is expanded over. */
-export function builderDateRange(): { fromDate: string; toDate: string } {
+/** Today through `days` later, inclusive, as the date strings a recurrence is expanded over. */
+export function dateRangeFromToday(days: number): { fromDate: string; toDate: string } {
   const from = new Date();
   from.setHours(0, 0, 0, 0);
   const to = new Date(from);
-  to.setDate(to.getDate() + 27);
+  to.setDate(to.getDate() + days);
   return { fromDate: toDateStr(from), toDate: toDateStr(to) };
+}
+
+/** Four weeks from today, the window the builder's recurrence is expanded over. */
+export function builderDateRange(): { fromDate: string; toDate: string } {
+  return dateRangeFromToday(27);
 }
 
 /** Compact hour label like "8a", "12p", "5p" for a minutes-from-midnight offset (axis tick labels). */

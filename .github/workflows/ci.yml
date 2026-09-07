@@ -15,14 +15,17 @@ jobs:
         with:
           bun-version: 1.3.8
       - run: bun install --frozen-lockfile
+      # The published SDK must stay compilable and must not ship test files in dist. It builds
+      # BEFORE the tests because @open-deltat/client resolves to dist/, so anything importing the
+      # SDK by package name (the examples suites do) cannot load until this has run.
+      - run: cd packages/client && bun run build
       # Regression guard for the SDK and shared date logic (bun runs *.test.ts natively).
       - run: bun test
-      # The published SDK must stay compilable and must not ship test files in dist.
-      - run: cd packages/client && bun run build
 
-  # The SDK hard-codes kernel contracts (multi-row INSERTs, IN-clause reads, predicate-ignoring
-  # SELECTs, $N substitution) that only a live server can verify; this job runs the contract
-  # suite in packages/client/integration/ against a real deltat.
+  # Two suites need a real server. The SDK hard-codes kernel contracts (multi-row INSERTs,
+  # IN-clause reads, predicate-ignoring SELECTs, $N substitution) that only a live server can
+  # verify. The public bookable service depends on a live availability sweep and on deltat actually
+  # refusing the second hold on a held span, which no unit test can stand in for.
   integration:
     name: Integration (live deltat)
     runs-on: ubuntu-latest
@@ -41,6 +44,8 @@ jobs:
         with:
           bun-version: 1.3.8
       - run: bun install --frozen-lockfile
+      # Same reason as the test job: the examples suite imports the SDK by package name.
+      - run: cd packages/client && bun run build
       - name: Cache the deltat binary
         id: deltat-bin
         uses: actions/cache@v4
@@ -63,11 +68,12 @@ jobs:
           echo "deltat never opened port 5433"
           cat "$RUNNER_TEMP/deltat.log"
           exit 1
-      - name: Run the live-server contract suite
+      - name: Run the live-server suites
         run: |
           DELTAT_INTEGRATION_PORT=5433 \
           DELTAT_INTEGRATION_PASSWORD="$DELTAT_PASSWORD" \
-            bun test packages/client/integration/
+          TZ=Europe/Berlin \
+            bun test packages/client/integration/ packages/examples/integration/
       - name: Print the server log
         if: failure()
         run: cat "$RUNNER_TEMP/deltat.log"
