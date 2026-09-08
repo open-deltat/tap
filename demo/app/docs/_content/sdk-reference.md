@@ -240,8 +240,22 @@ async place(opts: { resourceId: string; start: number; end: number; expiresAt: n
 
 Place one hold that auto-expires at `expiresAt` (Unix ms). Returns it with a generated id.
 
+`expiresAt` is a request, not an assignment: the server clamps it to its own clock plus a maximum TTL (`DELTAT_MAX_HOLD_TTL_MS`, one hour by default), and the returned `Hold` echoes what you asked for. For countdowns and renewal logic, read the hold back with `get` and trust the server's `expiresAt`.
+
 ```ts
 const hold = await db.holds.place({ resourceId: seat12.id, start: 1719216000000, end: 1719219600000, expiresAt: Date.now() + 120000 });
+```
+
+### commit
+
+```ts
+async commit(holdId: string, opts?: { label?: string }): Promise<{ bookingId: string }>
+```
+
+Convert a live hold into a booking in one atomic server-side statement. The booking takes over the hold's resource and span and the hold is consumed, so no competing writer can take the span in between. Rejects if the hold is unknown, already released, or expired; place a new hold and retry.
+
+```ts
+const { bookingId } = await db.holds.commit(hold.id, { label: "order-4417" });
 ```
 
 ### release
@@ -348,4 +362,4 @@ await db.rules.replaceOpenHours(seat12.id, segments);
 
 **`db.sql` is an escape hatch, not a verb.** It hands you the raw postgres connection. It is real and public, but reaching for it ties your code to the current transport. Use the verbs above; drop to `db.sql` only when nothing else covers the case.
 
-**There is no commit verb yet.** Turning a hold into a booking today is two steps: `holds.release` then `bookings.create`. That gap is non-atomic, so another caller can slip into the freed slot before your booking lands. An atomic hold-to-booking handoff is planned but not built, so for now treat the two-step as best-effort.
+**Convert holds with `holds.commit`, never with release-then-create.** The two-step version leaves an instant where the slot is free and a competing caller can take the very span the hold was protecting. `commit` does it in one statement. The pairing that is still missing is a *multi*-hold commit, where several holds convert together or not at all; until that ships, batch what you can through `bookings.create` and hold only the one scarce resource.

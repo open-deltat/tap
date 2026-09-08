@@ -41,6 +41,14 @@ export const DOCS_SECTIONS: DocsSection[] = [
       { href: "/docs/guides/postgres-wire", label: "Any Postgres client" },
     ],
   },
+  {
+    title: "Agents · in real time",
+    links: [
+      { href: "/docs/guides/ai-agent-scheduling", label: "Scheduling for AI agents" },
+      { href: "/docs/guides/voice-agent-booking", label: "Voice agents that book" },
+      { href: "/docs/guides/real-time-scheduling", label: "Real-time scheduling" },
+    ],
+  },
 ];
 
 export const DOCS_PATHS: string[] = DOCS_SECTIONS.flatMap((s) => s.links.map((l) => l.href));

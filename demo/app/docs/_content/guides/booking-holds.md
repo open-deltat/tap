@@ -29,7 +29,7 @@ Three properties do all the work:
 - **It only counts while `expiresAt` is in the future.** The instant the timer passes, the slot reads as free again on the very next query. A background sweep eventually deletes the stale record, but nothing waits on it.
 - **It can be released early.** `db.holds.release(hold.id)` gives the slot back immediately, for the buyer who taps "never mind".
 
-Δt trusts the expiry you send. It stores `expiresAt` as given, never shortens it, never invents one. A far-future expiry holds the slot that long, so the timer is a real decision, not a formality.
+The expiry you send is a request. The server clamps it to its own clock plus a maximum TTL (`DELTAT_MAX_HOLD_TTL_MS`, one hour by default), so a wrong client clock or an optimistic timer cannot park a slot indefinitely. The `Hold` you get back echoes what you asked for, so read it back with `db.holds.get` when you need the effective expiry for a countdown. Inside the cap, the timer is a real decision and worth making deliberately.
 
 ## Sizing the timer
 
@@ -37,7 +37,7 @@ The expiry is a tradeoff you should pick deliberately.
 
 Too short, and real buyers lose their seats mid-payment: the hold lapses while the card processor thinks, someone else grabs the slot, and your best customer gets an error on the confirmation screen. Too long, and abandoned carts sit on your inventory: a 30-minute hold on a hot showtime is 30 minutes of a sellable seat looking sold.
 
-A useful default is your honest checkout time with a margin: measure how long paying actually takes, then add slack for the slow tail. Ticketing sites cluster around 5 to 10 minutes for a reason. If the buyer is still there when the timer gets close, release the old hold and place a fresh one rather than starting with an hour (a live hold counts as occupancy, so the release has to come first).
+A useful default is your honest checkout time with a margin: measure how long paying actually takes, then add slack for the slow tail. Ticketing sites cluster around 5 to 10 minutes for a reason. If the buyer is still there when the timer gets close, release the old hold and place a fresh one rather than starting near the cap (a live hold counts as occupancy, so the release has to come first).
 
 ## The hold-to-book flow
 
@@ -57,14 +57,13 @@ const hold = await db.holds.place({
 
 // 3. Take payment while the hold blocks the slot
 
-// 4. Convert: release the hold, confirm the booking
-await db.holds.release(hold.id);
-await db.bookings.create([
-  { resourceId: seat12.id, start: hold.start, end: hold.end, label: "order-4417" },
-]);
+// 4. Convert: one atomic step, the hold becomes the booking
+const { bookingId } = await db.holds.commit(hold.id, { label: "order-4417" });
 ```
 
-Step 4 carries the one honest caveat in this flow: release and create are two calls today, not one atomic step, so there is a brief instant where the slot is genuinely free and a competing request could take it. An atomic hold-to-booking commit exists in the engine but is not yet exposed to clients. Until then, do the conversion immediately after payment settles, and treat a conflict on the create as a real (if rare) outcome to handle.
+Step 4 is a single server-side statement. The booking takes over the hold's resource and span and the hold is consumed, so the slot is never briefly free and no competing request can take the span the hold was protecting. Build it this way rather than `release` followed by `bookings.create`: that older two-call shape reopens the exact window the hold exists to close.
+
+A commit is rejected if the hold is unknown, already released, or expired. Treat that as a real outcome, not an exception to swallow: re-read availability and offer the buyer another slot.
 
 ## Tie the hold to the session
 
