@@ -65,7 +65,7 @@ Write-time conflict checks settle the instant race. The longer race is human: so
 
 That is what a hold is for: a tentative claim with a self-destruct timer that blocks the slot the instant it lands and frees itself if the buyer walks away. Holds get their own page: [What is a booking hold?](/docs/guides/booking-holds)
 
-One honest caveat sits at the end of that flow. Turning a hold into a booking is two steps today (release, then create), and between them the slot is briefly open to others. The gap is small and real; the holds page covers how to live with it.
+The end of that flow closes the same way the write does. `holds.commit` turns the hold into a booking in one atomic statement, so the slot is never briefly open between the two, and the holder cannot lose the very span the hold was protecting.
 
 ## Overbooking on purpose
 

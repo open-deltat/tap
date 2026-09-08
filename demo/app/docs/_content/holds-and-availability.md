@@ -107,19 +107,19 @@ await stop();
 
 `listen` hands you back an async function to unsubscribe. Events also bubble up the resource tree, so a subscriber watching Section A hears about changes on every seat inside it, including Seat 12, without subscribing to each one. (Malformed event payloads are quietly skipped rather than thrown at you.)
 
-## Honest note: hold then book is two steps today
+## Turning a hold into a booking
 
-The whole point of a hold is to reserve a slot while a customer finishes checkout, then turn it into a real booking. The clean version of that would be a single atomic step with no gap in between. That single step does not exist yet.
-
-Today the flow is two separate calls: release the hold, then create the booking.
+The whole point of a hold is to reserve a slot while a customer finishes checkout, then turn it into a real booking. That conversion is one atomic call:
 
 ```ts
-// Two steps today, not atomic.
-await db.holds.release(hold.id);
-await db.bookings.create([{ resourceId: seat12.id, start, end, label }]);
+const { bookingId } = await db.holds.commit(hold.id, { label: "order-4417" });
 ```
 
-Between those two calls the slot is genuinely free for an instant, which means a competing request could slip in and grab it. It is a small window, but it is real. For most flows it is fine, just know it is there. A one-step commit is on the roadmap and not built yet.
+The server does it in a single statement: the booking takes over the hold's resource and span, and the hold is consumed. The slot is never briefly free, so no competing writer can take the span the hold was protecting. If the hold is unknown, already released, or expired, the commit is rejected and you place a new hold and retry.
+
+Do not build this out of `holds.release` followed by `bookings.create`. That was the old shape, and the instant between the two calls is exactly the window a hold exists to close.
+
+One piece is still missing: a *multi*-hold commit, where several holds convert together or not at all. Until that ships, group what you can into a single atomic `bookings.create` batch and hold only the resource that is genuinely scarce.
 
 All of these calls speak in plain numbers: times are integer Unix milliseconds, and a slot `[start, end)` includes its start but not its end, so two slots that touch end-to-start do not overlap. Calendars, time zones, and recurring schedules are yours to expand into plain instants before you hand them to Δt ([how that expansion works](/docs/guides/recurring-availability)).
 
