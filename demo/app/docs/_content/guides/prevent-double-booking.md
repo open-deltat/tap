@@ -30,7 +30,7 @@ If you are building on a general-purpose database, you have three honest options
 
 Δt removes the gap instead of guarding it. There is no separate check step: the conflict test runs inside the write, against the resource's timeline, and the write only lands if it passes. Two bookings collide when their spans overlap:
 
-```
+```ts
 self.start < other.end && other.start < self.end
 ```
 
