@@ -1,9 +1,10 @@
 import Link from "next/link";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 
 // Renders docs markdown with the site's dark zinc/emerald styling, no typography plugin. Internal
-// links go through next/link; fenced code is a plain block, inline code gets a pill.
+// links go through next/link; fenced code is highlighted, inline code gets a pill.
 const components: Components = {
   h1: (p) => <h1 className="mt-10 text-2xl font-semibold text-zinc-100" {...p} />,
   h2: (p) => <h2 className="mt-10 text-xl font-semibold text-zinc-100" {...p} />,
@@ -54,9 +55,17 @@ const components: Components = {
   td: (p) => <td className="border-b border-white/[0.06] px-3 py-2 align-top" {...p} />,
 };
 
+// `detect: false` is the default and is load-bearing: a few fences are deliberately unlabelled
+// pseudo-code (the read/think/write sketch), and guessing a language for those colours them wrong.
+// Highlighting runs here on the server at build time, so highlight.js never reaches the browser;
+// the token colours live in globals.css under `.hljs`.
 export function Markdown({ children }: { children: string }) {
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[[rehypeHighlight, { detect: false }]]}
+      components={components}
+    >
       {children}
     </ReactMarkdown>
   );

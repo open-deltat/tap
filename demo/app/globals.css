@@ -128,3 +128,83 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Syntax highlighting for docs code fences. rehype-highlight (highlight.js) tags the tokens at
+   build time; these are the only colours, so no highlight.js theme stylesheet is imported. Tuned
+   against the fences' bg-black/30 on zinc-200, keeping emerald as the accent it already is
+   sitewide. Everything is scoped under .hljs so it cannot touch UI outside a code block. */
+.hljs-comment,
+.hljs-quote {
+  color: #8b8b95;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag,
+.hljs-name,
+.hljs-section {
+  color: #c4b5fd;
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-template-tag {
+  color: #6ee7b7;
+}
+
+.hljs-number,
+.hljs-meta .hljs-number {
+  color: #fcd34d;
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-class .hljs-title,
+.hljs-selector-id,
+.hljs-selector-class {
+  color: #7dd3fc;
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params,
+.hljs-subst {
+  color: #e4e4e7;
+}
+
+.hljs-built_in,
+.hljs-type,
+.hljs-builtin-name {
+  color: #5eead4;
+}
+
+.hljs-operator,
+.hljs-punctuation {
+  color: #a1a1aa;
+}
+
+.hljs-meta,
+.hljs-comment.hljs-meta {
+  color: #a1a1aa;
+}
+
+.hljs-deletion {
+  color: #fca5a5;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}
