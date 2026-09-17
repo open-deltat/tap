@@ -1,0 +1,56 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.open-deltat/deltat",
+  "description": "Give an agent a calendar it can book on without double-booking. Find free slots, hold one while you confirm, then commit the hold atomically.",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/open-deltat/tap",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "version": "0.1.0",
+  "websiteUrl": "https://delt.at",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@open-deltat/mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "DELTAT_PASSWORD",
+          "description": "Password for the deltat server. Required; there is no default.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "DELTAT_HOST",
+          "description": "Hostname of the deltat server.",
+          "isRequired": false,
+          "default": "localhost"
+        },
+        {
+          "name": "DELTAT_PORT",
+          "description": "Port deltat listens on.",
+          "isRequired": false,
+          "default": "5433"
+        },
+        {
+          "name": "DELTAT_DATABASE",
+          "description": "Tenant to connect to. Each database name is an isolated tenant.",
+          "isRequired": false,
+          "default": "public"
+        },
+        {
+          "name": "DELTAT_USER",
+          "description": "Username presented at connect time.",
+          "isRequired": false,
+          "default": "user"
+        }
+      ]
+    }
+  ]
+}

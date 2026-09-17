@@ -1,0 +1,65 @@
+{
+  "name": "@open-deltat/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for real-time scheduling: give an agent a calendar it can find, hold and commit slots on without ever double-booking.",
+  "license": "MIT",
+  "author": "Simon Orzel",
+  "homepage": "https://delt.at",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-deltat/tap.git",
+    "directory": "packages/mcp"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "modelcontextprotocol",
+    "model-context-protocol",
+    "scheduling",
+    "booking",
+    "calendar",
+    "appointments",
+    "availability",
+    "agents",
+    "ai-agents",
+    "deltat"
+  ],
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mcp": "dist/stdio.js",
+    "deltat-mcp": "dist/stdio.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "server.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "mcpName": "io.github.open-deltat/deltat",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "tsc",
+    "dev": "tsc --watch",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "jose": "^6.0.11",
+    "zod": "^4.6.5",
+    "@open-deltat/client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "typescript": "^5"
+  }
+}
