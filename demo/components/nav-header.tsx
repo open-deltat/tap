@@ -5,13 +5,21 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Sun, Moon, Github } from "lucide-react";
 import { Button } from "@open-deltat/examples/components/ui/button";
+import type { DisplayProfile } from "@open-deltat/examples/lib/auth-session";
+import { ProfileAvatar } from "@/components/profile-avatar";
 import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/seo";
 
 // A slim top bar on every page: the logo (back to the example gallery), a link to the
 // docs, and the theme toggle. The example list lives on the landing gallery (/), not in a
 // cramped row of links here.
-export function NavHeader() {
+export function NavHeader({
+  authEnabled = false,
+  profile = null,
+}: {
+  authEnabled?: boolean;
+  profile?: DisplayProfile | null;
+}) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   // Embedded example previews (used inside the landing cards) render chrome-free.
@@ -39,9 +47,6 @@ export function NavHeader() {
         <Link href="/docs" className={link(onDocs)}>
           Docs
         </Link>
-        <Link href="/new" className={link(onNew)}>
-          Make one
-        </Link>
         <a
           href={SITE.github}
           target="_blank"
@@ -61,6 +66,20 @@ export function NavHeader() {
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
           <span className="sr-only">Toggle theme</span>
         </Button>
+        {authEnabled ? (
+          profile ? (
+            // Signed in: the avatar itself is the "you are logged in" marker and links to the dashboard.
+            <ProfileAvatar profile={profile} />
+          ) : (
+            // Signed out: straight to the OAuth flow, no interstitial.
+            <Link
+              href="/auth/login?returnTo=/dashboard"
+              className="ml-1 inline-flex items-center rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
+            >
+              Sign in
+            </Link>
+          )
+        ) : null}
       </div>
     </header>
   );
