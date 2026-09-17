@@ -5,7 +5,7 @@ import { publicRegistry } from "../lib/public-registry";
 import type { BookableRecord } from "../lib/public-bookables";
 import * as service from "../lib/bookable-service";
 import { createRateLimiter } from "../lib/rate-limit";
-import { getSessionPrincipal } from "../lib/workos-session";
+import { getSessionPrincipal } from "../lib/auth-session";
 import { getSchedulerTemplate } from "../lib/scheduler-templates";
 import type { CreateBookableResult } from "./public-bookables";
 

@@ -5,13 +5,21 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Sun, Moon, Github } from "lucide-react";
 import { Button } from "@open-deltat/examples/components/ui/button";
+import type { DisplayProfile } from "@open-deltat/examples/lib/auth-session";
+import { ProfileAvatar } from "@/components/profile-avatar";
 import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/seo";
 
 // A slim top bar on every page: the logo (back to the example gallery), a link to the
 // docs, and the theme toggle. The example list lives on the landing gallery (/), not in a
 // cramped row of links here.
-export function NavHeader({ signedIn = false }: { signedIn?: boolean }) {
+export function NavHeader({
+  authEnabled = false,
+  profile = null,
+}: {
+  authEnabled?: boolean;
+  profile?: DisplayProfile | null;
+}) {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   // Embedded example previews (used inside the landing cards) render chrome-free.
@@ -19,9 +27,6 @@ export function NavHeader({ signedIn = false }: { signedIn?: boolean }) {
   const onDocs = pathname.startsWith("/docs");
   const onGallery = pathname === "/";
   const onNew = pathname === "/new";
-  // One button whether or not you are signed in: /dashboard sends a signed-out visitor to sign in
-  // and returns them here, so the nav never has to know the auth state to route correctly.
-  const dashboardHref = signedIn ? "/dashboard" : "/auth/login?returnTo=/dashboard";
 
   const link = (active: boolean) =>
     cn(
@@ -64,12 +69,20 @@ export function NavHeader({ signedIn = false }: { signedIn?: boolean }) {
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
           <span className="sr-only">Toggle theme</span>
         </Button>
-        <Link
-          href={dashboardHref}
-          className="ml-1 inline-flex items-center rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
-        >
-          {signedIn ? "Dashboard" : "Sign in"}
-        </Link>
+        {authEnabled ? (
+          profile ? (
+            // Signed in: the avatar itself is the "you are logged in" marker and links to the dashboard.
+            <ProfileAvatar profile={profile} />
+          ) : (
+            // Signed out: straight to the OAuth flow, no interstitial.
+            <Link
+              href="/auth/login?returnTo=/dashboard"
+              className="ml-1 inline-flex items-center rounded-md bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-opacity hover:opacity-90"
+            >
+              Sign in
+            </Link>
+          )
+        ) : null}
       </div>
     </header>
   );

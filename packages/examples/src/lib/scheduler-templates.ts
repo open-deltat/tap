@@ -1,11 +1,11 @@
 import type { WeekHours } from "../examples/builder/schedule";
 import { DEFAULT_WEEK } from "../examples/builder/schedule";
 
-// The templates a signed-in user can turn into a real, owned scheduler in one click. Each is a
-// pure data structure (a weekly-hours shape + slot length), NOT a migration: picking one runs the
-// same createBookable path the secret-link form uses, so the result renders in the /b/<id> viewer
-// today. Icons are lucide NAMES, resolved in the client picker, so this module stays server-safe
-// (the create action imports it).
+// The templates a signed-in user can turn into a real, owned schedule in one click. Each is a pure
+// data structure (a weekly-hours shape + slot length), NOT a migration: picking one runs the same
+// createBookable path the secret-link form uses, so the result renders in the /b/<id> viewer today.
+// Icons are lucide NAMES, resolved in the client picker, so this module stays server-safe (the
+// create action imports it).
 //
 // The scheduler family below instantiates end to end now. The seat-map and multi-resource examples
 // (airline, hotel, restaurant, ...) have bespoke viewers and are surfaced in the dashboard as
@@ -57,8 +57,8 @@ export const SCHEDULER_TEMPLATES: readonly SchedulerTemplate[] = [
   },
   {
     id: "meetings",
-    label: "Meeting scheduler",
-    tagline: "Let people book a 30-minute meeting in your working hours",
+    label: "Meetings",
+    tagline: "Let anyone book a 30-minute meeting in your working hours",
     icon: "Users",
     slotMinutes: 30,
     week: WEEKDAYS_9_5,

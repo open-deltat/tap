@@ -21,9 +21,9 @@ const ICONS: Record<string, ComponentType<LucideProps>> = {
   Store,
 };
 
-// The "which one do you want to make?" grid. Click a template, optionally rename it, and it becomes
-// a real owned scheduler; we route straight to its manage page (the same page the secret-link flow
-// lands on). The browser timezone is read here because the server cannot know it.
+// The "which one do you want to make?" grid. Click a template and it becomes a real owned schedule;
+// we route straight to its manage page (the same page the secret-link flow lands on). The browser
+// timezone is read here because the server cannot know it.
 
 export function TemplatePicker({ templates }: { templates: readonly SchedulerTemplate[] }) {
   const router = useRouter();

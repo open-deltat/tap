@@ -1,19 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   PKCE_COOKIE,
+  PROFILE_COOKIE,
   REFRESH_COOKIE,
   SESSION_COOKIE,
+  authConfig,
   exchangeCode,
-} from "@open-deltat/examples/lib/workos-session";
+  profileFromGrant,
+} from "@open-deltat/examples/lib/auth-session";
 
-// The OAuth callback: state check, code-for-token exchange (PKCE), session cookies, then /my.
-// Tokens go into httpOnly cookies and are never rendered; verification happens offline on read.
+// The OIDC callback: state check, code-for-token exchange (PKCE), session cookies, then the
+// post-login destination. Tokens go into httpOnly cookies and are never rendered; verification
+// happens offline on read. A display-only avatar cookie is set separately.
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl;
   const fail = (reason: string) =>
     NextResponse.redirect(new URL(`/dashboard?error=${encodeURIComponent(reason)}`, url.origin));
 
+  if (!authConfig()) return NextResponse.redirect(new URL("/", url.origin));
   if (url.searchParams.get("error")) return fail(url.searchParams.get("error") ?? "denied");
 
   const pkce = req.cookies.get(PKCE_COOKIE)?.value;
@@ -42,5 +47,13 @@ export async function GET(req: NextRequest) {
       maxAge: 60 * 60 * 24 * 7,
     });
   }
+  // Display-only, readable by the server-rendered nav to draw the avatar. Carries just an initial
+  // and an optional picture URL, never a token or anything sensitive.
+  res.cookies.set(PROFILE_COOKIE, JSON.stringify(profileFromGrant(grant)), {
+    httpOnly: false,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7,
+  });
   return res;
 }
