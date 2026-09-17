@@ -78,7 +78,54 @@ round trip rather than three and a model turn rather than several.
 - **Count the round trips and the model calls.** On a live phone call each one is audible dead air.
   The cheapest error handling is the kind that never needs a second question.
 
-## 5. Co-location is the common case; federation is the honest exception
+## 5. No backwards compatibility with the systems we replace
+
+Every previous attempt at a new calendar died solving interop with the old ones first. That
+assumption is the trap, not the migration.
+
+You either start fresh on deltat, or you keep a system that cannot do real time. We do not build
+two-way sync with Google or Outlook, and we do not let their model leak into ours. Two facts make
+this affordable rather than arrogant: **bookings are future-only**, so nobody needs last year's
+calendar imported, and the data is trivially exportable, so anyone who genuinely wants their history
+can move it themselves.
+
+The bet underneath it is that standing up a calendar on this becomes so cheap that importing the old
+one stops being worth anyone's time. If that bet is wrong, compatibility is a retreat we can always
+make later. If we build it up front, we inherit the constraints of the thing we were trying to
+replace, and the reason for doing any of this disappears.
+
+## 6. Ambiguity degrades to information, never to commitment
+
+This is the pattern under every conflict rule above, and it is worth naming once.
+
+There is a ladder of commitment: **reading availability is free, a hold is scarce and expiring, a
+booking is durable.** A request only climbs a rung when it is specific enough to justify the
+commitment. Ambiguity always moves you *down* the ladder, never up, and the resource itself is the
+authority on where the line sits.
+
+Concretely, the resource carries a hold budget (say ten slots for thirty seconds), and:
+
+- A query that fits the budget climbs a rung: those slots come back **held**.
+- A query that exceeds it does not: it returns the full availability **unheld**. Nothing is
+  committed, and the absence of holds is itself the message. The caller learns it needs a narrower
+  question without anyone having to raise an error.
+- A lost race falls back a rung: alternatives to read, never a substitute booked on the caller's
+  behalf.
+
+So "Monday to Friday next week" is answered with information; "Friday around 7pm" is answered with
+a hold. It is always the caller's job, human or model, to be specific enough to deserve a
+commitment.
+
+A useful corollary: **a person's empty calendar is a query.** "Tuesday, Wednesday or Thursday" and
+"the gaps in this person's week" are the same shape of input, so an agent can narrow either by
+asking one more question or by intersecting the caller's own availability. Both produce a query
+tight enough to hold against, which is why this belongs in the protocol rather than in each client.
+
+The same instinct governs the engine: a predicate it cannot honour is an error, never a silent
+no-op. Answering a question nobody asked is the database-layer version of holding a week for someone
+who wanted a haircut.
+
+## 7. Co-location is the common case; federation is the honest exception
 
 People book with people near them. Personal schedules cluster naturally: one tenant, one node, and
 even at large scale probably one node per country rather than one per person. That is not an
