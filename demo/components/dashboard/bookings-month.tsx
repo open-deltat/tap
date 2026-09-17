@@ -58,8 +58,10 @@ export function BookingsMonth({
       </CalendarDate>
       <CalendarHeader />
       <CalendarBody features={features} onSelectDay={(date) => onSelectDay(date)}>
+        {/* CalendarBody maps over a day's features and calls this without adding a key, so the
+            element it returns has to carry one itself. */}
         {({ feature }) => (
-          <div className="flex items-center gap-1.5 truncate text-xs">
+          <div key={feature.id} className="flex items-center gap-1.5 truncate text-xs">
             <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: feature.status.color }} />
             <span className="truncate">{feature.name}</span>
           </div>
