@@ -49,6 +49,34 @@ A zoneless timestamp is rejected rather than silently interpreted in whatever zo
 in. Errors come back with a typed prefix to branch on: `CONFLICT` (pick another slot), `EXPIRED`
 (re-hold), `INVALID`, `NOT_FOUND`.
 
+## A refusal tells you when
+
+When a slot is taken or the time falls outside opening hours, the refusal carries the times that
+would have worked, so an agent can counter-offer in the same turn instead of starting over:
+
+```json
+{
+  "error": "CONFLICT",
+  "booked": false, "held": false, "reserved": false,
+  "retry_same_time": true,
+  "alternatives": [
+    { "start": "2026-06-01T12:00:00.000Z", "end": "2026-06-01T13:00:00.000Z",
+      "start_local": "1 Jun 2026, 2:00 pm" }
+  ],
+  "next": "These times were free a moment ago but are NOT reserved. Offer one, then call hold_slot on it before you tell anyone it is theirs."
+}
+```
+
+On a live phone call that removes a whole model turn, which is otherwise silence.
+
+`reserved` is always `false`, and it is stated rather than implied because a model that skims to
+`alternatives` must not conclude something was set aside. An alternative is a time that **was**
+free; taking one still means calling `hold_slot`.
+
+A refusal with nothing to offer keeps the plain `CODE: message` shape, so a kernel with
+counter-offers disabled (`DELTAT_COUNTER_OFFER=0`) or one older than the feature behaves exactly as
+before.
+
 ## Configure it
 
 You need a deltat server. Self-host it with Docker:

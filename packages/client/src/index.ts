@@ -28,3 +28,5 @@ export type {
   DayName,
   DeltaTEvent,
 } from "./types.js";
+export { counterOffer, sqlstateOf } from "./errors.js";
+export type { CounterOffer } from "./errors.js";
