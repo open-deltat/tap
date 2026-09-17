@@ -40,3 +40,57 @@ to that moment. Treat it as load-bearing, not decoration.
   model on every call and surfaced in its reasoning to the user. They are UX. `CONFLICT: pick another
   slot` is good design; a raw stack trace is not. An agent-facing surface gets the same care as a
   human-facing one, because increasingly the agent is the user.
+
+## 3. Hold the minimum, for the shortest time
+
+A hold takes time out of circulation. It is the one thing this system gives away, so it is also the
+only thing worth being stingy about. Every design decision should push toward holding *less* for
+*less long*.
+
+- **Hold what was asked for, never a superset.** An agent told "Tuesday, Wednesday or Thursday
+  afternoon" holds those candidate slots, not the week. If the caller has not narrowed it down, the
+  right move is to ask one more question, not to reserve everything that might qualify. A vague
+  request is a prompt for a better query, not a licence to hold inventory.
+- **The TTL is sized to the conversation, not to the convenience.** A hold exists to survive a human
+  round trip: "let me check with my wife." That is minutes. Anything longer is squatting.
+- **An escrow hold is network-short.** When a hold spans several resources or several parties, it
+  only has to live as long as the calls it is coordinating: a second or two, not the default TTL.
+  Chain or delegate the holds and commit as fast as the network allows. A short escrow is a
+  respectful one, because every second of it is time nobody else can book.
+- **Bound holds per identity.** Hold squatting is the cheapest attack on a booking rail, and the
+  cap is only enforceable once writes are attributable, which is why identity on writes is a
+  performance feature and not only a safety one.
+
+The engineering consequence: prefer a precise query over a broad reservation, always. The product
+consequence: because holds are cheap and short, they can be free, and a rail where speculative holds
+are free is one no per-booking pricing model can follow.
+
+## 4. Never return a dead end
+
+Real time is not only about speed, it is about recovery. Every failure this system produces should
+carry the thing the caller needs to get unstuck, in the same response, so a lost race costs one
+round trip rather than three and a model turn rather than several.
+
+- **A refusal without an alternative is a bug.** Losing a hold should return the next workable slots,
+  not an apology. Contention is the steady state of a booking system, not an exception.
+- **Never act on the caller's behalf to avoid an error.** Offering alternatives is help; silently
+  booking one of them is a betrayal. The caller, human or agent, always makes the choice.
+- **Count the round trips and the model calls.** On a live phone call each one is audible dead air.
+  The cheapest error handling is the kind that never needs a second question.
+
+## 5. Co-location is the common case; federation is the honest exception
+
+People book with people near them. Personal schedules cluster naturally: one tenant, one node, and
+even at large scale probably one node per country rather than one per person. That is not an
+accident to route around, it is the shape of the demand, and it should be designed for.
+
+- **Optimise for same-node atomicity.** Where all the timelines involved are on one node, a
+  multi-party booking is genuinely all-or-nothing, with no coordinator and no consensus, because one
+  lock manager and one log already order everything.
+- **Degrade honestly across nodes.** Cross-home booking is a saga with compensation, not atomicity,
+  and the return value must say which one actually ran. Never let an agent believe it got a
+  guarantee it did not get.
+- **The hold is already the escrow primitive.** A cross-home booking is try (hold each), confirm
+  (commit each), abort (do nothing and let the TTLs expire). Decay-as-abort is what lets this work
+  without a transaction coordinator, and it is the reason federation is a later feature rather than
+  a different architecture.
