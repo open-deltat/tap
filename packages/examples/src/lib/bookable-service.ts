@@ -106,7 +106,8 @@ function validateCreateInput(input: CreateBookableInput): Outcome<ValidCreateInp
 
 export async function createBookable(
   deps: BookableDeps,
-  input: CreateBookableInput
+  input: CreateBookableInput,
+  opts?: { owner?: string }
 ): Promise<Outcome<CreatedBookable>> {
   if (deps.registry.count() >= MAX_PUBLIC_BOOKABLES) {
     return { ok: false, error: "The public registry is full. Nothing new can be created right now." };
@@ -137,7 +138,13 @@ export async function createBookable(
     await deps.dt.rules.create(
       segments.map((s) => ({ resourceId: resource.id, start: s.start, end: s.end, blocking: false }))
     );
-    const { manageKey } = deps.registry.register({ id: resource.id, name, slotMinutes, timezone });
+    const { manageKey } = deps.registry.register({
+      id: resource.id,
+      name,
+      slotMinutes,
+      timezone,
+      owner: opts?.owner,
+    });
     return { ok: true, value: { id: resource.id, name, manageKey } };
   } catch (err) {
     // Compensate. A resource the registry never learned about is unownable: nobody can rename it,

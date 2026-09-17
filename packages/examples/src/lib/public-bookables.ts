@@ -22,6 +22,12 @@ export interface BookableRecord {
 
 interface StoredRecord extends BookableRecord {
   readonly keyHash: string;
+  /**
+   * The signed-in principal that created this bookable (`iss#sub`), absent for bookables created
+   * through the anonymous secret-link flow. Ownership metadata like the keyHash: it never renders
+   * publicly and deltat never learns it (NOT-02).
+   */
+  readonly owner?: string;
 }
 
 interface RegistryFile {
@@ -36,8 +42,11 @@ export interface BookableRegistry {
     name: string;
     slotMinutes: number;
     timezone: string;
+    owner?: string;
   }): { record: BookableRecord; manageKey: string };
   get(id: string): BookableRecord | undefined;
+  /** Every bookable a signed-in principal created, newest first. */
+  listOwned(owner: string): BookableRecord[];
   /** The record if this key owns it, otherwise undefined. The single authorization point. */
   authorize(id: string, key: string): BookableRecord | undefined;
   rename(id: string, key: string, name: string): BookableRecord | undefined;
@@ -59,7 +68,8 @@ function isStoredRecord(value: unknown): value is StoredRecord {
     typeof r.slotMinutes === "number" &&
     typeof r.timezone === "string" &&
     typeof r.createdAt === "number" &&
-    typeof r.keyHash === "string"
+    typeof r.keyHash === "string" &&
+    (r.owner === undefined || typeof r.owner === "string")
   );
 }
 
@@ -77,7 +87,7 @@ function loadRecords(path: string): Map<string, StoredRecord> {
   }
 }
 
-function toPublic({ keyHash: _keyHash, ...record }: StoredRecord): BookableRecord {
+function toPublic({ keyHash: _keyHash, owner: _owner, ...record }: StoredRecord): BookableRecord {
   return record;
 }
 
@@ -124,6 +134,7 @@ export function openBookableRegistry(
         timezone: input.timezone,
         createdAt: Date.now(),
         keyHash: hashManageKey(manageKey),
+        ...(input.owner !== undefined && { owner: input.owner }),
       };
       records.set(stored.id, stored);
       flush();
@@ -133,6 +144,13 @@ export function openBookableRegistry(
     get(id) {
       const record = records.get(id);
       return record && toPublic(record);
+    },
+
+    listOwned(owner) {
+      return [...records.values()]
+        .filter((r) => r.owner === owner)
+        .sort((a, b) => b.createdAt - a.createdAt)
+        .map(toPublic);
     },
 
     authorize(id, key) {
