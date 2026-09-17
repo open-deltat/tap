@@ -2,9 +2,21 @@ import { test, expect } from "bun:test";
 import type { Sql } from "postgres";
 import { Holds } from "../holds.js";
 
-// See bookings.test.ts for why the Sql double is a narrow double-cast.
-function stubSql(rows: Record<string, unknown>[]): Sql {
-  return (() => Promise.resolve(rows)) as unknown as Sql;
+// See bookings.test.ts for why the Sql double is a narrow double-cast, and why the emitted query
+// is recorded rather than only the returned rows.
+function stubSql(rows: Record<string, unknown>[]): { sql: Sql; calls: { query: string; params: unknown[] }[] } {
+  const calls: { query: string; params: unknown[] }[] = [];
+  const tagged = (strings: TemplateStringsArray, ...params: unknown[]) => {
+    calls.push({ query: strings.join("?").trim(), params });
+    return Promise.resolve(rows);
+  };
+  const sql = Object.assign(tagged, {
+    unsafe: (query: string, params?: unknown[]) => {
+      calls.push({ query: query.trim(), params: params ?? [] });
+      return Promise.resolve(rows);
+    },
+  });
+  return { sql: sql as unknown as Sql, calls };
 }
 
 const row = (id: string, start: number, end: number) => ({
@@ -15,14 +27,24 @@ const row = (id: string, start: number, end: number) => ({
   expires_at: end + 1000,
 });
 
-test("get() windows holds with a half-open overlap despite the kernel returning them all", async () => {
-  const sql = stubSql([row("a", 0, 10), row("b", 10, 20), row("c", 20, 30)]);
+test("get() pushes the half-open window down as a span predicate", async () => {
+  const { sql, calls } = stubSql([row("a", 0, 10), row("b", 10, 20), row("c", 20, 30)]);
+  await new Holds(sql).get("r1", { start: 10, end: 20 });
+  expect(calls).toHaveLength(1);
+  expect(calls[0].query).toBe(
+    'SELECT * FROM holds WHERE resource_id = $1 AND start < $2 AND "end" > $3'
+  );
+  expect(calls[0].params).toEqual(["r1", 20, 10]);
+});
+
+test("get() still windows client-side, so an older kernel cannot widen the result", async () => {
+  const { sql } = stubSql([row("a", 0, 10), row("b", 10, 20), row("c", 20, 30)]);
   const got = await new Holds(sql).get("r1", { start: 10, end: 20 });
   expect(got.map((h) => h.id)).toEqual(["b"]);
 });
 
 test("get() with no window returns every hold", async () => {
-  const sql = stubSql([row("a", 0, 10), row("b", 10, 20)]);
+  const { sql } = stubSql([row("a", 0, 10), row("b", 10, 20)]);
   const got = await new Holds(sql).get("r1");
   expect(got.map((h) => h.id)).toEqual(["a", "b"]);
 });

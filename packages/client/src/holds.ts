@@ -66,8 +66,9 @@ export class Holds {
   }
 
   /**
-   * Holds for one resource, optionally filtered client-side to those overlapping a half-open
-   * `{ start, end }` window (the kernel ignores range predicates in SELECTs). Rows carry the
+   * Holds for one resource, optionally filtered to those overlapping a half-open `{ start, end }`
+   * window (pushed down to the kernel, and applied again client-side so the result is correct
+   * against kernels older than the span-predicate fix). Rows carry the
    * server's effective `expiresAt` (possibly clamped below what {@link place} requested), so this
    * is the authoritative read for countdowns and renewals. Not-yet-reaped expired holds can still
    * appear; check `expiresAt` if that matters.
@@ -76,17 +77,22 @@ export class Holds {
     resourceId: string,
     filter?: { start?: number; end?: number }
   ): Promise<Hold[]> {
-    // The kernel ignores range predicates in holds SELECTs, so window with the half-open
-    // overlap [start, end) client-side rather than emit SQL the parser silently drops.
-    const rows = await this
-      .sql`SELECT * FROM holds WHERE resource_id = ${resourceId}`;
-    const holds = rows.map(mapHold);
+    // Pushed down to the kernel, which honours span predicates (it used to drop them silently,
+    // which is why this filtered client-side). The window is a half-open OVERLAP, so it asks for
+    // rows that begin before the window ends and end after it begins, not containment.
     const start = filter?.start;
     const end = filter?.end;
-    if (start != null && end != null) {
-      return holds.filter((h) => h.start < end && h.end > start);
+    if (start == null || end == null) {
+      const rows = await this.sql`SELECT * FROM holds WHERE resource_id = ${resourceId}`;
+      return rows.map(mapHold);
     }
-    return holds;
+    const rows = await this.sql.unsafe(
+      `SELECT * FROM holds WHERE resource_id = $1 AND start < $2 AND "end" > $3`,
+      [resourceId, end, start]
+    );
+    // Applied again client-side: a no-op against a kernel that honours the predicate, and the
+    // correctness guarantee against one older than the fix. See bookings.get for the reasoning.
+    return rows.map(mapHold).filter((h) => h.start < end && h.end > start);
   }
 
   /** Holds for many resources in one round-trip, grouped by resource id. Every requested id is
