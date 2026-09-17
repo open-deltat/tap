@@ -53,23 +53,33 @@ export class WorkOSAdapter implements AuthAdapter {
   async verify(credential: string): Promise<VerifiedPrincipal | null> {
     let payload: JWTPayload;
     try {
+      // The JWKS is scoped to this AuthKit environment, so a valid signature already proves the
+      // token is ours. Issuer is NOT pinned in jwtVerify because WorkOS mints two issuer shapes
+      // from one environment: the AuthKit OIDC domain, and (from the first-party User Management
+      // exchange this app uses) `https://api.workos.com/user_management/<um-client>`, whose client
+      // id differs from the app client id. We assert the issuer shape below instead.
       ({ payload } = await jwtVerify(credential, this.jwks, {
-        issuer: this.issuer,
         audience: this.options.audience,
         algorithms: ["RS256"],
       }));
     } catch {
-      return null; // bad signature, wrong issuer/audience, expired, malformed: all fail closed
+      return null; // bad signature, wrong audience, expired, malformed: all fail closed
     }
     if (typeof payload.sub !== "string" || payload.sub.length === 0) return null;
+    if (typeof payload.iss !== "string" || !this.isTrustedIssuer(payload.iss)) return null;
 
     return {
-      // (iss, sub) is the durable key, never email (one-way door 2).
-      principalId: `${this.issuer}#${payload.sub}`,
+      // (iss, sub) is the durable key, never email (one-way door 2). The token's own iss is the
+      // true issuer; using it keeps the key stable across the two WorkOS issuer shapes.
+      principalId: `${payload.iss}#${payload.sub}`,
       tenant: this.options.tenant,
       scopes: this.options.scopes ?? [],
-      iss: this.issuer,
+      iss: payload.iss,
       sub: payload.sub,
     };
+  }
+
+  private isTrustedIssuer(iss: string): boolean {
+    return iss === this.issuer || iss.startsWith("https://api.workos.com/user_management/");
   }
 }

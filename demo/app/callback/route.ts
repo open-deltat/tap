@@ -12,20 +12,21 @@ import {
 export async function GET(req: NextRequest) {
   const url = req.nextUrl;
   const fail = (reason: string) =>
-    NextResponse.redirect(new URL(`/my?error=${encodeURIComponent(reason)}`, url.origin));
+    NextResponse.redirect(new URL(`/dashboard?error=${encodeURIComponent(reason)}`, url.origin));
 
   if (url.searchParams.get("error")) return fail(url.searchParams.get("error") ?? "denied");
 
   const pkce = req.cookies.get(PKCE_COOKIE)?.value;
   const code = url.searchParams.get("code");
   if (!pkce || !code) return fail("missing_flow_state");
-  const [state, verifier] = pkce.split(".");
+  const [state, verifier, returnToRaw] = pkce.split(".");
   if (!state || !verifier || url.searchParams.get("state") !== state) return fail("state_mismatch");
+  const returnTo = returnToRaw?.startsWith("/") && !returnToRaw.startsWith("//") ? returnToRaw : "/dashboard";
 
   const grant = await exchangeCode(code, verifier);
   if (!grant) return fail("exchange_failed");
 
-  const res = NextResponse.redirect(new URL("/my", url.origin));
+  const res = NextResponse.redirect(new URL(returnTo, url.origin));
   res.cookies.delete(PKCE_COOKIE);
   res.cookies.set(SESSION_COOKIE, grant.access_token, {
     httpOnly: true,

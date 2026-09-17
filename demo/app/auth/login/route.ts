@@ -11,6 +11,11 @@ export async function GET(req: NextRequest) {
     return new NextResponse("Sign-in is not configured (WORKOS_* env missing).", { status: 503 });
   }
 
+  // Where to land after sign-in. Only same-origin app paths are honored, so a crafted ?returnTo
+  // cannot turn the callback into an open redirect.
+  const requested = req.nextUrl.searchParams.get("returnTo") ?? "/dashboard";
+  const returnTo = requested.startsWith("/") && !requested.startsWith("//") ? requested : "/dashboard";
+
   const verifier = randomBytes(48).toString("base64url");
   const state = randomBytes(16).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
@@ -28,7 +33,9 @@ export async function GET(req: NextRequest) {
   }).toString();
 
   const res = NextResponse.redirect(authorize);
-  res.cookies.set(PKCE_COOKIE, `${state}.${verifier}`, {
+  // state, verifier, and the post-login destination travel together in one short-lived cookie the
+  // callback consumes. returnTo is last and its charset (an app path) cannot contain the delimiter.
+  res.cookies.set(PKCE_COOKIE, `${state}.${verifier}.${returnTo}`, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
