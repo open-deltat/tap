@@ -144,6 +144,13 @@ export async function cancelOwnedBooking(
   if (!deps.registry.authorizeOwner(input.id, input.owner)) {
     return { ok: false, error: "You do not own this calendar." };
   }
+  // Owning the calendar is not enough: deltat cancels a booking by bare id with no resource scope,
+  // so we must confirm this booking is actually on this calendar, or an owner could cancel a
+  // booking on someone else's calendar by guessing its id (ownership verification on entity access).
+  const bookings = await deps.dt.bookings.get(input.id);
+  if (!bookings.some((b) => b.id === input.bookingId)) {
+    return { ok: false, error: "That booking is not on this calendar." };
+  }
   await deps.dt.bookings.cancel(input.bookingId);
   return { ok: true, value: null };
 }
