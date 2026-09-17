@@ -1,17 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { Clock, Loader2, Save, Tag } from "lucide-react";
 import { WeekHoursEditor } from "@open-deltat/examples/components/week-hours-editor";
 import { saveCalendarAvailability } from "@open-deltat/examples/actions/my-bookables";
 import type { WeekHours } from "@open-deltat/examples/builder";
+import { Button } from "@open-deltat/examples/components/ui/button";
+import { Input } from "@open-deltat/examples/components/ui/input";
+import { Label } from "@open-deltat/examples/components/ui/label";
+import { InfoHint } from "@/components/ui/tooltip";
 
-// Kept in sync with ALLOWED_SLOT_MINUTES in bookable-service (a server-only module we must not pull
-// into the client bundle); the server action re-validates against the authoritative list.
+// Kept in sync with ALLOWED_SLOT_MINUTES in bookable-service (server-only; not imported into the
+// client bundle). The server action re-validates against the authoritative list.
 const SLOT_OPTIONS = [15, 30, 60, 90, 120] as const;
-
-// Set a calendar's availability in one place: the weekly open hours, how long each bookable slot
-// is, and what a slot costs. Saving expands the hours into deltat rules and stores the slot length
-// and price. Re-openable any time; this is the edit surface, not just the create one.
 
 export function AvailabilityEditor({
   id,
@@ -30,37 +32,34 @@ export function AvailabilityEditor({
   const [slotMinutes, setSlotMinutes] = useState(initialSlotMinutes);
   const [price, setPrice] = useState(initialPriceCents === null ? "" : (initialPriceCents / 100).toString());
   const [pending, start] = useTransition();
-  const [status, setStatus] = useState<{ kind: "ok" | "error"; msg: string } | null>(null);
 
   const save = () => {
-    setStatus(null);
     const trimmed = price.trim().replace(",", ".");
-    // Plain decimal only (matches the "like 40" hint); rejects 4e2 / 0x10 / stray text that
-    // Number() would otherwise coerce.
     if (trimmed !== "" && !/^\d+(\.\d{1,2})?$/.test(trimmed)) {
-      setStatus({ kind: "error", msg: "Enter a price like 40 or 39.99, or leave it blank for free." });
+      toast.error("Enter a price like 40 or 39.99, or leave it blank for free.");
       return;
     }
     const priceCents = trimmed === "" ? null : Math.round(Number(trimmed) * 100);
     start(async () => {
       const result = await saveCalendarAvailability(id, { week, slotMinutes, priceCents, currency });
-      setStatus(
-        result.ok
-          ? { kind: "ok", msg: "Availability saved." }
-          : { kind: "error", msg: result.error }
-      );
+      if (result.ok) toast.success("Availability saved.");
+      else toast.error(result.error);
     });
   };
 
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Slot length</span>
+        <div className="flex flex-col gap-1.5">
+          <Label className="flex items-center gap-1.5">
+            <Clock className="text-muted-foreground size-3.5" />
+            Slot length
+            <InfoHint>How long each bookable appointment is. A day of open hours is divided into slots of this length.</InfoHint>
+          </Label>
           <select
             value={slotMinutes}
             onChange={(e) => setSlotMinutes(Number(e.target.value))}
-            className="rounded-md border bg-background px-3 py-2 text-sm"
+            className="border-input bg-background focus-visible:ring-ring/50 h-9 rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-[3px]"
           >
             {SLOT_OPTIONS.map((m) => (
               <option key={m} value={m}>
@@ -68,39 +67,35 @@ export function AvailabilityEditor({
               </option>
             ))}
           </select>
-        </label>
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">Price per slot ({currency})</span>
-          <input
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="price" className="flex items-center gap-1.5">
+            <Tag className="text-muted-foreground size-3.5" />
+            Price per slot ({currency})
+            <InfoHint>Shown to bookers. Charging is coming; for now it is displayed, not collected.</InfoHint>
+          </Label>
+          <Input
+            id="price"
             inputMode="decimal"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             placeholder="Free"
-            className="rounded-md border bg-background px-3 py-2 text-sm"
           />
-        </label>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">Weekly hours</span>
+        <Label className="flex items-center gap-1.5">
+          Weekly hours
+          <InfoHint>The days and times this calendar is open. Bookers can only take slots inside these windows.</InfoHint>
+        </Label>
         <WeekHoursEditor week={week} onChange={setWeek} />
       </div>
 
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={save}
-          disabled={pending}
-          className="w-fit rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-60"
-        >
-          {pending ? "Saving…" : "Save availability"}
-        </button>
-        {status ? (
-          <span className={status.kind === "ok" ? "text-sm text-green-600" : "text-sm text-red-600"}>
-            {status.msg}
-          </span>
-        ) : null}
-      </div>
+      <Button type="button" onClick={save} disabled={pending} className="w-fit">
+        {pending ? <Loader2 className="animate-spin" /> : <Save />}
+        {pending ? "Saving…" : "Save availability"}
+      </Button>
     </div>
   );
 }
