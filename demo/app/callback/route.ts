@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   PKCE_COOKIE,
   PROFILE_COOKIE,
-  REFRESH_COOKIE,
   SESSION_COOKIE,
   authConfig,
   exchangeCode,
@@ -39,14 +38,10 @@ export async function GET(req: NextRequest) {
     path: "/",
     maxAge: grant.expires_in ?? 300,
   });
-  if (grant.refresh_token) {
-    res.cookies.set(REFRESH_COOKIE, grant.refresh_token, {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 60 * 60 * 24 * 7,
-    });
-  }
+  // The refresh token is deliberately NOT persisted: nothing consumes it yet, and a long-lived
+  // credential at rest with no use is pure liability. When a silent-refresh flow is added, store it
+  // then. For now a session simply ends when the access token expires.
+  //
   // Display-only, readable by the server-rendered nav to draw the avatar. Carries just an initial
   // and an optional picture URL, never a token or anything sensitive.
   res.cookies.set(PROFILE_COOKIE, JSON.stringify(profileFromGrant(grant)), {

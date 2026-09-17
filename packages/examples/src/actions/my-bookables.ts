@@ -15,6 +15,8 @@ import { getSessionPrincipal } from "../lib/auth-session";
 // calendars and nothing depends on keeping a link.
 
 const perPrincipalCreates = createRateLimiter({ limit: 20, windowMs: 3_600_000 });
+// Saving availability expands a week into rules; cap it so a script cannot hammer replaceOpenHours.
+const perPrincipalSaves = createRateLimiter({ limit: 120, windowMs: 3_600_000 });
 
 const deps = { dt: dtPublic, registry: publicRegistry };
 
@@ -55,6 +57,11 @@ export async function saveCalendarAvailability(
 ): Promise<Outcome<BookableRecord>> {
   const o = await owner();
   if (!o) return { ok: false, error: "Sign in to edit availability." };
+  const gate = perPrincipalSaves.check(o);
+  if (!gate.allowed) {
+    const minutes = Math.max(1, Math.ceil(gate.retryAfterMs / 60_000));
+    return { ok: false, error: `Too many saves. Try again in ${minutes} minutes.` };
+  }
   return owned.saveAvailability(deps, { id, owner: o, ...input });
 }
 

@@ -1,8 +1,18 @@
 import { expandRecurrence, type Booking, type DeltaT } from "@open-deltat/client";
 import type { BookableRecord, BookableRegistry } from "./public-bookables";
 import { MAX_PUBLIC_BOOKABLES, normalizeBookableName } from "./public-bookables";
-import { dateRangeFromToday, weekToRanges, type WeekHours } from "../examples/builder/schedule";
-import { HORIZON_DAYS, ALLOWED_SLOT_MINUTES, type Outcome } from "./bookable-service";
+import { dateRangeFromToday, type WeekHours } from "../examples/builder/schedule";
+import {
+  HORIZON_DAYS,
+  ALLOWED_SLOT_MINUTES,
+  isKnownTimeZone,
+  validateWeek,
+  type Outcome,
+} from "./bookable-service";
+
+// A small allow-list keeps currency the one stranger-supplied string that would otherwise bypass
+// display-text sanitization. Extend as real demand appears.
+const ALLOWED_CURRENCIES = ["EUR", "USD", "GBP", "CHF", "SEK", "NOK", "DKK", "PLN", "CAD", "AUD"] as const;
 
 // The full round-trip for a calendar a signed-in user owns: create it, set and re-set its
 // availability (hours + slot length + price), read it back, cancel bookings on it, delete it.
@@ -37,6 +47,9 @@ export async function createOwnedCalendar(
 ): Promise<Outcome<{ id: string }>> {
   const name = validateName(input.name);
   if (!name.ok) return name;
+  if (!isKnownTimeZone(input.timezone || "UTC")) {
+    return { ok: false, error: "That time zone is not one this server recognises." };
+  }
 
   const resource = await deps.dt.resources.create({ name: name.value });
   try {
@@ -74,36 +87,49 @@ export async function saveAvailability(
   if (!record) return { ok: false, error: "You do not own this calendar." };
 
   if (!ALLOWED_SLOT_MINUTES.includes(input.slotMinutes)) {
-    return { ok: false, error: "Pick a slot length of 15, 30, 60, 90, or 120 minutes." };
+    return { ok: false, error: `Pick a slot length of ${ALLOWED_SLOT_MINUTES.join(", ")} minutes.` };
   }
   if (input.priceCents !== null && (!Number.isInteger(input.priceCents) || input.priceCents < 0 || input.priceCents > MAX_PRICE_CENTS)) {
     return { ok: false, error: "That price is out of range." };
   }
+  const currency = (input.currency ?? "EUR").toUpperCase();
+  if (!ALLOWED_CURRENCIES.includes(currency as (typeof ALLOWED_CURRENCIES)[number])) {
+    return { ok: false, error: `Currency must be one of ${ALLOWED_CURRENCIES.join(", ")}.` };
+  }
 
-  const ranges = weekToRanges(input.week);
+  // Same guarded gate the create path uses: bounded range count, HH:MM times. Empty hours is legal
+  // (it means "no availability yet"): an empty week skips validation and clears the rules.
+  const hasHours = Object.values(input.week).some((r) => r && r.length > 0);
+  const ranges = hasHours ? validateWeek(input.week) : ({ ok: true, value: [] } as const);
+  if (!ranges.ok) return ranges;
+
   const { fromDate, toDate } = dateRangeFromToday(HORIZON_DAYS);
-  const segments = ranges.flatMap((range) =>
-    expandRecurrence({
-      daysOfWeek: [range.dow],
-      startTime: range.startTime,
-      endTime: range.endTime,
-      fromDate,
-      toDate,
-      timeZone: record.timezone,
-      blocking: false,
-    })
-  );
+  let segments: { start: number; end: number }[];
+  try {
+    segments = ranges.value
+      .flatMap((range) =>
+        expandRecurrence({
+          daysOfWeek: [range.dow],
+          startTime: range.startTime,
+          endTime: range.endTime,
+          fromDate,
+          toDate,
+          timeZone: record.timezone,
+          blocking: false,
+        })
+      )
+      .map((s) => ({ start: s.start, end: s.end }));
+  } catch (err) {
+    console.error("saveAvailability expansion failed:", err);
+    return { ok: false, error: "Those hours could not be turned into a schedule. Check the times." };
+  }
 
-  // Empty hours is legal: it means "no availability yet", and replaceOpenHours clears the rules.
-  await deps.dt.rules.replaceOpenHours(
-    input.id,
-    segments.map((s) => ({ start: s.start, end: s.end }))
-  );
+  await deps.dt.rules.replaceOpenHours(input.id, segments);
 
   const updated = deps.registry.updateOwned(input.id, input.owner, {
     slotMinutes: input.slotMinutes,
     priceCents: input.priceCents,
-    currency: input.currency,
+    currency,
     week: input.week,
   });
   if (!updated) return { ok: false, error: "You do not own this calendar." };

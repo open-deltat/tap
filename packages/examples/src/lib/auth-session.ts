@@ -136,30 +136,25 @@ export async function exchangeCode(code: string, codeVerifier: string): Promise<
  * profile claims first, then a returned `user` object, else a generic fallback. Returns only an
  * initial and an optional picture URL, never anything sensitive.
  */
+function idTokenClaims(idToken: string | undefined): Record<string, unknown> {
+  if (!idToken) return {};
+  try {
+    return JSON.parse(Buffer.from(idToken.split(".")[1] ?? "", "base64url").toString()) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
+}
+
+const asString = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+
 export function profileFromGrant(grant: TokenGrant): DisplayProfile {
-  let name: string | undefined;
-  let email: string | undefined;
-  let picture: string | undefined;
+  // Standard id_token profile claims first, then a returned user object as a fallback.
+  const claims = idTokenClaims(grant.id_token);
+  const user = grant.user ?? {};
+  const name = asString(claims.name) ?? user.first_name;
+  const email = asString(claims.email) ?? user.email;
+  const picture = asString(claims.picture) ?? user.profile_picture_url;
 
-  if (grant.id_token) {
-    try {
-      const claims = JSON.parse(
-        Buffer.from(grant.id_token.split(".")[1] ?? "", "base64url").toString()
-      ) as Record<string, unknown>;
-      if (typeof claims.name === "string") name = claims.name;
-      if (typeof claims.email === "string") email = claims.email;
-      if (typeof claims.picture === "string") picture = claims.picture;
-    } catch {
-      // fall through to the user object / default
-    }
-  }
-  if (grant.user) {
-    name ??= grant.user.first_name;
-    email ??= grant.user.email;
-    picture ??= grant.user.profile_picture_url;
-  }
-
-  const source = name ?? email ?? "";
-  const initial = source.trim().slice(0, 1).toUpperCase() || "U";
+  const initial = (name ?? email ?? "").trim().slice(0, 1).toUpperCase() || "U";
   return { initial, picture };
 }

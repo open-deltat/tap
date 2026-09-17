@@ -58,13 +58,35 @@ interface ValidCreateInput {
   ranges: { dow: number; startTime: string; endTime: string }[];
 }
 
-function isKnownTimeZone(timezone: string): boolean {
+export function isKnownTimeZone(timezone: string): boolean {
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: timezone });
     return true;
   } catch {
     return false;
   }
+}
+
+/**
+ * The single guarded gate from a weekly-hours shape to open-hour ranges, shared by the create path
+ * and the owned-availability edit path so neither can drift from the other's bounds: at least one
+ * block, at most MAX_WEEK_RANGES (one form post must not become tens of thousands of rules), and
+ * every time readable as HH:MM. Timezone is validated by the caller.
+ */
+export function validateWeek(
+  week: WeekHours
+): Outcome<{ dow: number; startTime: string; endTime: string }[]> {
+  const ranges = weekToRanges(week);
+  if (ranges.length === 0) {
+    return { ok: false, error: "Open at least one block of hours, or nobody can book anything." };
+  }
+  if (ranges.length > MAX_WEEK_RANGES) {
+    return { ok: false, error: `That is more than ${MAX_WEEK_RANGES} blocks of open hours in a week.` };
+  }
+  if (!ranges.every((r) => TIME_OF_DAY.test(r.startTime) && TIME_OF_DAY.test(r.endTime))) {
+    return { ok: false, error: "Those opening times are not readable as HH:MM." };
+  }
+  return { ok: true, value: ranges };
 }
 
 /** The name rules live in the registry module and throw; this surface answers in results. */
@@ -87,20 +109,12 @@ function validateCreateInput(input: CreateBookableInput): Outcome<ValidCreateInp
     return { ok: false, error: "That time zone is not one this server recognises." };
   }
 
-  const ranges = weekToRanges(input.week);
-  if (ranges.length === 0) {
-    return { ok: false, error: "Open at least one block of hours, or nobody can book anything." };
-  }
-  if (ranges.length > MAX_WEEK_RANGES) {
-    return { ok: false, error: `That is more than ${MAX_WEEK_RANGES} blocks of open hours in a week.` };
-  }
-  if (!ranges.every((r) => TIME_OF_DAY.test(r.startTime) && TIME_OF_DAY.test(r.endTime))) {
-    return { ok: false, error: "Those opening times are not readable as HH:MM." };
-  }
+  const ranges = validateWeek(input.week);
+  if (!ranges.ok) return ranges;
 
   return {
     ok: true,
-    value: { name: name.value, slotMinutes: input.slotMinutes, timezone: input.timezone, ranges },
+    value: { name: name.value, slotMinutes: input.slotMinutes, timezone: input.timezone, ranges: ranges.value },
   };
 }
 

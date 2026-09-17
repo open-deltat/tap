@@ -34,12 +34,14 @@ export function AvailabilityEditor({
 
   const save = () => {
     setStatus(null);
-    const trimmed = price.trim();
-    const priceCents = trimmed === "" ? null : Math.round(Number(trimmed) * 100);
-    if (priceCents !== null && (!Number.isFinite(priceCents) || priceCents < 0)) {
-      setStatus({ kind: "error", msg: "Enter a price like 40, or leave it blank for free." });
+    const trimmed = price.trim().replace(",", ".");
+    // Plain decimal only (matches the "like 40" hint); rejects 4e2 / 0x10 / stray text that
+    // Number() would otherwise coerce.
+    if (trimmed !== "" && !/^\d+(\.\d{1,2})?$/.test(trimmed)) {
+      setStatus({ kind: "error", msg: "Enter a price like 40 or 39.99, or leave it blank for free." });
       return;
     }
+    const priceCents = trimmed === "" ? null : Math.round(Number(trimmed) * 100);
     start(async () => {
       const result = await saveCalendarAvailability(id, { week, slotMinutes, priceCents, currency });
       setStatus(
