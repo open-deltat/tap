@@ -6,8 +6,8 @@ belongs in a public repo's CI without a scoped secret being set up first.
 
 | Package | Registry | Command |
 |---|---|---|
-| `@open-deltat/client` | npm | `bun publish` from `packages/client` |
-| `@open-deltat/mcp` | npm | `bun publish` from `packages/mcp` |
+| `@open-deltat/client` | npm | `npm publish` from `packages/client` |
+| `@open-deltat/mcp` | npm | `npm publish` from `packages/mcp` |
 | `io.github.open-deltat/deltat` | MCP registry | `mcp-publisher publish` from `packages/mcp` |
 
 ## Before publishing anything
@@ -29,10 +29,24 @@ drift, so you will know.
 
 ```bash
 cd packages/mcp
-bun pm pack                       # inspect the tarball before it is public
+npm pack                          # inspect the tarball before it is public
 tar -tzf open-deltat-mcp-*.tgz    # dist/, README.md, server.json, package.json and nothing else
-rm open-deltat-mcp-*.tgz
-bun publish
+```
+
+Install that tarball into an empty directory and run the bin before you publish it. It is the only
+check that exercises what a user gets, rather than what the repo has lying around:
+
+```bash
+mkdir /tmp/pkgcheck && cd /tmp/pkgcheck && npm init -y
+npm install /path/to/open-deltat-mcp-*.tgz
+npx @open-deltat/mcp              # must exit 1 and ask for DELTAT_PASSWORD
+```
+
+That one command proves the bin name resolved, the shebang survived `tsc`, and every dependency
+installs from the public registry. Then publish:
+
+```bash
+cd packages/mcp && npm publish
 ```
 
 Check the packed `package.json` has no `workspace:` ranges left in it:
@@ -41,9 +55,16 @@ Check the packed `package.json` has no `workspace:` ranges left in it:
 tar -xzOf open-deltat-mcp-*.tgz package/package.json | grep workspace
 ```
 
-That should print nothing. `bun pm pack` and `bun publish` rewrite `workspace:*` to the workspace
-package's real version, but a `workspace:` range reaching npm would make the published package
-uninstallable, so it is worth the ten seconds.
+That must print nothing, and this check is not ceremony. **`bun pm pack` rewrites `workspace:*` to
+the real version; `npm pack` does not.** A package published with npm while carrying a `workspace:*`
+range fails on install with `EUNSUPPORTEDPROTOCOL` for everyone, permanently, because npm versions
+are immutable.
+
+That is why cross-package deps here are written as ordinary semver ranges (`"@open-deltat/client":
+"^0.2.1"`) rather than `workspace:*`. Bun still symlinks the local workspace when its version
+satisfies the range, so local edits link through exactly as before, and the manifest is correct
+whichever tool publishes it. Keep it that way; the bump when the client gets a breaking change is
+cheaper than an uninstallable release.
 
 Then confirm the thing people will actually run works:
 

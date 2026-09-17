@@ -124,7 +124,7 @@
       },
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
-        "@open-deltat/client": "workspace:*",
+        "@open-deltat/client": "^0.2.1",
         "jose": "^6.0.11",
         "zod": "^4.6.5",
       },
