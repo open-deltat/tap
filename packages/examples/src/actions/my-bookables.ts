@@ -3,54 +3,84 @@
 import { dtPublic } from "../lib/deltat";
 import { publicRegistry } from "../lib/public-registry";
 import type { BookableRecord } from "../lib/public-bookables";
-import * as service from "../lib/bookable-service";
+import * as owned from "../lib/owned-calendar-service";
+import type { AvailabilityInput, CalendarView } from "../lib/owned-calendar-service";
+import type { Outcome } from "../lib/bookable-service";
 import { createRateLimiter } from "../lib/rate-limit";
 import { getSessionPrincipal } from "../lib/auth-session";
-import { getSchedulerTemplate } from "../lib/scheduler-templates";
-import type { CreateBookableResult } from "./public-bookables";
 
-// The signed-in twin of actions/public-bookables: same service, same tenant, but the caller is a
-// verified principal instead of an IP with a secret link. Ownership is the principal id, so the
-// dashboard lists your schedulers and a lost manage link is no longer a lost calendar.
+// The signed-in calendar surface: the full round-trip (create, read, set availability, rename,
+// cancel a booking, delete) for calendars a verified principal owns. Same public tenant as the
+// anonymous secret-link flow, but authorized by the principal, so the dashboard lists your
+// calendars and nothing depends on keeping a link.
 
 const perPrincipalCreates = createRateLimiter({ limit: 20, windowMs: 3_600_000 });
 
 const deps = { dt: dtPublic, registry: publicRegistry };
 
-/** Instantiate a scheduler template as a real, owned bookable. Returns the manage link once. */
-export async function createFromTemplate(input: {
-  templateId: string;
-  name?: string;
-  timezone?: string;
-}): Promise<CreateBookableResult> {
-  const principal = await getSessionPrincipal();
-  if (!principal) return { ok: false, error: "Sign in to create a scheduler." };
-
-  const template = getSchedulerTemplate(input.templateId);
-  if (!template) return { ok: false, error: "That template does not exist." };
-
-  const gate = perPrincipalCreates.check(principal.principalId);
-  if (!gate.allowed) {
-    const minutes = Math.max(1, Math.ceil(gate.retryAfterMs / 60_000));
-    return { ok: false, error: `That is twenty new schedulers in an hour. Try again in ${minutes} minutes.` };
-  }
-
-  const name = (input.name?.trim() || template.defaultName).slice(0, 60);
-  const timezone = input.timezone?.trim() || "UTC";
-  const created = await service.createBookable(
-    deps,
-    { name, slotMinutes: template.slotMinutes, timezone, week: template.week },
-    { owner: principal.principalId }
-  );
-  if (!created.ok) return created;
-  return { ok: true, ...created.value };
+async function owner(): Promise<string | null> {
+  return (await getSessionPrincipal())?.principalId ?? null;
 }
 
-/** Every scheduler the signed-in user created, newest first. Empty when signed out. */
+export type CreateCalendarResult = { ok: true; id: string } | { ok: false; error: string };
+
+/** Create an empty calendar; the caller then sets its availability. */
+export async function createCalendar(input: {
+  name: string;
+  timezone: string;
+}): Promise<CreateCalendarResult> {
+  const o = await owner();
+  if (!o) return { ok: false, error: "Sign in to create a calendar." };
+
+  const gate = perPrincipalCreates.check(o);
+  if (!gate.allowed) {
+    const minutes = Math.max(1, Math.ceil(gate.retryAfterMs / 60_000));
+    return { ok: false, error: `That is twenty new calendars in an hour. Try again in ${minutes} minutes.` };
+  }
+
+  const created = await owned.createOwnedCalendar(deps, { name: input.name, timezone: input.timezone, owner: o });
+  if (!created.ok) return created;
+  return { ok: true, id: created.value.id };
+}
+
+export async function getCalendar(id: string): Promise<Outcome<CalendarView>> {
+  const o = await owner();
+  if (!o) return { ok: false, error: "Sign in to manage a calendar." };
+  return owned.getOwnedCalendar(deps, { id, owner: o });
+}
+
+export async function saveCalendarAvailability(
+  id: string,
+  input: AvailabilityInput
+): Promise<Outcome<BookableRecord>> {
+  const o = await owner();
+  if (!o) return { ok: false, error: "Sign in to edit availability." };
+  return owned.saveAvailability(deps, { id, owner: o, ...input });
+}
+
+export async function renameCalendar(id: string, name: string): Promise<Outcome<BookableRecord>> {
+  const o = await owner();
+  if (!o) return { ok: false, error: "Sign in to rename a calendar." };
+  return owned.renameOwnedCalendar(deps, { id, owner: o, name });
+}
+
+export async function cancelCalendarBooking(id: string, bookingId: string): Promise<Outcome<null>> {
+  const o = await owner();
+  if (!o) return { ok: false, error: "Sign in to cancel a booking." };
+  return owned.cancelOwnedBooking(deps, { id, owner: o, bookingId });
+}
+
+export async function deleteCalendar(id: string): Promise<Outcome<null>> {
+  const o = await owner();
+  if (!o) return { ok: false, error: "Sign in to delete a calendar." };
+  return owned.deleteOwnedCalendar(deps, { id, owner: o });
+}
+
+/** Every calendar the signed-in user owns, newest first. Empty when signed out. */
 export async function myBookables(): Promise<BookableRecord[]> {
-  const principal = await getSessionPrincipal();
-  if (!principal) return [];
-  return publicRegistry.listOwned(principal.principalId);
+  const o = await owner();
+  if (!o) return [];
+  return publicRegistry.listOwned(o);
 }
 
 /** Who is signed in, for the dashboard header. Null when signed out. */

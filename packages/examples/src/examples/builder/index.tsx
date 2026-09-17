@@ -41,6 +41,9 @@ interface DayResult {
 }
 
 
+// Re-exported so app code can name the weekly-hours shape without reaching into an internal path.
+export type { WeekHours, TimeRange } from "./schedule";
+
 export default function BuilderExample() {
   const [resourceId, setResourceId] = useState<string | null>(null);
   const [resources, setResources] = useState<Resource[]>([]);

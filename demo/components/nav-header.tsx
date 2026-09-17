@@ -47,9 +47,6 @@ export function NavHeader({
         <Link href="/docs" className={link(onDocs)}>
           Docs
         </Link>
-        <Link href="/new" className={link(onNew)}>
-          Make one
-        </Link>
         <a
           href={SITE.github}
           target="_blank"
