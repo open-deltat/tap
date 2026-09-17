@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const [state, verifier] = pkce.split(".");
   if (!state || !verifier || url.searchParams.get("state") !== state) return fail("state_mismatch");
 
-  const grant = await exchangeCode(code, verifier, `${url.origin}/callback`);
+  const grant = await exchangeCode(code, verifier);
   if (!grant) return fail("exchange_failed");
 
   const res = NextResponse.redirect(new URL("/my", url.origin));

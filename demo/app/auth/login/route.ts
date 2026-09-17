@@ -15,10 +15,12 @@ export async function GET(req: NextRequest) {
   const state = randomBytes(16).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
 
-  const authorize = new URL(`${env.issuer}/oauth2/authorize`);
+  // First-party AuthKit flow (see exchangeCode in workos-session.ts for why not /oauth2/authorize).
+  const authorize = new URL("https://api.workos.com/user_management/authorize");
   authorize.search = new URLSearchParams({
     response_type: "code",
     client_id: env.clientId,
+    provider: "authkit",
     redirect_uri: `${req.nextUrl.origin}/callback`,
     code_challenge: challenge,
     code_challenge_method: "S256",

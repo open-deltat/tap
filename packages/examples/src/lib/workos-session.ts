@@ -40,22 +40,26 @@ export interface TokenGrant {
   expires_in?: number;
 }
 
-/** Exchange an authorization code (PKCE public client: no secret involved). */
-export async function exchangeCode(
-  code: string,
-  codeVerifier: string,
-  redirectUri: string
-): Promise<TokenGrant | null> {
+/**
+ * Exchange an authorization code (PKCE public client: no secret involved).
+ *
+ * This is WorkOS's FIRST-PARTY endpoint (api.workos.com/user_management), the flow the
+ * dashboard's Redirect URIs govern and the environment client id belongs to. The AuthKit
+ * domain's raw /oauth2/* endpoints serve registered third-party OAuth applications instead,
+ * and answer "application not found" for this client id: that path is the hosted MCP ring's,
+ * not the web app's. Tokens from here still carry the AuthKit domain as `iss` and verify
+ * against its JWKS, so WorkOSAdapter is unchanged.
+ */
+export async function exchangeCode(code: string, codeVerifier: string): Promise<TokenGrant | null> {
   const env = workosEnv();
   if (!env) return null;
-  const res = await fetch(`${env.issuer}/oauth2/token`, {
+  const res = await fetch("https://api.workos.com/user_management/authenticate", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "authorization_code",
       client_id: env.clientId,
       code,
-      redirect_uri: redirectUri,
       code_verifier: codeVerifier,
     }).toString(),
   });
