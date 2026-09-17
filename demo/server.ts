@@ -3,8 +3,15 @@ import { parse } from "node:url";
 import next from "next";
 import { WebSocketServer, type WebSocket } from "ws";
 import { z } from "zod";
-import { dt } from "@open-deltat/examples/lib/deltat";
+import { dt, dtPublic } from "@open-deltat/examples/lib/deltat";
 import { trackBookings } from "@open-deltat/examples/lib/session-bookings";
+
+// A subscription names its tenant; only these two exist. Default is the demo tenant (the examples'
+// resources); the signed-in dashboard's calendars live in the public tenant. An unknown value maps
+// to demo rather than erroring, so an old client keeps working.
+function clientFor(database: string | undefined) {
+  return database === "public" ? dtPublic : dt;
+}
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT || "3000", 10);
@@ -36,10 +43,11 @@ const handle = app.getRequestHandler();
 // an unchecked `any`. The first message opens a live subscription (and optionally a hold); later
 // messages confirm it. deltat enforces the semantic limits on the values (span/timestamp ranges).
 const InitMessage = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("subscribe"), resourceId: z.string().min(1).max(64) }),
+  z.object({ type: z.literal("subscribe"), resourceId: z.string().min(1).max(64), database: z.string().max(64).optional() }),
   z.object({
     type: z.literal("hold"),
     resourceId: z.string().min(1).max(64),
+    database: z.string().max(64).optional(),
     start: z.number().int(),
     end: z.number().int(),
   }),
@@ -53,14 +61,16 @@ interface WsState {
   unlisten: (() => Promise<void>) | null;
   holdId: string | null;
   resourceId: string | null;
+  client: typeof dt;
   start: number | null;
   end: number | null;
 }
 
 async function handleInit(ws: WebSocket, state: WsState, msg: InitMessage) {
   state.resourceId = msg.resourceId;
+  state.client = clientFor(msg.database);
 
-  state.unlisten = await dt.events.listen(msg.resourceId, (event) => {
+  state.unlisten = await state.client.events.listen(msg.resourceId, (event) => {
     if (ws.readyState === ws.OPEN) {
       ws.send(JSON.stringify(event));
     }
@@ -69,7 +79,7 @@ async function handleInit(ws: WebSocket, state: WsState, msg: InitMessage) {
   if (msg.type === "hold") {
     state.start = msg.start;
     state.end = msg.end;
-    const hold = await dt.holds.place({
+    const hold = await state.client.holds.place({
       resourceId: msg.resourceId,
       start: msg.start,
       end: msg.end,
@@ -92,9 +102,9 @@ async function handleConfirm(ws: WebSocket, state: WsState, msg: ConfirmMessage)
     // Release the hold BEFORE booking: deltat treats an active hold as a conflict, so
     // booking the same span while the hold is still live rejects the booking against the
     // client's own hold (same root cause as the seat-batch path).
-    try { await dt.holds.release(holdId); } catch {}
+    try { await state.client.holds.release(holdId); } catch {}
 
-    const [booking] = await dt.bookings.create([{
+    const [booking] = await state.client.bookings.create([{
       resourceId: state.resourceId,
       start: state.start,
       end: state.end,
@@ -113,7 +123,7 @@ async function handleConfirm(ws: WebSocket, state: WsState, msg: ConfirmMessage)
 
 async function handleClose(state: WsState) {
   if (state.holdId) {
-    try { await dt.holds.release(state.holdId); } catch {}
+    try { await state.client.holds.release(state.holdId); } catch {}
     state.holdId = null;
   }
   if (state.unlisten) {
@@ -156,7 +166,7 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 wss.on("connection", (ws) => {
-  const state: WsState = { unlisten: null, holdId: null, resourceId: null, start: null, end: null };
+  const state: WsState = { unlisten: null, holdId: null, resourceId: null, client: dt, start: null, end: null };
   let initialized = false;
   let initStarted = false;
 

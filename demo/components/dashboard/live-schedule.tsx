@@ -127,7 +127,8 @@ export function LiveSchedule({
     [push, timeOnly, clock]
   );
 
-  const { status } = useWebSocket({ type: "subscribe", resourceId: calendarId, onEvent });
+  // Owned calendars live in the public tenant; tell the bridge so it LISTENs on the right one.
+  const { status } = useWebSocket({ type: "subscribe", resourceId: calendarId, database: "public", onEvent });
   const badge = STATUS[status];
 
   // The selected day, and everything on it, in the calendar's timezone.
