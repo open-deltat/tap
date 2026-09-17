@@ -65,6 +65,18 @@ export async function saveCalendarAvailability(
   return owned.saveAvailability(deps, { id, owner: o, ...input });
 }
 
+/** Toggle whether a visitor must be signed in to book (reading the schedule stays public). */
+export async function setRequireLoginToBook(
+  id: string,
+  required: boolean
+): Promise<Outcome<BookableRecord>> {
+  const o = await owner();
+  if (!o) return { ok: false, error: "Sign in to change this." };
+  const updated = publicRegistry.updateOwned(id, o, { requireLoginToBook: required });
+  if (!updated) return { ok: false, error: "You do not own this calendar." };
+  return { ok: true, value: updated };
+}
+
 export async function renameCalendar(id: string, name: string): Promise<Outcome<BookableRecord>> {
   const o = await owner();
   if (!o) return { ok: false, error: "Sign in to rename a calendar." };

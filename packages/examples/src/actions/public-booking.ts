@@ -7,6 +7,7 @@ import * as service from "../lib/bookable-service";
 import type { Outcome } from "../lib/bookable-service";
 import { createRateLimiter } from "../lib/rate-limit";
 import { callerIp } from "../lib/caller";
+import { getSessionPrincipal } from "../lib/auth-session";
 
 // The booking edge. Same split as the create side: rate limiting and caller identity here, the
 // logic (including the registry gate on every entry point) in `lib/bookable-service`.
@@ -33,6 +34,12 @@ export async function holdPublicSlot(
 ): Promise<Outcome<{ holdId: string; expiresAt: number }>> {
   if (!perCallerHolds.check(await callerIp()).allowed || !siteWideHolds.check("site").allowed) {
     return { ok: false, error: "Too many holds from here just now. Give it a minute." };
+  }
+  // Reading the schedule is always public; BOOKING can require an account. Enforced here rather
+  // than in the UI, so hiding the button is a courtesy and this is the actual gate.
+  const record = publicRegistry.get(id);
+  if (record?.requireLoginToBook && !(await getSessionPrincipal())) {
+    return { ok: false, error: "SIGN_IN_REQUIRED" };
   }
   return service.holdSlot(deps, id, start, end);
 }

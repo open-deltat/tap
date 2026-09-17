@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AvailabilityEditor } from "@/components/dashboard/availability-editor";
 import { LiveSchedule } from "@/components/dashboard/live-schedule";
-import { ShareDialog } from "@/components/dashboard/share-dialog";
+import { ShareLinks } from "@/components/dashboard/share-links";
+import { BookingAccess } from "@/components/dashboard/booking-access";
+import { AmbientBackground } from "@/components/ambient-background";
 import { DeleteCalendarButton, RenameField } from "@/components/dashboard/calendar-admin";
 
 export const metadata = { title: "Manage calendar" };
@@ -27,30 +29,27 @@ export default async function ManageCalendarPage({ params }: { params: Promise<{
   const { record, bookings } = result.value;
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-8">
-      {/* Header: identity + stats + the rarely-used actions tucked to the right. */}
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
+      <AmbientBackground />
+      {/* Header: identity, stats, and the public URL right there — no dialog to click through. */}
       <div className="flex flex-col gap-3">
         <Link href="/dashboard" className="text-muted-foreground hover:text-foreground flex w-fit items-center gap-1 text-xs">
           <ArrowLeft className="size-3.5" /> All calendars
         </Link>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex min-w-0 flex-col gap-2">
-            <RenameField id={id} initialName={record.name} />
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="gap-1.5">
-                <CalendarClock className="size-3" /> {record.slotMinutes}-min slots
-              </Badge>
-              <Badge variant="muted" className="gap-1.5">
-                <Tag className="size-3" /> {formatPrice(record.priceCents, record.currency)}
-              </Badge>
-              <Badge variant="muted" className="gap-1.5">
-                <Globe className="size-3" /> {record.timezone}
-              </Badge>
-            </div>
+        <div className="flex flex-col gap-3">
+          <RenameField id={id} initialName={record.name} />
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary" className="gap-1.5">
+              <CalendarClock className="size-3" /> {record.slotMinutes}-min slots
+            </Badge>
+            <Badge variant="muted" className="gap-1.5">
+              <Tag className="size-3" /> {formatPrice(record.priceCents, record.currency)}
+            </Badge>
+            <Badge variant="muted" className="gap-1.5">
+              <Globe className="size-3" /> {record.timezone}
+            </Badge>
           </div>
-          <div className="shrink-0">
-            <ShareDialog path={`/b/${id}`} />
-          </div>
+          <ShareLinks path={`/b/${id}`} />
         </div>
       </div>
 
@@ -88,7 +87,11 @@ export default async function ManageCalendarPage({ params }: { params: Promise<{
         </TabsContent>
 
         <TabsContent value="settings" className="flex flex-col gap-6 pt-2">
-          <p className="text-muted-foreground text-sm">
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">Who can book</h3>
+            <BookingAccess id={id} initial={record.requireLoginToBook} />
+          </div>
+          <p className="text-muted-foreground border-t pt-6 text-sm">
             Edit the name inline in the header above. Timezone ({record.timezone}) is set from your
             browser at creation.
           </p>

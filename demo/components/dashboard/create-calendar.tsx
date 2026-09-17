@@ -24,7 +24,7 @@ export function CreateCalendar() {
         toast.error(result.error);
         return;
       }
-      router.push(`/dashboard/${result.id}`);
+      router.push(`/dashboard/c/${result.id}`);
     });
   };
 

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@open-deltat/examples/components/ui/button";
 import { CreateCalendar } from "@/components/dashboard/create-calendar";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import { AmbientBackground } from "@/components/ambient-background";
 
 // The signed-in home. Only reachable when logged in: a genuinely signed-out visitor is sent
 // straight to sign-in, while a present-but-unverifiable session shows a prompt (never a loop).
@@ -49,7 +50,8 @@ export default async function DashboardPage({
   const mine = await myBookables();
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-10 px-6 py-12">
+    <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-12">
+      <AmbientBackground />
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-semibold tracking-tight">Your calendars</h1>
@@ -70,7 +72,7 @@ export default async function DashboardPage({
       {mine.length > 0 ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {mine.map((b) => (
-            <Link key={b.id} href={`/dashboard/${b.id}`} className="group">
+            <Link key={b.id} href={`/dashboard/c/${b.id}`} className="group">
               <Card className="gap-0 py-0 transition-colors group-hover:border-foreground/30">
                 <CardContent className="flex items-center gap-3 py-4">
                   <span className="bg-muted text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-md">

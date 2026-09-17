@@ -58,6 +58,20 @@ const minOfDay = (ms: number, tz: string): number => {
   return h * 60 + m;
 };
 
+const WINDOWS = [
+  { label: "10m", ms: 10 * 60_000 },
+  { label: "1h", ms: 3_600_000 },
+  { label: "All", ms: Number.POSITIVE_INFINITY },
+] as const;
+
+const TONES = [
+  { label: "All", value: "all" },
+  { label: "Bookings", value: "book" },
+  { label: "Holds", value: "hold" },
+] as const;
+
+type ToneFilter = (typeof TONES)[number]["value"];
+
 let seq = 0;
 
 export function LiveSchedule({
@@ -75,6 +89,8 @@ export function LiveSchedule({
   const [holds, setHolds] = useState<Hold[]>([]);
   const [log, setLog] = useState<LogLine[]>([]);
   const [dayOffset, setDayOffset] = useState(0);
+  const [windowMs, setWindowMs] = useState<number>(WINDOWS[1].ms);
+  const [tone, setTone] = useState<ToneFilter>("all");
 
   const fmtDay = useCallback(
     (ms: number) => new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric", timeZone: timezone }).format(ms),
@@ -130,6 +146,17 @@ export function LiveSchedule({
   // Owned calendars live in the public tenant; tell the bridge so it LISTENs on the right one.
   const { status } = useWebSocket({ type: "subscribe", resourceId: calendarId, database: "public", onEvent });
   const badge = STATUS[status];
+
+  // Filtering is derived, never a second copy of the log: one source of truth, two views of it.
+  const visibleLog = useMemo(() => {
+    const cutoff = Number.isFinite(windowMs) ? Date.now() - windowMs : 0;
+    return log.filter((l) => {
+      if (l.at < cutoff) return false;
+      if (tone === "all") return true;
+      if (tone === "book") return l.tone === "book" || l.tone === "cancel";
+      return l.tone === "hold" || l.tone === "release";
+    });
+  }, [log, windowMs, tone]);
 
   // The selected day, and everything on it, in the calendar's timezone.
   const dayMs = Date.now() + dayOffset * DAY;
@@ -215,15 +242,50 @@ export function LiveSchedule({
         <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-amber-400/60" /> Hold</span>
       </div>
 
-      {/* Full observability: a rolling, real-time log of every hold, booking, and cancellation. */}
+      {/* Observability: a rolling, real-time log of every hold, booking, and cancellation.
+          deltat's event stream is a live tick, not a queryable history, so this starts at the
+          moment the page connects; a durable log is the change-feed/cursor work. */}
       <div className="flex flex-col gap-2">
-        <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Activity</span>
-        <div className="bg-muted/40 h-44 overflow-y-auto rounded-lg border font-mono text-xs">
-          {log.length === 0 ? (
-            <p className="text-muted-foreground p-3">Waiting for events… holds, bookings, and cancellations appear here live.</p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">Activity</span>
+          <div className="flex items-center gap-1">
+            {WINDOWS.map((w) => (
+              <button
+                key={w.label}
+                type="button"
+                onClick={() => setWindowMs(w.ms)}
+                className={`rounded-md px-2 py-1 text-xs transition-colors ${
+                  windowMs === w.ms ? "bg-accent text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {w.label}
+              </button>
+            ))}
+            <span className="bg-border mx-1 h-4 w-px" />
+            {TONES.map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTone(t.value)}
+                className={`rounded-md px-2 py-1 text-xs transition-colors ${
+                  tone === t.value ? "bg-accent text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="bg-muted/40 h-80 overflow-y-auto rounded-lg border font-mono text-xs">
+          {visibleLog.length === 0 ? (
+            <p className="text-muted-foreground p-3">
+              {log.length === 0
+                ? "Watching… holds, bookings, and cancellations appear here the moment they happen."
+                : "Nothing in this window. Widen the time range or clear the filter."}
+            </p>
           ) : (
             <ul className="divide-border/60 divide-y">
-              {log.map((l) => (
+              {visibleLog.map((l) => (
                 <li key={l.key} className="flex items-start gap-2 px-3 py-1.5">
                   <span className="text-muted-foreground tabular-nums">{clock(l.at)}</span>
                   <span className={`mt-1 size-1.5 shrink-0 rounded-full ${dotColor(l.tone)}`} aria-hidden />

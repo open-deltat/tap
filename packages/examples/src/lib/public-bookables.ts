@@ -29,11 +29,17 @@ export interface BookableRecord {
    * a week from thousands of expanded segments. Empty for a calendar with no availability yet.
    */
   readonly week: WeekHours;
+  /**
+   * Whether booking requires a signed-in visitor. The schedule is always public to read; this gates
+   * only the write. Defaults ON: it makes every booking attributable to a real account (so a
+   * no-show can be followed up) and is the platform's main organic sign-up path.
+   */
+  readonly requireLoginToBook: boolean;
 }
 
 // At rest the presentation fields are optional so records written before they existed still load;
 // toPublic fills the defaults, so callers always see a complete BookableRecord.
-interface StoredRecord extends Omit<BookableRecord, "priceCents" | "currency" | "week"> {
+interface StoredRecord extends Omit<BookableRecord, "priceCents" | "currency" | "week" | "requireLoginToBook"> {
   readonly keyHash: string;
   /**
    * The signed-in principal that created this bookable (`iss#sub`), absent for bookables created
@@ -44,6 +50,7 @@ interface StoredRecord extends Omit<BookableRecord, "priceCents" | "currency" | 
   readonly priceCents?: number | null;
   readonly currency?: string;
   readonly week?: WeekHours;
+  readonly requireLoginToBook?: boolean;
 }
 
 interface RegistryFile {
@@ -72,7 +79,14 @@ export interface BookableRegistry {
   updateOwned(
     id: string,
     owner: string,
-    patch: { name?: string; slotMinutes?: number; priceCents?: number | null; currency?: string; week?: WeekHours }
+    patch: {
+      name?: string;
+      slotMinutes?: number;
+      priceCents?: number | null;
+      currency?: string;
+      week?: WeekHours;
+      requireLoginToBook?: boolean;
+    }
   ): BookableRecord | undefined;
   /** Owner-gated removal from the registry. deltat resource deletion is the caller's job. */
   unregisterOwned(id: string, owner: string): boolean;
@@ -122,6 +136,7 @@ function toPublic({
   priceCents,
   currency,
   week,
+  requireLoginToBook,
   ...record
 }: StoredRecord): BookableRecord {
   return {
@@ -129,6 +144,8 @@ function toPublic({
     priceCents: priceCents ?? null,
     currency: currency ?? "EUR",
     week: week ?? {},
+    // Default ON, including for records written before the field existed.
+    requireLoginToBook: requireLoginToBook ?? true,
   };
 }
 
@@ -212,6 +229,7 @@ export function openBookableRegistry(
         ...(patch.priceCents !== undefined && { priceCents: patch.priceCents }),
         ...(patch.currency !== undefined && { currency: patch.currency }),
         ...(patch.week !== undefined && { week: patch.week }),
+        ...(patch.requireLoginToBook !== undefined && { requireLoginToBook: patch.requireLoginToBook }),
       };
       records.set(id, updated);
       flush();
