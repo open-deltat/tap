@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { CalendarCheck, Clock, Loader2 } from "lucide-react";
+import { CalendarCheck, Clock, Globe, Loader2, TriangleAlert } from "lucide-react";
 import { Calendar } from "@open-deltat/examples/components/ui/calendar";
 import { Button } from "@open-deltat/examples/components/ui/button";
 import { Input } from "@open-deltat/examples/components/ui/input";
+import { Label } from "@open-deltat/examples/components/ui/label";
 import {
   commitPublicHold,
   getPublicSlots,
@@ -56,7 +57,10 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
   const [month, setMonth] = useState<Date>(date);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [held, setHeld] = useState<Held | null>(null);
+  /** Seconds left on the current hold, so the visitor can see their time running out. */
+  const [secondsLeft, setSecondsLeft] = useState(0);
   const [name, setName] = useState("");
   const [pending, start] = useTransition();
 
@@ -80,10 +84,19 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadFailed(false);
     const dayStart = date.getTime();
-    const spans = await getPublicSlots(record.id, dayStart, dayStart + DAY_MS);
-    setSlots(sliceIntoSlots(spans, slotMs, Date.now()));
-    setLoading(false);
+    try {
+      const spans = await getPublicSlots(record.id, dayStart, dayStart + DAY_MS);
+      setSlots(sliceIntoSlots(spans, slotMs, Date.now()));
+    } catch {
+      // A stranger's first impression must never be a spinner that never resolves; say what happened
+      // and give them the one action that helps.
+      setLoadFailed(true);
+      setSlots([]);
+    } finally {
+      setLoading(false);
+    }
   }, [date, record.id, slotMs]);
 
   useEffect(() => {
@@ -106,6 +119,31 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
   // The in-app path, unchanged in effect: React really does unmount on a client-side navigation, so
   // the action has a live document to run in and the slot comes back in milliseconds.
   useEffect(() => releaseOutstanding, [releaseOutstanding]);
+
+  // Tick the hold down. Without this the visitor types their name against a silent deadline and
+  // discovers it passed only when confirming fails. On expiry the server has already dropped the
+  // hold, so this only catches the UI up: forget the id (releasing it would be a wasted call) and
+  // reload so the slot reappears for whoever wants it next.
+  useEffect(() => {
+    if (!held) {
+      setSecondsLeft(0);
+      return;
+    }
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((held.expiresAt - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      if (remaining === 0) {
+        dropHold();
+        setHeld(null);
+        setName("");
+        toast.info("That hold expired. Pick a time again.");
+        void load();
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [held, dropHold, load]);
 
   // A hold this tab placed before a reload or a crash. The teardown beacon below usually got there
   // first and release is idempotent, so this costs a round trip in the common case and is the only
@@ -192,6 +230,13 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
 
   const dateLabel = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: tz }).format(date);
 
+  // Every time on this page is the calendar's local time. Say so when the visitor is somewhere else,
+  // otherwise they read "14:00" as their own afternoon and arrive at the wrong hour.
+  const viewerTz = typeof Intl === "undefined" ? tz : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tzNote = viewerTz === tz ? null : `Times shown in ${tz.replace(/_/g, " ")}`;
+
+  const mmss = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
+
   return (
     <Card>
       <CardContent className="grid grid-cols-1 gap-6 sm:grid-cols-[auto_1fr]">
@@ -218,30 +263,46 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
         </div>
 
         <div className="flex min-h-80 flex-col">
-          <div className="mb-3 flex items-baseline justify-between">
-            <span className="text-sm font-medium">{dateLabel}</span>
-            <Badge variant="muted" className="gap-1">
-              <Clock className="size-3" />
-              {record.slotMinutes}m · {priceLabel}
-            </Badge>
+          <div className="mb-3 flex flex-col gap-1">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm font-medium">{dateLabel}</span>
+              <Badge variant="muted" className="gap-1">
+                <Clock className="size-3" />
+                {record.slotMinutes}m · {priceLabel}
+              </Badge>
+            </div>
+            {tzNote ? (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                <Globe className="size-3" />
+                {tzNote}
+              </span>
+            ) : null}
           </div>
 
           {held ? (
             <div className="bg-muted/40 flex flex-1 flex-col justify-center gap-4 rounded-lg border p-6">
-              <div className="text-center">
+              <div className="flex flex-col items-center gap-1 text-center">
                 <p className="text-muted-foreground text-sm">Holding your slot</p>
                 <p className="text-lg font-semibold">
                   {dateLabel.split(",")[0]} at {time(held.start)}
                 </p>
                 <p className="text-muted-foreground text-xs">{priceLabel}</p>
+                <Badge variant={secondsLeft <= 60 ? "destructive" : "secondary"} className="mt-1 gap-1 tabular-nums">
+                  <Clock className="size-3" />
+                  {mmss} left
+                </Badge>
               </div>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
-                maxLength={60}
-                autoFocus
-              />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="booker-name">Your name</Label>
+                <Input
+                  id="booker-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="So they know who is coming"
+                  maxLength={60}
+                  autoFocus
+                />
+              </div>
               <div className="flex gap-2">
                 <Button onClick={confirm} disabled={pending} className="flex-1">
                   {pending ? <Loader2 className="animate-spin" /> : <CalendarCheck />}
@@ -255,6 +316,14 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
           ) : loading ? (
             <div className="text-muted-foreground flex flex-1 items-center justify-center text-sm">
               <Loader2 className="mr-2 size-4 animate-spin" /> Loading…
+            </div>
+          ) : loadFailed ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-6 text-center">
+              <TriangleAlert className="text-muted-foreground size-5" />
+              <p className="text-sm">Could not load times for this day.</p>
+              <Button variant="outline" size="sm" onClick={() => void load()}>
+                Try again
+              </Button>
             </div>
           ) : slots.length === 0 ? (
             <div className="text-muted-foreground flex flex-1 items-center justify-center rounded-lg border border-dashed text-center text-sm">
