@@ -63,24 +63,30 @@ export class Bookings {
 
   /**
    * Bookings for one resource. An optional `{ start, end }` keeps only those overlapping the
-   * half-open window; it's applied client-side because the kernel ignores range predicates in
-   * SELECTs.
+   * half-open window. The predicate is pushed down to the kernel and applied again client-side,
+   * so the result is correct against kernels older than the span-predicate fix too.
    */
   async get(
     resourceId: string,
     filter?: { start?: number; end?: number }
   ): Promise<Booking[]> {
-    // The kernel ignores range predicates in bookings SELECTs, so window with the half-open
-    // overlap [start, end) client-side rather than emit SQL the parser silently drops.
-    const rows = await this
-      .sql`SELECT * FROM bookings WHERE resource_id = ${resourceId}`;
-    const bookings = rows.map(mapBooking);
+    // Pushed down to the kernel, which honours span predicates (it used to drop them silently,
+    // which is why this filtered client-side). The window is a half-open OVERLAP, so it asks for
+    // rows that begin before the window ends and end after it begins, not containment.
     const start = filter?.start;
     const end = filter?.end;
-    if (start != null && end != null) {
-      return bookings.filter((b) => b.start < end && b.end > start);
+    if (start == null || end == null) {
+      const rows = await this.sql`SELECT * FROM bookings WHERE resource_id = ${resourceId}`;
+      return rows.map(mapBooking);
     }
-    return bookings;
+    const rows = await this.sql.unsafe(
+      `SELECT * FROM bookings WHERE resource_id = $1 AND start < $2 AND "end" > $3`,
+      [resourceId, end, start]
+    );
+    // The same window applied again client-side. Against a kernel that honours the predicate this
+    // is a no-op; against one older than the fix (which dropped span predicates silently) it is
+    // what keeps the result correct. An SDK is used against server versions it did not choose.
+    return rows.map(mapBooking).filter((b) => b.start < end && b.end > start);
   }
 
   /** Bookings for many resources in one round-trip, grouped by resource id. Every requested id is
