@@ -46,8 +46,8 @@
   },
   "mcpName": "io.github.open-deltat/deltat",
   "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "tsc",
+    "build": "cd ../client && bun run build && cd ../mcp && tsc",
+    "prepublishOnly": "cd ../client && bun run build && cd ../mcp && tsc",
     "dev": "tsc --watch",
     "test": "bun test",
     "typecheck": "tsc --noEmit"

@@ -10,6 +10,10 @@ belongs in a public repo's CI without a scoped secret being set up first.
 | `@open-deltat/mcp` | npm | `npm publish` from `packages/mcp` |
 | `io.github.open-deltat/deltat` | MCP registry | `mcp-publisher publish` from `packages/mcp` |
 
+CI has a `Publishable (clean checkout)` job that runs `npm publish --dry-run` without pre-building
+anything, which is the state a release machine is always in. If it is green, the publish below will
+not abort partway.
+
 ## Before publishing anything
 
 ```bash
