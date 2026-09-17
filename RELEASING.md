@@ -4,11 +4,26 @@ Two packages publish to npm from this repo, plus one registry submission. None o
 yet: publishing needs an npm token and the MCP registry needs an interactive login, and neither
 belongs in a public repo's CI without a scoped secret being set up first.
 
-| Package | Registry | Command |
-|---|---|---|
-| `@open-deltat/client` | npm | `npm publish` from `packages/client` |
-| `@open-deltat/mcp` | npm | `npm publish` from `packages/mcp` |
-| `io.github.open-deltat/deltat` | MCP registry | `mcp-publisher publish` from `packages/mcp` |
+| Order | Package | Registry | Command |
+|---|---|---|---|
+| 1 | `@open-deltat/client` | npm | `npm publish` from `packages/client` |
+| 2 | `@open-deltat/mcp` | npm | `npm publish` from `packages/mcp` |
+| 3 | `io.github.open-deltat/deltat` | MCP registry | `mcp-publisher publish` from `packages/mcp` |
+
+**The order is not a convention, it is a correctness requirement.** `@open-deltat/mcp` declares a
+semver range on `@open-deltat/client`, and once published it resolves that range from the registry,
+never from this workspace. Publishing the MCP package against a client that is missing an API it
+calls ships a server whose tools throw at runtime. That has already happened once: the registry
+carried a `0.2.1` with no `Holds.commit` while `server.ts` called it, because two commits landed in
+the client without a version bump.
+
+Before publishing the MCP package, this must print OK:
+
+```bash
+./scripts/check-published-deps.sh
+```
+
+`PENDING` means the client bump is not on the registry yet: publish step 1 first, then re-run.
 
 CI has a `Publishable (clean checkout)` job that runs `npm publish --dry-run` without pre-building
 anything, which is the state a release machine is always in. If it is green, the publish below will

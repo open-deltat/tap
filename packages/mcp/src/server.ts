@@ -42,17 +42,40 @@ const local = (ms: number, tz: string): string => {
 };
 
 class ToolError extends Error {
-  constructor(readonly code: "CONFLICT" | "EXPIRED" | "INVALID" | "NOT_FOUND", message: string) {
+  constructor(
+    readonly code: "CONFLICT" | "EXPIRED" | "INVALID" | "NOT_FOUND" | "INTERNAL",
+    message: string
+  ) {
     super(message);
   }
 }
 
-/** Map a deltat/pg error to the agent-facing typed code. */
+/**
+ * Map a deltat/pg error to the agent-facing typed code.
+ *
+ * The default is INTERNAL, not INVALID. INVALID tells a model its arguments were wrong, which is an
+ * invitation to retry with different ones; for a fault that has nothing to do with the arguments
+ * that is an infinite loop, and on `hold_slot` each pass leaves a live hold blocking the slot until
+ * the reaper expires it. So INVALID is now reserved for errors that name a specific argument
+ * problem, and anything unrecognised says plainly that retrying will not help.
+ */
 function classify(err: unknown): ToolError {
+  // An error that already carries a code was classified at the throw site, which knew more than
+  // any message-text match can recover. Re-deriving it here is how a precise "that timestamp has
+  // no offset" got downgraded to an unhelpful INTERNAL.
+  if (err instanceof ToolError) return err;
+
   const msg = err instanceof Error ? err.message : String(err);
   if (/expired|no longer exists|unknown hold/i.test(msg)) return new ToolError("EXPIRED", msg);
   if (/conflict|overlap|already|capacity/i.test(msg)) return new ToolError("CONFLICT", msg);
-  return new ToolError("INVALID", msg);
+  if (/not found|unknown resource|no such/i.test(msg)) return new ToolError("NOT_FOUND", msg);
+  if (/invalid|malformed|out of range|must be|cannot parse|unsupported/i.test(msg)) {
+    return new ToolError("INVALID", msg);
+  }
+  return new ToolError(
+    "INTERNAL",
+    `${msg} (this is a server or configuration fault, not a problem with your arguments; retrying the same call will not help)`
+  );
 }
 
 const ok = (text: string) => ({ content: [{ type: "text" as const, text }] });

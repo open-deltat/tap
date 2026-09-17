@@ -78,7 +78,7 @@
     },
     "packages/client": {
       "name": "@open-deltat/client",
-      "version": "0.2.1",
+      "version": "0.3.0",
       "dependencies": {
         "postgres": "^3.4.8",
         "ulid": "^3.0.2",
@@ -124,7 +124,7 @@
       },
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
-        "@open-deltat/client": "^0.2.1",
+        "@open-deltat/client": "^0.3.0",
         "jose": "^6.0.11",
         "zod": "^4.6.5",
       },
