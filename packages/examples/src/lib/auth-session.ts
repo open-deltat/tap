@@ -10,6 +10,21 @@ import { OidcAdapter, type VerifiedPrincipal } from "@open-deltat/mcp";
 // Optional overrides (for providers whose endpoints are not at the OIDC defaults):
 //   AUTH_AUTHORIZE_URL, AUTH_TOKEN_URL, AUTH_JWKS_URI, AUTH_TRUSTED_ISSUERS (comma-separated).
 
+/**
+ * Only a same-origin app path is a safe post-login destination. A denylist is not enough: `new URL`
+ * treats a backslash like a slash, so "/\evil.com" resolves to an external origin. Require a single
+ * leading "/" followed by something that is neither "/" nor "\".
+ */
+export function safeReturnTo(raw: string | null | undefined, fallback = "/dashboard"): string {
+  if (!raw || !raw.startsWith("/")) return fallback;
+  const second = raw[1];
+  if (second === "/" || second === "\\") return fallback;
+  return raw;
+}
+
+/** Cookies must not travel in cleartext outside local development. */
+export const cookieSecure = process.env.NODE_ENV === "production";
+
 export const SESSION_COOKIE = "dt_session";
 export const REFRESH_COOKIE = "dt_refresh";
 export const PROFILE_COOKIE = "dt_profile"; // display-only: an initial and optional avatar URL
@@ -62,6 +77,10 @@ function getAdapter(): OidcAdapter | null {
     jwksUri: config.jwksUri,
     trustedIssuers: config.trustedIssuers,
     tenant: "public",
+    // Bind the token to this app: a valid signature from the issuer is not enough, since the same
+    // JWKS signs tokens minted for other clients/resources of that issuer. Providers that do not
+    // stamp an audience leave AUTH_AUDIENCE unset and fall back to issuer-only trust.
+    audience: process.env.AUTH_AUDIENCE || undefined,
   });
   return adapter;
 }

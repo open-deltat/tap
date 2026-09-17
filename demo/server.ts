@@ -5,12 +5,23 @@ import { WebSocketServer, type WebSocket } from "ws";
 import { z } from "zod";
 import { dt, dtPublic } from "@open-deltat/examples/lib/deltat";
 import { trackBookings } from "@open-deltat/examples/lib/session-bookings";
+import { publicRegistry } from "@open-deltat/examples/lib/public-registry";
+import * as bookable from "@open-deltat/examples/lib/bookable-service";
 
 // A subscription names its tenant; only these two exist. Default is the demo tenant (the examples'
-// resources); the signed-in dashboard's calendars live in the public tenant. An unknown value maps
-// to demo rather than erroring, so an old client keeps working.
+// resources); user-owned calendars live in the public tenant. An unknown value maps to demo rather
+// than erroring, so an old client keeps working.
 function clientFor(database: string | undefined) {
   return database === "public" ? dtPublic : dt;
+}
+
+// The public tenant holds calendars real people own, so a socket may only touch one that is actually
+// a registered bookable (the registry is the list of things published for booking). Without this an
+// unauthenticated stranger could name any resource id — they are visible in every /b/<id> share
+// link — and stream its bookings or write to it. The demo tenant is seeded fixtures, open by design.
+function mayAccess(resourceId: string, database: string | undefined): boolean {
+  if (database !== "public") return true;
+  return publicRegistry.get(resourceId) !== undefined;
 }
 
 const dev = process.env.NODE_ENV !== "production";
@@ -61,13 +72,18 @@ interface WsState {
   unlisten: (() => Promise<void>) | null;
   holdId: string | null;
   resourceId: string | null;
+  database: string | undefined;
   client: typeof dt;
   start: number | null;
   end: number | null;
 }
 
 async function handleInit(ws: WebSocket, state: WsState, msg: InitMessage) {
+  if (!mayAccess(msg.resourceId, msg.database)) {
+    throw new Error("Unknown bookable");
+  }
   state.resourceId = msg.resourceId;
+  state.database = msg.database;
   state.client = clientFor(msg.database);
 
   state.unlisten = await state.client.events.listen(msg.resourceId, (event) => {
@@ -98,6 +114,24 @@ async function handleConfirm(ws: WebSocket, state: WsState, msg: ConfirmMessage)
   try {
     const holdId = state.holdId;
     state.holdId = null;
+
+    // A real person's calendar goes through the same service the HTTP booking path uses, so the
+    // booker name is sanitized (never raw stranger text into an append-only log) and the hold is
+    // committed atomically rather than released-then-rebooked. Demo fixtures keep the legacy path.
+    if (state.database === "public") {
+      const result = await bookable.commitHold(
+        { dt: state.client, registry: publicRegistry },
+        state.resourceId,
+        holdId,
+        msg.label ?? ""
+      );
+      if (!result.ok) {
+        ws.send(JSON.stringify({ type: "error", message: result.error }));
+        return;
+      }
+      ws.send(JSON.stringify({ type: "confirmed", booking: { id: result.value.bookingId } }));
+      return;
+    }
 
     // Release the hold BEFORE booking: deltat treats an active hold as a conflict, so
     // booking the same span while the hold is still live rejects the booking against the
@@ -166,7 +200,7 @@ server.on("upgrade", (req, socket, head) => {
 });
 
 wss.on("connection", (ws) => {
-  const state: WsState = { unlisten: null, holdId: null, resourceId: null, client: dt, start: null, end: null };
+  const state: WsState = { unlisten: null, holdId: null, resourceId: null, database: undefined, client: dt, start: null, end: null };
   let initialized = false;
   let initStarted = false;
 

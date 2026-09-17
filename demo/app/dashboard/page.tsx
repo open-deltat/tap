@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@open-deltat/examples/components/ui/button";
 import { CreateCalendar } from "@/components/dashboard/create-calendar";
+import { SignOutButton } from "@/components/dashboard/sign-out-button";
 
 // The signed-in home. Only reachable when logged in: a genuinely signed-out visitor is sent
 // straight to sign-in, while a present-but-unverifiable session shows a prompt (never a loop).
@@ -56,9 +57,7 @@ export default async function DashboardPage({
             Real-time calendars anyone, or any AI agent, can book against.
           </p>
         </div>
-        <a href="/auth/logout" className="text-muted-foreground hover:text-foreground text-sm underline">
-          Sign out
-        </a>
+        <SignOutButton />
       </div>
 
       {error ? (

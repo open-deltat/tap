@@ -4,8 +4,10 @@ import {
   PROFILE_COOKIE,
   SESSION_COOKIE,
   authConfig,
+  cookieSecure,
   exchangeCode,
   profileFromGrant,
+  safeReturnTo,
 } from "@open-deltat/examples/lib/auth-session";
 
 // The OIDC callback: state check, code-for-token exchange (PKCE), session cookies, then the
@@ -25,7 +27,7 @@ export async function GET(req: NextRequest) {
   if (!pkce || !code) return fail("missing_flow_state");
   const [state, verifier, returnToRaw] = pkce.split(".");
   if (!state || !verifier || url.searchParams.get("state") !== state) return fail("state_mismatch");
-  const returnTo = returnToRaw?.startsWith("/") && !returnToRaw.startsWith("//") ? returnToRaw : "/dashboard";
+  const returnTo = safeReturnTo(returnToRaw);
 
   const grant = await exchangeCode(code, verifier);
   if (!grant) return fail("exchange_failed");
@@ -34,6 +36,7 @@ export async function GET(req: NextRequest) {
   res.cookies.delete(PKCE_COOKIE);
   res.cookies.set(SESSION_COOKIE, grant.access_token, {
     httpOnly: true,
+    secure: cookieSecure,
     sameSite: "lax",
     path: "/",
     maxAge: grant.expires_in ?? 300,
@@ -46,6 +49,7 @@ export async function GET(req: NextRequest) {
   // and an optional picture URL, never a token or anything sensitive.
   res.cookies.set(PROFILE_COOKIE, JSON.stringify(profileFromGrant(grant)), {
     httpOnly: false,
+    secure: cookieSecure,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
