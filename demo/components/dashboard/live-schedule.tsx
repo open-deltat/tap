@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DeltaTEvent } from "@open-deltat/client";
 import { useWebSocket, type StreamStatus } from "@open-deltat/examples/hooks/use-websocket";
 import {
@@ -11,6 +11,7 @@ import type { WeekHours } from "@open-deltat/examples/builder";
 import { ChevronLeft, ChevronRight, Radio } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@open-deltat/examples/components/ui/button";
+import { BookingsMonth } from "@/components/dashboard/bookings-month";
 
 // The daily view, the thing an operator actually looks at: a live day schedule showing open hours
 // (grey), bookings (green), and active holds (amber) on an hour axis, plus a real-time activity
@@ -72,6 +73,29 @@ const TONES = [
 
 type ToneFilter = (typeof TONES)[number]["value"];
 
+type ViewMode = "day" | "month";
+
+// Per-calendar so a busy month-view calendar and a quiet day-view one can differ. Storage is a
+// nicety, never a correctness input: any failure (private mode, disabled storage, a stale value
+// from an older build) falls back to the default rather than throwing.
+const modeKey = (calendarId: string) => `deltat:cal:${calendarId}:view`;
+
+function readMode(calendarId: string): ViewMode {
+  try {
+    return localStorage.getItem(modeKey(calendarId)) === "month" ? "month" : "day";
+  } catch {
+    return "day";
+  }
+}
+
+function writeMode(calendarId: string, mode: ViewMode): void {
+  try {
+    localStorage.setItem(modeKey(calendarId), mode);
+  } catch {
+    /* storage unavailable; the choice simply does not persist */
+  }
+}
+
 let seq = 0;
 
 export function LiveSchedule({
@@ -91,6 +115,22 @@ export function LiveSchedule({
   const [dayOffset, setDayOffset] = useState(0);
   const [windowMs, setWindowMs] = useState<number>(WINDOWS[1].ms);
   const [tone, setTone] = useState<ToneFilter>("all");
+  const [mode, setMode] = useState<ViewMode>("day");
+
+  // Remember day-vs-month per calendar: an operator who lives in the month view should not have to
+  // re-pick it on every visit. Read on mount rather than in useState's initializer, because
+  // localStorage does not exist during the server render.
+  useEffect(() => {
+    setMode(readMode(calendarId));
+  }, [calendarId]);
+
+  const chooseMode = useCallback(
+    (next: ViewMode) => {
+      setMode(next);
+      writeMode(calendarId, next);
+    },
+    [calendarId]
+  );
 
   const fmtDay = useCallback(
     (ms: number) => new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric", timeZone: timezone }).format(ms),
@@ -191,12 +231,17 @@ export function LiveSchedule({
         text: b.label ?? "Booked",
       })),
     });
-    if (dayHolds.length) {
-      rows.push({
-        label: "Holds",
-        boxes: dayHolds.map((h) => ({ start: minOfDay(h.start, timezone), end: minOfDay(h.end, timezone), color: "amber" as const, text: "hold" })),
-      });
-    }
+    // Always present, even with no holds: a row that appears and disappears makes the timeline jump
+    // under the cursor exactly when someone is watching a hold land.
+    rows.push({
+      label: "Holds",
+      boxes: dayHolds.map((h) => ({
+        start: minOfDay(h.start, timezone),
+        end: minOfDay(h.end, timezone),
+        color: "amber" as const,
+        text: "hold",
+      })),
+    });
 
     const ticks: { value: number; label: string }[] = [];
     const startHour = Math.ceil(axisStart / 60);
@@ -209,38 +254,76 @@ export function LiveSchedule({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon-sm" onClick={() => setDayOffset((d) => d - 1)} aria-label="Previous day">
-            <ChevronLeft />
-          </Button>
-          <span className="min-w-40 text-center text-sm font-medium">
-            {dayOffset === 0 ? "Today · " : ""}
-            {fmtDay(dayMs)}
-          </span>
-          <Button variant="ghost" size="icon-sm" onClick={() => setDayOffset((d) => d + 1)} aria-label="Next day">
-            <ChevronRight />
-          </Button>
+          {mode === "day" ? (
+            <>
+              <Button variant="ghost" size="icon-sm" onClick={() => setDayOffset((d) => d - 1)} aria-label="Previous day">
+                <ChevronLeft />
+              </Button>
+              <span className="min-w-40 text-center text-sm font-medium">
+                {dayOffset === 0 ? "Today · " : ""}
+                {fmtDay(dayMs)}
+              </span>
+              <Button variant="ghost" size="icon-sm" onClick={() => setDayOffset((d) => d + 1)} aria-label="Next day">
+                <ChevronRight />
+              </Button>
+            </>
+          ) : (
+            <span className="text-sm font-medium">Month overview</span>
+          )}
         </div>
-        <Badge variant={badge.variant} className="gap-1.5">
-          <Radio className="size-3" />
-          {badge.label}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <div className="bg-muted flex rounded-md p-0.5">
+            {(["day", "month"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => chooseMode(m)}
+                className={`rounded px-2.5 py-1 text-xs capitalize transition-colors ${
+                  mode === m ? "bg-background text-foreground font-medium shadow-sm" : "text-muted-foreground"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <Badge variant={badge.variant} className="gap-1.5">
+            <Radio className="size-3" />
+            {badge.label}
+          </Badge>
+        </div>
       </div>
 
-      {view.open || view.count > 0 ? (
-        <LabeledTimeline axisStart={view.axisStart} axisEnd={view.axisEnd} rows={view.rows} ticks={view.ticks} labelWidth={56} />
+      {mode === "month" ? (
+        <BookingsMonth
+          bookings={bookings}
+          timezone={timezone}
+          onSelectDay={(d) => {
+            // Jump into that day's detail: whole-day difference from today, in the calendar's zone.
+            const today = new Date(dayKey(Date.now(), timezone));
+            const picked = new Date(dayKey(d.getTime(), timezone));
+            setDayOffset(Math.round((picked.getTime() - today.getTime()) / DAY));
+            chooseMode("day");
+          }}
+        />
       ) : (
-        <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-10 text-center text-sm">
-          Closed this day. Set open hours in the Availability tab.
-        </div>
-      )}
+        <>
+          {view.open || view.count > 0 ? (
+            <LabeledTimeline axisStart={view.axisStart} axisEnd={view.axisEnd} rows={view.rows} ticks={view.ticks} labelWidth={56} />
+          ) : (
+            <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-10 text-center text-sm">
+              Closed this day. Set open hours in the Availability tab.
+            </div>
+          )}
 
-      <div className="text-muted-foreground flex items-center gap-4 text-xs">
-        <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-zinc-500/50" /> Open</span>
-        <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-emerald-500/60" /> Booked</span>
-        <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-amber-400/60" /> Hold</span>
-      </div>
+          <div className="text-muted-foreground flex items-center gap-4 text-xs">
+            <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-zinc-500/50" /> Open</span>
+            <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-emerald-500/60" /> Booked</span>
+            <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-amber-400/60" /> Hold</span>
+          </div>
+        </>
+      )}
 
       {/* Observability: a rolling, real-time log of every hold, booking, and cancellation.
           deltat's event stream is a live tick, not a queryable history, so this starts at the

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { CalendarCheck, Clock, Loader2 } from "lucide-react";
 import { Calendar } from "@open-deltat/examples/components/ui/calendar";
@@ -12,6 +12,12 @@ import {
   holdPublicSlot,
   releasePublicHold,
 } from "@open-deltat/examples/actions/public-booking";
+import {
+  beaconReleaseHold,
+  forgetHold,
+  rememberHold,
+  takeAbandonedHold,
+} from "@open-deltat/examples/lib/hold-release";
 import type { BookableRecord } from "@open-deltat/examples/lib/public-bookables";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +60,10 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
   const [name, setName] = useState("");
   const [pending, start] = useTransition();
 
+  // The hold that still owes a release, in a ref rather than state so the teardown listener and the
+  // unmount cleanup read the current value instead of the one captured when they were registered.
+  const outstanding = useRef<string | null>(null);
+
   const tz = record.timezone;
   const time = useCallback(
     (ms: number) => new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", timeZone: tz }).format(ms),
@@ -80,13 +90,65 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
     void load();
   }, [load]);
 
-  // Release a live hold if the visitor leaves it dangling.
+  /** Stop tracking a hold without touching it. For an id that is already spent or already gone. */
+  const dropHold = useCallback(() => {
+    outstanding.current = null;
+    forgetHold(record.id);
+  }, [record.id]);
+
+  /** Hand the slot back now rather than at the TTL. Safe to call with nothing outstanding. */
+  const releaseOutstanding = useCallback(() => {
+    const holdId = outstanding.current;
+    dropHold();
+    if (holdId) void releasePublicHold(record.id, holdId);
+  }, [dropHold, record.id]);
+
+  // The in-app path, unchanged in effect: React really does unmount on a client-side navigation, so
+  // the action has a live document to run in and the slot comes back in milliseconds.
+  useEffect(() => releaseOutstanding, [releaseOutstanding]);
+
+  // A hold this tab placed before a reload or a crash. The teardown beacon below usually got there
+  // first and release is idempotent, so this costs a round trip in the common case and is the only
+  // thing that works at all when the tab was killed without running any handler. Releasing then
+  // reloading, so the visitor sees the slot they just gave back rather than their own ghost.
+  //
+  // Guarded to one sweep per bookable: `load` is in the deps so the reload is never stale, but that
+  // makes the effect re-run whenever the date changes, and a sweep at that point could take the note
+  // for a hold placed seconds ago rather than one left by a dead document.
+  const swept = useRef<string | null>(null);
   useEffect(() => {
-    if (!held) return;
-    return () => {
-      void releasePublicHold(record.id, held.holdId);
+    if (swept.current === record.id) return;
+    swept.current = record.id;
+    const abandoned = takeAbandonedHold(record.id);
+    if (!abandoned) return;
+    void releasePublicHold(record.id, abandoned).then(load);
+  }, [record.id, load]);
+
+  useEffect(() => {
+    // `pagehide` is the last event a document gets before a reload, a close, or a navigation away.
+    // `visibilitychange` would also fire on a plain tab switch, which must NOT release: a hold is
+    // sized to survive someone leaving to check with a colleague.
+    const onPageHide = () => {
+      const holdId = outstanding.current;
+      // The note in sessionStorage deliberately stays put. sendBeacon reports that the browser
+      // accepted the beacon, never that it arrived, so the next mount's sweep is still the backstop.
+      if (holdId) beaconReleaseHold(record.id, holdId);
     };
-  }, [held, record.id]);
+    // Coming back through bfcache restores the live page with its hold state intact, but the hold
+    // itself went out with the beacon. Drop it so the UI stops claiming a slot we no longer have.
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      dropHold();
+      setHeld(null);
+      void load();
+    };
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [record.id, dropHold, load]);
 
   const pickSlot = (slot: Slot) => {
     start(async () => {
@@ -96,7 +158,11 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
         void load();
         return;
       }
-      setHeld({ ...slot, holdId: result.value.holdId, expiresAt: result.value.expiresAt });
+      const { holdId, expiresAt } = result.value;
+      // Recorded before the render, so a teardown one tick later already finds it.
+      outstanding.current = holdId;
+      rememberHold(record.id, { holdId, expiresAt });
+      setHeld({ ...slot, holdId, expiresAt });
     });
   };
 
@@ -109,6 +175,9 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
         return;
       }
       toast.success("Booked! You're confirmed.");
+      // Drop, never release: committing spends the hold id, so anything that swept it later would
+      // be a round trip that can only fail.
+      dropHold();
       setHeld(null);
       setName("");
       void load();
@@ -116,7 +185,7 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
   };
 
   const cancelHold = () => {
-    if (held) void releasePublicHold(record.id, held.holdId);
+    releaseOutstanding();
     setHeld(null);
     setName("");
   };
@@ -136,6 +205,8 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
               const next = new Date(d);
               next.setHours(0, 0, 0, 0);
               setDate(next);
+              // Walking to another day abandons the hold as surely as pressing Back does.
+              releaseOutstanding();
               setHeld(null);
             }}
             month={month}
