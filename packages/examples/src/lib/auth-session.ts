@@ -36,28 +36,36 @@ export interface AuthConfig {
   authorizeUrl: string;
   tokenUrl: string;
   jwksUri: string;
+  /** OIDC userinfo, for the name and email a meeting request shows its owner. */
+  userinfoUrl: string;
   trustedIssuers: string[];
   /** Optional extra query param some providers require on /authorize, e.g. `provider=authkit`. */
   extraAuthorizeParams: Record<string, string>;
 }
 
+/**
+ * One AUTH_* setting: trimmed, and blank counts as unset. Compose passes an unset variable through as
+ * an empty string, which `??` would take as a value and use in place of the default.
+ */
+const setting = (name: string): string | undefined => process.env[name]?.trim() || undefined;
+
 /** The auth config, or null when this instance has no sign-in configured. */
 export function authConfig(): AuthConfig | null {
-  const issuer = process.env.AUTH_ISSUER?.replace(/\/$/, "");
-  const clientId = process.env.AUTH_CLIENT_ID;
+  const issuer = setting("AUTH_ISSUER")?.replace(/\/$/, "");
+  const clientId = setting("AUTH_CLIENT_ID");
   if (!issuer || !clientId) return null;
 
-  const extraIssuers =
-    process.env.AUTH_TRUSTED_ISSUERS?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+  const extraIssuers = setting("AUTH_TRUSTED_ISSUERS")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
 
-  const provider = process.env.AUTH_PROVIDER_PARAM?.trim();
+  const provider = setting("AUTH_PROVIDER_PARAM");
 
   return {
     issuer,
     clientId,
-    authorizeUrl: process.env.AUTH_AUTHORIZE_URL ?? `${issuer}/oauth2/authorize`,
-    tokenUrl: process.env.AUTH_TOKEN_URL ?? `${issuer}/oauth2/token`,
-    jwksUri: process.env.AUTH_JWKS_URI ?? `${issuer}/oauth2/jwks`,
+    authorizeUrl: setting("AUTH_AUTHORIZE_URL") ?? `${issuer}/oauth2/authorize`,
+    tokenUrl: setting("AUTH_TOKEN_URL") ?? `${issuer}/oauth2/token`,
+    jwksUri: setting("AUTH_JWKS_URI") ?? `${issuer}/oauth2/jwks`,
+    userinfoUrl: setting("AUTH_USERINFO_URL") ?? `${issuer}/oauth2/userinfo`,
     trustedIssuers: [issuer, ...extraIssuers],
     extraAuthorizeParams: provider ? { provider } : {},
   };
@@ -80,18 +88,27 @@ function getAdapter(): OidcAdapter | null {
     // Bind the token to this app: a valid signature from the issuer is not enough, since the same
     // JWKS signs tokens minted for other clients/resources of that issuer. Providers that do not
     // stamp an audience leave AUTH_AUDIENCE unset and fall back to issuer-only trust.
-    audience: process.env.AUTH_AUDIENCE || undefined,
+    audience: setting("AUTH_AUDIENCE"),
   });
   return adapter;
 }
 
 /** The signed-in principal, or null. Fails closed on a missing, expired, or tampered cookie. */
 export async function getSessionPrincipal(): Promise<VerifiedPrincipal | null> {
+  return (await getSession())?.principal ?? null;
+}
+
+/**
+ * The verified principal together with the token it was verified from, for the one call that needs
+ * the token itself: userinfo, which answers only for the token's own subject.
+ */
+export async function getSession(): Promise<{ principal: VerifiedPrincipal; token: string } | null> {
   const verify = getAdapter();
   if (!verify) return null;
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  return verify.verify(token);
+  const principal = await verify.verify(token);
+  return principal ? { principal, token } : null;
 }
 
 /**

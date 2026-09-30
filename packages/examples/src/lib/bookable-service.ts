@@ -220,13 +220,21 @@ export async function listSlots(
   return deps.dt.availability.get({ resourceId: id, start, end: clampedEnd });
 }
 
+/**
+ * A calendar whose owner approves each meeting takes requests, never direct holds or bookings.
+ * Checked here, where every hold and commit path passes, rather than only in the UI.
+ */
+export const REQUESTS_ONLY = "This calendar takes meeting requests: ask for a time and the owner confirms it.";
+
 export async function holdSlot(
   deps: BookableDeps,
   id: string,
   start: number,
   end: number
 ): Promise<Outcome<{ holdId: string; expiresAt: number }>> {
-  if (!deps.registry.get(id)) return { ok: false, error: "That bookable no longer exists." };
+  const record = deps.registry.get(id);
+  if (!record) return { ok: false, error: "That bookable no longer exists." };
+  if (record.bookingMode === "request") return { ok: false, error: REQUESTS_ONLY };
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
     return { ok: false, error: "That is not a valid span of time." };
   }
@@ -253,7 +261,10 @@ export async function commitHold(
   holdId: string,
   bookedBy: string
 ): Promise<Outcome<{ bookingId: string }>> {
-  if (!deps.registry.get(id)) return { ok: false, error: "That bookable no longer exists." };
+  const record = deps.registry.get(id);
+  if (!record) return { ok: false, error: "That bookable no longer exists." };
+  // A hold placed before the owner switched to requests must not become a booking either.
+  if (record.bookingMode === "request") return { ok: false, error: REQUESTS_ONLY };
 
   // GAP-02: `label` is still free text in the kernel, so this is the one place a stranger's string
   // reaches the WAL. Sanitized under the same rule as every other public display string until
