@@ -36,4 +36,5 @@ export type { ParsedInstant } from "./time.js";
 export { ChangeTracker } from "./watch.js";
 export type { Change } from "./watch.js";
 export { tlsSetting, passwordInClear } from "./tls.js";
+export { ADAPTER_DEFAULTS } from "./defaults.js";
 export type { TlsSetting } from "./tls.js";

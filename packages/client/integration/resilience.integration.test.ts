@@ -7,7 +7,7 @@
  * DELTAT_INTEGRATION_PORT like the other live suites, and on a `deltat` binary (DELTAT_BIN or PATH);
  * the TLS test also needs `openssl`.
  */
-import { afterAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -22,6 +22,12 @@ const PASSWORD = "resilience-suite-only";
 const T0 = Date.UTC(2036, 0, 5, 9);
 const HOUR = 3_600_000;
 const dirs: string[] = [];
+/** Every deltat this suite starts, so a failed assertion cannot leave one running. */
+const servers: { kill: () => Promise<void> }[] = [];
+
+afterEach(async () => {
+  await Promise.all(servers.splice(0).map((s) => s.kill()));
+});
 
 afterAll(async () => {
   await Promise.all(dirs.map((d) => rm(d, { recursive: true, force: true })));
@@ -63,6 +69,7 @@ async function ownDeltat(extraEnv: Record<string, string> = {}) {
     await state.proc?.exited;
     state.proc = null;
   };
+  servers.push({ kill });
   await start();
   return { port, dir, start, kill };
 }

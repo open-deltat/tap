@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { tlsSetting, type DeltaTOptions } from "@open-deltat/client";
+import { ADAPTER_DEFAULTS as DEFAULTS, tlsSetting, type DeltaTOptions } from "@open-deltat/client";
 
 // Where the CLI connects, and with what password. The environment wins over the saved file, field
 // by field, and the variable names and defaults are the MCP server's (packages/mcp/server.json), so
@@ -27,8 +27,6 @@ export type Connection = Target & { password: string; tls: NonNullable<DeltaTOpt
 export type Resolved =
   | { ok: true; connection: Connection; passwordFrom: "env" | "file"; tlsCa: string | null; warnings: string[] }
   | { ok: false; message: string };
-
-const DEFAULTS = { host: "localhost", port: 5433, database: "public", user: "user" } as const;
 
 const blankToNull = (v: string | undefined): string | null => {
   const t = v?.trim();
@@ -114,8 +112,14 @@ export async function resolveConnection(env: Env): Promise<Resolved> {
   const port = envPort !== null ? parsePort(envPort, "DELTAT_PORT") : (saved.port ?? DEFAULTS.port);
   if (typeof port === "string") return { ok: false, message: port };
 
-  const tlsCa = blankToNull(env.DELTAT_TLS_CA) ?? saved.tlsCa ?? null;
-  const tls = await tlsSetting({ tls: blankToNull(env.DELTAT_TLS) ?? saved.tls ?? null, caPath: tlsCa }, readText);
+  // TLS is one setting, not two fields to merge: if the environment says anything about it, its
+  // DELTAT_TLS and DELTAT_TLS_CA decide together; otherwise the saved pair does. Merging them field
+  // by field produced states nobody asked for, such as a saved "off" next to an env CA.
+  const envTls = blankToNull(env.DELTAT_TLS);
+  const envCa = blankToNull(env.DELTAT_TLS_CA);
+  const fromEnv = envTls !== null || envCa !== null;
+  const tlsCa = fromEnv ? envCa : (saved.tlsCa ?? null);
+  const tls = await tlsSetting({ tls: fromEnv ? envTls : (saved.tls ?? null), caPath: tlsCa }, readText);
   if (!tls.ok) return tls;
   const host = blankToNull(env.DELTAT_HOST) ?? saved.host ?? DEFAULTS.host;
 

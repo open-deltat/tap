@@ -9,12 +9,15 @@ import { readSecret } from "./prompt.js";
 
 const stop = new EventEmitter();
 
-// The reader went away (`deltat-cli watch ... | head -1`): there is nothing left to write to, so
-// stop the way Ctrl-C would instead of crashing on the unhandled write error.
-process.stdout.on("error", (e: NodeJS.ErrnoException) => {
+// The reader went away (`deltat-cli watch ... | head -1`, or with 2>&1 the same pipe for both):
+// there is nothing left to write to, so stop the way Ctrl-C would instead of crashing on the
+// unhandled write error. Either stream can hit it first.
+const onBrokenPipe = (e: NodeJS.ErrnoException) => {
   if (e.code !== "EPIPE") throw e;
   stop.emit("stop");
-});
+};
+process.stdout.on("error", onBrokenPipe);
+process.stderr.on("error", onBrokenPipe);
 
 process.exitCode = await main(process.argv.slice(2), {
   stdout: (text) => {

@@ -34,10 +34,17 @@ function readHidden(prompt: string): Promise<string | null> {
   });
 }
 
-/** The first line exactly as piped, minus its line ending: a password may contain spaces. */
+/**
+ * The first line exactly as piped, minus its line ending: a password may contain spaces. Stops at
+ * the first newline instead of waiting for end of input, so a pipe that stays open cannot hang login.
+ */
 async function readFirstLine(): Promise<string | null> {
   const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
+  for await (const chunk of process.stdin) {
+    chunks.push(Buffer.from(chunk));
+    if (chunks[chunks.length - 1]?.includes(0x0a)) break;
+  }
+  process.stdin.pause();
   const first = Buffer.concat(chunks).toString("utf8").split(/\r?\n/)[0] ?? "";
   return first === "" ? null : first;
 }

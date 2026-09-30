@@ -160,6 +160,20 @@ describe("TLS settings", () => {
     expect(await resolveConnection(env({ DELTAT_PASSWORD: "pw", DELTAT_TLS_CA: ca }))).toMatchObject({ connection: { tls: { ca: PEM } } });
   });
 
+  test("the environment's TLS settings replace the saved ones as a pair, never merge with them", async () => {
+    const ca = join(dir, "ca.pem");
+    await writeFile(ca, PEM);
+    // Logged in without TLS; a CA in the environment alone turns it on, not a refused "off + CA".
+    await saveConnection(env(), connection);
+    expect(await resolveConnection(env({ DELTAT_TLS_CA: ca }))).toMatchObject({ ok: true, connection: { tls: { ca: PEM } } });
+    // Logged in with a CA; DELTAT_TLS=off in the environment drops the saved CA with it.
+    await saveConnection(env(), { ...connection, tls: true, tlsCa: ca });
+    expect(await resolveConnection(env({ DELTAT_TLS: "off", DELTAT_PASSWORD: "pw" }))).toMatchObject({
+      ok: true,
+      connection: { tls: false },
+    });
+  });
+
   test("a setting that is neither on nor off, or a CA that cannot be read, stops the command", async () => {
     expect((await resolveConnection(env({ DELTAT_PASSWORD: "pw", DELTAT_TLS: "maybe" }))).ok).toBe(false);
     expect((await resolveConnection(env({ DELTAT_PASSWORD: "pw", DELTAT_TLS_CA: join(dir, "missing.pem") }))).ok).toBe(false);

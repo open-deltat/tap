@@ -255,7 +255,7 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
       args: "<calendar> [--from <time> --to <time>]",
       summary: "Print each change as it happens, until Ctrl-C.",
       details:
-        'Changes: held, booked, hold ended (released or expired, may be free again), cancelled. Every line carries its time; with --from/--to only changes to those times are printed. A commit is reported once, as booked. Booking labels are never printed here, because whoever books sets them. If the connection to deltat drops, a "disconnected" line says so, the watch keeps retrying, and a "reconnected" line says changes in between were not seen; a "lagged" line says the same when deltat dropped notifications for a slow reader. If the calendar is deleted the watch ends with a not-found error (exit 5). With --json the first line is always {"status":"watching"}, status lines carry "status" and every change carries "change". An agent can run this in the background and react to each line.',
+        'Changes: held, booked, hold ended (released or expired, may be free again), cancelled. Every line carries its time; with --from/--to only changes to those times are printed. A commit is reported once, as booked. Booking labels are never printed here, because whoever books sets them. If the connection to deltat drops, a "disconnected" line says so, the watch keeps retrying, and a "reconnected" line says changes in between were not seen; a "lagged" line says the same when deltat dropped notifications for a slow reader. If reconnecting keeps failing (deltat restarted with another password, say), a "reconnect_failing" line says why, once per reason. If the calendar is deleted the watch ends with a not-found error (exit 5). With --json the first line is always {"status":"watching"}, status lines carry "status" and every change carries "change". An agent can run this in the background and react to each line.',
       options: { ...WINDOW_OPTIONS },
       prepare(a) {
         const calendar = onlyId(a, "calendar");
@@ -270,7 +270,11 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
             // A watcher's silence has to mean "nothing changed", so losing the connection, getting
             // it back and being told of a lag are reported on stdout, where whoever reads the
             // changes will see them.
-            const status = (state: "disconnected" | "reconnected" | "lagged", text: string, extra: Record<string, unknown> = {}) => {
+            const status = (
+              state: "disconnected" | "reconnected" | "lagged" | "reconnect_failing",
+              text: string,
+              extra: Record<string, unknown> = {}
+            ) => {
               const at = ctx.io.now();
               ctx.io.stdout(
                 ctx.json
@@ -303,6 +307,10 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
                   missed,
                   may_have_missed_changes: true,
                 }),
+              onRetryFailing: (e) => {
+                const reason = classifyRefusal(e).message;
+                status("reconnect_failing", `reconnecting keeps failing, still retrying: ${clean(reason)}`, { reason });
+              },
               onGone: () => finish.with("gone"),
             });
             void ctx.io.interrupted().then(() => finish.with("interrupted"));

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { DeltaT, passwordInClear, tlsSetting } from "@open-deltat/client";
+import { ADAPTER_DEFAULTS, DeltaT, passwordInClear, tlsSetting } from "@open-deltat/client";
 import { createDeltatMcpServer } from "./server.js";
 
 // The stdio entry point: connect to a deltat over its Postgres wire, expose the tools over stdio.
@@ -28,10 +28,10 @@ if (!password) {
 }
 
 const config = {
-  host: process.env.DELTAT_HOST ?? "localhost",
-  port: Number(process.env.DELTAT_PORT ?? 5433),
-  database: process.env.DELTAT_DATABASE ?? "public",
-  username: process.env.DELTAT_USER ?? "user",
+  host: process.env.DELTAT_HOST ?? ADAPTER_DEFAULTS.host,
+  port: Number(process.env.DELTAT_PORT ?? ADAPTER_DEFAULTS.port),
+  database: process.env.DELTAT_DATABASE ?? ADAPTER_DEFAULTS.database,
+  username: process.env.DELTAT_USER ?? ADAPTER_DEFAULTS.user,
 } as const;
 
 async function main() {

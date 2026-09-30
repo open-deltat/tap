@@ -165,15 +165,27 @@ describe("what never reaches a watcher", () => {
 });
 
 describe("memory", () => {
-  test("an unwindowed watch forgets spans that already ended once it has seen many", () => {
+  test("an unwindowed watch keeps at most 10 000 spans, forgetting the oldest first", () => {
     const t = new ChangeTracker(null, noSeed);
-    for (let i = 0; i < 10_001; i++) t.apply(booked(`b${i}`, { start: i, end: i + 1 }), 20_000);
-    // Every one of those ended before "now", so their cancels no longer know the time...
-    expect(t.apply(cancelled("b5"), 20_000)).toEqual([{ kind: "cancelled", resourceId: CAL, bookingId: "b5", start: null, end: null }]);
-    // ...while a booking still in the future is remembered.
-    t.apply(booked("future", { start: 30_000, end: 31_000 }), 20_000);
-    expect(t.apply(cancelled("future"), 20_000)).toEqual([
-      { kind: "cancelled", resourceId: CAL, bookingId: "future", start: 30_000, end: 31_000 },
-    ]);
+    for (let i = 0; i <= 10_000; i++) t.apply(booked(`b${i}`, { start: i * 10, end: i * 10 + 5 }), T);
+    expect(t.apply(cancelled("b0"), T)).toEqual([{ kind: "cancelled", resourceId: CAL, bookingId: "b0", start: null, end: null }]);
+    expect(t.apply(cancelled("b1"), T)).toEqual([{ kind: "cancelled", resourceId: CAL, bookingId: "b1", start: 10, end: 15 }]);
+  });
+
+  test("seeding more than the limit stays linear and keeps the newest", () => {
+    const bookings = Array.from({ length: 30_000 }, (_, i) => ({ id: `s${i}`, resourceId: CAL, start: i, end: i + 1, label: null }));
+    const started = performance.now();
+    const t = new ChangeTracker(null, { holds: [], bookings });
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(t.apply(cancelled("s29999"), T)[0]).toMatchObject({ start: 29_999 });
+    expect(t.apply(cancelled("s0"), T)[0]).toMatchObject({ start: null });
+  });
+
+  test("once the kernel describes its own endings, nothing is remembered any more", () => {
+    const t = new ChangeTracker(null, noSeed);
+    t.apply(booked("b1", A), T);
+    t.apply(cancelled("b2", CAL, B), T); // a kernel that sends spans on endings (deltat#42)
+    // b1's span was dropped with the memory; a new kernel would have sent it on the cancel anyway.
+    expect(t.apply(cancelled("b1"), T)).toEqual([{ kind: "cancelled", resourceId: CAL, bookingId: "b1", start: null, end: null }]);
   });
 });

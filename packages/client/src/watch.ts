@@ -35,7 +35,10 @@ export type Change =
  */
 export const SETTLE_MS = 100;
 
-/** Spans remembered for older kernels before those that already ended are forgotten. */
+/**
+ * Spans remembered for older kernels. Past this the oldest is forgotten first, so an ending that
+ * old reports its time as unknown rather than the tracker growing without limit.
+ */
 const REMEMBER_LIMIT = 10_000;
 
 type HoldEnded = Extract<Change, { kind: "hold_ended" }>;
@@ -48,13 +51,18 @@ export class ChangeTracker {
   private readonly placed = new Map<string, Placed>();
   /** Releases from older kernels waiting to see whether a booking claims them, by hold id. */
   private readonly parked = new Map<string, { change: HoldEnded; at: number }>();
+  /**
+   * Set once an ending arrives with its own span: the kernel describes endings (deltat#42), so there
+   * is nothing to remember and the memory is dropped.
+   */
+  private kernelDescribesEndings = false;
 
   constructor(
     private readonly window: Window | null,
     seed: { holds: readonly Hold[]; bookings: readonly Booking[] }
   ) {
     for (const { id, resourceId, start, end } of [...seed.holds, ...seed.bookings]) {
-      this.remember(id, { resourceId, start, end }, 0);
+      this.remember(id, { resourceId, start, end });
     }
   }
 
@@ -68,11 +76,12 @@ export class ChangeTracker {
   apply(event: DeltaTEvent, now: number): Change[] {
     if ("HoldPlaced" in event) {
       const { id, resource_id, span, expires_at } = event.HoldPlaced;
-      this.remember(id, { resourceId: resource_id, ...span }, now);
+      this.remember(id, { resourceId: resource_id, ...span });
       return this.keep([{ kind: "held", resourceId: resource_id, holdId: id, ...span, expiresAt: expires_at }]);
     }
     if ("HoldReleased" in event) {
       const { id, resource_id, span, reason } = event.HoldReleased;
+      if (span) this.describedByKernel();
       const remembered = this.forget(id);
       const known = span ?? remembered;
       const ended: HoldEnded = { kind: "hold_ended", resourceId: resource_id, holdId: id, start: known?.start ?? null, end: known?.end ?? null };
@@ -83,7 +92,7 @@ export class ChangeTracker {
     }
     if ("BookingConfirmed" in event) {
       const { id, resource_id, span } = event.BookingConfirmed;
-      this.remember(id, { resourceId: resource_id, ...span }, now);
+      this.remember(id, { resourceId: resource_id, ...span });
       const claimed = [...this.parked].find(
         ([, p]) => p.change.resourceId === resource_id && p.change.start === span.start && p.change.end === span.end
       );
@@ -92,6 +101,7 @@ export class ChangeTracker {
     }
     if ("BookingCancelled" in event) {
       const { id, resource_id, span } = event.BookingCancelled;
+      if (span) this.describedByKernel();
       const remembered = this.forget(id);
       const known = span ?? remembered;
       return this.keep([
@@ -115,14 +125,22 @@ export class ChangeTracker {
     return this.settle(Number.POSITIVE_INFINITY);
   }
 
-  private remember(id: string, span: Placed, now: number): void {
+  private remember(id: string, span: Placed): void {
+    if (this.kernelDescribesEndings) return;
     // With a window, a span outside it can never be reported, so there is nothing to remember.
     if (this.window && !overlaps(span.start, span.end, this.window)) return;
     this.placed.set(id, span);
-    // An unwindowed watch on a busy calendar would otherwise keep every booking it ever saw.
+    // A Map keeps insertion order, so its first key is the oldest span: forgetting it is O(1), and
+    // an unwindowed watch on a busy calendar stays at REMEMBER_LIMIT however long it runs.
     if (this.placed.size > REMEMBER_LIMIT) {
-      for (const [key, p] of this.placed) if (p.end <= now) this.placed.delete(key);
+      const oldest = this.placed.keys().next();
+      if (!oldest.done) this.placed.delete(oldest.value);
     }
+  }
+
+  private describedByKernel(): void {
+    this.kernelDescribesEndings = true;
+    this.placed.clear();
   }
 
   private forget(id: string): Placed | undefined {

@@ -15,9 +15,15 @@ const CAL = "01CAL0000000000000000000000";
 function fakeSql() {
   const gate = { open: Promise.resolve() as Promise<void> };
   const reads: string[] = [];
+  const concurrency = { now: 0, most: 0 };
   const answer = (kind: string) => {
     reads.push(kind);
-    return gate.open.then(() => []);
+    concurrency.now += 1;
+    concurrency.most = Math.max(concurrency.most, concurrency.now);
+    return gate.open.then(() => {
+      concurrency.now -= 1;
+      return [];
+    });
   };
   // Holds.get and Bookings.get use a tagged template without a window and unsafe() with one.
   const sql = Object.assign(() => answer("unwindowed"), { unsafe: () => answer("windowed") });
@@ -26,7 +32,7 @@ function fakeSql() {
     gate.open = released.promise;
     return () => released.resolve();
   };
-  return { sql: sql as unknown as Sql, reads, hold };
+  return { sql: sql as unknown as Sql, reads, hold, concurrency };
 }
 
 function fakeListener() {
@@ -66,6 +72,7 @@ async function watching(opts: { window?: { start: number; end: number } } = {}) 
       {
         ...opts,
         onReady: () => log.push("ready"),
+        onDisconnected: () => log.push("disconnected"),
         onResubscribed: () => log.push("resubscribed"),
         onLagged: (n) => log.push(`lagged:${n}`),
         onGone: () => log.push("gone"),
@@ -139,6 +146,50 @@ describe("Events.watch", () => {
     await tick();
     expect(w.log).toEqual(["ready", "gone"]);
     expect(w.sub.captured.stopped).toBe(true);
+  });
+
+  test("a connection blip during the first read is reported after ready, and the re-read waits its turn", async () => {
+    const w = await watching();
+    const open = w.db.hold();
+    const started = w.start();
+    await tick();
+    w.sub.captured.subscriber?.onLost?.();
+    w.sub.captured.subscriber?.onSubscribed(); // re-subscribed while the first read is in flight
+    await tick();
+    open();
+    await started;
+    await Bun.sleep(10);
+    expect(w.log).toEqual(["ready", "disconnected", "resubscribed"]);
+    expect(w.db.concurrency.most).toBe(2); // the two reads of one snapshot (holds, bookings), never two snapshots
+  });
+
+  test("the calendar deleted during the first read: no ready, only gone", async () => {
+    const w = await watching();
+    const open = w.db.hold();
+    const started = w.start();
+    await tick();
+    w.sub.captured.subscriber?.onGone?.();
+    open();
+    await started;
+    expect(w.log).toEqual(["gone"]);
+  });
+
+  test("stopping reports a release still waiting for its booking instead of dropping it", async () => {
+    const w = await watching();
+    const stop = await w.start();
+    w.sub.send(held("h1", 1000));
+    w.sub.send(released("h1")); // an older kernel: parked for SETTLE_MS
+    await stop();
+    expect(w.log).toEqual(["ready", "held", "hold_ended"]);
+  });
+
+  test("a malformed Lagged notice is skipped, not reported as 'missed undefined'", async () => {
+    const w = await watching();
+    await w.start();
+    w.sub.captured.subscriber?.onNotify(JSON.stringify({ Lagged: {} }));
+    w.sub.captured.subscriber?.onNotify("\"just a string\"");
+    await Bun.sleep(10);
+    expect(w.log).toEqual(["ready"]);
   });
 
   test("with a window, the calendar is read for that window only", async () => {

@@ -24,6 +24,11 @@ export type Subscriber = {
   onLost?: () => void;
   /** The resource no longer exists (deleted while the connection was down); nothing more will arrive. */
   onGone?: () => void;
+  /**
+   * Re-subscribing keeps failing, and why (a wrong password after deltat restarted, say). Called once
+   * per distinct reason, not on every attempt; retrying continues, since the cause may be fixed.
+   */
+  onRetryFailing?: (error: unknown) => void;
 };
 
 /** What Events needs from a subscription source. Subscriptions is the real one; tests pass a fake. */
@@ -49,7 +54,7 @@ type Connect = (hooks: { onnotify: (channel: string, payload: string) => void; o
 
 const quoted = (channel: string) => `"${channel.replace(/"/g, '""')}"`;
 
-type Outcome = "live" | "gone" | "retry" | "stale";
+type Outcome = "live" | "gone" | "retry";
 
 export class Subscriptions implements Listener {
   private readonly channels = new Map<string, Set<Subscriber>>();
@@ -63,6 +68,8 @@ export class Subscriptions implements Listener {
   private generation = 0;
   private retrying = false;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Why reconnecting last failed, so each distinct reason is reported once, not every attempt. */
+  private lastRetryFailure: string | null = null;
   private closed = false;
 
   constructor(private readonly connect: Connect) {}
@@ -78,7 +85,10 @@ export class Subscriptions implements Listener {
       // `onnotify` is how postgres.js's own listen receives notifications, and the only way to
       // receive them on a connection we own; its types leave it out. The live resilience suite
       // fails if a postgres.js upgrade ever drops it.
-      const options: postgres.Options<{}> & { onnotify: typeof onnotify } = {
+      const options: postgres.Options<{}> & {
+        onnotify: typeof onnotify;
+        shared: { retries: number; typeArrayMap: Record<string, unknown> };
+      } = {
         ...parsed,
         max: 1,
         // 0 disables both timers (postgres.js connection.js, timer()). The default max_lifetime
@@ -89,6 +99,11 @@ export class Subscriptions implements Listener {
         fetch_types: false,
         onnotify,
         onclose,
+        // Parsed options carry the main pool's `shared` state, including its reconnect counter
+        // (connection.js), and postgres.js uses options that have `shared` as they are. Sharing it
+        // would let this connection's failed reconnects back the main pool off too, and the other
+        // way round. Its own fresh state keeps the two apart.
+        shared: { retries: 0, typeArrayMap: {} },
       };
       return postgres(options);
     });
@@ -165,9 +180,16 @@ export class Subscriptions implements Listener {
   }
 
   /**
-   * Listen to every channel that is not live, each on its own. A channel that comes back is
-   * reported at once, whatever the others do; one whose resource is gone is dropped and reported;
-   * the rest are retried with backoff until they succeed or the client is closed.
+   * Listen to every channel that is not live, each on its own. The batch is judged once it has
+   * settled: if the connection closed at any point during it, every LISTEN in it was on a
+   * connection that is gone, including ones that returned before the drop, so none counts and the
+   * whole batch is retried. Otherwise a channel that came back is reported at once, whatever the
+   * others did; one whose resource is gone is dropped and reported; the rest are retried with
+   * backoff until they succeed or the client is closed.
+   *
+   * Only the subscribers waiting when the attempt started are told. One that joined meanwhile ran
+   * its own LISTEN and was told already; one that left is not told, and a channel nobody wants any
+   * more is UNLISTENed rather than marked live.
    */
   private resubscribe(attempt: number): void {
     if (this.retrying || this.closed) return;
@@ -176,33 +198,58 @@ export class Subscriptions implements Listener {
     this.retryTimer = setTimeout(async () => {
       this.retryTimer = null;
       const generation = this.generation;
-      const wanted = [...this.channels.keys()].filter((c) => !this.live.has(c));
+      const batch = [...this.channels]
+        .filter(([channel]) => !this.live.has(channel))
+        .map(([channel, subscribers]) => ({ channel, waiting: [...subscribers] }));
       const outcomes = await Promise.all(
-        wanted.map(async (channel): Promise<[string, Outcome]> => {
+        batch.map(async ({ channel }): Promise<{ outcome: Outcome; error?: unknown }> => {
           try {
             await this.listenOn(channel);
-            return [channel, this.generation === generation ? "live" : "stale"];
+            return { outcome: "live" };
           } catch (error) {
-            return [channel, sqlstateOf(error) === UNDEFINED_OBJECT ? "gone" : "retry"];
+            return { outcome: sqlstateOf(error) === UNDEFINED_OBJECT ? "gone" : "retry", error };
           }
         })
       );
       this.retrying = false;
       if (this.closed) return;
+      const stale = generation !== this.generation;
 
-      for (const [channel, outcome] of outcomes) {
-        const subscribers = [...(this.channels.get(channel) ?? [])];
+      const results = batch.map((b, i) => ({ ...b, ...(outcomes[i] ?? { outcome: "retry" as const }) }));
+      for (const { channel, waiting, outcome, error } of results) {
+        const current = this.channels.get(channel);
+        const stillWaiting = waiting.filter((s) => current?.has(s));
+        if (stale) continue;
         if (outcome === "live") {
+          this.lastRetryFailure = null;
+          if (!current) {
+            await this.unlisten(channel);
+            continue;
+          }
           this.live.add(channel);
-          for (const s of subscribers) s.onSubscribed();
+          for (const s of stillWaiting) s.onSubscribed();
         } else if (outcome === "gone") {
           this.channels.delete(channel);
-          for (const s of subscribers) s.onGone?.();
+          for (const s of stillWaiting) s.onGone?.();
+        } else {
+          this.reportRetryFailure(error, stillWaiting);
         }
       }
-      if (outcomes.some(([, outcome]) => outcome === "retry" || outcome === "stale")) this.resubscribe(attempt + 1);
+      if (stale || results.some(({ outcome }) => outcome === "retry")) this.resubscribe(attempt + 1);
     }, delay);
     // Deliberately not unref()'d: while deltat is down this timer is the only thing keeping a
     // watcher's process alive, and a watcher must outlast an outage. close() clears it.
+  }
+
+  private reportRetryFailure(error: unknown, subscribers: readonly Subscriber[]): void {
+    const reason = sqlstateOf(error) ?? (error instanceof Error ? error.message : "unknown");
+    if (reason === this.lastRetryFailure) return;
+    this.lastRetryFailure = reason;
+    for (const s of subscribers) s.onRetryFailing?.(error);
+  }
+
+  private async unlisten(channel: string): Promise<void> {
+    const conn = this.conn;
+    if (conn) await conn`UNLISTEN ${conn.unsafe(quoted(channel))}`.catch(() => undefined);
   }
 }

@@ -15,7 +15,9 @@ function fakeConnection() {
     broken: Map<string, string | undefined>;
     /** When set, the next LISTEN waits for this before answering. */
     pause: Promise<void> | null;
-  } = { refusals: 0, broken: new Map(), pause: null };
+    /** LISTENs on these channels wait for their gate before answering. */
+    paused: Map<string, Promise<void>>;
+  } = { refusals: 0, broken: new Map(), pause: null, paused: new Map() };
   const hooks: { onnotify?: (channel: string, payload: string) => void; onclose?: () => void } = {};
   const run = async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.reduce((acc, s, i) => acc + s + (i < values.length ? String(values[i]) : ""), "");
@@ -23,6 +25,11 @@ function fakeConnection() {
     const pause = state.pause;
     state.pause = null;
     if (pause) await pause;
+    const gate = [...state.paused].find(([channel]) => text.startsWith("LISTEN") && text.includes(`"${channel}"`));
+    if (gate) {
+      state.paused.delete(gate[0]);
+      await gate[1];
+    }
     const broken = [...state.broken].find(([channel]) => text.includes(`"${channel}"`));
     if (broken) throw Object.assign(new Error("listen refused"), broken[1] ? { code: broken[1] } : {});
     if (state.refusals > 0) {
@@ -56,6 +63,12 @@ function fakeConnection() {
       state.pause = gate.promise;
       return () => gate.resolve();
     },
+    /** The next LISTEN on `channel` waits until the returned function is called. */
+    pauseChannel: (channel: string) => {
+      const gate = Promise.withResolvers<void>();
+      state.paused.set(channel, gate.promise);
+      return () => gate.resolve();
+    },
     notify: (channel: string, payload: string) => hooks.onnotify?.(channel, payload),
     drop: () => hooks.onclose?.(),
   };
@@ -68,9 +81,13 @@ function recorder() {
     onSubscribed: () => log.push("subscribed"),
     onLost: () => log.push("lost"),
     onGone: () => log.push("gone"),
+    onRetryFailing: (e) => log.push(`failing:${(e as { code?: string }).code ?? "?"}`),
   };
   return { log, subscriber };
 }
+
+const listensOn = (statements: string[], channel: string) =>
+  statements.filter((s) => s === `LISTEN "${channel}"`).length;
 
 const listens = (statements: string[]) => statements.filter((s) => s.startsWith("LISTEN")).length;
 
@@ -118,7 +135,8 @@ describe("Subscriptions", () => {
       f.drop();
       await Bun.sleep(2_200); // 250 + 500 + 1000 ms of backoff
       expect(listens(f.statements)).toBe(4);
-      expect(r.log).toEqual(["subscribed", "lost", "subscribed"]);
+      // The refused attempts are reported once (same reason twice), then the subscription is back.
+      expect(r.log).toEqual(["subscribed", "lost", "failing:?", "subscribed"]);
       f.notify("resource_1", "after");
       expect(r.log.at(-1)).toBe("notify:after");
     },
@@ -152,7 +170,7 @@ describe("Subscriptions", () => {
       f.drop();
       await Bun.sleep(400);
       expect(a.log).toEqual(["subscribed", "lost", "subscribed"]);
-      expect(b.log).toEqual(["subscribed", "lost"]);
+      expect(b.log).toEqual(["subscribed", "lost", "failing:?"]);
       f.notify("resource_a", "x");
       expect(a.log.at(-1)).toBe("notify:x");
       await f.subscriptions.close();
@@ -198,6 +216,82 @@ describe("Subscriptions", () => {
       expect(listens(f.statements)).toBe(2);
     },
     3_000
+  );
+
+  test(
+    "a drop in the middle of a retry voids the LISTENs that had already returned, so none is stranded",
+    async () => {
+      const f = fakeConnection();
+      const a = recorder();
+      const b = recorder();
+      await f.subscriptions.listen("resource_a", a.subscriber);
+      await f.subscriptions.listen("resource_b", b.subscriber);
+      const resumeB = f.pauseChannel("resource_b");
+      f.drop();
+      await Bun.sleep(300); // the retry ran: A's LISTEN returned, B's is still in flight
+      f.drop(); // and now the connection those LISTENs used is gone
+      resumeB();
+      await Bun.sleep(700); // the next attempt (500 ms backoff) listens both again
+      expect(listensOn(f.statements, "resource_a")).toBe(3);
+      expect(a.log).toEqual(["subscribed", "lost", "subscribed"]);
+      f.notify("resource_a", "x");
+      expect(a.log.at(-1)).toBe("notify:x");
+      await f.subscriptions.close();
+    },
+    3_000
+  );
+
+  test(
+    "a channel given up while its retry is in flight is UNLISTENed, not marked live",
+    async () => {
+      const f = fakeConnection();
+      const r = recorder();
+      const stop = await f.subscriptions.listen("resource_1", r.subscriber);
+      const resume = f.pauseChannel("resource_1");
+      f.drop();
+      await Bun.sleep(300);
+      await stop();
+      resume();
+      await Bun.sleep(50);
+      expect(f.statements.at(-1)).toBe('UNLISTEN "resource_1"');
+      expect(r.log).toEqual(["subscribed", "lost"]);
+    },
+    3_000
+  );
+
+  test(
+    "a subscriber that joins while a retry is in flight is told it subscribed exactly once",
+    async () => {
+      const f = fakeConnection();
+      const first = recorder();
+      await f.subscriptions.listen("resource_1", first.subscriber);
+      const resume = f.pauseChannel("resource_1");
+      f.drop();
+      await Bun.sleep(300);
+      const second = recorder();
+      await f.subscriptions.listen("resource_1", second.subscriber);
+      resume();
+      await Bun.sleep(50);
+      expect(second.log).toEqual(["subscribed"]);
+      expect(first.log).toEqual(["subscribed", "lost", "subscribed"]);
+    },
+    3_000
+  );
+
+  test(
+    "a reconnect that keeps failing says why, once per reason, and keeps retrying",
+    async () => {
+      const f = fakeConnection();
+      const r = recorder();
+      await f.subscriptions.listen("resource_1", r.subscriber);
+      f.breakChannel("resource_1", "28P01"); // deltat came back with a different password
+      f.drop();
+      await Bun.sleep(1_900); // three failed attempts
+      expect(r.log).toEqual(["subscribed", "lost", "failing:28P01"]);
+      expect(listensOn(f.statements, "resource_1")).toBeGreaterThanOrEqual(4);
+      await f.subscriptions.close();
+    },
+    4_000
   );
 
   test("close() bounds how long it waits for the connection to end", async () => {

@@ -8,7 +8,7 @@
  * Gated on DELTAT_INTEGRATION_PORT like the other live suites. The process tests need the CLI built
  * (`cd packages/cli && bun run build`), because they run dist/ with node, as a user would.
  */
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -121,8 +121,15 @@ describe("the booking loop against a live deltat", () => {
 });
 
 /** Spawn `node dist/index.js watch ... --json` and read its stdout line by line as it arrives. */
-function spawnWatch() {
-  const proc = Bun.spawn(["node", BIN, "watch", calendar, "--json"], { env: { ...process.env, ...env() }, stdout: "pipe", stderr: "pipe" });
+/** Every watch process a test starts, so none outlives a failed assertion. */
+const spawned: ReturnType<typeof Bun.spawn>[] = [];
+afterEach(() => {
+  for (const proc of spawned.splice(0)) if (proc.exitCode === null) proc.kill("SIGKILL");
+});
+
+function spawnWatch(calendarId = calendar) {
+  const proc = Bun.spawn(["node", BIN, "watch", calendarId, "--json"], { env: { ...process.env, ...env() }, stdout: "pipe", stderr: "pipe" });
+  spawned.push(proc);
   const reader = proc.stdout.getReader();
   const decoder = new TextDecoder();
   const lines: Record<string, unknown>[] = [];
@@ -176,15 +183,15 @@ describe("watch as a real process", () => {
       const client = sdk;
       if (!client) throw new Error("live suite without a client");
       const doomed = await client.resources.create({ name: "cli-it-doomed", capacity: 1 });
-      const proc = Bun.spawn(["node", BIN, "watch", doomed.id, "--json"], {
-        env: { ...process.env, ...env() },
-        stdout: "pipe",
-        stderr: "pipe",
-      });
-      await Bun.sleep(1_500);
+      const w = spawnWatch(doomed.id);
+      // Only once watching has started can exit 5 mean "deleted while watched"; before that it
+      // would be the startup check refusing an unknown calendar, which is not what this tests.
+      expect((await w.waitFor(1))[0]).toMatchObject({ status: "watching" });
       await client.resources.delete(doomed.id);
-      const code = await Promise.race([proc.exited, Bun.sleep(5_000).then(() => "still running")]);
+      const code = await Promise.race([w.proc.exited, Bun.sleep(5_000).then(() => "still running")]);
       expect(code).toBe(5);
+      await w.pump;
+      expect(w.lines.at(-1)).toMatchObject({ error: "NOT_FOUND" });
     },
     20_000
   );

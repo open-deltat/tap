@@ -1,5 +1,6 @@
 import type { Sql } from "postgres";
 import { Bookings } from "./bookings.js";
+import { asDeltaTEvent } from "./event-shape.js";
 import { Holds } from "./holds.js";
 import { Subscriptions, type Listener } from "./subscriptions.js";
 import type { DeltaTEvent } from "./types.js";
@@ -25,6 +26,8 @@ export type WatchOptions = {
   onLagged?: (missed: number) => void;
   /** The calendar was deleted. Nothing more will arrive and the watch has stopped. */
   onGone?: () => void;
+  /** Reconnecting keeps failing, and why; once per distinct reason. The watch keeps retrying. */
+  onRetryFailing?: (error: unknown) => void;
 };
 
 /**
@@ -49,9 +52,10 @@ function reportError(error: unknown, onError?: (error: unknown) => void): void {
   }
 }
 
+/** The payload as a checked event, or null when it is not valid JSON or not an event this client knows. */
 const parseEvent = (payload: string): DeltaTEvent | null => {
   try {
-    return JSON.parse(payload) as DeltaTEvent;
+    return asDeltaTEvent(JSON.parse(payload));
   } catch {
     return null;
   }
@@ -76,7 +80,8 @@ export class Events {
    *
    * Whenever the calendar is (re-)read, at the start, after reconnecting, after a Lagged notice,
    * events arriving meanwhile are held back and replayed on the fresh picture, so none is applied to
-   * a picture that is about to be replaced. Re-reads run one at a time.
+   * a picture that is about to be replaced. Reads run one at a time, the first one included, and
+   * status callbacks that fire during the first read wait until onReady has run.
    */
   async watch(
     resourceId: string,
@@ -90,8 +95,16 @@ export class Events {
       held: DeltaTEvent[];
       timer: ReturnType<typeof setTimeout> | null;
       stopped: boolean;
-    } = { tracker: null, held: [], timer: null, stopped: false };
-    let rereads = Promise.resolve();
+      ready: boolean;
+      /** Status callbacks that fired before onReady, delivered right after it. */
+      later: (() => void)[];
+    } = { tracker: null, held: [], timer: null, stopped: false, ready: false, later: [] };
+    // Every read of the calendar, the first one included, is a link in this chain, so no two run
+    // at once and a re-read requested during the first read waits for it.
+    const firstRead: { done: () => void } = { done: () => undefined };
+    let reads = new Promise<void>((resolve) => {
+      firstRead.done = resolve;
+    });
 
     const snapshot = async () => {
       const filter = window ?? undefined;
@@ -122,16 +135,24 @@ export class Events {
       }, Math.max(0, due - Date.now()));
     };
 
+    const whenReady = (fn: () => void) => {
+      if (state.ready) fn();
+      else state.later.push(fn);
+    };
+
     const stopRef: { stop: (() => Promise<void>) | null } = { stop: null };
     const end = async () => {
+      if (state.stopped) return;
       state.stopped = true;
       clearTimer();
+      // A release still waiting to see whether a booking claims it is reported, not dropped.
+      if (state.tracker) report(state.tracker.flush());
       await stopRef.stop?.();
     };
     const gone = () => {
       if (state.stopped) return;
       void end();
-      notify(options.onGone);
+      whenReady(() => notify(options.onGone));
     };
 
     const handle = (event: DeltaTEvent) => {
@@ -157,7 +178,7 @@ export class Events {
     // never come, so report what is parked, re-read the calendar, replay what arrived meanwhile,
     // then say there was a gap.
     const reread = (after: () => void) => {
-      rereads = rereads.then(async () => {
+      reads = reads.then(async () => {
         if (state.stopped) return;
         const previous = state.tracker;
         clearTimer();
@@ -179,18 +200,27 @@ export class Events {
     // the snapshot already reflects is harmless to replay: remembering a span twice changes nothing.
     stopRef.stop = await this.listen(resourceId, handle, {
       ...(onError ? { onError } : {}),
-      ...(options.onDisconnected ? { onDisconnected: options.onDisconnected } : {}),
+      onDisconnected: () => whenReady(() => notify(options.onDisconnected)),
+      onRetryFailing: (error) => whenReady(() => deliver(() => options.onRetryFailing?.(error), onError)),
       onResubscribed: () => reread(() => options.onResubscribed?.()),
       onGone: gone,
     });
     const started = await snapshot().catch(async (error: unknown) => {
+      firstRead.done();
       await end();
       throw error;
     });
-    notify(options.onReady);
-    state.tracker = started;
-    replayHeld();
-    arm();
+    // Stopped already means the calendar went away during the first read: there is nothing to be
+    // ready for, and the onGone waiting in `later` is what the caller hears.
+    if (!state.stopped) {
+      notify(options.onReady);
+      state.tracker = started;
+      replayHeld();
+      arm();
+    }
+    state.ready = true;
+    for (const fn of state.later.splice(0)) fn();
+    firstRead.done();
 
     return end;
   }
@@ -215,6 +245,8 @@ export class Events {
       onResubscribed?: () => void;
       /** The resource was deleted while the connection was down; this subscription has ended. */
       onGone?: () => void;
+      /** Reconnecting keeps failing, and why; once per distinct reason. Retrying continues. */
+      onRetryFailing?: (error: unknown) => void;
     }
   ): Promise<() => Promise<void>> {
     const onError = options?.onError;
@@ -234,6 +266,7 @@ export class Events {
       },
       onLost: () => hook(options?.onDisconnected),
       onGone: () => hook(options?.onGone),
+      onRetryFailing: (error) => hook(options?.onRetryFailing && (() => options.onRetryFailing?.(error))),
     });
   }
 }

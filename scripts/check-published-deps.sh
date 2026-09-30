@@ -67,6 +67,7 @@ const required = [
   [() => fn('parseInstant'), 'parseInstant'],
   [() => fn('tlsSetting'), 'tlsSetting  (DELTAT_TLS / DELTAT_TLS_CA, read the same way by both adapters)'],
   [() => fn('passwordInClear'), 'passwordInClear'],
+  [() => typeof client.ADAPTER_DEFAULTS?.port === 'number', 'ADAPTER_DEFAULTS  (where both adapters connect by default)'],
 ]
 
 const missing = required.filter(([present]) => {
