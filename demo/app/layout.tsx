@@ -4,6 +4,7 @@ import Script from "next/script";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@open-deltat/examples/components/ui/sonner";
 import { NavHeader } from "@/components/nav-header";
+import { authEnabled, getDisplayProfile } from "@open-deltat/examples/lib/auth-session";
 import { JsonLd } from "@/components/json-ld";
 import { SITE, TITLE_TEMPLATE, organizationLd, websiteLd, softwareApplicationLd } from "@/lib/seo";
 import "./globals.css";
@@ -72,11 +73,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Nav display uses the cheap, display-only profile cookie, not a per-request token verification;
+  // access control is enforced on /dashboard and the actions, which verify the real session.
+  const profile = await getDisplayProfile();
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -84,7 +88,7 @@ export default function RootLayout({
       >
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <div className="flex h-[100dvh] flex-col">
-            <NavHeader />
+            <NavHeader authEnabled={authEnabled()} profile={profile} />
             <div className="flex-1 min-h-0">{children}</div>
           </div>
           <Toaster />

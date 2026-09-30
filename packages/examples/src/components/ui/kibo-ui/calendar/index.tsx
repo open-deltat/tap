@@ -88,7 +88,7 @@ type OutOfBoundsDayProps = {
 };
 
 const OutOfBoundsDay = ({ day }: OutOfBoundsDayProps) => (
-  <div className="relative h-full w-full bg-white/[0.015] p-1 text-right text-[11px] text-zinc-600">
+  <div className="relative h-full w-full bg-muted/30 p-1 text-right text-[11px] text-muted-foreground/70">
     {day}
   </div>
 );
@@ -175,12 +175,12 @@ export const CalendarBody = ({
 
     const content = (
       <>
-        <span className="text-right text-[11px] text-zinc-500">{day}</span>
+        <span className="text-right text-[11px] text-muted-foreground">{day}</span>
         <div className="flex flex-col gap-1">
           {featuresForDay.slice(0, max).map((feature) => children({ feature }))}
         </div>
         {featuresForDay.length > max && (
-          <span className="mt-auto block text-[10px] text-emerald-300/80">
+          <span className="mt-auto block text-[10px] text-emerald-600 dark:text-emerald-300/80">
             +{featuresForDay.length - max} more
           </span>
         )}
@@ -227,7 +227,7 @@ export const CalendarBody = ({
       {days.map((day, index) => (
         <div
           className={cn(
-            "relative min-h-[5.5rem] overflow-hidden border-t border-r border-white/[0.06]",
+            "relative min-h-[5.5rem] overflow-hidden border-t border-r border-border",
             index % 7 === 6 && "border-r-0"
           )}
           key={index}
@@ -312,7 +312,7 @@ export const CalendarLabel = ({ className }: CalendarLabelProps) => {
     [locale, month, year]
   );
 
-  return <span className={cn("text-sm font-medium text-zinc-200", className)}>{label}</span>;
+  return <span className={cn("text-sm font-medium text-foreground", className)}>{label}</span>;
 };
 
 export type CalendarDateProps = {
@@ -336,7 +336,7 @@ export const CalendarHeader = ({ className }: CalendarHeaderProps) => {
     <div className={cn("grid flex-grow grid-cols-7", className)}>
       {daysData.map((day) => (
         <div
-          className="p-2 text-right text-[10px] uppercase tracking-wider text-zinc-500"
+          className="p-2 text-right text-[10px] uppercase tracking-wider text-muted-foreground"
           key={day}
         >
           {day}
@@ -357,7 +357,7 @@ export const CalendarItem = memo(({ feature, className }: CalendarItemProps) => 
       className="h-1.5 w-1.5 shrink-0 rounded-full"
       style={{ backgroundColor: feature.status.color }}
     />
-    <span className="truncate text-zinc-300">{feature.name}</span>
+    <span className="truncate text-foreground">{feature.name}</span>
   </div>
 ));
 

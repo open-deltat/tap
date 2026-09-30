@@ -24,12 +24,14 @@ export interface TimelineRow {
   boxes: TimelineBox[];
 }
 
+// Each colour carries a light/dark text pair: these boxes render on the dark marketing canvas AND on
+// the theme-aware dashboard, and near-white text over a pale tint is unreadable in light mode.
 const COLOR: Record<BoxColor, string> = {
-  sky: "border-sky-400/40 bg-sky-500/30 text-sky-50",
-  rose: "border-rose-400/40 bg-rose-500/30 text-rose-50",
-  emerald: "border-emerald-400/40 bg-emerald-500/30 text-emerald-50",
-  amber: "border-amber-300/50 bg-amber-400/30 text-amber-50",
-  zinc: "border-white/15 bg-zinc-500/25 text-zinc-100",
+  sky: "border-sky-400/40 bg-sky-500/30 text-sky-900 dark:text-sky-50",
+  rose: "border-rose-400/40 bg-rose-500/30 text-rose-900 dark:text-rose-50",
+  emerald: "border-emerald-400/40 bg-emerald-500/30 text-emerald-900 dark:text-emerald-50",
+  amber: "border-amber-300/50 bg-amber-400/30 text-amber-900 dark:text-amber-50",
+  zinc: "border-border bg-muted-foreground/25 text-foreground",
 };
 
 interface Props {
@@ -68,7 +70,7 @@ export function LabeledTimeline({
   const hasOps = rows.some((r) => r.op);
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+    <div className="rounded-lg border bg-muted/30 p-3">
       {ticks && ticks.length > 0 && (
         <div className="mb-1.5 flex items-end gap-2">
           {hasOps && <span className="w-3 shrink-0" />}
@@ -79,7 +81,7 @@ export function LabeledTimeline({
               return (
                 <span
                   key={i}
-                  className="absolute -translate-x-1/2 text-[9px] tabular-nums text-zinc-500"
+                  className="absolute -translate-x-1/2 text-[9px] tabular-nums text-muted-foreground"
                   style={{ left: `${left}%` }}
                 >
                   {t.label}
@@ -94,18 +96,18 @@ export function LabeledTimeline({
           <div key={ri}>
             {row.divider && <div className="mb-1.5 h-px bg-emerald-400/20" />}
             {row.heading ? (
-              <div className={cn("pb-0.5 text-[11px] font-semibold uppercase tracking-wider text-zinc-300", ri > 0 && "pt-2")}>
+              <div className={cn("pb-0.5 text-[11px] font-semibold uppercase tracking-wider text-foreground", ri > 0 && "pt-2")}>
                 {row.heading}
               </div>
             ) : (
             <div className="flex items-center gap-2">
               {hasOps && (
-                <span className="w-3 shrink-0 text-right font-mono text-[11px] text-zinc-500">
+                <span className="w-3 shrink-0 text-right font-mono text-[11px] text-muted-foreground">
                   {row.op ?? ""}
                 </span>
               )}
               {(row.label || labelWidth > 0) && (
-                <span className="shrink-0 text-right text-[10px] text-zinc-400" style={{ width: labelWidth }}>
+                <span className="shrink-0 text-right text-[10px] text-muted-foreground" style={{ width: labelWidth }}>
                   {row.label}
                 </span>
               )}
@@ -134,7 +136,7 @@ export function LabeledTimeline({
       </div>
 
       {showAxis && (
-        <div className="mt-2 flex items-center gap-2 text-[10px] text-zinc-500" style={{ paddingLeft: labelWidth + 8 }}>
+        <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground" style={{ paddingLeft: labelWidth + 8 }}>
           <span>◀ {pastLabel}</span>
           <div className="h-px flex-1 bg-white/15" />
           <span>{futureLabel} ▶</span>

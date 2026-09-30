@@ -56,14 +56,29 @@ export async function authorizePublicBookable(
   return publicRegistry.authorize(id, manageKey);
 }
 
+// Manage-key writes are authorized, but the key is guessable-in-principle and these do real work
+// (a rename writes the registry and deltat; a delete destroys a calendar), so they carry the same
+// per-caller bound as every other public write rather than relying on authorization alone.
+const perCallerManageWrites = createRateLimiter({ limit: 30, windowMs: 3_600_000 });
+
+async function manageWriteAllowed(): Promise<boolean> {
+  return perCallerManageWrites.check(await callerIp()).allowed;
+}
+
 export async function renamePublicBookable(
   id: string,
   manageKey: string,
   name: string
 ): Promise<Outcome<BookableRecord>> {
+  if (!(await manageWriteAllowed())) {
+    return { ok: false, error: "Too many changes from here just now. Give it a minute." };
+  }
   return service.renameBookable(deps, id, manageKey, name);
 }
 
 export async function deletePublicBookable(id: string, manageKey: string): Promise<Outcome<null>> {
+  if (!(await manageWriteAllowed())) {
+    return { ok: false, error: "Too many changes from here just now. Give it a minute." };
+  }
   return service.deleteBookable(deps, id, manageKey);
 }

@@ -4,6 +4,8 @@ import type { DeltaTEvent } from "@open-deltat/client";
 interface SubscribeOptions {
   type: "subscribe";
   resourceId: string;
+  /** Which tenant the resource lives in. Omitted = the demo tenant (the examples' default). */
+  database?: string;
   onEvent: (event: DeltaTEvent) => void;
 }
 
@@ -44,7 +46,13 @@ export function useWebSocket(options: SubscribeOptions | null): StreamControl {
       ws.onopen = () => {
         attempt = 0;
         setStatus("live");
-        ws.send(JSON.stringify({ type: "subscribe", resourceId }));
+        ws.send(
+          JSON.stringify({
+            type: "subscribe",
+            resourceId,
+            ...(optionsRef.current?.database ? { database: optionsRef.current.database } : {}),
+          })
+        );
       };
 
       ws.onmessage = (e) => {
@@ -77,7 +85,7 @@ export function useWebSocket(options: SubscribeOptions | null): StreamControl {
       if (reconnectTimer) clearTimeout(reconnectTimer);
       ws.close();
     };
-  }, [options?.resourceId]);
+  }, [options?.resourceId, options?.database]);
 
   return { status };
 }
