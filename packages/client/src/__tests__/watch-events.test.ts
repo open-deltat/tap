@@ -16,13 +16,14 @@ function fakeSql() {
   const gate = { open: Promise.resolve() as Promise<void> };
   const reads: string[] = [];
   const concurrency = { now: 0, most: 0 };
-  const failing = { reads: 0, hanging: 0 };
+  const failing = { reads: 0, hanging: 0, delayMs: 0 };
   const answer = (kind: string) => {
     reads.push(kind);
     if (failing.hanging > 0) {
       failing.hanging -= 1;
       return new Promise<never>(() => undefined); // sent down a connection that died without closing
     }
+    if (failing.delayMs > 0) return Bun.sleep(failing.delayMs).then(() => []);
     concurrency.now += 1;
     concurrency.most = Math.max(concurrency.most, concurrency.now);
     const fails = failing.reads > 0;
@@ -48,7 +49,11 @@ function fakeSql() {
   const hangReads = (n: number) => {
     failing.hanging = n;
   };
-  return { sql: sql as unknown as Sql, reads, hold, concurrency, failReads, hangReads };
+  /** Every read from now on answers after `ms`: a big calendar, or a slow link. */
+  const slowReads = (ms: number) => {
+    failing.delayMs = ms;
+  };
+  return { sql: sql as unknown as Sql, reads, hold, concurrency, failReads, hangReads, slowReads };
 }
 
 function fakeListener() {
@@ -154,6 +159,35 @@ describe("Events.watch", () => {
       w.db.hangReads(2); // one snapshot, sent down a dead connection
       w.sub.captured.subscriber?.onSubscribed();
       await Bun.sleep(400); // 50 ms timeout, then the 250 ms retry
+      expect(w.log).toEqual(["ready", "error:reading the calendar took longer than 50 ms", "resubscribed"]);
+    },
+    3_000
+  );
+
+  test(
+    "the calendar deleted while a re-read is failing ends the watch, instead of being dropped with the held events",
+    async () => {
+      const w = await watching();
+      await w.start();
+      w.db.failReads(4); // two failed snapshots
+      w.sub.captured.subscriber?.onSubscribed();
+      await Bun.sleep(10);
+      w.sub.send({ ResourceDeleted: { id: CAL } });
+      await Bun.sleep(850);
+      expect(w.log).toEqual(["ready", "error:read failed", "gone"]);
+      expect(w.sub.captured.stopped).toBe(true);
+    },
+    3_000
+  );
+
+  test(
+    "a read that is slow but alive gets longer each attempt, so it completes instead of retrying forever",
+    async () => {
+      const w = await watching({}, 50);
+      await w.start();
+      w.db.slowReads(80); // every read from here: past the first limit, inside the second
+      w.sub.captured.subscriber?.onSubscribed();
+      await Bun.sleep(600); // 50 ms limit fails, 250 ms pause, 100 ms limit holds
       expect(w.log).toEqual(["ready", "error:reading the calendar took longer than 50 ms", "resubscribed"]);
     },
     3_000

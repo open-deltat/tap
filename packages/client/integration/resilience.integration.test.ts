@@ -11,7 +11,7 @@ import { afterAll, afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DeltaT, type Change } from "../src/index.js";
+import { DeltaT, sqlstateOf, type Change } from "../src/index.js";
 
 const BIN = process.env.DELTAT_BIN ?? Bun.which("deltat");
 const enabled = Boolean(process.env.DELTAT_INTEGRATION_PORT) && BIN !== null;
@@ -59,9 +59,9 @@ async function ownDeltat(extraEnv: Record<string, string> = {}) {
   const port = await freePort();
   const env = { ...process.env, DELTAT_PORT: String(port), DELTAT_BIND: "127.0.0.1", DELTAT_DATA_DIR: join(dir, "data"), DELTAT_PASSWORD: PASSWORD, ...extraEnv };
   const state: { proc: ReturnType<typeof Bun.spawn> | null } = { proc: null };
-  const start = async () => {
+  const start = async (overrides: Record<string, string> = {}) => {
     if (!BIN) throw new Error("no deltat binary");
-    state.proc = Bun.spawn([BIN], { env, stdout: "ignore", stderr: "ignore" });
+    state.proc = Bun.spawn([BIN], { env: { ...env, ...overrides }, stdout: "ignore", stderr: "ignore" });
     await waitForPort(port);
   };
   const kill = async () => {
@@ -128,6 +128,28 @@ describe("a subscription outlives deltat going down", () => {
       await server.kill();
     },
     60_000
+  );
+
+  liveTest(
+    "deltat coming back with another password is reported as refusing, with its SQLSTATE, once",
+    async () => {
+      // The unit fake cannot vouch for this: which fields deltat's ErrorResponse carries decides
+      // whether the client can tell "deltat said no" from "deltat is unreachable". A check on a
+      // field deltat never sends silenced every refusal, and only a real deltat shows it.
+      const server = await ownDeltat();
+      const dt = clientFor(server.port);
+      const cal = await openCalendar(dt);
+      const refusals: (string | null)[] = [];
+      await dt.events.listen(cal, () => undefined, { onRetryFailing: (e) => refusals.push(sqlstateOf(e)) });
+      await server.kill();
+      await server.start({ DELTAT_PASSWORD: "not-the-one-the-client-has" });
+      expect(await until(() => refusals.length > 0, 10_000)).toBe(true);
+      await Bun.sleep(2_000); // more failed attempts, still one report
+      expect(refusals).toEqual(["28P01"]);
+      await dt.close();
+      await server.kill();
+    },
+    30_000
   );
 
   liveTest(

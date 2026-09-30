@@ -63,10 +63,11 @@ const UNDEFINED_OBJECT = "42704";
 /**
  * `everyMs`: how often an idle connection is proven alive. `timeoutMs`: how long any statement on
  * the subscription connection, heartbeat or not, may go unanswered before the connection counts as
- * dead and is replaced.
+ * dead and is replaced. `connectMs`: added for the first statement after (re)connecting, which also
+ * waits for the connection to be set up; postgres.js's own connect timeout, 30 s unless configured.
  */
-export type HeartbeatOptions = { everyMs: number; timeoutMs: number };
-const HEARTBEAT: HeartbeatOptions = { everyMs: 30_000, timeoutMs: 10_000 };
+export type HeartbeatOptions = { everyMs: number; timeoutMs: number; connectMs: number };
+const HEARTBEAT: HeartbeatOptions = { everyMs: 30_000, timeoutMs: 10_000, connectMs: 30_000 };
 
 type Hooks = { onnotify: (channel: string, payload: string) => void; onclose: () => void };
 type Connect = (hooks: Hooks) => Sql;
@@ -75,11 +76,12 @@ type Outcome = { ok: true } | { ok: false; error: unknown };
 const quoted = (channel: string) => `"${channel.replace(/"/g, '""')}"`;
 
 /**
- * An error deltat itself sent: postgres.js turns an ErrorResponse into a PostgresError, which carries
- * the response's severity. A failing connection (ECONNREFUSED, EPIPE, a timeout) has none; it means
- * deltat is unreachable, which onLost already told the subscriber.
+ * An error deltat itself sent: postgres.js turns every ErrorResponse into a PostgresError. A failing
+ * connection (ECONNREFUSED, EPIPE, a timeout) is a plain Error; it means deltat is unreachable, which
+ * onLost already told the subscriber. Not a field check: deltat's ErrorResponse carries `S` only, so
+ * postgres.js's `severity` (from `V`) is never set, and checking it silenced every refusal.
  */
-const isServerError = (e: unknown): boolean => typeof (e as { severity?: unknown } | null)?.severity === "string";
+const isServerError = (e: unknown): boolean => e instanceof postgres.PostgresError;
 
 type Entry = {
   channel: string;
@@ -105,6 +107,8 @@ export class Subscriptions implements Listener {
   private attempt = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  /** The current connection has answered since it was (re)connected, so it is set up. */
+  private proven = false;
 
   constructor(
     private readonly connect: Connect,
@@ -118,6 +122,7 @@ export class Subscriptions implements Listener {
     // constructor's type does not accept, though the runtime value carries the password and works.
     // This is the one place that crosses that gap.
     const parsed = sql.options as unknown as postgres.Options<{}>;
+    const connectMs = (parsed.connect_timeout ?? HEARTBEAT.connectMs / 1000) * 1000;
     return new Subscriptions(({ onnotify, onclose }) => {
       // `onnotify` is how postgres.js's own listen receives notifications, and the only way to
       // receive them on a connection we own; its types leave it out. The live resilience suite
@@ -143,7 +148,7 @@ export class Subscriptions implements Listener {
         shared: { retries: 0, typeArrayMap: {} },
       };
       return postgres(options);
-    });
+    }, { ...HEARTBEAT, connectMs });
   }
 
   /**
@@ -213,6 +218,7 @@ export class Subscriptions implements Listener {
   private dropped(): void {
     if (this.closed) return;
     this.generation += 1;
+    this.proven = false;
     this.live.clear();
     for (const entry of this.entries) {
       if (!entry.told) continue;
@@ -325,16 +331,19 @@ export class Subscriptions implements Listener {
   private async statement(conn: Sql, verb: "LISTEN" | "UNLISTEN", channel: string): Promise<Outcome> {
     const query =
       verb === "LISTEN" ? conn`LISTEN ${conn.unsafe(quoted(channel))}` : conn`UNLISTEN ${conn.unsafe(quoted(channel))}`;
+    // A connection still being set up (TCP, TLS, auth, deltat loading the tenant) is slow, not dead.
+    const limit = this.proven ? this.heartbeat.timeoutMs : this.heartbeat.timeoutMs + this.heartbeat.connectMs;
     const answer = await Promise.race([
       query.then(
         (): Outcome => ({ ok: true }),
         (e: unknown): Outcome => ({ ok: false, error: e ?? new Error(`${verb} failed`) })
       ),
-      new Promise<null>((resolve) => unref(setTimeout(() => resolve(null), this.heartbeat.timeoutMs))),
+      new Promise<null>((resolve) => unref(setTimeout(() => resolve(null), limit))),
     ]);
+    if (answer?.ok && conn === this.conn) this.proven = true;
     if (answer) return answer;
     this.replace(conn);
-    return { ok: false, error: new Error(`deltat did not answer ${verb} within ${this.heartbeat.timeoutMs} ms`) };
+    return { ok: false, error: new Error(`deltat did not answer ${verb} within ${limit} ms`) };
   }
 
   /** Give up on `conn` if it is still the current one. Its late close is ignored; the retry builds another. */

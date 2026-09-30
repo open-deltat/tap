@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { Sql } from "postgres";
+import postgres, { type Sql } from "postgres";
 import { Subscriptions, type HeartbeatOptions, type Subscriber } from "../subscriptions.js";
 
 // The retry loop is what keeps a watcher from going silent when deltat restarts. Driven here with a
@@ -15,10 +15,16 @@ import { Subscriptions, type HeartbeatOptions, type Subscriber } from "../subscr
 type Hooks = { onnotify: (channel: string, payload: string) => void; onclose: () => void };
 type CloseOrder = "reject, then close" | "close, then reject";
 
-const QUIET: HeartbeatOptions = { everyMs: 60_000, timeoutMs: 60_000 };
+const QUIET: HeartbeatOptions = { everyMs: 60_000, timeoutMs: 60_000, connectMs: 0 };
 
-/** How deltat's own errors arrive: postgres.js's PostgresError carries the ErrorResponse's severity. */
-const serverError = (code: string) => Object.assign(new Error(`deltat said ${code}`), { code, severity: "ERROR" });
+/**
+ * How deltat's own errors arrive: a PostgresError with the fields deltat's ErrorResponse carries,
+ * which are S, C and M. No V, so no `severity`; a fake that set one hid a check that relied on it.
+ * Constructed the way postgres.js does it (connection.js, from the parsed fields); its types only
+ * declare Error's constructor, and this file is not type-checked.
+ */
+const serverError = (code: string) =>
+  new postgres.PostgresError({ severity_local: "ERROR", code, message: `deltat said ${code}` });
 /** How a failing connection arrives: Node's code, no severity. */
 const socketError = (code: string) => Object.assign(new Error(`connect ${code}`), { code });
 
@@ -418,7 +424,7 @@ describe(`Subscriptions (${order})`, () => {
   test(
     "a connection that stops answering without closing is replaced, and its late close is ignored",
     async () => {
-      const f = fake({ everyMs: 50, timeoutMs: 50 });
+      const f = fake({ everyMs: 50, timeoutMs: 50, connectMs: 100 });
       const r = recorder();
       await f.subscriptions.listen("resource_1", r.subscriber);
       await Bun.sleep(200); // healthy beats change nothing
@@ -444,7 +450,7 @@ describe(`Subscriptions (${order})`, () => {
     "a subscribe that meets a dead connection replaces it instead of waiting on it, so the others are not left deaf",
     async () => {
       // Only the statement timeout can catch this: the heartbeat stays out of the way of a pass.
-      const f = fake({ everyMs: 60_000, timeoutMs: 50 });
+      const f = fake({ everyMs: 60_000, timeoutMs: 50, connectMs: 100 });
       const a = recorder();
       await f.subscriptions.listen("resource_a", a.subscriber);
       f.hang();
@@ -454,6 +460,32 @@ describe(`Subscriptions (${order})`, () => {
       expect(f.connections.length).toBe(2);
       f.notify("resource_a", "x");
       expect(a.log.at(-1)).toBe("notify:x");
+      await f.subscriptions.close();
+    },
+    3_000
+  );
+
+  test(
+    "a connection that is slow to set up is given the connect time, not taken for dead",
+    async () => {
+      const f = fake({ everyMs: 60_000, timeoutMs: 50, connectMs: 200 });
+      const resume = f.pauseNext(); // TLS, auth, deltat loading the tenant
+      const subscribing = f.subscriptions.listen("resource_1", recorder().subscriber);
+      await Bun.sleep(120); // past the statement timeout, inside timeout + connect
+      resume();
+      await subscribing;
+      expect(f.connections.length).toBe(1);
+      await f.subscriptions.close();
+    },
+    3_000
+  );
+
+  test(
+    "a new connection that never answers is still given up, after the statement and connect time",
+    async () => {
+      const f = fake({ everyMs: 60_000, timeoutMs: 50, connectMs: 100 });
+      f.pauseNext(); // never resumed
+      await expect(f.subscriptions.listen("resource_1", recorder().subscriber)).rejects.toThrow("within 150 ms");
       await f.subscriptions.close();
     },
     3_000

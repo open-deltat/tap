@@ -132,11 +132,11 @@ export class Events {
       ]);
       return new ChangeTracker(window, { holds, bookings });
     };
-    const snapshot = () =>
+    const snapshot = (timeoutMs: number) =>
       Promise.race([
         read(),
         new Promise<never>((_, reject) =>
-          unref(setTimeout(() => reject(new Error(`reading the calendar took longer than ${this.readTimeoutMs} ms`)), this.readTimeoutMs))
+          unref(setTimeout(() => reject(new Error(`reading the calendar took longer than ${timeoutMs} ms`)), timeoutMs))
         ),
       ]);
     const report = (changes: Change[]) => {
@@ -183,13 +183,15 @@ export class Events {
     const handle = (event: DeltaTEvent) => {
       if (state.stopped) return;
       const tracker = state.tracker;
-      if (tracker === null) {
+      // Before anything is held: no read can show a deletion (deltat answers a deleted calendar with
+      // an empty one), so a held notice that a failed read then dropped was the only word of it.
+      if ("ResourceDeleted" in event && event.ResourceDeleted.id === resourceId) {
+        gone();
+      } else if (tracker === null) {
         state.held.push(event);
       } else if ("Lagged" in event) {
         const { missed } = event.Lagged;
         reread(() => options.onLagged?.(missed));
-      } else if ("ResourceDeleted" in event && event.ResourceDeleted.id === resourceId) {
-        gone();
       } else {
         report(tracker.apply(event, Date.now()));
         arm();
@@ -204,8 +206,12 @@ export class Events {
     // Events keep being held meanwhile. The first failure is reported; the retries are quiet.
     const readUntilFresh = async (): Promise<ChangeTracker | null> => {
       for (let attempt = 0; !state.stopped; attempt++) {
-        const fresh = await snapshot().catch((error: unknown) => {
-          if (attempt === 0) reportError(error, onError);
+        // Each attempt waits longer than the last: a big calendar over a slow link is slow, not
+        // dead, and a fixed limit it cannot meet would retry it forever, each read competing with
+        // the ones before it for the same link.
+        const fresh = await snapshot(this.readTimeoutMs * (attempt + 1)).catch((error: unknown) => {
+          // Not once the watch has ended (the calendar was deleted meanwhile): nobody is reading.
+          if (attempt === 0 && !state.stopped) reportError(error, onError);
           return null;
         });
         if (fresh) return fresh;
@@ -237,7 +243,8 @@ export class Events {
         arm();
         // The connection dropped again since: the stream is not complete, onDisconnected said so
         // last, and the re-read that the next re-subscription queues is the one that may say otherwise.
-        if (state.drops === drops) deliver(after, onError);
+        // And replaying what was held may itself have ended the watch (the calendar was deleted).
+        if (!state.stopped && state.drops === drops) deliver(after, onError);
       });
     };
 
@@ -253,7 +260,7 @@ export class Events {
       onResubscribed: () => reread(() => options.onResubscribed?.()),
       onGone: gone,
     });
-    const started = await snapshot().catch(async (error: unknown) => {
+    const started = await snapshot(this.readTimeoutMs).catch(async (error: unknown) => {
       firstRead.done();
       await end();
       throw error;
