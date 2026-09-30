@@ -60,20 +60,26 @@ const CLOSE_TIMEOUT_S = 5;
 /** SQLSTATE deltat returns for a LISTEN on a resource that does not exist. */
 const UNDEFINED_OBJECT = "42704";
 
+/**
+ * `everyMs`: how often an idle connection is proven alive. `timeoutMs`: how long any statement on
+ * the subscription connection, heartbeat or not, may go unanswered before the connection counts as
+ * dead and is replaced.
+ */
 export type HeartbeatOptions = { everyMs: number; timeoutMs: number };
 const HEARTBEAT: HeartbeatOptions = { everyMs: 30_000, timeoutMs: 10_000 };
 
 type Hooks = { onnotify: (channel: string, payload: string) => void; onclose: () => void };
 type Connect = (hooks: Hooks) => Sql;
+type Outcome = { ok: true } | { ok: false; error: unknown };
 
 const quoted = (channel: string) => `"${channel.replace(/"/g, '""')}"`;
 
 /**
- * A SQLSTATE is five digits or capital letters. postgres.js also puts Node's own codes
- * (ECONNREFUSED, ETIMEDOUT) in `code`, and those mean deltat is unreachable, not that it said no.
+ * An error deltat itself sent: postgres.js turns an ErrorResponse into a PostgresError, which carries
+ * the response's severity. A failing connection (ECONNREFUSED, EPIPE, a timeout) has none; it means
+ * deltat is unreachable, which onLost already told the subscriber.
  */
-const isSqlstate = (code: string | null): code is string =>
-  code !== null && code.length === 5 && [...code].every((c) => (c >= "0" && c <= "9") || (c >= "A" && c <= "Z"));
+const isServerError = (e: unknown): boolean => typeof (e as { severity?: unknown } | null)?.severity === "string";
 
 type Entry = {
   channel: string;
@@ -256,19 +262,16 @@ export class Subscriptions implements Listener {
     const stale = () => this.closed || generation !== this.generation;
 
     for (const channel of [...wanted()].filter((c) => !this.live.has(c))) {
-      const error = await conn`LISTEN ${conn.unsafe(quoted(channel))}`.then(
-        () => null,
-        (e: unknown) => e ?? new Error("LISTEN failed")
-      );
+      const outcome = await this.statement(conn, "LISTEN", channel);
       // Settled before giving up on this pass: a first attempt fails, a gone resource is gone, and
       // deltat's own "no" is worth reporting, whatever the connection did afterwards.
-      if (error !== null) this.failed(channel, error, generation !== this.generation);
+      if (!outcome.ok) this.failed(channel, outcome.error, generation !== this.generation);
       if (stale()) return; // dropped() scheduled the retry
-      if (error === null) this.live.add(channel);
+      if (outcome.ok) this.live.add(channel);
     }
 
     for (const channel of [...this.live].filter((c) => !wanted().has(c))) {
-      await conn`UNLISTEN ${conn.unsafe(quoted(channel))}`.catch(() => undefined);
+      await this.statement(conn, "UNLISTEN", channel);
       if (stale()) return;
       this.live.delete(channel);
     }
@@ -306,7 +309,7 @@ export class Subscriptions implements Listener {
       } else if (own && code === UNDEFINED_OBJECT) {
         this.entries.delete(entry);
         entry.subscriber.onGone?.();
-      } else if (isSqlstate(code) && entry.reported !== code) {
+      } else if (isServerError(error) && entry.reported !== code) {
         entry.reported = code;
         entry.subscriber.onRetryFailing?.(error);
       }
@@ -314,9 +317,37 @@ export class Subscriptions implements Listener {
   }
 
   /**
+   * One statement on `conn`. No answer within the timeout means the connection is dead without having
+   * closed (a host that vanished, a dropped NAT flow), so it is replaced and everyone re-subscribes.
+   * Every statement goes through here: a pass waiting on a dead socket would otherwise hold off the
+   * heartbeat, and with it the only thing that notices, for as long as TCP takes to give up.
+   */
+  private async statement(conn: Sql, verb: "LISTEN" | "UNLISTEN", channel: string): Promise<Outcome> {
+    const query =
+      verb === "LISTEN" ? conn`LISTEN ${conn.unsafe(quoted(channel))}` : conn`UNLISTEN ${conn.unsafe(quoted(channel))}`;
+    const answer = await Promise.race([
+      query.then(
+        (): Outcome => ({ ok: true }),
+        (e: unknown): Outcome => ({ ok: false, error: e ?? new Error(`${verb} failed`) })
+      ),
+      new Promise<null>((resolve) => unref(setTimeout(() => resolve(null), this.heartbeat.timeoutMs))),
+    ]);
+    if (answer) return answer;
+    this.replace(conn);
+    return { ok: false, error: new Error(`deltat did not answer ${verb} within ${this.heartbeat.timeoutMs} ms`) };
+  }
+
+  /** Give up on `conn` if it is still the current one. Its late close is ignored; the retry builds another. */
+  private replace(conn: Sql): void {
+    if (this.conn !== conn || this.closed) return;
+    this.conn = null;
+    this.dropped();
+    void conn.end({ timeout: 0 }).catch(() => undefined);
+  }
+
+  /**
    * While anything is live, prove the connection is still there: re-LISTEN one live channel, which
-   * deltat treats as a no-op. No answer within the timeout means the connection is dead without
-   * having closed, so it is replaced and everyone re-subscribes.
+   * deltat treats as a no-op. A pass in progress is its own proof, since its statements are timed too.
    */
   private keepHeartbeat(): void {
     if (this.live.size === 0 || this.closed) {
@@ -334,16 +365,7 @@ export class Subscriptions implements Listener {
     const conn = this.conn;
     const [channel] = this.live;
     if (!conn || channel === undefined || this.pass) return;
-    const answered = await Promise.race([
-      conn`LISTEN ${conn.unsafe(quoted(channel))}`.then(
-        () => true,
-        () => true
-      ),
-      new Promise<false>((resolve) => unref(setTimeout(() => resolve(false), this.heartbeat.timeoutMs))),
-    ]);
-    if (answered || this.conn !== conn || this.closed) return;
-    this.conn = null; // a replacement is built on the next pass; the old one's late close is ignored
-    this.dropped();
-    void conn.end({ timeout: 0 }).catch(() => undefined);
+    // Any answer, even an error, proves the connection; statement() replaces it when there is none.
+    await this.statement(conn, "LISTEN", channel);
   }
 }

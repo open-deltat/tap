@@ -59,6 +59,14 @@ function reportError(error: unknown, onError?: (error: unknown) => void): void {
 /** Delay before each retry of a failed re-read, in ms; the last value repeats. */
 const REREAD_DELAYS_MS = [250, 500, 1_000, 2_000, 5_000] as const;
 
+/**
+ * How long one read of the calendar may take. A read sent down a pooled connection that died
+ * without closing never answers, and the watch would wait on it for good, holding every event
+ * that arrives meanwhile. Past this it counts as failed and is tried again, on another connection,
+ * since the dead one is still busy with it.
+ */
+const READ_TIMEOUT_MS = 10_000;
+
 /** The payload as a checked event, or null when it is not valid JSON or not an event this client knows. */
 const parseEvent = (payload: string): DeltaTEvent | null => {
   try {
@@ -71,7 +79,8 @@ const parseEvent = (payload: string): DeltaTEvent | null => {
 export class Events {
   constructor(
     private readonly sql: Sql,
-    private readonly subscriptions: Listener = Subscriptions.from(sql)
+    private readonly subscriptions: Listener = Subscriptions.from(sql),
+    private readonly readTimeoutMs: number = READ_TIMEOUT_MS
   ) {}
 
   /** Stop every subscription and retry of this client. DeltaT.close() calls it. */
@@ -105,7 +114,9 @@ export class Events {
       ready: boolean;
       /** Status callbacks that fired before onReady, delivered right after it. */
       later: (() => void)[];
-    } = { tracker: null, held: [], timer: null, stopped: false, ready: false, later: [] };
+      /** Connection drops so far. A re-read that a drop overtook must not announce the stream complete. */
+      drops: number;
+    } = { tracker: null, held: [], timer: null, stopped: false, ready: false, later: [], drops: 0 };
     // Every read of the calendar, the first one included, is a link in this chain, so no two run
     // at once and a re-read requested during the first read waits for it.
     const firstRead: { done: () => void } = { done: () => undefined };
@@ -113,7 +124,7 @@ export class Events {
       firstRead.done = resolve;
     });
 
-    const snapshot = async () => {
+    const read = async () => {
       const filter = window ?? undefined;
       const [holds, bookings] = await Promise.all([
         new Holds(this.sql).get(resourceId, filter),
@@ -121,6 +132,13 @@ export class Events {
       ]);
       return new ChangeTracker(window, { holds, bookings });
     };
+    const snapshot = () =>
+      Promise.race([
+        read(),
+        new Promise<never>((_, reject) =>
+          unref(setTimeout(() => reject(new Error(`reading the calendar took longer than ${this.readTimeoutMs} ms`)), this.readTimeoutMs))
+        ),
+      ]);
     const report = (changes: Change[]) => {
       for (const change of changes) deliver(() => onChange(change), onError);
     };
@@ -191,6 +209,10 @@ export class Events {
           return null;
         });
         if (fresh) return fresh;
+        // Everything held so far happened before the next attempt reads, so that read shows its
+        // result; the lines for them are what the "may have missed changes" after the read covers.
+        // Dropping them keeps what is held down to what one attempt can see arrive.
+        state.held.splice(0);
         const delay = REREAD_DELAYS_MS[Math.min(attempt, REREAD_DELAYS_MS.length - 1)];
         // Unref'd: a watch that was stopped meanwhile must not keep its process alive for the delay.
         await new Promise<void>((resolve) => unref(setTimeout(resolve, delay)));
@@ -202,6 +224,7 @@ export class Events {
     // never come, so report what is parked, re-read the calendar, replay what arrived meanwhile,
     // then say there was a gap.
     const reread = (after: () => void) => {
+      const drops = state.drops;
       reads = reads.then(async () => {
         if (state.stopped) return;
         clearTimer();
@@ -212,7 +235,9 @@ export class Events {
         state.tracker = fresh;
         replayHeld();
         arm();
-        deliver(after, onError);
+        // The connection dropped again since: the stream is not complete, onDisconnected said so
+        // last, and the re-read that the next re-subscription queues is the one that may say otherwise.
+        if (state.drops === drops) deliver(after, onError);
       });
     };
 
@@ -220,7 +245,10 @@ export class Events {
     // the snapshot already reflects is harmless to replay: remembering a span twice changes nothing.
     stopRef.stop = await this.listen(resourceId, handle, {
       ...(onError ? { onError } : {}),
-      onDisconnected: () => whenReady(() => notify(options.onDisconnected)),
+      onDisconnected: () => {
+        state.drops += 1;
+        whenReady(() => notify(options.onDisconnected));
+      },
       onRetryFailing: (error) => whenReady(() => deliver(() => options.onRetryFailing?.(error), onError)),
       onResubscribed: () => reread(() => options.onResubscribed?.()),
       onGone: gone,

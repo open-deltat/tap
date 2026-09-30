@@ -5,22 +5,32 @@ import { Subscriptions, type HeartbeatOptions, type Subscriber } from "../subscr
 // The retry loop is what keeps a watcher from going silent when deltat restarts. Driven here with a
 // fake connection that behaves like postgres.js where it matters: a connection-level failure
 // (unreachable, wrong password) rejects the statement AND closes the connection, a channel-level
-// one (unknown resource, limit reached) only rejects it, and a connection can stop answering without
-// closing. The live suite (integration/resilience) does the same against a real deltat that is killed.
+// one (unknown resource, limit reached) only rejects it, an error deltat sent carries a severity,
+// and a connection can stop answering without closing. The live suite (integration/resilience) does
+// the same against a real deltat that is killed.
+//
+// postgres.js 3.4.8 rejects the statement first and reports the close on a later tick (measured on
+// Bun and Node). Every test runs in that order and in the reverse one, so neither is relied on.
 
 type Hooks = { onnotify: (channel: string, payload: string) => void; onclose: () => void };
+type CloseOrder = "reject, then close" | "close, then reject";
 
 const QUIET: HeartbeatOptions = { everyMs: 60_000, timeoutMs: 60_000 };
 
-function fakeConnection(heartbeat: HeartbeatOptions = QUIET) {
+/** How deltat's own errors arrive: postgres.js's PostgresError carries the ErrorResponse's severity. */
+const serverError = (code: string) => Object.assign(new Error(`deltat said ${code}`), { code, severity: "ERROR" });
+/** How a failing connection arrives: Node's code, no severity. */
+const socketError = (code: string) => Object.assign(new Error(`connect ${code}`), { code });
+
+function fakeConnection(order: CloseOrder, heartbeat: HeartbeatOptions = QUIET) {
   const statements: string[] = [];
   const ended: unknown[] = [];
   const connections: Hooks[] = [];
   const state: {
     /** Statements left that fail with ECONNREFUSED. */
     refusals: number;
-    /** While set, every statement fails with this code and closes the connection. */
-    down: string | null;
+    /** While set, every statement fails with this error and closes the connection. */
+    down: Error | null;
     /** Channels whose LISTEN fails with this SQLSTATE, connection left open. */
     broken: Map<string, string>;
     /** When set, the next statement waits for this before answering. */
@@ -33,9 +43,10 @@ function fakeConnection(heartbeat: HeartbeatOptions = QUIET) {
 
   const subscriptions = new Subscriptions((hooks) => {
     const index = connections.push(hooks) - 1;
-    const closeWith = (code: string): never => {
-      hooks.onclose();
-      throw Object.assign(new Error(`refused (${code})`), { code });
+    const closeWith = (error: Error): never => {
+      if (order === "close, then reject") hooks.onclose();
+      else setTimeout(hooks.onclose, 0);
+      throw error;
     };
     const run = async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const text = strings.reduce((acc, s, i) => acc + s + (i < values.length ? String(values[i]) : ""), "");
@@ -52,10 +63,10 @@ function fakeConnection(heartbeat: HeartbeatOptions = QUIET) {
       if (state.down) closeWith(state.down);
       if (state.refusals > 0) {
         state.refusals -= 1;
-        closeWith("ECONNREFUSED");
+        closeWith(socketError("ECONNREFUSED"));
       }
       const broken = [...state.broken].find(([channel]) => text.includes(`"${channel}"`));
-      if (broken) throw Object.assign(new Error("listen refused"), { code: broken[1] });
+      if (broken) throw serverError(broken[1]);
       return [];
     };
     const conn = Object.assign(run, {
@@ -77,8 +88,9 @@ function fakeConnection(heartbeat: HeartbeatOptions = QUIET) {
     refuse: (n: number) => {
       state.refusals = n;
     },
-    goDown: (code = "ECONNREFUSED") => {
-      state.down = code;
+    /** Every statement fails and closes the connection, with a socket error unless deltat's own is given. */
+    goDown: (error: Error = socketError("ECONNREFUSED")) => {
+      state.down = error;
     },
     comeBack: () => {
       state.down = null;
@@ -119,9 +131,12 @@ const listensOn = (statements: string[], channel: string) =>
 
 const listens = (statements: string[]) => statements.filter((s) => s.startsWith("LISTEN")).length;
 
-describe("Subscriptions", () => {
+for (const order of ["reject, then close", "close, then reject"] as const) {
+describe(`Subscriptions (${order})`, () => {
+  const fake = (heartbeat?: HeartbeatOptions) => fakeConnection(order, heartbeat);
+
   test("two subscribers on one channel share one LISTEN, and both hear it", async () => {
-    const f = fakeConnection();
+    const f = fake();
     const a = recorder();
     const b = recorder();
     await f.subscriptions.listen("resource_1", a.subscriber);
@@ -133,7 +148,7 @@ describe("Subscriptions", () => {
   });
 
   test("the last unsubscribe UNLISTENs, earlier ones do not", async () => {
-    const f = fakeConnection();
+    const f = fake();
     const stopA = await f.subscriptions.listen("resource_1", recorder().subscriber);
     const stopB = await f.subscriptions.listen("resource_1", recorder().subscriber);
     await stopA();
@@ -143,7 +158,7 @@ describe("Subscriptions", () => {
   });
 
   test("a first LISTEN that fails rejects and leaves nothing subscribed", async () => {
-    const f = fakeConnection();
+    const f = fake();
     f.refuse(1);
     const r = recorder();
     await expect(f.subscriptions.listen("resource_1", r.subscriber)).rejects.toThrow("ECONNREFUSED");
@@ -154,7 +169,7 @@ describe("Subscriptions", () => {
   test(
     "a dropped connection is re-subscribed through refused attempts, and unreachability alone is not reported as failing",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const r = recorder();
       await f.subscriptions.listen("resource_1", r.subscriber);
       f.refuse(2);
@@ -175,7 +190,7 @@ describe("Subscriptions", () => {
   test(
     "close() stops retrying for good",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       await f.subscriptions.listen("resource_1", recorder().subscriber);
       f.goDown();
       f.drop();
@@ -190,7 +205,7 @@ describe("Subscriptions", () => {
   test(
     "a channel that keeps failing does not strand the others: each is back the moment it is",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const a = recorder();
       const b = recorder();
       await f.subscriptions.listen("resource_a", a.subscriber);
@@ -210,7 +225,7 @@ describe("Subscriptions", () => {
   test(
     "a channel whose resource was deleted during the outage is reported gone, not retried forever",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const a = recorder();
       const b = recorder();
       await f.subscriptions.listen("resource_a", a.subscriber);
@@ -230,7 +245,7 @@ describe("Subscriptions", () => {
   test(
     "a LISTEN that succeeded on a connection that then closed does not count: listen() settles on the retry",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const r = recorder();
       const resume = f.pauseNext();
       const subscribing = f.subscriptions.listen("resource_1", r.subscriber);
@@ -247,7 +262,7 @@ describe("Subscriptions", () => {
   test(
     "a drop in the middle of a retry voids the LISTENs that had already returned, so none is stranded",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const a = recorder();
       const b = recorder();
       await f.subscriptions.listen("resource_a", a.subscriber);
@@ -271,7 +286,7 @@ describe("Subscriptions", () => {
   test(
     "a drop during an UNLISTEN voids the pass, so no channel is taken for live on the dead connection",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const a = recorder();
       await f.subscriptions.listen("resource_a", a.subscriber);
       const stopU = await f.subscriptions.listen("resource_u", recorder().subscriber);
@@ -292,7 +307,7 @@ describe("Subscriptions", () => {
   test(
     "a channel given up while its retry is in flight is UNLISTENed, not marked live, and unsubscribing does not wait for it",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const r = recorder();
       const stop = await f.subscriptions.listen("resource_1", r.subscriber);
       const resume = f.pauseChannel("resource_1");
@@ -310,7 +325,7 @@ describe("Subscriptions", () => {
   test(
     "a subscriber that joins while a retry is in flight is told it subscribed exactly once, with the others",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const first = recorder();
       await f.subscriptions.listen("resource_1", first.subscriber);
       const resume = f.pauseChannel("resource_1");
@@ -330,7 +345,7 @@ describe("Subscriptions", () => {
   test(
     "a subscriber whose own LISTEN brings a lost channel back tells the earlier subscribers too",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const first = recorder();
       await f.subscriptions.listen("resource_1", first.subscriber);
       f.drop();
@@ -348,7 +363,7 @@ describe("Subscriptions", () => {
   test(
     "a first listen() while deltat is down rejects instead of claiming to be subscribed",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const a = recorder();
       await f.subscriptions.listen("resource_a", a.subscriber);
       f.goDown();
@@ -368,12 +383,12 @@ describe("Subscriptions", () => {
   test(
     "deltat refusing the reconnect is reported to every waiting subscriber, once per reason, and retrying continues",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       const a = recorder();
       const b = recorder();
       await f.subscriptions.listen("resource_a", a.subscriber);
       await f.subscriptions.listen("resource_b", b.subscriber);
-      f.goDown("28P01"); // deltat came back with a different password
+      f.goDown(serverError("28P01")); // deltat came back with a different password
       f.drop();
       await Bun.sleep(900); // two failed attempts, each closing the connection
       expect(a.log).toEqual(["subscribed", "lost", "failing:28P01"]);
@@ -390,9 +405,9 @@ describe("Subscriptions", () => {
   test(
     "a first listen() behind a channel that keeps failing the connection still settles",
     async () => {
-      const f = fakeConnection();
+      const f = fake();
       await f.subscriptions.listen("resource_a", recorder().subscriber);
-      f.goDown("28P01");
+      f.goDown(serverError("28P01"));
       f.drop();
       await expect(f.subscriptions.listen("resource_b", recorder().subscriber)).rejects.toThrow("28P01");
       await f.subscriptions.close();
@@ -403,7 +418,7 @@ describe("Subscriptions", () => {
   test(
     "a connection that stops answering without closing is replaced, and its late close is ignored",
     async () => {
-      const f = fakeConnection({ everyMs: 50, timeoutMs: 50 });
+      const f = fake({ everyMs: 50, timeoutMs: 50 });
       const r = recorder();
       await f.subscriptions.listen("resource_1", r.subscriber);
       await Bun.sleep(200); // healthy beats change nothing
@@ -425,16 +440,51 @@ describe("Subscriptions", () => {
     3_000
   );
 
+  test(
+    "a subscribe that meets a dead connection replaces it instead of waiting on it, so the others are not left deaf",
+    async () => {
+      // Only the statement timeout can catch this: the heartbeat stays out of the way of a pass.
+      const f = fake({ everyMs: 60_000, timeoutMs: 50 });
+      const a = recorder();
+      await f.subscriptions.listen("resource_a", a.subscriber);
+      f.hang();
+      await expect(f.subscriptions.listen("resource_b", recorder().subscriber)).rejects.toThrow("did not answer");
+      await Bun.sleep(400); // the 250 ms retry, on a new connection
+      expect(a.log).toEqual(["subscribed", "lost", "subscribed"]);
+      expect(f.connections.length).toBe(2);
+      f.notify("resource_a", "x");
+      expect(a.log.at(-1)).toBe("notify:x");
+      await f.subscriptions.close();
+    },
+    3_000
+  );
+
+  test(
+    "a socket error whose code looks like a SQLSTATE (EPIPE) is not reported as deltat refusing",
+    async () => {
+      const f = fake();
+      const r = recorder();
+      await f.subscriptions.listen("resource_1", r.subscriber);
+      f.goDown(socketError("EPIPE"));
+      f.drop();
+      await Bun.sleep(900);
+      expect(r.log).toEqual(["subscribed", "lost"]);
+      await f.subscriptions.close();
+    },
+    3_000
+  );
+
   test("close() bounds how long it waits for the connection to end", async () => {
-    const f = fakeConnection();
+    const f = fake();
     await f.subscriptions.listen("resource_1", recorder().subscriber);
     await f.subscriptions.close();
     expect(f.ended).toEqual([{ timeout: 5 }]);
   });
 
   test("a channel name cannot break out of its quotes", async () => {
-    const f = fakeConnection();
+    const f = fake();
     await f.subscriptions.listen('resource_"; DROP', recorder().subscriber);
     expect(f.statements[0]).toBe('LISTEN "resource_""; DROP"');
   });
 });
+}

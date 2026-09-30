@@ -16,9 +16,13 @@ function fakeSql() {
   const gate = { open: Promise.resolve() as Promise<void> };
   const reads: string[] = [];
   const concurrency = { now: 0, most: 0 };
-  const failing = { reads: 0 };
+  const failing = { reads: 0, hanging: 0 };
   const answer = (kind: string) => {
     reads.push(kind);
+    if (failing.hanging > 0) {
+      failing.hanging -= 1;
+      return new Promise<never>(() => undefined); // sent down a connection that died without closing
+    }
     concurrency.now += 1;
     concurrency.most = Math.max(concurrency.most, concurrency.now);
     const fails = failing.reads > 0;
@@ -40,7 +44,11 @@ function fakeSql() {
   const failReads = (n: number) => {
     failing.reads = n;
   };
-  return { sql: sql as unknown as Sql, reads, hold, concurrency, failReads };
+  /** The next `n` reads never answer. */
+  const hangReads = (n: number) => {
+    failing.hanging = n;
+  };
+  return { sql: sql as unknown as Sql, reads, hold, concurrency, failReads, hangReads };
 }
 
 function fakeListener() {
@@ -64,12 +72,12 @@ const held = (id: string, start: number): DeltaTEvent => ({
 });
 const released = (id: string): DeltaTEvent => ({ HoldReleased: { id, resource_id: CAL } });
 
-async function watching(opts: { window?: { start: number; end: number } } = {}) {
+async function watching(opts: { window?: { start: number; end: number } } = {}, readTimeoutMs?: number) {
   const db = fakeSql();
   const sub = fakeListener();
   const log: string[] = [];
   const changes: Change[] = [];
-  const events = new Events(db.sql, sub.listener);
+  const events = new Events(db.sql, sub.listener, readTimeoutMs);
   const start = () =>
     events.watch(
       CAL,
@@ -128,13 +136,44 @@ describe("Events.watch", () => {
       w.db.failReads(4); // two failed snapshots
       w.sub.captured.subscriber?.onSubscribed();
       await Bun.sleep(10);
-      w.sub.send(held("h1", 1000)); // arrives while the calendar cannot be read: held, not dropped
+      // Arrives before the attempt that succeeds, so that read already shows it: not replayed, and
+      // "resubscribed" is the line that says changes in between may be missing.
+      w.sub.send(held("h1", 1000));
       expect(w.log).toEqual(["ready", "error:read failed"]);
       await Bun.sleep(850); // retries after 250 and 500 ms
-      expect(w.log).toEqual(["ready", "error:read failed", "held", "resubscribed"]);
+      expect(w.log).toEqual(["ready", "error:read failed", "resubscribed"]);
     },
     3_000
   );
+
+  test(
+    "a re-read that never answers times out and is tried again, instead of holding the watch forever",
+    async () => {
+      const w = await watching({}, 50);
+      await w.start();
+      w.db.hangReads(2); // one snapshot, sent down a dead connection
+      w.sub.captured.subscriber?.onSubscribed();
+      await Bun.sleep(400); // 50 ms timeout, then the 250 ms retry
+      expect(w.log).toEqual(["ready", "error:reading the calendar took longer than 50 ms", "resubscribed"]);
+    },
+    3_000
+  );
+
+  test("a re-read that a newer drop overtook does not announce the stream complete", async () => {
+    const w = await watching();
+    await w.start();
+    w.sub.captured.subscriber?.onLost?.();
+    const open = w.db.hold();
+    w.sub.captured.subscriber?.onSubscribed(); // re-read in flight
+    await tick();
+    w.sub.captured.subscriber?.onLost?.(); // and the connection drops again
+    open();
+    await Bun.sleep(10);
+    expect(w.log).toEqual(["ready", "disconnected", "disconnected"]);
+    w.sub.captured.subscriber?.onSubscribed();
+    await Bun.sleep(10);
+    expect(w.log).toEqual(["ready", "disconnected", "disconnected", "resubscribed"]);
+  });
 
   test("a Lagged notice re-reads the calendar and says how much was missed", async () => {
     const w = await watching();
