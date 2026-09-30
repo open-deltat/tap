@@ -13,7 +13,12 @@ import { createDeltatMcpServer } from "./server.js";
 // client silently tried a guessable credential instead of saying what was wrong; deltat itself
 // refuses to run on a known default for the same reason. Everything else defaults to a local
 // server, because that is what someone trying this out for the first time has in front of them.
-const password = process.env.DELTAT_PASSWORD;
+//
+// Read like the CLI's (packages/cli/src/config.ts): values are trimmed and a blank one counts as
+// unset, so an MCP client config with `"DELTAT_PORT": ""` connects to the default port instead of
+// port 0, except the password, which is used exactly as given (a space can be part of it).
+const setting = (name: string): string | null => process.env[name]?.trim() || null;
+const password = process.env.DELTAT_PASSWORD?.trim() ? process.env.DELTAT_PASSWORD : null;
 if (!password) {
   console.error(
     [
@@ -27,17 +32,23 @@ if (!password) {
   process.exit(1);
 }
 
+const port = Number(setting("DELTAT_PORT") ?? ADAPTER_DEFAULTS.port);
+if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+  console.error(`deltat MCP server: DELTAT_PORT is not a port number: ${setting("DELTAT_PORT")}`);
+  process.exit(1);
+}
+
 const config = {
-  host: process.env.DELTAT_HOST ?? ADAPTER_DEFAULTS.host,
-  port: Number(process.env.DELTAT_PORT ?? ADAPTER_DEFAULTS.port),
-  database: process.env.DELTAT_DATABASE ?? ADAPTER_DEFAULTS.database,
-  username: process.env.DELTAT_USER ?? ADAPTER_DEFAULTS.user,
+  host: setting("DELTAT_HOST") ?? ADAPTER_DEFAULTS.host,
+  port,
+  database: setting("DELTAT_DATABASE") ?? ADAPTER_DEFAULTS.database,
+  username: setting("DELTAT_USER") ?? ADAPTER_DEFAULTS.user,
 } as const;
 
-async function main() {
+async function main(password: string) {
   // Read the same way as the CLI's, so one set of variables means one connection everywhere. A value
   // that is neither on nor off stops the server rather than quietly connecting without TLS.
-  const tls = await tlsSetting({ tls: process.env.DELTAT_TLS, caPath: process.env.DELTAT_TLS_CA }, (p) => readFile(p, "utf8"));
+  const tls = await tlsSetting({ tls: setting("DELTAT_TLS"), caPath: setting("DELTAT_TLS_CA") }, (p) => readFile(p, "utf8"));
   if (!tls.ok) throw new Error(tls.message);
   if (passwordInClear(config.host, tls.tls)) {
     console.error(`deltat MCP server: warning: the password goes to ${config.host} unencrypted. Set DELTAT_TLS=on.`);
@@ -51,7 +62,7 @@ async function main() {
   console.error(`deltat MCP server ready (${config.host}:${config.port}/${config.database}, TLS ${tls.tls ? "on" : "off"})`);
 }
 
-main().catch((err) => {
+main(password).catch((err) => {
   console.error("deltat MCP server failed to start:", err);
   process.exit(1);
 });

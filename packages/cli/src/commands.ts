@@ -83,6 +83,8 @@ export const cleartextWarning = (c: Pick<Connection, "host" | "tls">): string =>
 
 const tlsLabel = (tls: Connection["tls"], ca: string | null) => (tls === false ? "off" : ca ? `on (trusting ${ca})` : "on");
 
+const reasonOf = (e: unknown): string => (e instanceof Error ? e.message : "unknown error");
+
 const WINDOW_OPTIONS = { from: { type: "string" }, to: { type: "string" } } as const;
 
 export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
@@ -255,7 +257,7 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
       args: "<calendar> [--from <time> --to <time>]",
       summary: "Print each change as it happens, until Ctrl-C.",
       details:
-        'Changes: held, booked, hold ended (released or expired, may be free again), cancelled. Every line carries its time; with --from/--to only changes to those times are printed. A commit is reported once, as booked. Booking labels are never printed here, because whoever books sets them. If the connection to deltat drops, a "disconnected" line says so, the watch keeps retrying, and a "reconnected" line says changes in between were not seen; a "lagged" line says the same when deltat dropped notifications for a slow reader. If reconnecting keeps failing (deltat restarted with another password, say), a "reconnect_failing" line says why, once per reason. If the calendar is deleted the watch ends with a not-found error (exit 5). With --json the first line is always {"status":"watching"}, status lines carry "status" and every change carries "change". An agent can run this in the background and react to each line.',
+        'Changes: held, booked, hold ended (released or expired, may be free again), cancelled. Every line carries its time; with --from/--to only changes to those times are printed. A commit is reported once, as booked. Booking labels are never printed here, because whoever books sets them. If the connection to deltat drops, a "disconnected" line says so, the watch keeps retrying, and a "reconnected" line says changes in between were not seen; a "lagged" line says the same when deltat dropped notifications for a slow reader. If deltat answers the reconnect with an error (it restarted with another password, say), a "reconnect_failing" line says why, once per reason; deltat simply being unreachable is what "disconnected" already said. If the calendar is deleted the watch ends with a not-found error (exit 5). With --json the first line is always {"status":"watching"}, status lines carry "status" and every change carries "change". An agent can run this in the background and react to each line.',
       options: { ...WINDOW_OPTIONS },
       prepare(a) {
         const calendar = onlyId(a, "calendar");
@@ -289,7 +291,9 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
             });
             const stop = await dt.events.watch(calendar, write, {
               ...(window ? { window } : {}),
-              onError: (e) => ctx.io.stderr(`watch: ${clean(classifyRefusal(e).message)}\n`),
+              // The error's own words, not classifyRefusal's: that one's verdict is for a call the
+              // caller made ("retrying will not help"), and the watch is retrying on its own.
+              onError: (e) => ctx.io.stderr(`watch: ${clean(reasonOf(e))}\n`),
               // Runs before any change is written, so this is always the first line.
               onReady: () => {
                 if (ctx.json) {
@@ -308,8 +312,8 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
                   may_have_missed_changes: true,
                 }),
               onRetryFailing: (e) => {
-                const reason = classifyRefusal(e).message;
-                status("reconnect_failing", `reconnecting keeps failing, still retrying: ${clean(reason)}`, { reason });
+                const reason = reasonOf(e);
+                status("reconnect_failing", `deltat refuses the reconnect, still retrying: ${clean(reason)}`, { reason });
               },
               onGone: () => finish.with("gone"),
             });

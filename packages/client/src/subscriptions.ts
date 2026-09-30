@@ -1,5 +1,6 @@
 import postgres, { type Sql } from "postgres";
 import { sqlstateOf } from "./errors.js";
+import { unref } from "./timers.js";
 
 /**
  * LISTEN subscriptions that survive deltat going away and coming back.
@@ -10,23 +11,32 @@ import { sqlstateOf } from "./errors.js";
  * error and no further events: measured at 10 s and 40 s of downtime. A watcher then reads silence as
  * "nothing is happening", which is the one failure a live view must never have.
  *
- * So the subscriptions live on a connection this class owns. When it closes, every channel is
- * listened to again, each on its own and retrying with backoff until it succeeds, and each subscriber
- * is told as soon as its own channel is back. A channel whose resource was deleted meanwhile is not
- * retried forever: its subscribers are told it is gone.
+ * So the subscriptions live on a connection this class owns, managed as desired state:
+ *
+ *  - Which channels someone wants is the set of subscribers. Which channels are LISTENed is `live`,
+ *    and it only ever describes the connection of the current `generation`; a drop empties it.
+ *  - One reconcile pass at a time makes live match wanted, and re-checks the generation after every
+ *    await: whatever it learned on a connection that has since dropped does not count.
+ *  - Whether a subscriber has been told it is subscribed on the current connection is a flag on the
+ *    subscriber itself, cleared on a drop. Any subscriber whose channel is live and who has not been
+ *    told is told. Nothing depends on which batch or which caller happened to do the LISTEN.
+ *
+ * A heartbeat catches a connection that died without closing (a host that vanished, a dropped NAT
+ * flow), which TCP keepalive alone notices only after minutes.
  */
 
 export type Subscriber = {
   onNotify: (payload: string) => void;
-  /** Called after the first LISTEN succeeds and again after every re-subscription. */
+  /** Called when subscribed, and again after every re-subscription following a drop. */
   onSubscribed: () => void;
   /** Called once when the connection drops; nothing arrives until the next onSubscribed. */
   onLost?: () => void;
   /** The resource no longer exists (deleted while the connection was down); nothing more will arrive. */
   onGone?: () => void;
   /**
-   * Re-subscribing keeps failing, and why (a wrong password after deltat restarted, say). Called once
-   * per distinct reason, not on every attempt; retrying continues, since the cause may be fixed.
+   * Re-subscribing keeps failing because deltat answered with an error (a wrong password after it
+   * restarted, say). Once per distinct error, not per attempt, and not for plain unreachability,
+   * which onLost already said. Retrying continues, since the cause may be fixed.
    */
   onRetryFailing?: (error: unknown) => void;
 };
@@ -50,29 +60,50 @@ const CLOSE_TIMEOUT_S = 5;
 /** SQLSTATE deltat returns for a LISTEN on a resource that does not exist. */
 const UNDEFINED_OBJECT = "42704";
 
-type Connect = (hooks: { onnotify: (channel: string, payload: string) => void; onclose: () => void }) => Sql;
+export type HeartbeatOptions = { everyMs: number; timeoutMs: number };
+const HEARTBEAT: HeartbeatOptions = { everyMs: 30_000, timeoutMs: 10_000 };
+
+type Hooks = { onnotify: (channel: string, payload: string) => void; onclose: () => void };
+type Connect = (hooks: Hooks) => Sql;
 
 const quoted = (channel: string) => `"${channel.replace(/"/g, '""')}"`;
 
-type Outcome = "live" | "gone" | "retry";
+/**
+ * A SQLSTATE is five digits or capital letters. postgres.js also puts Node's own codes
+ * (ECONNREFUSED, ETIMEDOUT) in `code`, and those mean deltat is unreachable, not that it said no.
+ */
+const isSqlstate = (code: string | null): code is string =>
+  code !== null && code.length === 5 && [...code].every((c) => (c >= "0" && c <= "9") || (c >= "A" && c <= "Z"));
+
+type Entry = {
+  channel: string;
+  subscriber: Subscriber;
+  /** Told onSubscribed on the connection as it is now. False from the start and after every drop. */
+  told: boolean;
+  /** Settles listen() on the first outcome; null once settled. */
+  first: { resolve: () => void; reject: (error: unknown) => void } | null;
+  /** The last failure reported to this subscriber, so each distinct one is reported once. */
+  reported: string | null;
+};
 
 export class Subscriptions implements Listener {
-  private readonly channels = new Map<string, Set<Subscriber>>();
-  /** Channels LISTENed on the connection as it is now; emptied whenever it closes. */
+  private readonly entries = new Set<Entry>();
+  /** Channels LISTENed on the connection of the current generation. */
   private readonly live = new Set<string>();
   private conn: Sql | null = null;
-  /**
-   * Bumped every time the connection closes. A LISTEN that succeeded on an earlier connection says
-   * nothing about the current one, so it only counts if the generation is unchanged when it returns.
-   */
+  /** Bumped on every drop; anything learned under an older value is about a connection that is gone. */
   private generation = 0;
-  private retrying = false;
-  private retryTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Why reconnecting last failed, so each distinct reason is reported once, not every attempt. */
-  private lastRetryFailure: string | null = null;
   private closed = false;
+  private pass: Promise<void> | null = null;
+  private again = false;
+  private attempt = 0;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(private readonly connect: Connect) {}
+  constructor(
+    private readonly connect: Connect,
+    private readonly heartbeat: HeartbeatOptions = HEARTBEAT
+  ) {}
 
   /** A dedicated connection built from the same settings as `sql`, the way postgres.js builds its own. */
   static from(sql: Sql): Subscriptions {
@@ -109,147 +140,210 @@ export class Subscriptions implements Listener {
     });
   }
 
-  /** Subscribe; rejects if the first LISTEN fails. Resolves to an unsubscribe function. */
+  /**
+   * Subscribe. Resolves once subscribed, to an unsubscribe function; rejects if the first attempt
+   * fails. A drop after that is recovered from, and reported through the subscriber's callbacks.
+   */
   async listen(channel: string, subscriber: Subscriber): Promise<() => Promise<void>> {
     if (this.closed) throw new Error("deltat: subscriptions are closed");
-    const subscribers = this.channels.get(channel) ?? new Set<Subscriber>();
-    subscribers.add(subscriber);
-    this.channels.set(channel, subscribers);
-
-    if (!this.live.has(channel)) {
-      const generation = this.generation;
-      try {
-        await this.listenOn(channel);
-      } catch (error) {
-        this.forget(channel, subscriber);
-        throw error;
-      }
-      // If the connection closed while this LISTEN was in flight, the retry loop already owns the
-      // channel and will report onSubscribed when it is really back.
-      if (generation === this.generation) this.live.add(channel);
-    }
-    subscriber.onSubscribed();
-
-    return async () => {
-      this.forget(channel, subscriber);
-      if (!this.channels.has(channel) && this.live.delete(channel) && this.conn) {
-        await this.conn`UNLISTEN ${this.conn.unsafe(quoted(channel))}`.catch(() => undefined);
-      }
-    };
+    return new Promise((resolve, reject) => {
+      const entry: Entry = {
+        channel,
+        subscriber,
+        told: false,
+        reported: null,
+        first: {
+          // Unsubscribing takes effect at once (nothing more reaches this subscriber) and does not
+          // wait for the UNLISTEN: a pass in flight against a host that is not answering would
+          // otherwise hold up a watcher's Ctrl-C until the connect timed out.
+          resolve: () =>
+            resolve(async () => {
+              this.entries.delete(entry);
+              void this.reconcile();
+            }),
+          reject,
+        },
+      };
+      this.entries.add(entry);
+      void this.reconcile();
+    });
   }
 
   /** Stop listening for good: no more retries, and the connection is closed within CLOSE_TIMEOUT_S. */
   async close(): Promise<void> {
     this.closed = true;
     if (this.retryTimer) clearTimeout(this.retryTimer);
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
     this.retryTimer = null;
+    this.heartbeatTimer = null;
     const conn = this.conn;
     this.conn = null;
     this.live.clear();
+    for (const entry of this.entries) entry.first?.reject(new Error("deltat: subscriptions are closed"));
+    this.entries.clear();
     await conn?.end({ timeout: CLOSE_TIMEOUT_S }).catch(() => undefined);
   }
 
   private connection(): Sql {
-    this.conn ??= this.connect({
+    if (this.conn) return this.conn;
+    const self: { sql: Sql | null } = { sql: null };
+    const sql = this.connect({
+      // Only the current connection counts. One replaced after a missed heartbeat may still report
+      // its own close later, and that must not tear down its successor.
       onnotify: (channel, payload) => {
-        for (const s of this.channels.get(channel) ?? []) s.onNotify(payload);
+        if (this.conn !== self.sql) return;
+        for (const entry of this.entries) if (entry.channel === channel) entry.subscriber.onNotify(payload);
       },
       onclose: () => {
-        if (this.closed) return;
-        this.generation += 1;
-        // Only channels that were live hear about the loss, so a failed reconnect attempt (which
-        // closes again) does not announce it twice.
-        const lost = [...this.live];
-        this.live.clear();
-        for (const channel of lost) for (const s of this.channels.get(channel) ?? []) s.onLost?.();
-        if (this.channels.size > 0) this.resubscribe(0);
+        if (this.conn === self.sql) this.dropped();
       },
     });
-    return this.conn;
+    self.sql = sql;
+    this.conn = sql;
+    return sql;
   }
 
-  private async listenOn(channel: string): Promise<void> {
-    const conn = this.connection();
-    await conn`LISTEN ${conn.unsafe(quoted(channel))}`;
+  /** The connection is gone: nothing is live, everyone told is told it is lost, and a retry is due. */
+  private dropped(): void {
+    if (this.closed) return;
+    this.generation += 1;
+    this.live.clear();
+    for (const entry of this.entries) {
+      if (!entry.told) continue;
+      entry.told = false;
+      entry.subscriber.onLost?.();
+    }
+    this.scheduleRetry();
   }
 
-  private forget(channel: string, subscriber: Subscriber): void {
-    const subscribers = this.channels.get(channel);
-    subscribers?.delete(subscriber);
-    if (subscribers?.size === 0) this.channels.delete(channel);
-  }
-
-  /**
-   * Listen to every channel that is not live, each on its own. The batch is judged once it has
-   * settled: if the connection closed at any point during it, every LISTEN in it was on a
-   * connection that is gone, including ones that returned before the drop, so none counts and the
-   * whole batch is retried. Otherwise a channel that came back is reported at once, whatever the
-   * others did; one whose resource is gone is dropped and reported; the rest are retried with
-   * backoff until they succeed or the client is closed.
-   *
-   * Only the subscribers waiting when the attempt started are told. One that joined meanwhile ran
-   * its own LISTEN and was told already; one that left is not told, and a channel nobody wants any
-   * more is UNLISTENed rather than marked live.
-   */
-  private resubscribe(attempt: number): void {
-    if (this.retrying || this.closed) return;
-    this.retrying = true;
-    const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)];
-    this.retryTimer = setTimeout(async () => {
+  private scheduleRetry(): void {
+    if (this.closed || this.retryTimer) return;
+    const delay = RETRY_DELAYS_MS[Math.min(this.attempt, RETRY_DELAYS_MS.length - 1)];
+    this.attempt += 1;
+    this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
-      const generation = this.generation;
-      const batch = [...this.channels]
-        .filter(([channel]) => !this.live.has(channel))
-        .map(([channel, subscribers]) => ({ channel, waiting: [...subscribers] }));
-      const outcomes = await Promise.all(
-        batch.map(async ({ channel }): Promise<{ outcome: Outcome; error?: unknown }> => {
-          try {
-            await this.listenOn(channel);
-            return { outcome: "live" };
-          } catch (error) {
-            return { outcome: sqlstateOf(error) === UNDEFINED_OBJECT ? "gone" : "retry", error };
-          }
-        })
-      );
-      this.retrying = false;
-      if (this.closed) return;
-      const stale = generation !== this.generation;
-
-      const results = batch.map((b, i) => ({ ...b, ...(outcomes[i] ?? { outcome: "retry" as const }) }));
-      for (const { channel, waiting, outcome, error } of results) {
-        const current = this.channels.get(channel);
-        const stillWaiting = waiting.filter((s) => current?.has(s));
-        if (stale) continue;
-        if (outcome === "live") {
-          this.lastRetryFailure = null;
-          if (!current) {
-            await this.unlisten(channel);
-            continue;
-          }
-          this.live.add(channel);
-          for (const s of stillWaiting) s.onSubscribed();
-        } else if (outcome === "gone") {
-          this.channels.delete(channel);
-          for (const s of stillWaiting) s.onGone?.();
-        } else {
-          this.reportRetryFailure(error, stillWaiting);
-        }
-      }
-      if (stale || results.some(({ outcome }) => outcome === "retry")) this.resubscribe(attempt + 1);
+      void this.reconcile();
     }, delay);
     // Deliberately not unref()'d: while deltat is down this timer is the only thing keeping a
     // watcher's process alive, and a watcher must outlast an outage. close() clears it.
   }
 
-  private reportRetryFailure(error: unknown, subscribers: readonly Subscriber[]): void {
-    const reason = sqlstateOf(error) ?? (error instanceof Error ? error.message : "unknown");
-    if (reason === this.lastRetryFailure) return;
-    this.lastRetryFailure = reason;
-    for (const s of subscribers) s.onRetryFailing?.(error);
+  /** Run reconcile passes, one at a time, until nothing changed during the last one. */
+  private reconcile(): Promise<void> {
+    if (this.pass) {
+      this.again = true;
+      return this.pass;
+    }
+    this.pass = (async () => {
+      try {
+        do {
+          this.again = false;
+          await this.reconcileOnce();
+        } while (this.again && !this.closed);
+      } finally {
+        this.pass = null;
+      }
+    })();
+    return this.pass;
   }
 
-  private async unlisten(channel: string): Promise<void> {
+  private async reconcileOnce(): Promise<void> {
+    if (this.closed) return;
+    const generation = this.generation;
+    const conn = this.connection();
+    const wanted = () => new Set([...this.entries].map((entry) => entry.channel));
+    // After any await: a drop (or close) meanwhile means this pass speaks for a connection that is gone.
+    const stale = () => this.closed || generation !== this.generation;
+
+    for (const channel of [...wanted()].filter((c) => !this.live.has(c))) {
+      const error = await conn`LISTEN ${conn.unsafe(quoted(channel))}`.then(
+        () => null,
+        (e: unknown) => e ?? new Error("LISTEN failed")
+      );
+      // Settled before giving up on this pass: a first attempt fails, a gone resource is gone, and
+      // deltat's own "no" is worth reporting, whatever the connection did afterwards.
+      if (error !== null) this.failed(channel, error, generation !== this.generation);
+      if (stale()) return; // dropped() scheduled the retry
+      if (error === null) this.live.add(channel);
+    }
+
+    for (const channel of [...this.live].filter((c) => !wanted().has(c))) {
+      await conn`UNLISTEN ${conn.unsafe(quoted(channel))}`.catch(() => undefined);
+      if (stale()) return;
+      this.live.delete(channel);
+    }
+
+    for (const entry of this.entries) {
+      if (entry.told || !this.live.has(entry.channel)) continue;
+      entry.told = true;
+      entry.reported = null;
+      const first = entry.first;
+      entry.first = null;
+      entry.subscriber.onSubscribed();
+      first?.resolve();
+    }
+
+    const waiting = [...this.entries].some((entry) => !entry.told);
+    if (waiting) this.scheduleRetry();
+    else this.attempt = 0;
+    this.keepHeartbeat();
+  }
+
+  /**
+   * What a failed LISTEN means for the subscribers of `channel` and, when it took the connection
+   * with it, for every subscriber still waiting. A pass stops at a drop, so a channel later in the
+   * order never gets its own attempt: without this, a first listen() behind a channel whose LISTEN
+   * keeps dropping the connection (deltat restarted with another password) would never settle.
+   */
+  private failed(channel: string, error: unknown, connectionLost: boolean): void {
+    const code = sqlstateOf(error);
+    for (const entry of [...this.entries]) {
+      const own = entry.channel === channel;
+      if (!own && !(connectionLost && !entry.told)) continue;
+      if (entry.first) {
+        this.entries.delete(entry);
+        entry.first.reject(error);
+      } else if (own && code === UNDEFINED_OBJECT) {
+        this.entries.delete(entry);
+        entry.subscriber.onGone?.();
+      } else if (isSqlstate(code) && entry.reported !== code) {
+        entry.reported = code;
+        entry.subscriber.onRetryFailing?.(error);
+      }
+    }
+  }
+
+  /**
+   * While anything is live, prove the connection is still there: re-LISTEN one live channel, which
+   * deltat treats as a no-op. No answer within the timeout means the connection is dead without
+   * having closed, so it is replaced and everyone re-subscribes.
+   */
+  private keepHeartbeat(): void {
+    if (this.live.size === 0 || this.closed) {
+      if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+      return;
+    }
+    if (this.heartbeatTimer) return;
+    this.heartbeatTimer = setInterval(() => void this.beat(), this.heartbeat.everyMs);
+    // A heartbeat alone must not keep a process alive; the subscriptions' socket does that.
+    unref(this.heartbeatTimer);
+  }
+
+  private async beat(): Promise<void> {
     const conn = this.conn;
-    if (conn) await conn`UNLISTEN ${conn.unsafe(quoted(channel))}`.catch(() => undefined);
+    const [channel] = this.live;
+    if (!conn || channel === undefined || this.pass) return;
+    const answered = await Promise.race([
+      conn`LISTEN ${conn.unsafe(quoted(channel))}`.then(
+        () => true,
+        () => true
+      ),
+      new Promise<false>((resolve) => unref(setTimeout(() => resolve(false), this.heartbeat.timeoutMs))),
+    ]);
+    if (answered || this.conn !== conn || this.closed) return;
+    this.conn = null; // a replacement is built on the next pass; the old one's late close is ignored
+    this.dropped();
+    void conn.end({ timeout: 0 }).catch(() => undefined);
   }
 }

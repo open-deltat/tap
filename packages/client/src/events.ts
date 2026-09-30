@@ -3,6 +3,7 @@ import { Bookings } from "./bookings.js";
 import { asDeltaTEvent } from "./event-shape.js";
 import { Holds } from "./holds.js";
 import { Subscriptions, type Listener } from "./subscriptions.js";
+import { unref } from "./timers.js";
 import type { DeltaTEvent } from "./types.js";
 import { ChangeTracker, type Change } from "./watch.js";
 
@@ -26,7 +27,10 @@ export type WatchOptions = {
   onLagged?: (missed: number) => void;
   /** The calendar was deleted. Nothing more will arrive and the watch has stopped. */
   onGone?: () => void;
-  /** Reconnecting keeps failing, and why; once per distinct reason. The watch keeps retrying. */
+  /**
+   * deltat answers the reconnect with an error (a changed password, say), once per distinct error.
+   * Mere unreachability is not reported here; onDisconnected already said it. The watch keeps retrying.
+   */
   onRetryFailing?: (error: unknown) => void;
 };
 
@@ -51,6 +55,9 @@ function reportError(error: unknown, onError?: (error: unknown) => void): void {
     // A throwing onError hook would tear down the connection the same way. Drop it.
   }
 }
+
+/** Delay before each retry of a failed re-read, in ms; the last value repeats. */
+const REREAD_DELAYS_MS = [250, 500, 1_000, 2_000, 5_000] as const;
 
 /** The payload as a checked event, or null when it is not valid JSON or not an event this client knows. */
 const parseEvent = (payload: string): DeltaTEvent | null => {
@@ -174,21 +181,34 @@ export class Events {
       for (const event of state.held.splice(0)) handle(event);
     };
 
+    // A re-read that fails is tried again rather than papered over: onResubscribed and onLagged say
+    // "what follows is complete again", which is only true once the calendar has actually been read.
+    // Events keep being held meanwhile. The first failure is reported; the retries are quiet.
+    const readUntilFresh = async (): Promise<ChangeTracker | null> => {
+      for (let attempt = 0; !state.stopped; attempt++) {
+        const fresh = await snapshot().catch((error: unknown) => {
+          if (attempt === 0) reportError(error, onError);
+          return null;
+        });
+        if (fresh) return fresh;
+        const delay = REREAD_DELAYS_MS[Math.min(attempt, REREAD_DELAYS_MS.length - 1)];
+        // Unref'd: a watch that was stopped meanwhile must not keep its process alive for the delay.
+        await new Promise<void>((resolve) => unref(setTimeout(resolve, delay)));
+      }
+      return null;
+    };
+
     // After an outage or a lag the remembered spans may be stale and a parked release's booking may
     // never come, so report what is parked, re-read the calendar, replay what arrived meanwhile,
     // then say there was a gap.
     const reread = (after: () => void) => {
       reads = reads.then(async () => {
         if (state.stopped) return;
-        const previous = state.tracker;
         clearTimer();
-        if (previous) report(previous.flush());
+        if (state.tracker) report(state.tracker.flush());
         state.tracker = null;
-        const fresh = await snapshot().catch((error: unknown) => {
-          reportError(error, onError);
-          return previous ?? new ChangeTracker(window, { holds: [], bookings: [] });
-        });
-        if (state.stopped) return;
+        const fresh = await readUntilFresh();
+        if (fresh === null || state.stopped) return;
         state.tracker = fresh;
         replayHeld();
         arm();
@@ -245,7 +265,7 @@ export class Events {
       onResubscribed?: () => void;
       /** The resource was deleted while the connection was down; this subscription has ended. */
       onGone?: () => void;
-      /** Reconnecting keeps failing, and why; once per distinct reason. Retrying continues. */
+      /** deltat answers the reconnect with an error, once per distinct error. Retrying continues. */
       onRetryFailing?: (error: unknown) => void;
     }
   ): Promise<() => Promise<void>> {

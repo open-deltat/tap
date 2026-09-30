@@ -44,4 +44,10 @@ describe("asDeltaTEvent", () => {
       expect(asDeltaTEvent(payload)).toBeNull();
     }
   });
+
+  test("refuses a kind named after a prototype member, without throwing", () => {
+    for (const kind of ["constructor", "toString", "hasOwnProperty", "__proto__"]) {
+      expect(asDeltaTEvent(JSON.parse(`{"${kind}":{}}`))).toBeNull();
+    }
+  });
 });

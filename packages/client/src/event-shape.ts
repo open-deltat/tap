@@ -16,7 +16,8 @@ export function asDeltaTEvent(value: unknown): DeltaTEvent | null {
   if (keys.length !== 1 || kind === undefined) return null;
   const body = value[kind];
   if (!isRecord(body)) return null;
-  const valid = SHAPES[kind];
+  // Own keys only: `kind` comes off the network, and SHAPES["constructor"] is Object itself.
+  const valid = Object.hasOwn(SHAPES, kind) ? SHAPES[kind] : undefined;
   // Checked field by field just above, which is what this cast stands for.
   return valid !== undefined && valid(body) ? (value as DeltaTEvent) : null;
 }

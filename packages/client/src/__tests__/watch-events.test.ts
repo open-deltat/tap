@@ -16,12 +16,16 @@ function fakeSql() {
   const gate = { open: Promise.resolve() as Promise<void> };
   const reads: string[] = [];
   const concurrency = { now: 0, most: 0 };
+  const failing = { reads: 0 };
   const answer = (kind: string) => {
     reads.push(kind);
     concurrency.now += 1;
     concurrency.most = Math.max(concurrency.most, concurrency.now);
+    const fails = failing.reads > 0;
+    if (fails) failing.reads -= 1;
     return gate.open.then(() => {
       concurrency.now -= 1;
+      if (fails) throw new Error("read failed");
       return [];
     });
   };
@@ -32,7 +36,11 @@ function fakeSql() {
     gate.open = released.promise;
     return () => released.resolve();
   };
-  return { sql: sql as unknown as Sql, reads, hold, concurrency };
+  /** The next `n` reads fail. A snapshot is two reads (holds, bookings). */
+  const failReads = (n: number) => {
+    failing.reads = n;
+  };
+  return { sql: sql as unknown as Sql, reads, hold, concurrency, failReads };
 }
 
 function fakeListener() {
@@ -76,6 +84,7 @@ async function watching(opts: { window?: { start: number; end: number } } = {}) 
         onResubscribed: () => log.push("resubscribed"),
         onLagged: (n) => log.push(`lagged:${n}`),
         onGone: () => log.push("gone"),
+        onError: (e) => log.push(`error:${e instanceof Error ? e.message : "?"}`),
       }
     );
   return { db, sub, log, changes, start };
@@ -110,6 +119,22 @@ describe("Events.watch", () => {
     expect(w.log).toEqual(["ready", "held", "resubscribed", "hold_ended"]);
     expect(w.changes[1]).toMatchObject({ kind: "hold_ended", start: 1000, end: 2000 });
   });
+
+  test(
+    "a re-read that fails is retried, and 'resubscribed' waits until the calendar has really been read",
+    async () => {
+      const w = await watching();
+      await w.start();
+      w.db.failReads(4); // two failed snapshots
+      w.sub.captured.subscriber?.onSubscribed();
+      await Bun.sleep(10);
+      w.sub.send(held("h1", 1000)); // arrives while the calendar cannot be read: held, not dropped
+      expect(w.log).toEqual(["ready", "error:read failed"]);
+      await Bun.sleep(850); // retries after 250 and 500 ms
+      expect(w.log).toEqual(["ready", "error:read failed", "held", "resubscribed"]);
+    },
+    3_000
+  );
 
   test("a Lagged notice re-reads the calendar and says how much was missed", async () => {
     const w = await watching();

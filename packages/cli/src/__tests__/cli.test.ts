@@ -22,6 +22,7 @@ type WatchHooks = {
   onResubscribed?: () => void;
   onLagged?: (missed: number) => void;
   onGone?: () => void;
+  onRetryFailing?: (error: unknown) => void;
 };
 
 type Fake = {
@@ -33,6 +34,7 @@ type Fake = {
   outage: () => void;
   lag: (missed: number) => void;
   deleteCalendar: () => void;
+  refuseReconnect: (error: unknown) => void;
 };
 
 /** The subset of DeltaT the CLI calls, recording each call. Behaviour is overridable per test. */
@@ -94,6 +96,7 @@ function fakeServer(overrides: Record<string, (...args: unknown[]) => Promise<un
       }),
     lag: (missed) => hooks.forEach((h) => h.onLagged?.(missed)),
     deleteCalendar: () => hooks.forEach((h) => h.onGone?.()),
+    refuseReconnect: (error) => hooks.forEach((h) => h.onRetryFailing?.(error)),
   };
 }
 
@@ -364,6 +367,19 @@ describe("watch", () => {
     stopped.resolve();
     const lines = (await running).out.trim().split("\n").map((l) => JSON.parse(l));
     expect(lines[1]).toMatchObject({ status: "lagged", missed: 12, may_have_missed_changes: true });
+  });
+
+  test("a refused reconnect gives deltat's reason and says the watch is still retrying, never that retrying will not help", async () => {
+    const server = fakeServer();
+    const stopped = Promise.withResolvers<void>();
+    const running = run(["watch", CAL], { server, stopWatch: stopped.promise });
+    await Bun.sleep(10);
+    server.refuseReconnect(Object.assign(new Error('password authentication failed for user "deltat"'), { code: "28P01" }));
+    stopped.resolve();
+    const r = await running;
+    expect(r.out).toContain("reconnect_failing");
+    expect(r.out).toContain("still retrying: password authentication failed");
+    expect(r.out).not.toContain("will not help");
   });
 
   test("the calendar being deleted ends the watch with exit 5 instead of silence", async () => {
