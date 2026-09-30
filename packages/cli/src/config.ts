@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { tlsSetting, type DeltaTOptions } from "@open-deltat/client";
 
 // Where the CLI connects, and with what password. The environment wins over the saved file, field
 // by field, and the variable names and defaults are the MCP server's (packages/mcp/server.json), so
@@ -12,37 +13,41 @@ import { dirname, join } from "node:path";
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
-export type Connection = { host: string; port: number; database: string; user: string; password: string };
+type Target = { host: string; port: number; database: string; user: string };
+
+/** What `login` saves. TLS is kept as the switch and the CA's path, never the certificate itself. */
+export type Saved = Target & { password: string; tls: boolean; tlsCa: string | null };
+
+/** Everything needed to open a connection, TLS resolved to what the client takes. */
+export type Connection = Target & { password: string; tls: NonNullable<DeltaTOptions["tls"]> };
 
 export type Resolved =
-  | { ok: true; connection: Connection; passwordFrom: "env" | "file"; warnings: string[] }
+  | { ok: true; connection: Connection; passwordFrom: "env" | "file"; tlsCa: string | null; warnings: string[] }
   | { ok: false; message: string };
 
 const DEFAULTS = { host: "localhost", port: 5433, database: "public", user: "user" } as const;
-const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1"]);
 
 const blankToNull = (v: string | undefined): string | null => {
   const t = v?.trim();
   return t ? t : null;
 };
 
+const readText = (path: string) => readFile(path, "utf8");
+
 export function configPath(env: Env): string {
   const base = blankToNull(env.XDG_CONFIG_HOME) ?? join(blankToNull(env.HOME) ?? homedir(), ".config");
   return join(base, "deltat", "cli.json");
 }
-
-/** A password to anything but this machine crosses the network in the clear: the SDK has no TLS yet. */
-export const isLoopback = (host: string): boolean => LOOPBACK.has(host.toLowerCase());
 
 function parsePort(raw: string | number, from: string): number | string {
   const n = typeof raw === "number" ? raw : Number(raw);
   return Number.isInteger(n) && n >= 1 && n <= 65_535 ? n : `${from} is not a port number: ${raw}`;
 }
 
-type Saved = Partial<Connection>;
-
 /** The saved file, or {} when there is none. Anything malformed is an error, never a guess. */
-async function readSaved(path: string): Promise<{ ok: true; saved: Saved; warnings: string[] } | { ok: false; message: string }> {
+async function readSaved(
+  path: string
+): Promise<{ ok: true; saved: Partial<Saved>; warnings: string[] } | { ok: false; message: string }> {
   const raw = await readFile(path, "utf8").catch((e: NodeJS.ErrnoException) => (e.code === "ENOENT" ? null : e));
   if (raw === null) return { ok: true, saved: {}, warnings: [] };
   if (raw instanceof Error) return { ok: false, message: `Cannot read ${path}: ${raw.message}` };
@@ -71,6 +76,7 @@ async function readSaved(path: string): Promise<{ ok: true; saved: Saved; warnin
         ? parsePort(rawPort, `port in ${path}`)
         : `port in ${path} is not a port number`;
   if (typeof port === "string") return { ok: false, message: port };
+  if (o.tls !== undefined && typeof o.tls !== "boolean") return { ok: false, message: `tls in ${path} must be true or false` };
 
   // Like ssh with a private key: say so when others can read the password, rather than using it silently.
   const mode = (await stat(path)).mode;
@@ -80,12 +86,15 @@ async function readSaved(path: string): Promise<{ ok: true; saved: Saved; warnin
   const database = field("database");
   const user = field("user");
   const password = field("password");
-  const saved: Saved = {
+  const tlsCa = field("tlsCa");
+  const saved: Partial<Saved> = {
     ...(host ? { host } : {}),
     ...(port !== undefined ? { port } : {}),
     ...(database ? { database } : {}),
     ...(user ? { user } : {}),
     ...(password ? { password } : {}),
+    ...(typeof o.tls === "boolean" ? { tls: o.tls } : {}),
+    ...(tlsCa ? { tlsCa } : {}),
   };
   return { ok: true, saved, warnings };
 }
@@ -105,6 +114,10 @@ export async function resolveConnection(env: Env): Promise<Resolved> {
     return { ok: false, message: "No password. Run `deltat-cli login`, or set DELTAT_PASSWORD." };
   }
 
+  const tlsCa = blankToNull(env.DELTAT_TLS_CA) ?? saved.tlsCa ?? null;
+  const tls = await tlsSetting({ tls: blankToNull(env.DELTAT_TLS) ?? saved.tls ?? null, caPath: tlsCa }, readText);
+  if (!tls.ok) return tls;
+
   return {
     ok: true,
     connection: {
@@ -113,25 +126,37 @@ export async function resolveConnection(env: Env): Promise<Resolved> {
       database: blankToNull(env.DELTAT_DATABASE) ?? saved.database ?? DEFAULTS.database,
       user: blankToNull(env.DELTAT_USER) ?? saved.user ?? DEFAULTS.user,
       password,
+      tls: tls.tls,
     },
     passwordFrom: envPassword !== null ? "env" : "file",
+    tlsCa,
     warnings: file.warnings,
   };
 }
 
-/** Connection options `login` accepts, before the password is known. */
-export function connectionFromFlags(
+/** Connection options `login` accepts, before the password is known. Flags win over the environment. */
+export async function targetFromFlags(
   env: Env,
-  flags: { host?: string | null; port?: string | null; database?: string | null; user?: string | null }
-): Omit<Connection, "password"> | string {
+  flags: { host?: string | null; port?: string | null; database?: string | null; user?: string | null; tls?: boolean; tlsCa?: string | null }
+): Promise<{ ok: true; target: Target; tls: Connection["tls"]; save: Pick<Saved, "tls" | "tlsCa"> } | { ok: false; message: string }> {
   const rawPort = flags.port ?? blankToNull(env.DELTAT_PORT);
   const port = rawPort === null ? DEFAULTS.port : parsePort(rawPort, "--port");
-  if (typeof port === "string") return port;
+  if (typeof port === "string") return { ok: false, message: port };
+
+  const tlsCa = flags.tlsCa ?? blankToNull(env.DELTAT_TLS_CA);
+  const tls = await tlsSetting({ tls: flags.tls === true ? true : blankToNull(env.DELTAT_TLS), caPath: tlsCa }, readText);
+  if (!tls.ok) return tls;
+
   return {
-    host: flags.host ?? blankToNull(env.DELTAT_HOST) ?? DEFAULTS.host,
-    port,
-    database: flags.database ?? blankToNull(env.DELTAT_DATABASE) ?? DEFAULTS.database,
-    user: flags.user ?? blankToNull(env.DELTAT_USER) ?? DEFAULTS.user,
+    ok: true,
+    target: {
+      host: flags.host ?? blankToNull(env.DELTAT_HOST) ?? DEFAULTS.host,
+      port,
+      database: flags.database ?? blankToNull(env.DELTAT_DATABASE) ?? DEFAULTS.database,
+      user: flags.user ?? blankToNull(env.DELTAT_USER) ?? DEFAULTS.user,
+    },
+    tls: tls.tls,
+    save: { tls: tls.tls !== false, tlsCa },
   };
 }
 
@@ -139,14 +164,14 @@ export function connectionFromFlags(
  * Write the file atomically and owner-only: a temp file created 0600 in a 0700 directory, then
  * renamed over the old one, so a crash mid-write never leaves a half-written or world-readable file.
  */
-export async function saveConnection(env: Env, connection: Connection): Promise<string> {
+export async function saveConnection(env: Env, saved: Saved): Promise<string> {
   const path = configPath(env);
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });
   const tmp = `${path}.${process.pid}.tmp`;
   // `wx` creates the file fresh, so the 0600 mode always applies; a stale temp file from a crashed
   // run could otherwise keep whatever mode it had.
   await rm(tmp, { force: true });
-  await writeFile(tmp, `${JSON.stringify(connection, null, 2)}\n`, { mode: 0o600, flag: "wx" });
+  await writeFile(tmp, `${JSON.stringify(saved, null, 2)}\n`, { mode: 0o600, flag: "wx" });
   await rename(tmp, path);
   return path;
 }

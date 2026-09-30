@@ -16,11 +16,15 @@ const PASSWORD = "correct-horse-battery-staple";
 const T = "2026-10-01T09:00:00+02:00";
 const T2 = "2026-10-01T12:00:00+02:00";
 
+type WatchHooks = { onDisconnected?: () => void; onResubscribed?: () => void };
+
 type Fake = {
   dt: DeltaT;
   calls: string[];
   closed: () => number;
   emit: (c: Change) => void;
+  /** The connection to deltat drops, then comes back, as events.watch reports it. */
+  outage: () => void;
 };
 
 /** The subset of DeltaT the CLI calls, recording each call. Behaviour is overridable per test. */
@@ -28,6 +32,7 @@ function fakeServer(overrides: Record<string, (...args: unknown[]) => Promise<un
   const calls: string[] = [];
   const closes: number[] = [];
   const watchers: ((c: Change) => void)[] = [];
+  const hooks: WatchHooks[] = [];
   const call =
     (name: string, fallback: (...args: unknown[]) => Promise<unknown>) =>
     (...args: unknown[]) => {
@@ -53,8 +58,9 @@ function fakeServer(overrides: Record<string, (...args: unknown[]) => Promise<un
       cancel: call("bookings.cancel", async () => undefined),
     },
     events: {
-      watch: call("events.watch", async (_id, onChange) => {
+      watch: call("events.watch", async (_id, onChange, options) => {
         watchers.push(onChange as (c: Change) => void);
+        hooks.push(options as WatchHooks);
         return async () => {
           calls.push("watch.stop");
         };
@@ -70,6 +76,11 @@ function fakeServer(overrides: Record<string, (...args: unknown[]) => Promise<un
     calls,
     closed: () => closes.length,
     emit: (c) => watchers.forEach((w) => w(c)),
+    outage: () =>
+      hooks.forEach((h) => {
+        h.onDisconnected?.();
+        h.onResubscribed?.();
+      }),
   };
 }
 
@@ -242,10 +253,18 @@ describe("talking to the server", () => {
     expect(JSON.parse(json.out).bookings[0].label).toBe("Alex\u001b]0;pwned\u0007");
   });
 
-  test("a non-local host gets a warning that the password travels unencrypted", async () => {
+  test("a non-local host gets a warning that the password travels unencrypted, unless TLS is on", async () => {
     const r = await run(["calendars"], { env: { DELTAT_HOST: "db.example.com" } });
     expect(r.err).toContain("unencrypted");
     expect((await run(["calendars"])).err).not.toContain("unencrypted");
+    const tls = await run(["calendars"], { env: { DELTAT_HOST: "db.example.com", DELTAT_TLS: "on" } });
+    expect(tls.err).not.toContain("unencrypted");
+  });
+
+  test("a TLS setting that is neither on nor off stops the command before it connects", async () => {
+    const r = await run(["calendars"], { env: { DELTAT_TLS: "sometimes" } });
+    expect(r.code).toBe(2);
+    expect(r.connectedTo).toEqual([]);
   });
 
   test("no password configured is bad input (exit 2), and nothing connects", async () => {
@@ -309,6 +328,18 @@ describe("watch", () => {
     expect(lines.map((l) => l.status ?? l.change)).toEqual(["watching", "held", "booked"]);
     expect(server.calls).toContain("watch.stop");
     expect(server.closed()).toBe(1);
+  });
+
+  test("says so on stdout when the connection drops and when it is back, so silence keeps meaning nothing changed", async () => {
+    const server = fakeServer();
+    const stopped = Promise.withResolvers<void>();
+    const running = run(["watch", CAL, "--json"], { server, stopWatch: stopped.promise });
+    await Bun.sleep(10);
+    server.outage();
+    stopped.resolve();
+    const lines = (await running).out.trim().split("\n").map((l) => JSON.parse(l));
+    expect(lines.map((l) => l.status)).toEqual(["watching", "disconnected", "reconnected"]);
+    expect(lines[2]).toMatchObject({ may_have_missed_changes: true });
   });
 
   test("refuses an unknown calendar instead of watching silence forever", async () => {

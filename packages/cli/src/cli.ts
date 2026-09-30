@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import { classifyRefusal, type DeltaT, type Refusal } from "@open-deltat/client";
 import { BIN, COMMANDS, cleartextWarning, type Command, type Io, type Outcome, type Runner } from "./commands.js";
-import { isLoopback, resolveConnection } from "./config.js";
+import { resolveConnection } from "./config.js";
 import { InputError, type Args } from "./input.js";
 import { EXIT, clean, isTimeZone, refusalJson, refusalText } from "./render.js";
 
@@ -134,7 +134,7 @@ export async function main(argv: readonly string[], io: Io): Promise<number> {
     const resolved = await resolveConnection(io.env);
     if (!resolved.ok) throw new InputError(resolved.message);
     for (const warning of resolved.warnings) io.stderr(`warning: ${warning}\n`);
-    if (!isLoopback(resolved.connection.host)) io.stderr(cleartextWarning(resolved.connection.host));
+    io.stderr(cleartextWarning(resolved.connection));
     const dt = io.connect(resolved.connection);
     opened.push(dt);
     return dt;

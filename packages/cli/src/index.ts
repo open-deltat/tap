@@ -26,7 +26,7 @@ process.exitCode = await main(process.argv.slice(2), {
   env: process.env,
   now: () => Date.now(),
   readSecret,
-  connect: (c) => new DeltaT({ host: c.host, port: c.port, database: c.database, username: c.user, password: c.password }),
+  connect: (c) => new DeltaT({ host: c.host, port: c.port, database: c.database, username: c.user, password: c.password, tls: c.tls }),
   // Signals are only caught while a command waits on them. Catching them globally would make every
   // other command impossible to interrupt.
   interrupted: async () => {

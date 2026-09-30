@@ -67,10 +67,16 @@ const required = [
   [() => method('Events', 'watch'), 'Events.watch  (deltat-cli watch)'],
   [() => fn('classifyRefusal'), 'classifyRefusal  (both adapters report refusals through it)'],
   [() => fn('parseInstant'), 'parseInstant'],
-  // A type, so there is nothing to import: read from the published declarations.
+  [() => fn('tlsSetting'), 'tlsSetting  (DELTAT_TLS / DELTAT_TLS_CA, read the same way by both adapters)'],
+  [() => fn('passwordInClear'), 'passwordInClear'],
+  // Types, so there is nothing to import: read from the published declarations.
   [
     () => /timeZone\??:/.test(readFileSync('node_modules/@open-deltat/client/dist/recurrence.d.ts', 'utf8')),
     'RecurrencePattern.timeZone  (or availability expands in the host zone)',
+  ],
+  [
+    () => /tls\??:/.test(readFileSync('node_modules/@open-deltat/client/dist/client.d.ts', 'utf8')),
+    'DeltaTOptions.tls  (or DELTAT_TLS is silently ignored and the password goes out in the clear)',
   ],
 ]
 

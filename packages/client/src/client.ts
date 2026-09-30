@@ -12,7 +12,17 @@ export interface DeltaTOptions {
   database?: string;
   username?: string;
   password?: string;
+  /**
+   * Encrypt the connection and verify the server's certificate: `true` trusts the system's
+   * certificate authorities, `{ ca }` trusts the given PEM instead (a deltat with a self-signed
+   * certificate). There is deliberately no way to skip verification: an unverified TLS link hands
+   * the password to whoever answers. Without it the password crosses the network in the clear.
+   */
+  tls?: boolean | { ca: string };
 }
+
+const sslFor = (tls: DeltaTOptions["tls"]) =>
+  tls ? { rejectUnauthorized: true, ...(typeof tls === "object" ? { ca: tls.ca } : {}) } : false;
 
 /**
  * Entry point to a deltat database. Holds one pgwire connection and exposes the typed sub-APIs
@@ -39,6 +49,7 @@ export class DeltaT {
         database: opts.database ?? "default",
         username: opts.username ?? "user",
         password: opts.password ?? "deltat",
+        ssl: sslFor(opts.tls),
         fetch_types: false,
         prepare: false,
       });
@@ -52,8 +63,11 @@ export class DeltaT {
     this.events = new Events(this.sql);
   }
 
-  /** Close the underlying connection. The instance is unusable afterward, so call it once at shutdown. */
+  /**
+   * Close the connection and every subscription, including any retry waiting for deltat to come
+   * back. The instance is unusable afterward, so call it once at shutdown.
+   */
   async close(): Promise<void> {
-    await this.sql.end();
+    await Promise.all([this.events.close(), this.sql.end()]);
   }
 }

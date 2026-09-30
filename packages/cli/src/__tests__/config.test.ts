@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { configPath, connectionFromFlags, forgetConnection, isLoopback, resolveConnection, saveConnection } from "../config.js";
+import { configPath, forgetConnection, resolveConnection, saveConnection, targetFromFlags } from "../config.js";
 
 // This file holds a password. The tests pin who can read it, where it comes from, and that a broken
 // file is reported instead of half-used.
@@ -16,7 +16,8 @@ afterEach(async () => {
 });
 
 const env = (extra: Record<string, string> = {}) => ({ XDG_CONFIG_HOME: dir, ...extra });
-const connection = { host: "localhost", port: 5433, database: "public", user: "user", password: "s3cret" };
+const connection = { host: "localhost", port: 5433, database: "public", user: "user", password: "s3cret", tls: false, tlsCa: null };
+const PEM = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
 
 describe("resolveConnection", () => {
   test("uses the MCP server's defaults, and refuses to connect without a password", async () => {
@@ -77,7 +78,17 @@ describe("the saved file", () => {
 
   test("round-trips the connection", async () => {
     await saveConnection(env(), connection);
-    expect(await resolveConnection(env())).toMatchObject({ ok: true, connection, passwordFrom: "file" });
+    const { tlsCa: _, ...expected } = connection;
+    expect(await resolveConnection(env())).toMatchObject({ ok: true, connection: expected, passwordFrom: "file" });
+  });
+
+  test("keeps the CA's path, not the certificate, and reads it when connecting", async () => {
+    const ca = join(dir, "ca.pem");
+    await writeFile(ca, PEM);
+    const path = await saveConnection(env(), { ...connection, tls: true, tlsCa: ca });
+    expect(JSON.parse(await Bun.file(path).text())).toMatchObject({ tls: true, tlsCa: ca });
+    expect(await Bun.file(path).text()).not.toContain("BEGIN CERTIFICATE");
+    expect(await resolveConnection(env())).toMatchObject({ ok: true, connection: { tls: { ca: PEM } }, tlsCa: ca });
   });
 
   test("warns when others can read it, the way ssh does about a key", async () => {
@@ -102,27 +113,41 @@ describe("the saved file", () => {
   });
 });
 
-describe("isLoopback", () => {
-  test("compares the whole host, so a lookalike domain is not trusted", () => {
-    expect(isLoopback("localhost")).toBe(true);
-    expect(isLoopback("127.0.0.1")).toBe(true);
-    expect(isLoopback("::1")).toBe(true);
-    expect(isLoopback("localhost.example.com")).toBe(false);
-    expect(isLoopback("127.0.0.1.nip.io")).toBe(false);
+describe("TLS settings", () => {
+  test("off unless asked for", async () => {
+    expect(await resolveConnection(env({ DELTAT_PASSWORD: "pw" }))).toMatchObject({ ok: true, connection: { tls: false } });
+  });
+
+  test("DELTAT_TLS turns it on; DELTAT_TLS_CA trusts a certificate and implies it", async () => {
+    expect(await resolveConnection(env({ DELTAT_PASSWORD: "pw", DELTAT_TLS: "on" }))).toMatchObject({ connection: { tls: true } });
+    const ca = join(dir, "ca.pem");
+    await writeFile(ca, PEM);
+    expect(await resolveConnection(env({ DELTAT_PASSWORD: "pw", DELTAT_TLS_CA: ca }))).toMatchObject({ connection: { tls: { ca: PEM } } });
+  });
+
+  test("a setting that is neither on nor off, or a CA that cannot be read, stops the command", async () => {
+    expect((await resolveConnection(env({ DELTAT_PASSWORD: "pw", DELTAT_TLS: "maybe" }))).ok).toBe(false);
+    expect((await resolveConnection(env({ DELTAT_PASSWORD: "pw", DELTAT_TLS_CA: join(dir, "missing.pem") }))).ok).toBe(false);
   });
 });
 
-describe("connectionFromFlags", () => {
-  test("flags win over the environment, which wins over defaults", () => {
-    expect(connectionFromFlags({ DELTAT_HOST: "env-host", DELTAT_USER: "env-user" }, { host: "flag-host" })).toEqual({
-      host: "flag-host",
-      port: 5433,
-      database: "public",
-      user: "env-user",
+describe("targetFromFlags", () => {
+  test("flags win over the environment, which wins over defaults", async () => {
+    expect(await targetFromFlags({ DELTAT_HOST: "env-host", DELTAT_USER: "env-user" }, { host: "flag-host" })).toEqual({
+      ok: true,
+      target: { host: "flag-host", port: 5433, database: "public", user: "env-user" },
+      tls: false,
+      save: { tls: false, tlsCa: null },
     });
   });
 
-  test("a bad --port is an error message, not a connection", () => {
-    expect(typeof connectionFromFlags({}, { port: "nope" })).toBe("string");
+  test("--tls-ca turns TLS on and is saved as a path", async () => {
+    const ca = join(dir, "ca.pem");
+    await writeFile(ca, PEM);
+    expect(await targetFromFlags({}, { tlsCa: ca })).toMatchObject({ ok: true, tls: { ca: PEM }, save: { tls: true, tlsCa: ca } });
+  });
+
+  test("a bad --port is an error, not a connection", async () => {
+    expect((await targetFromFlags({}, { port: "nope" })).ok).toBe(false);
   });
 });

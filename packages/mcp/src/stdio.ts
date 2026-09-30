@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+import { readFile } from "node:fs/promises";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { DeltaT } from "@open-deltat/client";
+import { DeltaT, passwordInClear, tlsSetting } from "@open-deltat/client";
 import { createDeltatMcpServer } from "./server.js";
 
 // The stdio entry point: connect to a deltat over its Postgres wire, expose the tools over stdio.
@@ -33,14 +34,21 @@ const config = {
   username: process.env.DELTAT_USER ?? "user",
 } as const;
 
-const server = createDeltatMcpServer(new DeltaT({ ...config, password }));
-
 async function main() {
+  // Read the same way as the CLI's, so one set of variables means one connection everywhere. A value
+  // that is neither on nor off stops the server rather than quietly connecting without TLS.
+  const tls = await tlsSetting({ tls: process.env.DELTAT_TLS, caPath: process.env.DELTAT_TLS_CA }, (p) => readFile(p, "utf8"));
+  if (!tls.ok) throw new Error(tls.message);
+  if (passwordInClear(config.host, tls.tls)) {
+    console.error(`deltat MCP server: warning: the password goes to ${config.host} unencrypted. Set DELTAT_TLS=on.`);
+  }
+
+  const server = createDeltatMcpServer(new DeltaT({ ...config, password, tls: tls.tls }));
   const transport = new StdioServerTransport();
   await server.connect(transport);
   // stdout is the MCP channel, so this and every other diagnostic goes to stderr. The password is
   // never echoed.
-  console.error(`deltat MCP server ready (${config.host}:${config.port}/${config.database})`);
+  console.error(`deltat MCP server ready (${config.host}:${config.port}/${config.database}, TLS ${tls.tls ? "on" : "off"})`);
 }
 
 main().catch((err) => {

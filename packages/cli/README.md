@@ -20,7 +20,18 @@ deltat-cli login --host localhost --database public
 command line is visible to other users and kept in shell history.
 
 Or skip the file and use the same variables as the MCP server: `DELTAT_HOST`, `DELTAT_PORT`,
-`DELTAT_DATABASE`, `DELTAT_USER`, `DELTAT_PASSWORD`. A variable wins over the saved file.
+`DELTAT_DATABASE`, `DELTAT_USER`, `DELTAT_PASSWORD`, `DELTAT_TLS`, `DELTAT_TLS_CA`. A variable wins
+over the saved file.
+
+For any deltat that is not on your machine, turn on TLS so the password is encrypted:
+
+```bash
+deltat-cli login --host deltat.example.com --tls
+deltat-cli login --host 10.0.0.5 --tls-ca ./deltat-cert.pem   # a self-signed deltat: trust its certificate
+```
+
+The server's certificate is always verified; there is no option to skip that, because an unverified
+connection hands the password to whoever answers.
 
 `deltat-cli status` shows where you are connected and whether it answers, and never prints the password.
 
@@ -57,7 +68,12 @@ Prints each change as it happens until Ctrl-C: `held`, `booked`, `hold ended` (r
 may be free again) and `cancelled`, each with its time. A commit is reported once, as `booked`.
 Booking labels are never printed here, because whoever books sets them.
 
-With `--json` the first line is `{"status":"watching",...}` and every later line is one change:
+If the connection to deltat drops, `watch` prints `disconnected`, keeps retrying on its own, and
+prints `reconnected` once it is back, noting that changes in between were not seen. Silence always
+means nothing changed, never that the watch quietly died.
+
+With `--json` the first line is `{"status":"watching",...}`, status lines carry `status`, and every
+change is one line carrying `change`:
 
 ```json
 {"change":"held","calendar_id":"01J...","resource_id":"01J...","start":"2026-10-01T08:00:00.000Z","end":"2026-10-01T08:30:00.000Z","start_local":"Thu 1 Oct 2026, 10:00","hold_id":"01K...","expires_at":"2026-10-01T08:05:00.000Z","at":"2026-10-01T07:59:12.000Z"}
@@ -79,8 +95,8 @@ Monitor tool and every change arrives as a message.
 
 ## Security notes
 
-- The deltat client has no TLS yet. Connecting to anything but this machine sends the password
-  unencrypted, and the CLI warns you when it does. Use a trusted network or an SSH tunnel.
+- Without `--tls` / `DELTAT_TLS=on`, the password to anything but this machine travels unencrypted,
+  and every command that connects warns you when it does.
 - The saved file is created `0600` in a `0700` directory. If it becomes readable by others, every
   command that connects warns until you `chmod 600` it.
 - Labels and names come from whoever created them. The CLI strips terminal control characters

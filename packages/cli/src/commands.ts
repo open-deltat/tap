@@ -1,11 +1,10 @@
-import { classifyRefusal, type Change, type DeltaT, type Refusal } from "@open-deltat/client";
+import { classifyRefusal, passwordInClear, type Change, type DeltaT, type Refusal } from "@open-deltat/client";
 import {
   configPath,
-  connectionFromFlags,
   forgetConnection,
-  isLoopback,
   resolveConnection,
   saveConnection,
+  targetFromFlags,
   type Connection,
   type Env,
 } from "./config.js";
@@ -75,8 +74,13 @@ async function withCalendar(ctx: Ctx, id: string, then: (dt: DeltaT) => Promise<
   return then(dt);
 }
 
-export const cleartextWarning = (host: string) =>
-  `warning: the password goes to ${host} unencrypted. The deltat client has no TLS yet; use it over a trusted network or an SSH tunnel.\n`;
+/** Empty unless the password would cross a network unencrypted. */
+export const cleartextWarning = (c: Pick<Connection, "host" | "tls">): string =>
+  passwordInClear(c.host, c.tls)
+    ? `warning: the password goes to ${c.host} unencrypted. Set DELTAT_TLS=on (and DELTAT_TLS_CA for a self-signed server), or use an SSH tunnel.\n`
+    : "";
+
+const tlsLabel = (tls: Connection["tls"], ca: string | null) => (tls === false ? "off" : ca ? `on (trusting ${ca})` : "on");
 
 const WINDOW_OPTIONS = { from: { type: "string" }, to: { type: "string" } } as const;
 
@@ -250,7 +254,7 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
       args: "<calendar> [--from <time> --to <time>]",
       summary: "Print each change as it happens, until Ctrl-C.",
       details:
-        'Changes: held, booked, hold ended (released or expired, may be free again), cancelled. Every line carries its time; with --from/--to only changes to those times are printed. A commit is reported once, as booked. Booking labels are never printed here, because whoever books sets them. With --json the first line is {"status":"watching"} and every later line is one change. An agent can run this in the background and react to each line.',
+        'Changes: held, booked, hold ended (released or expired, may be free again), cancelled. Every line carries its time; with --from/--to only changes to those times are printed. A commit is reported once, as booked. Booking labels are never printed here, because whoever books sets them. If the connection to deltat drops, a "disconnected" line says so, the watch keeps retrying, and a "reconnected" line says changes in between were not seen. With --json the first line is {"status":"watching"}, status lines carry "status" and every change carries "change". An agent can run this in the background and react to each line.',
       options: { ...WINDOW_OPTIONS },
       prepare(a) {
         const calendar = onlyId(a, "calendar");
@@ -261,9 +265,21 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
               const at = ctx.io.now();
               ctx.io.stdout(ctx.json ? `${JSON.stringify(changeJson(c, calendar, ctx.tz, at))}\n` : `${changeLine(c, ctx.tz, at)}\n`);
             };
+            // A watcher's silence has to mean "nothing changed", so losing the connection and getting
+            // it back are reported on stdout, where whoever reads the changes will see them.
+            const status = (state: "disconnected" | "reconnected", text: string) => {
+              const at = ctx.io.now();
+              ctx.io.stdout(
+                ctx.json
+                  ? `${JSON.stringify({ status: state, calendar_id: calendar, ...(state === "reconnected" ? { may_have_missed_changes: true } : {}), at: iso(at) })}\n`
+                  : `${local(at, ctx.tz).split(", ").pop()}  ${state.padEnd(10)}  ${text}\n`
+              );
+            };
             const stop = await dt.events.watch(calendar, write, {
               ...(window ? { window } : {}),
               onError: (e) => ctx.io.stderr(`watch: ${clean(classifyRefusal(e).message)}\n`),
+              onDisconnected: () => status("disconnected", "lost the connection to deltat; retrying, no changes until reconnected"),
+              onResubscribed: () => status("reconnected", "changes made while disconnected were not seen; check again with find"),
             });
             if (ctx.json) {
               const w = window ? { from: iso(window.start), to: iso(window.end) } : {};
@@ -302,28 +318,38 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
     "login",
     {
       group: "Setup",
-      args: "[--host <host>] [--port <port>] [--database <name>] [--user <name>]",
+      args: "[--host <host>] [--port <port>] [--database <name>] [--user <name>] [--tls] [--tls-ca <file>]",
       summary: "Check a connection and save it.",
       details:
-        "Asks for the password without echoing it, or reads DELTAT_PASSWORD. There is deliberately no --password flag: a command line is visible to other users and kept in shell history. The connection is tested before anything is saved, and the file is readable by you only.",
-      options: { host: { type: "string" }, port: { type: "string" }, database: { type: "string" }, user: { type: "string" } },
+        "Asks for the password without echoing it, or reads DELTAT_PASSWORD. There is deliberately no --password flag: a command line is visible to other users and kept in shell history. --tls encrypts the connection and verifies the server's certificate; --tls-ca trusts a certificate file instead of the system's authorities, for a deltat with a self-signed certificate (it implies --tls). There is no way to skip verification. The connection is tested before anything is saved, and the file is readable by you only.",
+      options: {
+        host: { type: "string" },
+        port: { type: "string" },
+        database: { type: "string" },
+        user: { type: "string" },
+        tls: { type: "boolean" },
+        "tls-ca": { type: "string" },
+      },
       prepare(a, env) {
         noPositionals(a);
-        const target = connectionFromFlags(env, {
+        const flags = {
           host: text(a, "host"),
           port: text(a, "port"),
           database: text(a, "database"),
           user: text(a, "user"),
-        });
-        if (typeof target === "string") throw new InputError(target);
+          tls: a.values.tls === true,
+          tlsCa: text(a, "tls-ca"),
+        };
         return async ({ io }) => {
+          const resolved = await targetFromFlags(env, flags);
+          if (!resolved.ok) return refused("INVALID", resolved.message);
+          const { target, tls, save } = resolved;
           const where = `${target.user}@${target.host}:${target.port}/${target.database}`;
           const password = env.DELTAT_PASSWORD?.trim() || (await io.readSecret(`Password for ${where}: `));
           if (!password) return refused("INVALID", "No password given.");
-          if (!isLoopback(target.host)) io.stderr(cleartextWarning(target.host));
+          io.stderr(cleartextWarning({ host: target.host, tls }));
 
-          const connection = { ...target, password };
-          const dt = io.connect(connection);
+          const dt = io.connect({ ...target, password, tls });
           const reached = await dt.resources.get({ roots: true }).then(
             () => null,
             (e: unknown) => classifyRefusal(e)
@@ -331,10 +357,10 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
           await dt.close().catch(() => undefined);
           if (reached !== null) return { kind: "refused", refusal: reached };
 
-          const path = await saveConnection(env, connection);
+          const path = await saveConnection(env, { ...target, password, ...save });
           return result(
-            { logged_in: true, host: target.host, port: target.port, database: target.database, user: target.user, config: path },
-            `Logged in to ${target.host}:${target.port}/${target.database} as ${target.user}.\nSaved to ${path}, readable by you only.`
+            { logged_in: true, ...target, tls: tlsLabel(tls, save.tlsCa), config: path },
+            `Logged in to ${target.host}:${target.port}/${target.database} as ${target.user}, TLS ${tlsLabel(tls, save.tlsCa)}.\nSaved to ${path}, readable by you only.`
           );
         };
       },
@@ -372,6 +398,7 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
           const resolved = await resolveConnection(env);
           if (!resolved.ok) return refused("INVALID", resolved.message);
           const { host, port, database, user } = resolved.connection;
+          io.stderr(cleartextWarning(resolved.connection));
           const dt = io.connect(resolved.connection);
           const failure = await dt.resources.get({ roots: true }).then(
             () => null,
@@ -380,6 +407,7 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
           await dt.close().catch(() => undefined);
           const config = configPath(env);
           const passwordFrom = resolved.passwordFrom === "env" ? "DELTAT_PASSWORD" : config;
+          const tls = tlsLabel(resolved.connection.tls, resolved.tlsCa);
           return result(
             {
               host,
@@ -388,6 +416,7 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
               user,
               password: "set",
               password_from: passwordFrom,
+              tls,
               config,
               reachable: failure === null,
               ...(failure ? { error: failure.code, message: failure.message } : {}),
@@ -396,6 +425,7 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
             [
               `${user}@${host}:${port}/${database}`,
               `password  set (from ${passwordFrom})`,
+              `tls       ${tls}`,
               failure === null ? "reachable yes" : `reachable no: ${clean(failure.message)}`,
               ...resolved.warnings.map((w) => `warning: ${w}`),
             ].join("\n")
