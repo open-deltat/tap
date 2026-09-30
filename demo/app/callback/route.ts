@@ -9,6 +9,7 @@ import {
   profileFromGrant,
   safeReturnTo,
 } from "@open-deltat/examples/lib/auth-session";
+import { siteOrigin } from "@open-deltat/examples/lib/public-base-url";
 
 // The OIDC callback: state check, code-for-token exchange (PKCE), session cookies, then the
 // post-login destination. Tokens go into httpOnly cookies and are never rendered; verification
@@ -16,10 +17,12 @@ import {
 
 export async function GET(req: NextRequest) {
   const url = req.nextUrl;
+  // Every redirect goes to the public origin: behind the proxy the request's own is localhost:3000.
+  const origin = siteOrigin(url.origin);
   const fail = (reason: string) =>
-    NextResponse.redirect(new URL(`/dashboard?error=${encodeURIComponent(reason)}`, url.origin));
+    NextResponse.redirect(new URL(`/dashboard?error=${encodeURIComponent(reason)}`, origin));
 
-  if (!authConfig()) return NextResponse.redirect(new URL("/", url.origin));
+  if (!authConfig()) return NextResponse.redirect(new URL("/", origin));
   if (url.searchParams.get("error")) return fail(url.searchParams.get("error") ?? "denied");
 
   const pkce = req.cookies.get(PKCE_COOKIE)?.value;
@@ -32,7 +35,7 @@ export async function GET(req: NextRequest) {
   const grant = await exchangeCode(code, verifier);
   if (!grant) return fail("exchange_failed");
 
-  const res = NextResponse.redirect(new URL(returnTo, url.origin));
+  const res = NextResponse.redirect(new URL(returnTo, origin));
   res.cookies.delete(PKCE_COOKIE);
   res.cookies.set(SESSION_COOKIE, grant.access_token, {
     httpOnly: true,

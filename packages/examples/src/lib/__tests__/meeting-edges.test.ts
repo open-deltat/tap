@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { fetchVerifiedContact } from "../userinfo";
 import { webhookNotifier, webhookUrlFrom } from "../notify";
-import { publicBaseUrlFrom } from "../public-base-url";
+import { publicBaseUrlFrom, siteOrigin } from "../public-base-url";
 
 const USERINFO = "https://issuer.test/oauth2/userinfo";
 
@@ -89,5 +89,11 @@ describe("the site's public origin", () => {
     expect(publicBaseUrlFrom("javascript:alert(1)")).toBeNull();
     expect(publicBaseUrlFrom("")).toBeNull();
     expect(publicBaseUrlFrom(undefined)).toBeNull();
+  });
+
+  test("sign-in sends people to the public origin, not the address the app sees behind the proxy", () => {
+    expect(siteOrigin("https://localhost:3000", "https://delt.at")).toBe("https://delt.at");
+    // Reached directly (local development), the request's own origin is the right one.
+    expect(siteOrigin("http://localhost:3000", null)).toBe("http://localhost:3000");
   });
 });
