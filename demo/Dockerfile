@@ -13,10 +13,11 @@ WORKDIR /app
 COPY . .
 RUN bun install
 
-# @open-deltat/client publishes from dist/ (tsc output, gitignored), so it isn't in the clone and
-# `bun install` only symlinks it. Build it before the app imports it. (@open-deltat/shared ships
-# raw .ts and needs no build.)
-RUN cd packages/client && bun run build
+# @open-deltat/client and @open-deltat/mcp publish from dist/ (tsc output, gitignored), so neither is
+# in the clone and `bun install` only symlinks them. Build both before the app imports them: sign-in
+# and the hosted /mcp endpoint import @open-deltat/mcp. Its build script builds the client first.
+# (@open-deltat/shared ships raw .ts and needs no build.)
+RUN cd packages/mcp && bun run build
 
 # Production Next build for the demo (output lands in demo/.next).
 RUN cd demo && bun run build
