@@ -5,8 +5,8 @@ it, and watch the calendar change live. Readable output by default, `--json` for
 agents.
 
 ```bash
-npm install -g @open-deltat/cli
-deltat-cli --help        # or the short alias: dt
+npx @open-deltat/cli --help       # run it without installing anything
+npm install -g @open-deltat/cli   # or install it: deltat-cli, or the short alias dt
 ```
 
 ## Connect
