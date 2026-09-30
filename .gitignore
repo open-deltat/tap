@@ -1,6 +1,8 @@
 node_modules/
 .next/
 dist/
+# `bun run compile` output: a self-contained binary, tens of MB, never committed or published
+packages/cli/build/
 *.tsbuildinfo
 .turbo/
 .env

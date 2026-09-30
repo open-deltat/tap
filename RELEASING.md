@@ -1,6 +1,6 @@
 # Releasing
 
-Two packages publish to npm from this repo, plus one registry submission. None of it is automated
+Three packages publish to npm from this repo, plus one registry submission. None of it is automated
 yet: publishing needs an npm token and the MCP registry needs an interactive login, and neither
 belongs in a public repo's CI without a scoped secret being set up first.
 
@@ -8,7 +8,12 @@ belongs in a public repo's CI without a scoped secret being set up first.
 |---|---|---|---|
 | 1 | `@open-deltat/client` | npm | `npm publish` from `packages/client` |
 | 2 | `@open-deltat/mcp` | npm | `npm publish` from `packages/mcp` |
+| 2 | `@open-deltat/cli` | npm | `npm publish` from `packages/cli` |
 | 3 | `io.github.open-deltat/deltat` | MCP registry | `mcp-publisher publish` from `packages/mcp` |
+
+The MCP server and the CLI are both adapters over the client and do not depend on each other, so
+either can go second. Everything below about the MCP server's client range applies to the CLI's too,
+and `check-published-deps.sh` checks both.
 
 **The order is not a convention, it is a correctness requirement.** `@open-deltat/mcp` declares a
 semver range on `@open-deltat/client`, and once published it resolves that range from the registry,

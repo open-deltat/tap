@@ -28,5 +28,9 @@ export type {
   DayName,
   DeltaTEvent,
 } from "./types.js";
-export { counterOffer, sqlstateOf } from "./errors.js";
-export type { CounterOffer } from "./errors.js";
+export { counterOffer, sqlstateOf, classifyRefusal } from "./errors.js";
+export type { CounterOffer, Refusal, RefusalCode } from "./errors.js";
+export { parseInstant } from "./time.js";
+export type { ParsedInstant } from "./time.js";
+export { ChangeTracker } from "./watch.js";
+export type { Change } from "./watch.js";

@@ -63,6 +63,15 @@ const slots = await dt.availability.get({
 
 > deltat's current transport is the PostgreSQL wire protocol, a transitional choice. A v2 framed protocol with HTTP and MCP adapters is planned (see deltat's `docs/REQUIREMENTS.md`, PROTO-01/02). The typed API above is built to outlast that swap.
 
+## CLI
+
+`@open-deltat/cli` puts the same booking loop in a terminal, for people and for agents that have a shell. `deltat-cli watch <calendar> --json` prints one line per change as it happens, so an agent can react to a time being held, booked or freed. See [`packages/cli`](packages/cli/README.md).
+
+```bash
+npm install -g @open-deltat/cli
+deltat-cli find <calendar> --from 2026-10-01T09:00:00+02:00 --to 2026-10-01T18:00:00+02:00
+```
+
 ## Demos
 
 | Demo | What it shows |

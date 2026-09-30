@@ -126,6 +126,18 @@ export class Resources {
 
     return rows.map(mapResource);
   }
+
+  /**
+   * One resource by id, or null. Check this before trusting an empty read: availability, holds and
+   * bookings for an id that does not exist come back empty rather than as an error, which reads as
+   * "fully booked" or "nothing happening" instead of "wrong id".
+   *
+   * The kernel only filters resources by parent, so this reads the tenant's resources and picks one.
+   * Fine for an existence check, not for a hot path.
+   */
+  async find(id: string): Promise<Resource | null> {
+    return (await this.get()).find((r) => r.id === id) ?? null;
+  }
 }
 
 function mapResource(row: Record<string, unknown>): Resource {
