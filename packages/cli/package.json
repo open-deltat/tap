@@ -1,0 +1,51 @@
+{
+  "name": "@open-deltat/cli",
+  "version": "0.1.0",
+  "description": "Book time on a deltat calendar from the terminal: find what is free, hold it, commit it, and watch changes live. Human output by default, --json for scripts and AI agents.",
+  "license": "MIT",
+  "author": "Simon Orzel",
+  "homepage": "https://delt.at",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-deltat/tap.git",
+    "directory": "packages/cli"
+  },
+  "keywords": [
+    "cli",
+    "deltat",
+    "scheduling",
+    "booking",
+    "calendar",
+    "availability",
+    "agents",
+    "ai-agents"
+  ],
+  "type": "module",
+  "bin": {
+    "deltat-cli": "dist/index.js",
+    "dt": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "cd ../client && bun run build && cd ../cli && tsc",
+    "prepublishOnly": "cd ../client && bun run build && cd ../cli && tsc",
+    "compile": "bun run build && bun build src/index.ts --compile --outfile build/deltat-cli",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@open-deltat/client": "^0.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "typescript": "^5"
+  }
+}

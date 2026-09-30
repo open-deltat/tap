@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { counterOffer, sqlstateOf } from "../errors.js";
+import { classifyRefusal, counterOffer, sqlstateOf } from "../errors.js";
 
 // This parser runs inside a caller's catch block, where throwing a second error is the worst thing
 // it could do. Every test below is either "the happy path is correct" or "this weird input yields
@@ -111,5 +111,48 @@ describe("sqlstateOf", () => {
   test("null for anything that is not a Postgres error", () => {
     expect(sqlstateOf(new Error("boom"))).toBeNull();
     expect(sqlstateOf(undefined)).toBeNull();
+  });
+});
+
+// Both the MCP server and the CLI answer through this, so a code here is what a model acts on: a
+// wrong one either abandons a booking it could have made or retries a call that can never work.
+describe("classifyRefusal", () => {
+  const pgError = (code: string, message: string, detail?: unknown) =>
+    Object.assign(new Error(message), { code, ...(detail ? { detail: JSON.stringify(detail) } : {}) });
+
+  test("a lost race is a CONFLICT that carries the times that would work", () => {
+    const r = classifyRefusal(pgError("40001", "conflict", validBody));
+    expect(r.code).toBe("CONFLICT");
+    expect(r.offer?.alternatives).toHaveLength(2);
+  });
+
+  test("outside opening hours is a CONFLICT, never INTERNAL, so the caller asks for another time", () => {
+    expect(classifyRefusal(pgError("23514", "span is outside open windows or blocked")).code).toBe("CONFLICT");
+  });
+
+  test("a lapsed hold is EXPIRED even though its SQLSTATE says unknown id", () => {
+    expect(classifyRefusal(pgError("42704", "hold 01X has expired")).code).toBe("EXPIRED");
+  });
+
+  test("an unknown id that is not a lapsed hold is NOT_FOUND", () => {
+    expect(classifyRefusal(pgError("42704", "resource 01X")).code).toBe("NOT_FOUND");
+  });
+
+  test("a reused id and an exceeded limit are the caller's to fix: INVALID", () => {
+    expect(classifyRefusal(pgError("23505", "duplicate id")).code).toBe("INVALID");
+    expect(classifyRefusal(pgError("54000", "too many ids")).code).toBe("INVALID");
+  });
+
+  test("anything unrecognised is INTERNAL and says a retry will not help, rather than inviting a loop", () => {
+    const r = classifyRefusal(new Error("connect ECONNREFUSED 127.0.0.1:5433"));
+    expect(r.code).toBe("INTERNAL");
+    expect(r.message).toContain("retrying the same call will not help");
+    expect(r.offer).toBeNull();
+  });
+
+  test("never throws, whatever it is handed", () => {
+    for (const weird of [undefined, null, 42, "text", { code: 7 }, Object.create(null)]) {
+      expect(() => classifyRefusal(weird)).not.toThrow();
+    }
   });
 });

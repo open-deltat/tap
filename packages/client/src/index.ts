@@ -6,6 +6,7 @@ export { Bookings } from "./bookings.js";
 export { Holds } from "./holds.js";
 export { Availability } from "./availability.js";
 export { Events } from "./events.js";
+export type { WatchOptions } from "./events.js";
 export {
   daysOfWeekMask,
   daysFromMask,
@@ -28,5 +29,12 @@ export type {
   DayName,
   DeltaTEvent,
 } from "./types.js";
-export { counterOffer, sqlstateOf } from "./errors.js";
-export type { CounterOffer } from "./errors.js";
+export { counterOffer, sqlstateOf, classifyRefusal } from "./errors.js";
+export type { CounterOffer, Refusal, RefusalCode } from "./errors.js";
+export { parseInstant } from "./time.js";
+export type { ParsedInstant } from "./time.js";
+export { ChangeTracker } from "./watch.js";
+export type { Change } from "./watch.js";
+export { tlsSetting, passwordInClear } from "./tls.js";
+export { ADAPTER_DEFAULTS } from "./defaults.js";
+export type { TlsSetting } from "./tls.js";

@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { DeltaT, expandRecurrence, counterOffer, sqlstateOf } from "@open-deltat/client";
-import type { CounterOffer } from "@open-deltat/client";
+import { DeltaT, expandRecurrence, classifyRefusal, parseInstant } from "@open-deltat/client";
+import type { CounterOffer, RefusalCode } from "@open-deltat/client";
 
 // The agent-facing tool surface over deltat: create a calendar, set its availability, then the
 // real-time booking loop (find, hold, commit, release) plus read and cancel. Times cross this
@@ -19,19 +19,11 @@ const DAY = 86_400_000;
 const HORIZON_DAYS = 60;
 const HOLD_TTL_MS = 5 * 60_000; // long enough to check with a human before committing
 
-// RFC 3339 with a mandatory offset (Z or ±HH:MM). Enforced because a zoneless datetime is
-// interpreted in the host's local zone by Date.parse, so the same agent input would book a
-// different absolute instant depending on where the process runs. A strict shape also rejects the
-// non-RFC-3339 forms Date.parse leniently accepts.
-const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}(:\d{2})?(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$/;
-
+// Strict RFC 3339 with an offset; parseInstant says why a zoneless time is refused.
 const toMs = (iso: string): number => {
-  if (!RFC3339.test(iso)) {
-    throw new ToolError("INVALID", `Not an RFC 3339 timestamp with an offset (e.g. 2026-06-01T09:00:00Z): ${iso}`);
-  }
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) throw new ToolError("INVALID", `Unparseable timestamp: ${iso}`);
-  return ms;
+  const parsed = parseInstant(iso);
+  if (!parsed.ok) throw new ToolError("INVALID", parsed.message);
+  return parsed.ms;
 };
 const toIso = (ms: number): string => new Date(ms).toISOString();
 const local = (ms: number, tz: string): string => {
@@ -44,7 +36,7 @@ const local = (ms: number, tz: string): string => {
 
 class ToolError extends Error {
   constructor(
-    readonly code: "CONFLICT" | "EXPIRED" | "INVALID" | "NOT_FOUND" | "INTERNAL",
+    readonly code: RefusalCode,
     message: string,
     /** Times the caller could take instead, when the kernel supplied any. */
     readonly offer?: CounterOffer
@@ -53,65 +45,14 @@ class ToolError extends Error {
   }
 }
 
-/**
- * Map a deltat/pg error to the agent-facing typed code.
- *
- * SQLSTATE first, message text only as a fallback for kernels older than the taxonomy. Matching on
- * prose was how `ClosedBySchedule` ("span is outside open windows or blocked") ended up reported as
- * INTERNAL: it matched none of the four patterns, so a request merely outside opening hours told
- * the model that retrying would not help, and the model abandoned a booking it could have made by
- * asking for a different time.
- *
- * The default stays INTERNAL rather than INVALID. INVALID tells a model its arguments were wrong,
- * which invites a retry; for a fault unrelated to the arguments that is an infinite loop, and on
- * `hold_slot` each pass leaves a live hold blocking the slot until the reaper expires it.
- */
+/** Map a deltat/pg error to the agent-facing typed code. The mapping and its reasons live in the SDK. */
 function classify(err: unknown): ToolError {
   // An error that already carries a code was classified at the throw site, which knew more than
   // any message-text match can recover. Re-deriving it here is how a precise "that timestamp has
   // no offset" got downgraded to an unhelpful INTERNAL.
   if (err instanceof ToolError) return err;
-
-  const msg = err instanceof Error ? err.message : String(err);
-  const offer = counterOffer(err) ?? undefined;
-
-  // Before the SQLSTATE switch, not after. A hold that lapsed mid-conversation surfaces as 42704
-  // (unknown id), and reporting that as NOT_FOUND would tell the model it had the wrong calendar
-  // when the truth is that its hold expired and it should place a new one.
-  if (/expired|no longer exists|unknown hold/i.test(msg)) {
-    return new ToolError("EXPIRED", msg, offer);
-  }
-
-  switch (sqlstateOf(err)) {
-    // Lost a race, or the resource filled. Both mean "not this time", and both now carry the
-    // times that do work.
-    case "40001":
-      return new ToolError("CONFLICT", msg, offer);
-    // Outside open hours or outside the parent's availability. Not a race, so retrying the same
-    // span is pointless, but it is exactly where alternatives are most useful.
-    case "23514":
-      return new ToolError("CONFLICT", msg, offer);
-    case "42704":
-      return new ToolError("NOT_FOUND", msg, offer);
-    case "23505": // reused id
-    case "54000": // limit exceeded
-      return new ToolError("INVALID", msg, offer);
-    case "58030": // WAL / storage fault
-      return new ToolError("INTERNAL", msg, offer);
-  }
-
-  // Fallback for a kernel that predates real SQLSTATEs, or a non-deltat error.
-  if (/conflict|overlap|already|capacity|outside open|blocked/i.test(msg)) {
-    return new ToolError("CONFLICT", msg, offer);
-  }
-  if (/not found|unknown resource|no such/i.test(msg)) return new ToolError("NOT_FOUND", msg, offer);
-  if (/invalid|malformed|out of range|must be|cannot parse|unsupported/i.test(msg)) {
-    return new ToolError("INVALID", msg, offer);
-  }
-  return new ToolError(
-    "INTERNAL",
-    `${msg} (this is a server or configuration fault, not a problem with your arguments; retrying the same call will not help)`
-  );
+  const refusal = classifyRefusal(err);
+  return new ToolError(refusal.code, refusal.message, refusal.offer ?? undefined);
 }
 
 const ok = (text: string) => ({ content: [{ type: "text" as const, text }] });
