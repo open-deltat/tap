@@ -32,9 +32,10 @@ export default function Home() {
             A real-time database for time.
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-zinc-400">
-            For anything people book, from concert seats to restaurant tables. Δt shows what is
-            still free and updates everyone the moment something is taken. Nothing ever gets
-            booked twice. AI agents can book on it too. Every demo below is live.
+            For anything people book, from concert seats to restaurant tables, Δt treats time as
+            an asset that belongs to that seat or table. It shows what is still free and updates
+            everyone the moment something is taken. Nothing ever gets booked twice. AI agents can
+            book on it too. Every demo below is live.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
             <a
