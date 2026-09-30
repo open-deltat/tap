@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { PKCE_COOKIE, authConfig, cookieSecure, safeReturnTo } from "@open-deltat/examples/lib/auth-session";
+import { siteOrigin } from "@open-deltat/examples/lib/public-base-url";
 
 // Kicks off sign-in against the configured OIDC issuer: PKCE (public client, no secret in this
 // app), state for CSRF, both stashed in one short-lived httpOnly cookie the callback consumes.
@@ -20,7 +21,9 @@ export async function GET(req: NextRequest) {
   authorize.search = new URLSearchParams({
     response_type: "code",
     client_id: config.clientId,
-    redirect_uri: `${req.nextUrl.origin}/callback`,
+    // The public origin, not the request's: behind the proxy the app sees localhost:3000, and the
+    // identity provider only accepts the redirect URIs registered for the real site.
+    redirect_uri: `${siteOrigin(req.nextUrl.origin)}/callback`,
     scope: "openid profile email",
     code_challenge: challenge,
     code_challenge_method: "S256",
