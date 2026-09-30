@@ -34,6 +34,31 @@ describe("parseInstant", () => {
   });
 
   test("refuses a well-shaped but impossible date rather than rolling it over", () => {
-    expect(parseInstant("2026-13-45T25:00Z").ok).toBe(false);
+    // Each of these is a real booking on the wrong day if Date.parse is trusted: it rolls
+    // 2026-02-30 to 2 March and 24:00 to the next morning.
+    for (const input of [
+      "2026-13-45T25:00Z",
+      "2026-02-30T09:00:00Z",
+      "2026-02-29T09:00:00Z", // 2026 is not a leap year
+      "2026-04-31T09:00:00Z",
+      "2026-06-01T24:00:00Z",
+      "2026-06-01T23:60:00Z",
+      "2026-06-01T23:59:60Z",
+      "2026-06-01T09:00:00+24:00",
+      "2026-00-10T09:00:00Z",
+      "2026-06-00T09:00:00Z",
+    ]) {
+      expect(parseInstant(input)).toMatchObject({ ok: false });
+    }
+  });
+
+  test("accepts the real edges of the calendar", () => {
+    expect(ms("2028-02-29T09:00:00Z")).toBe(Date.UTC(2028, 1, 29, 9)); // leap year
+    expect(ms("2000-02-29T00:00:00Z")).toBe(Date.UTC(2000, 1, 29)); // divisible by 400
+    expect(ms("2026-12-31T23:59:59+14:00")).toBe(Date.UTC(2026, 11, 31, 9, 59, 59));
+  });
+
+  test("refuses 29 February in a century year that is not a leap year", () => {
+    expect(parseInstant("2100-02-29T09:00:00Z").ok).toBe(false);
   });
 });

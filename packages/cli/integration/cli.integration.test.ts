@@ -171,6 +171,25 @@ describe("watch as a real process", () => {
   );
 
   liveTest(
+    "ends with exit 5 when the calendar it watches is deleted, instead of going silent",
+    async () => {
+      const client = sdk;
+      if (!client) throw new Error("live suite without a client");
+      const doomed = await client.resources.create({ name: "cli-it-doomed", capacity: 1 });
+      const proc = Bun.spawn(["node", BIN, "watch", doomed.id, "--json"], {
+        env: { ...process.env, ...env() },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      await Bun.sleep(1_500);
+      await client.resources.delete(doomed.id);
+      const code = await Promise.race([proc.exited, Bun.sleep(5_000).then(() => "still running")]);
+      expect(code).toBe(5);
+    },
+    20_000
+  );
+
+  liveTest(
     "exits cleanly when its reader goes away, instead of crashing",
     async () => {
       const client = sdk;

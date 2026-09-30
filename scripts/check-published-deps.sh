@@ -44,13 +44,11 @@ for ADAPTER in mcp cli; do
   mkdir -p "$DIR"
   cd "$DIR"
   npm init -y >/dev/null 2>&1
-  npm install "@open-deltat/client@$RANGE" --silent >/dev/null 2>&1
+  npm install "@open-deltat/client@$RANGE" typescript@5 --silent >/dev/null 2>&1
 
   # The APIs the adapters call, checked on the REGISTRY copy by importing it, not on the workspace.
   # Add a line when an adapter starts using a new one.
   ADAPTER="$ADAPTER" node --input-type=module - <<'NODE'
-import { readFileSync } from 'node:fs'
-
 const client = await import('@open-deltat/client')
 const method = (cls, name) => typeof client[cls]?.prototype?.[name] === 'function'
 const fn = (name) => typeof client[name] === 'function'
@@ -69,15 +67,6 @@ const required = [
   [() => fn('parseInstant'), 'parseInstant'],
   [() => fn('tlsSetting'), 'tlsSetting  (DELTAT_TLS / DELTAT_TLS_CA, read the same way by both adapters)'],
   [() => fn('passwordInClear'), 'passwordInClear'],
-  // Types, so there is nothing to import: read from the published declarations.
-  [
-    () => /timeZone\??:/.test(readFileSync('node_modules/@open-deltat/client/dist/recurrence.d.ts', 'utf8')),
-    'RecurrencePattern.timeZone  (or availability expands in the host zone)',
-  ],
-  [
-    () => /tls\??:/.test(readFileSync('node_modules/@open-deltat/client/dist/client.d.ts', 'utf8')),
-    'DeltaTOptions.tls  (or DELTAT_TLS is silently ignored and the password goes out in the clear)',
-  ],
 ]
 
 const missing = required.filter(([present]) => {
@@ -93,6 +82,22 @@ if (missing.length) {
   process.exit(1)
 }
 
-console.log(`OK: the published client satisfies every API the adapters call (${required.length} checked).`)
+console.log(`OK: every runtime API the adapters call is in the published client (${required.length} checked).`)
 NODE
+
+  # Types have nothing to import, so the compiler checks them against the published declarations:
+  # a snippet that uses the type the way the adapters do must compile.
+  type_check() {
+    printf '%s\n' "$2" > type-check.ts
+    if ! npx --no-install tsc --noEmit --strict --skipLibCheck --module esnext --moduleResolution bundler type-check.ts >/dev/null 2>&1; then
+      echo "FAIL: the published client is missing a type packages/$ADAPTER relies on: $1"
+      echo "      Bump and publish @open-deltat/client first, then raise the range in packages/$ADAPTER/package.json."
+      exit 1
+    fi
+  }
+  type_check 'DeltaTOptions.tls  (or DELTAT_TLS is silently ignored and the password goes out in the clear)' \
+    'import type { DeltaTOptions } from "@open-deltat/client"; export const tls: DeltaTOptions["tls"] = { ca: "" };'
+  type_check 'RecurrencePattern.timeZone  (or availability expands in the host zone)' \
+    'import type { RecurrencePattern } from "@open-deltat/client"; export const zone: RecurrencePattern["timeZone"] = "Europe/Berlin";'
+  echo "OK: the types the adapters rely on compile against the published client (2 checked)."
 done

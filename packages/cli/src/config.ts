@@ -1,15 +1,18 @@
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { tlsSetting, type DeltaTOptions } from "@open-deltat/client";
 
 // Where the CLI connects, and with what password. The environment wins over the saved file, field
 // by field, and the variable names and defaults are the MCP server's (packages/mcp/server.json), so
-// one set of variables configures both. Values are trimmed and a blank one counts as unset.
+// one set of variables configures both. Values are trimmed and a blank one counts as unset, except
+// a password, which is used exactly as given (a space can be part of it).
 //
 // The password never travels through argv: a command line is visible to every user in `ps` and is
 // kept in shell history. It comes from DELTAT_PASSWORD or from the file `login` writes, which is
-// created readable by its owner only.
+// created readable by its owner only. A saved password only ever goes to the server it was saved
+// for, over TLS if it was saved with TLS: pointing DELTAT_HOST or DELTAT_PORT elsewhere, or turning
+// TLS off, needs its own DELTAT_PASSWORD rather than silently reusing the saved one.
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
@@ -31,6 +34,9 @@ const blankToNull = (v: string | undefined): string | null => {
   const t = v?.trim();
   return t ? t : null;
 };
+
+/** A password exactly as given, or null when it is empty or only whitespace. */
+export const secret = (v: string | undefined | null): string | null => (v && v.trim() !== "" ? v : null);
 
 const readText = (path: string) => readFile(path, "utf8");
 
@@ -85,7 +91,7 @@ async function readSaved(
   const host = field("host");
   const database = field("database");
   const user = field("user");
-  const password = field("password");
+  const password = typeof o.password === "string" ? secret(o.password) : null;
   const tlsCa = field("tlsCa");
   const saved: Partial<Saved> = {
     ...(host ? { host } : {}),
@@ -108,20 +114,21 @@ export async function resolveConnection(env: Env): Promise<Resolved> {
   const port = envPort !== null ? parsePort(envPort, "DELTAT_PORT") : (saved.port ?? DEFAULTS.port);
   if (typeof port === "string") return { ok: false, message: port };
 
-  const envPassword = blankToNull(env.DELTAT_PASSWORD);
-  const password = envPassword ?? saved.password ?? null;
-  if (password === null) {
-    return { ok: false, message: "No password. Run `deltat-cli login`, or set DELTAT_PASSWORD." };
-  }
-
   const tlsCa = blankToNull(env.DELTAT_TLS_CA) ?? saved.tlsCa ?? null;
   const tls = await tlsSetting({ tls: blankToNull(env.DELTAT_TLS) ?? saved.tls ?? null, caPath: tlsCa }, readText);
   if (!tls.ok) return tls;
+  const host = blankToNull(env.DELTAT_HOST) ?? saved.host ?? DEFAULTS.host;
+
+  const envPassword = secret(env.DELTAT_PASSWORD);
+  const password = envPassword ?? saved.password ?? null;
+  if (password === null) return { ok: false, message: "No password. Run `deltat-cli login`, or set DELTAT_PASSWORD." };
+  const refusal = envPassword === null ? savedPasswordRefusal(saved, { host, port, tls: tls.tls }) : null;
+  if (refusal) return { ok: false, message: refusal };
 
   return {
     ok: true,
     connection: {
-      host: blankToNull(env.DELTAT_HOST) ?? saved.host ?? DEFAULTS.host,
+      host,
       port,
       database: blankToNull(env.DELTAT_DATABASE) ?? saved.database ?? DEFAULTS.database,
       user: blankToNull(env.DELTAT_USER) ?? saved.user ?? DEFAULTS.user,
@@ -134,6 +141,26 @@ export async function resolveConnection(env: Env): Promise<Resolved> {
   };
 }
 
+/**
+ * Why the saved password must not be sent where this command would send it, or null when it may.
+ * It belongs to the exact host and port `login` tested it against (compared whole, never as a
+ * substring), and if it was saved with TLS it never goes out without it.
+ */
+function savedPasswordRefusal(
+  saved: Partial<Saved>,
+  destination: { host: string; port: number; tls: Connection["tls"] }
+): string | null {
+  const savedHost = saved.host ?? DEFAULTS.host;
+  const savedPort = saved.port ?? DEFAULTS.port;
+  if (destination.host.toLowerCase() !== savedHost.toLowerCase() || destination.port !== savedPort) {
+    return `The saved password is for ${savedHost}:${savedPort}, not ${destination.host}:${destination.port}. Set DELTAT_PASSWORD for that server, or log in to it.`;
+  }
+  if (saved.tls === true && destination.tls === false) {
+    return "The saved connection uses TLS, and DELTAT_TLS=off would send its password unencrypted. Set DELTAT_PASSWORD to override, or drop DELTAT_TLS.";
+  }
+  return null;
+}
+
 /** Connection options `login` accepts, before the password is known. Flags win over the environment. */
 export async function targetFromFlags(
   env: Env,
@@ -143,7 +170,9 @@ export async function targetFromFlags(
   const port = rawPort === null ? DEFAULTS.port : parsePort(rawPort, "--port");
   if (typeof port === "string") return { ok: false, message: port };
 
-  const tlsCa = flags.tlsCa ?? blankToNull(env.DELTAT_TLS_CA);
+  // Saved as an absolute path: the file is read by commands run from any directory.
+  const rawCa = flags.tlsCa ?? blankToNull(env.DELTAT_TLS_CA);
+  const tlsCa = rawCa === null ? null : resolve(rawCa);
   const tls = await tlsSetting({ tls: flags.tls === true ? true : blankToNull(env.DELTAT_TLS), caPath: tlsCa }, readText);
   if (!tls.ok) return tls;
 

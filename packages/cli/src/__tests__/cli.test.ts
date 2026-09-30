@@ -16,7 +16,13 @@ const PASSWORD = "correct-horse-battery-staple";
 const T = "2026-10-01T09:00:00+02:00";
 const T2 = "2026-10-01T12:00:00+02:00";
 
-type WatchHooks = { onDisconnected?: () => void; onResubscribed?: () => void };
+type WatchHooks = {
+  onReady?: () => void;
+  onDisconnected?: () => void;
+  onResubscribed?: () => void;
+  onLagged?: (missed: number) => void;
+  onGone?: () => void;
+};
 
 type Fake = {
   dt: DeltaT;
@@ -25,6 +31,8 @@ type Fake = {
   emit: (c: Change) => void;
   /** The connection to deltat drops, then comes back, as events.watch reports it. */
   outage: () => void;
+  lag: (missed: number) => void;
+  deleteCalendar: () => void;
 };
 
 /** The subset of DeltaT the CLI calls, recording each call. Behaviour is overridable per test. */
@@ -60,7 +68,10 @@ function fakeServer(overrides: Record<string, (...args: unknown[]) => Promise<un
     events: {
       watch: call("events.watch", async (_id, onChange, options) => {
         watchers.push(onChange as (c: Change) => void);
-        hooks.push(options as WatchHooks);
+        const h = options as WatchHooks;
+        hooks.push(h);
+        // As the real watch does: ready once subscribed and read, before any change is delivered.
+        h.onReady?.();
         return async () => {
           calls.push("watch.stop");
         };
@@ -81,6 +92,8 @@ function fakeServer(overrides: Record<string, (...args: unknown[]) => Promise<un
         h.onDisconnected?.();
         h.onResubscribed?.();
       }),
+    lag: (missed) => hooks.forEach((h) => h.onLagged?.(missed)),
+    deleteCalendar: () => hooks.forEach((h) => h.onGone?.()),
   };
 }
 
@@ -340,6 +353,30 @@ describe("watch", () => {
     const lines = (await running).out.trim().split("\n").map((l) => JSON.parse(l));
     expect(lines.map((l) => l.status)).toEqual(["watching", "disconnected", "reconnected"]);
     expect(lines[2]).toMatchObject({ may_have_missed_changes: true });
+  });
+
+  test("a lag is reported with how much was missed", async () => {
+    const server = fakeServer();
+    const stopped = Promise.withResolvers<void>();
+    const running = run(["watch", CAL, "--json"], { server, stopWatch: stopped.promise });
+    await Bun.sleep(10);
+    server.lag(12);
+    stopped.resolve();
+    const lines = (await running).out.trim().split("\n").map((l) => JSON.parse(l));
+    expect(lines[1]).toMatchObject({ status: "lagged", missed: 12, may_have_missed_changes: true });
+  });
+
+  test("the calendar being deleted ends the watch with exit 5 instead of silence", async () => {
+    const server = fakeServer();
+    const neverInterrupted = new Promise<void>(() => undefined);
+    const running = run(["watch", CAL, "--json"], { server, stopWatch: neverInterrupted });
+    await Bun.sleep(10);
+    server.deleteCalendar();
+    const r = await running;
+    expect(r.code).toBe(5);
+    const lines = r.out.trim().split("\n").map((l) => JSON.parse(l));
+    expect(lines.at(-1)).toMatchObject({ error: "NOT_FOUND" });
+    expect(server.closed()).toBe(1);
   });
 
   test("refuses an unknown calendar instead of watching silence forever", async () => {

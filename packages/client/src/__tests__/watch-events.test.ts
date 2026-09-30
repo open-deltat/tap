@@ -1,0 +1,152 @@
+import { describe, expect, test } from "bun:test";
+import type { Sql } from "postgres";
+import { Events } from "../events.js";
+import type { Listener, Subscriber } from "../subscriptions.js";
+import type { DeltaTEvent } from "../types.js";
+import type { Change } from "../watch.js";
+import { SETTLE_MS } from "../watch.js";
+
+// Events.watch across the moments a live calendar is re-read. The snapshot queries go to a fake
+// connection whose answers can be held back, so an event can be delivered while a read is in
+// flight: the race a picture that is about to be replaced would otherwise swallow.
+
+const CAL = "01CAL0000000000000000000000";
+
+function fakeSql() {
+  const gate = { open: Promise.resolve() as Promise<void> };
+  const reads: string[] = [];
+  const answer = (kind: string) => {
+    reads.push(kind);
+    return gate.open.then(() => []);
+  };
+  // Holds.get and Bookings.get use a tagged template without a window and unsafe() with one.
+  const sql = Object.assign(() => answer("unwindowed"), { unsafe: () => answer("windowed") });
+  const hold = () => {
+    const released = Promise.withResolvers<void>();
+    gate.open = released.promise;
+    return () => released.resolve();
+  };
+  return { sql: sql as unknown as Sql, reads, hold };
+}
+
+function fakeListener() {
+  const captured: { subscriber: Subscriber | null; stopped: boolean } = { subscriber: null, stopped: false };
+  const listener: Listener = {
+    listen: async (_channel, subscriber) => {
+      captured.subscriber = subscriber;
+      subscriber.onSubscribed();
+      return async () => {
+        captured.stopped = true;
+      };
+    },
+    close: async () => undefined,
+  };
+  const send = (event: DeltaTEvent) => captured.subscriber?.onNotify(JSON.stringify(event));
+  return { listener, captured, send };
+}
+
+const held = (id: string, start: number): DeltaTEvent => ({
+  HoldPlaced: { id, resource_id: CAL, span: { start, end: start + 1000 }, expires_at: 9e15 },
+});
+const released = (id: string): DeltaTEvent => ({ HoldReleased: { id, resource_id: CAL } });
+
+async function watching(opts: { window?: { start: number; end: number } } = {}) {
+  const db = fakeSql();
+  const sub = fakeListener();
+  const log: string[] = [];
+  const changes: Change[] = [];
+  const events = new Events(db.sql, sub.listener);
+  const start = () =>
+    events.watch(
+      CAL,
+      (c) => {
+        changes.push(c);
+        log.push(c.kind);
+      },
+      {
+        ...opts,
+        onReady: () => log.push("ready"),
+        onResubscribed: () => log.push("resubscribed"),
+        onLagged: (n) => log.push(`lagged:${n}`),
+        onGone: () => log.push("gone"),
+      }
+    );
+  return { db, sub, log, changes, start };
+}
+
+const tick = () => Bun.sleep(0);
+
+describe("Events.watch", () => {
+  test("onReady comes before any change, even one that arrived during the first read", async () => {
+    const w = await watching();
+    const open = w.db.hold();
+    const started = w.start();
+    await tick();
+    w.sub.send(held("h1", 1000));
+    open();
+    await started;
+    expect(w.log).toEqual(["ready", "held"]);
+  });
+
+  test("events during a re-read are held and replayed on the fresh picture, so an ending keeps its time", async () => {
+    const w = await watching();
+    await w.start();
+    const open = w.db.hold();
+    w.sub.captured.subscriber?.onSubscribed(); // re-subscribed after an outage: the calendar is re-read
+    await tick();
+    // Placed and released while the re-read is in flight. Applied to the old picture and then
+    // replaced, the release would reach the new one with no idea when the hold was.
+    w.sub.send(held("h1", 1000));
+    w.sub.send(released("h1"));
+    open();
+    await Bun.sleep(SETTLE_MS + 30);
+    expect(w.log).toEqual(["ready", "held", "resubscribed", "hold_ended"]);
+    expect(w.changes[1]).toMatchObject({ kind: "hold_ended", start: 1000, end: 2000 });
+  });
+
+  test("a Lagged notice re-reads the calendar and says how much was missed", async () => {
+    const w = await watching();
+    await w.start();
+    const readsBefore = w.db.reads.length;
+    w.sub.send({ Lagged: { missed: 7 } });
+    await Bun.sleep(10);
+    expect(w.log).toEqual(["ready", "lagged:7"]);
+    expect(w.db.reads.length).toBeGreaterThan(readsBefore);
+  });
+
+  test("the watched calendar being deleted ends the watch and says so", async () => {
+    const w = await watching();
+    await w.start();
+    w.sub.send({ ResourceDeleted: { id: CAL } });
+    await tick();
+    w.sub.send(held("h1", 1000));
+    expect(w.log).toEqual(["ready", "gone"]);
+    expect(w.sub.captured.stopped).toBe(true);
+  });
+
+  test("a child resource being deleted is not the calendar going away", async () => {
+    const w = await watching();
+    await w.start();
+    w.sub.send({ ResourceDeleted: { id: "01CHILD" } });
+    w.sub.send(held("h1", 1000));
+    expect(w.log).toEqual(["ready", "held"]);
+  });
+
+  test("a subscription that comes back gone (deleted during an outage) ends the watch too", async () => {
+    const w = await watching();
+    await w.start();
+    w.sub.captured.subscriber?.onGone?.();
+    await tick();
+    expect(w.log).toEqual(["ready", "gone"]);
+    expect(w.sub.captured.stopped).toBe(true);
+  });
+
+  test("with a window, the calendar is read for that window only", async () => {
+    const w = await watching({ window: { start: 0, end: 10_000 } });
+    await w.start();
+    expect(w.db.reads).toEqual(["windowed", "windowed"]);
+    const unwindowed = await watching();
+    await unwindowed.start();
+    expect(unwindowed.db.reads).toEqual(["unwindowed", "unwindowed"]);
+  });
+});

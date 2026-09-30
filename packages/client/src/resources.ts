@@ -1,6 +1,10 @@
 import type { Sql } from "postgres";
 import { ulid } from "ulid";
+import { sqlstateOf } from "./errors.js";
 import type { Resource } from "./types.js";
+
+/** SQLSTATE a kernel older than deltat#42 answers `SELECT ... FROM resources WHERE id = ...` with. */
+const FILTER_REFUSED = "42601";
 
 export class Resources {
   constructor(private readonly sql: Sql) {}
@@ -132,10 +136,19 @@ export class Resources {
    * bookings for an id that does not exist come back empty rather than as an error, which reads as
    * "fully booked" or "nothing happening" instead of "wrong id".
    *
-   * The kernel only filters resources by parent, so this reads the tenant's resources and picks one.
-   * Fine for an existence check, not for a hot path.
+   * A direct lookup on kernels that accept `WHERE id` (deltat#42). Older ones refuse that filter
+   * with 42601 ("missing filter: parent_id"), and only then does this read every resource in the
+   * tenant and pick one; any other error is a real failure and is thrown.
    */
   async find(id: string): Promise<Resource | null> {
+    const direct = await this.sql`SELECT * FROM resources WHERE id = ${id}`.then(
+      (rows) => ({ supported: true as const, rows }),
+      (error: unknown) => {
+        if (sqlstateOf(error) === FILTER_REFUSED) return { supported: false as const };
+        throw error;
+      }
+    );
+    if (direct.supported) return direct.rows.map(mapResource)[0] ?? null;
     return (await this.get()).find((r) => r.id === id) ?? null;
   }
 }

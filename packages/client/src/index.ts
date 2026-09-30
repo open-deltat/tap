@@ -6,6 +6,7 @@ export { Bookings } from "./bookings.js";
 export { Holds } from "./holds.js";
 export { Availability } from "./availability.js";
 export { Events } from "./events.js";
+export type { WatchOptions } from "./events.js";
 export {
   daysOfWeekMask,
   daysFromMask,

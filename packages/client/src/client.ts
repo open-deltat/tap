@@ -65,9 +65,10 @@ export class DeltaT {
 
   /**
    * Close the connection and every subscription, including any retry waiting for deltat to come
-   * back. The instance is unusable afterward, so call it once at shutdown.
+   * back, forcing them closed after 5 s so an unreachable host cannot hang shutdown. The instance is
+   * unusable afterward, so call it once at shutdown.
    */
   async close(): Promise<void> {
-    await Promise.all([this.events.close(), this.sql.end()]);
+    await Promise.all([this.events.close(), this.sql.end({ timeout: 5 })]);
   }
 }

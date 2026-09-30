@@ -21,7 +21,10 @@ command line is visible to other users and kept in shell history.
 
 Or skip the file and use the same variables as the MCP server: `DELTAT_HOST`, `DELTAT_PORT`,
 `DELTAT_DATABASE`, `DELTAT_USER`, `DELTAT_PASSWORD`, `DELTAT_TLS`, `DELTAT_TLS_CA`. A variable wins
-over the saved file.
+over the saved file, with one exception: the saved password only ever goes to the host and port it
+was saved for, and over TLS if it was saved with TLS. Pointing `DELTAT_HOST` somewhere else, or
+setting `DELTAT_TLS=off`, needs its own `DELTAT_PASSWORD`. Passwords are used exactly as typed,
+spaces included.
 
 For any deltat that is not on your machine, turn on TLS so the password is encrypted:
 
@@ -69,11 +72,13 @@ may be free again) and `cancelled`, each with its time. A commit is reported onc
 Booking labels are never printed here, because whoever books sets them.
 
 If the connection to deltat drops, `watch` prints `disconnected`, keeps retrying on its own, and
-prints `reconnected` once it is back, noting that changes in between were not seen. Silence always
-means nothing changed, never that the watch quietly died.
+prints `reconnected` once it is back, noting that changes in between were not seen. If deltat had
+to drop notifications because the watch fell behind, it prints `lagged` with how many. If the
+calendar is deleted, the watch ends with a not-found error and exit code 5. Silence always means
+nothing changed, never that the watch quietly died.
 
-With `--json` the first line is `{"status":"watching",...}`, status lines carry `status`, and every
-change is one line carrying `change`:
+With `--json` the first line is always `{"status":"watching",...}`, status lines carry `status`, and
+every change is one line carrying `change`:
 
 ```json
 {"change":"held","calendar_id":"01J...","resource_id":"01J...","start":"2026-10-01T08:00:00.000Z","end":"2026-10-01T08:30:00.000Z","start_local":"Thu 1 Oct 2026, 10:00","hold_id":"01K...","expires_at":"2026-10-01T08:05:00.000Z","at":"2026-10-01T07:59:12.000Z"}

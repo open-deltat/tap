@@ -94,7 +94,20 @@ export type DeltaTEvent =
         expires_at: number;
       };
     }
-  | { HoldReleased: { id: string; resource_id: string } }
+  | {
+      /**
+       * `span`, `reason` and `booking_id` come from kernels that describe an ending (deltat#42);
+       * older kernels send only the ids. `committed` means a `BookingConfirmed` for `booking_id`
+       * follows: the time did not become free.
+       */
+      HoldReleased: {
+        id: string;
+        resource_id: string;
+        span?: { start: number; end: number };
+        reason?: "released" | "expired" | "committed";
+        booking_id?: string;
+      };
+    }
   | {
       BookingConfirmed: {
         id: string;
@@ -103,4 +116,10 @@ export type DeltaTEvent =
         label: string | null;
       };
     }
-  | { BookingCancelled: { id: string; resource_id: string } };
+  /** `span` comes from kernels that describe an ending (deltat#42); older kernels send only the ids. */
+  | { BookingCancelled: { id: string; resource_id: string; span?: { start: number; end: number } } }
+  /**
+   * Not a change: this subscriber fell behind and `missed` notifications were dropped (deltat#42).
+   * Whatever the subscriber knows about the calendar may be stale; re-read it.
+   */
+  | { Lagged: { missed: number } };

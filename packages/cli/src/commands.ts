@@ -4,6 +4,7 @@ import {
   forgetConnection,
   resolveConnection,
   saveConnection,
+  secret,
   targetFromFlags,
   type Connection,
   type Env,
@@ -254,42 +255,62 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
       args: "<calendar> [--from <time> --to <time>]",
       summary: "Print each change as it happens, until Ctrl-C.",
       details:
-        'Changes: held, booked, hold ended (released or expired, may be free again), cancelled. Every line carries its time; with --from/--to only changes to those times are printed. A commit is reported once, as booked. Booking labels are never printed here, because whoever books sets them. If the connection to deltat drops, a "disconnected" line says so, the watch keeps retrying, and a "reconnected" line says changes in between were not seen. With --json the first line is {"status":"watching"}, status lines carry "status" and every change carries "change". An agent can run this in the background and react to each line.',
+        'Changes: held, booked, hold ended (released or expired, may be free again), cancelled. Every line carries its time; with --from/--to only changes to those times are printed. A commit is reported once, as booked. Booking labels are never printed here, because whoever books sets them. If the connection to deltat drops, a "disconnected" line says so, the watch keeps retrying, and a "reconnected" line says changes in between were not seen; a "lagged" line says the same when deltat dropped notifications for a slow reader. If the calendar is deleted the watch ends with a not-found error (exit 5). With --json the first line is always {"status":"watching"}, status lines carry "status" and every change carries "change". An agent can run this in the background and react to each line.',
       options: { ...WINDOW_OPTIONS },
       prepare(a) {
         const calendar = onlyId(a, "calendar");
         const window = optionalWindow(a);
         return (ctx) =>
           withCalendar(ctx, calendar, async (dt) => {
+            const time = (at: number) => local(at, ctx.tz).split(", ").pop();
             const write = (c: Change) => {
               const at = ctx.io.now();
               ctx.io.stdout(ctx.json ? `${JSON.stringify(changeJson(c, calendar, ctx.tz, at))}\n` : `${changeLine(c, ctx.tz, at)}\n`);
             };
-            // A watcher's silence has to mean "nothing changed", so losing the connection and getting
-            // it back are reported on stdout, where whoever reads the changes will see them.
-            const status = (state: "disconnected" | "reconnected", text: string) => {
+            // A watcher's silence has to mean "nothing changed", so losing the connection, getting
+            // it back and being told of a lag are reported on stdout, where whoever reads the
+            // changes will see them.
+            const status = (state: "disconnected" | "reconnected" | "lagged", text: string, extra: Record<string, unknown> = {}) => {
               const at = ctx.io.now();
               ctx.io.stdout(
                 ctx.json
-                  ? `${JSON.stringify({ status: state, calendar_id: calendar, ...(state === "reconnected" ? { may_have_missed_changes: true } : {}), at: iso(at) })}\n`
-                  : `${local(at, ctx.tz).split(", ").pop()}  ${state.padEnd(10)}  ${text}\n`
+                  ? `${JSON.stringify({ status: state, calendar_id: calendar, ...extra, at: iso(at) })}\n`
+                  : `${time(at)}  ${state.padEnd(10)}  ${text}\n`
               );
             };
+            // Not Promise.withResolvers: the CLI supports Node 20, which does not have it.
+            const finish: { with: (why: "interrupted" | "gone") => void } = { with: () => undefined };
+            const ended = new Promise<"interrupted" | "gone">((resolve) => {
+              finish.with = resolve;
+            });
             const stop = await dt.events.watch(calendar, write, {
               ...(window ? { window } : {}),
               onError: (e) => ctx.io.stderr(`watch: ${clean(classifyRefusal(e).message)}\n`),
+              // Runs before any change is written, so this is always the first line.
+              onReady: () => {
+                if (ctx.json) {
+                  const w = window ? { from: iso(window.start), to: iso(window.end) } : {};
+                  ctx.io.stdout(`${JSON.stringify({ status: "watching", calendar_id: calendar, ...w })}\n`);
+                } else {
+                  ctx.io.stderr(`Watching ${calendar}${window ? ` between ${range(window.start, window.end, ctx.tz)}` : ""}. Ctrl-C to stop.\n`);
+                }
+              },
               onDisconnected: () => status("disconnected", "lost the connection to deltat; retrying, no changes until reconnected"),
-              onResubscribed: () => status("reconnected", "changes made while disconnected were not seen; check again with find"),
+              onResubscribed: () =>
+                status("reconnected", "changes made while disconnected were not seen; check again with find", { may_have_missed_changes: true }),
+              onLagged: (missed) =>
+                status("lagged", `deltat dropped ${missed} notification(s) while this watch fell behind; check again with find`, {
+                  missed,
+                  may_have_missed_changes: true,
+                }),
+              onGone: () => finish.with("gone"),
             });
-            if (ctx.json) {
-              const w = window ? { from: iso(window.start), to: iso(window.end) } : {};
-              ctx.io.stdout(`${JSON.stringify({ status: "watching", calendar_id: calendar, ...w })}\n`);
-            } else {
-              ctx.io.stderr(`Watching ${calendar}${window ? ` between ${range(window.start, window.end, ctx.tz)}` : ""}. Ctrl-C to stop.\n`);
-            }
-            await ctx.io.interrupted();
+            void ctx.io.interrupted().then(() => finish.with("interrupted"));
+            const why = await ended;
             await stop();
-            return { kind: "streamed" };
+            return why === "gone"
+              ? refused("NOT_FOUND", `Calendar ${calendar} was deleted; there is nothing left to watch.`)
+              : { kind: "streamed" };
           });
       },
     },
@@ -345,7 +366,7 @@ export const COMMANDS: ReadonlyMap<string, Command> = new Map<string, Command>([
           if (!resolved.ok) return refused("INVALID", resolved.message);
           const { target, tls, save } = resolved;
           const where = `${target.user}@${target.host}:${target.port}/${target.database}`;
-          const password = env.DELTAT_PASSWORD?.trim() || (await io.readSecret(`Password for ${where}: `));
+          const password = secret(env.DELTAT_PASSWORD) ?? secret(await io.readSecret(`Password for ${where}: `));
           if (!password) return refused("INVALID", "No password given.");
           io.stderr(cleartextWarning({ host: target.host, tls }));
 

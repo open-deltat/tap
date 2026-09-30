@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { realpathSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -113,6 +114,40 @@ describe("the saved file", () => {
   });
 });
 
+describe("the saved password only goes where it was saved", () => {
+  test("pointing DELTAT_HOST or DELTAT_PORT elsewhere does not carry the saved password along", async () => {
+    await saveConnection(env(), { ...connection, host: "prod.example" });
+    for (const other of [{ DELTAT_HOST: "staging.example" }, { DELTAT_HOST: "prod.example.evil.com" }, { DELTAT_PORT: "6000" }]) {
+      const r = await resolveConnection(env(other));
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.message).toContain("saved password is for prod.example:5433");
+    }
+  });
+
+  test("the same host in another case, or an explicit DELTAT_PASSWORD, is fine", async () => {
+    await saveConnection(env(), { ...connection, host: "prod.example" });
+    expect((await resolveConnection(env({ DELTAT_HOST: "PROD.example" }))).ok).toBe(true);
+    expect(await resolveConnection(env({ DELTAT_HOST: "staging.example", DELTAT_PASSWORD: "staging-pw" }))).toMatchObject({
+      ok: true,
+      connection: { host: "staging.example", password: "staging-pw" },
+    });
+  });
+
+  test("a password saved with TLS is not sent without it", async () => {
+    await saveConnection(env(), { ...connection, tls: true });
+    const r = await resolveConnection(env({ DELTAT_TLS: "off" }));
+    expect(r.ok === false && r.message).toContain("unencrypted");
+  });
+
+  test("a password is used exactly as given: surrounding spaces survive the round trip", async () => {
+    await saveConnection(env(), { ...connection, password: " pass word " });
+    expect(await resolveConnection(env())).toMatchObject({ ok: true, connection: { password: " pass word " } });
+    expect(await resolveConnection(env({ DELTAT_PASSWORD: " env pw " }))).toMatchObject({ connection: { password: " env pw " } });
+    // Only an empty or all-whitespace value counts as unset.
+    expect(await resolveConnection(env({ DELTAT_PASSWORD: "   " }))).toMatchObject({ passwordFrom: "file" });
+  });
+});
+
 describe("TLS settings", () => {
   test("off unless asked for", async () => {
     expect(await resolveConnection(env({ DELTAT_PASSWORD: "pw" }))).toMatchObject({ ok: true, connection: { tls: false } });
@@ -145,6 +180,18 @@ describe("targetFromFlags", () => {
     const ca = join(dir, "ca.pem");
     await writeFile(ca, PEM);
     expect(await targetFromFlags({}, { tlsCa: ca })).toMatchObject({ ok: true, tls: { ca: PEM }, save: { tls: true, tlsCa: ca } });
+  });
+
+  test("a relative --tls-ca is saved absolute, so commands from other directories still find it", async () => {
+    await writeFile(join(dir, "ca.pem"), PEM);
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      const r = await targetFromFlags({}, { tlsCa: "./ca.pem" });
+      expect(r.ok && r.save.tlsCa).toBe(join(realpathSync(dir), "ca.pem"));
+    } finally {
+      process.chdir(cwd);
+    }
   });
 
   test("a bad --port is an error, not a connection", async () => {
