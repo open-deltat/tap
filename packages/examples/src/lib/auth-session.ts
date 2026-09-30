@@ -36,6 +36,8 @@ export interface AuthConfig {
   authorizeUrl: string;
   tokenUrl: string;
   jwksUri: string;
+  /** OIDC userinfo, for the name and email a meeting request shows its owner. */
+  userinfoUrl: string;
   trustedIssuers: string[];
   /** Optional extra query param some providers require on /authorize, e.g. `provider=authkit`. */
   extraAuthorizeParams: Record<string, string>;
@@ -58,6 +60,7 @@ export function authConfig(): AuthConfig | null {
     authorizeUrl: process.env.AUTH_AUTHORIZE_URL ?? `${issuer}/oauth2/authorize`,
     tokenUrl: process.env.AUTH_TOKEN_URL ?? `${issuer}/oauth2/token`,
     jwksUri: process.env.AUTH_JWKS_URI ?? `${issuer}/oauth2/jwks`,
+    userinfoUrl: process.env.AUTH_USERINFO_URL ?? `${issuer}/oauth2/userinfo`,
     trustedIssuers: [issuer, ...extraIssuers],
     extraAuthorizeParams: provider ? { provider } : {},
   };
@@ -87,11 +90,20 @@ function getAdapter(): OidcAdapter | null {
 
 /** The signed-in principal, or null. Fails closed on a missing, expired, or tampered cookie. */
 export async function getSessionPrincipal(): Promise<VerifiedPrincipal | null> {
+  return (await getSession())?.principal ?? null;
+}
+
+/**
+ * The verified principal together with the token it was verified from, for the one call that needs
+ * the token itself: userinfo, which answers only for the token's own subject.
+ */
+export async function getSession(): Promise<{ principal: VerifiedPrincipal; token: string } | null> {
   const verify = getAdapter();
   if (!verify) return null;
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  return verify.verify(token);
+  const principal = await verify.verify(token);
+  return principal ? { principal, token } : null;
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import { dtPublic } from "../lib/deltat";
 import { publicRegistry } from "../lib/public-registry";
-import type { BookableRecord } from "../lib/public-bookables";
+import { isBookingMode, type BookableRecord } from "../lib/public-bookables";
 import * as owned from "../lib/owned-calendar-service";
 import type { AvailabilityInput, CalendarView } from "../lib/owned-calendar-service";
 import type { Outcome } from "../lib/bookable-service";
@@ -73,6 +73,16 @@ export async function setRequireLoginToBook(
   const o = await owner();
   if (!o) return { ok: false, error: "Sign in to change this." };
   const updated = publicRegistry.updateOwned(id, o, { requireLoginToBook: required });
+  if (!updated) return { ok: false, error: "You do not own this calendar." };
+  return { ok: true, value: updated };
+}
+
+/** Book directly (instant) or have every meeting approved first (request). */
+export async function setBookingMode(id: string, mode: string): Promise<Outcome<BookableRecord>> {
+  if (!isBookingMode(mode)) return { ok: false, error: "Unknown booking mode." };
+  const o = await owner();
+  if (!o) return { ok: false, error: "Sign in to change this." };
+  const updated = publicRegistry.updateOwned(id, o, { bookingMode: mode });
   if (!updated) return { ok: false, error: "You do not own this calendar." };
   return { ok: true, value: updated };
 }
