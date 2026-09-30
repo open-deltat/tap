@@ -58,11 +58,27 @@ function optionalText(raw: string | null | undefined, field: string, maxLength: 
   return text(raw, field, maxLength);
 }
 
-/** "Thu 2 Oct, 10:00 to 10:30 (Europe/Berlin)", in the calendar's own zone. */
+/**
+ * "Thu 2 Oct, 10:00 to 10:30 (Europe/Berlin)", in the calendar's own zone. Assembled from parts
+ * rather than `format`: ICU versions disagree on the punctuation between them ("Thu 2 Oct" here,
+ * "Thu, 2 Oct" there), and this text goes to the owner and to agents, so it must not vary by machine.
+ */
 export function describeSpan(start: number, end: number, timeZone: string): string {
-  const day = new Intl.DateTimeFormat("en-GB", { timeZone, weekday: "short", day: "numeric", month: "short" });
-  const time = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-  return `${day.format(start)}, ${time.format(start)} to ${time.format(end)} (${timeZone})`;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const at = (ms: number) => {
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.formatToParts(ms).find((p) => p.type === type)?.value ?? "";
+    return { day: `${part("weekday")} ${part("day")} ${part("month")}`, time: `${part("hour")}:${part("minute")}` };
+  };
+  const from = at(start);
+  return `${from.day}, ${from.time} to ${at(end).time} (${timeZone})`;
 }
 
 function validateSpan(record: BookableRecord, start: number, end: number, now: number): Outcome<null> {
