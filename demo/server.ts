@@ -95,6 +95,19 @@ async function handleInit(ws: WebSocket, state: WsState, msg: InitMessage) {
   if (msg.type === "hold") {
     state.start = msg.start;
     state.end = msg.end;
+    // A real person's calendar goes through the service's gate, as the confirm path below does:
+    // placing the hold directly would let a request-only calendar be booked around its owner.
+    if (state.database === "public") {
+      const held = await bookable.holdSlot(
+        { dt: state.client, registry: publicRegistry },
+        msg.resourceId,
+        msg.start,
+        msg.end
+      );
+      if (!held.ok) throw new Error(held.error);
+      state.holdId = held.value.holdId;
+      return;
+    }
     const hold = await state.client.holds.place({
       resourceId: msg.resourceId,
       start: msg.start,

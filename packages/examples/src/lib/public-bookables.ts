@@ -35,11 +35,23 @@ export interface BookableRecord {
    * no-show can be followed up) and is the platform's main organic sign-up path.
    */
   readonly requireLoginToBook: boolean;
+  /**
+   * `instant`: a visitor holds a slot and books it. `request`: a signed-in visitor asks for a time and
+   * the owner approves each meeting (meeting-requests.ts); nothing books without the owner.
+   */
+  readonly bookingMode: BookingMode;
 }
+
+export const BOOKING_MODES = ["instant", "request"] as const;
+export type BookingMode = (typeof BOOKING_MODES)[number];
+
+export const isBookingMode = (value: unknown): value is BookingMode =>
+  BOOKING_MODES.some((mode) => mode === value);
 
 // At rest the presentation fields are optional so records written before they existed still load;
 // toPublic fills the defaults, so callers always see a complete BookableRecord.
-interface StoredRecord extends Omit<BookableRecord, "priceCents" | "currency" | "week" | "requireLoginToBook"> {
+interface StoredRecord
+  extends Omit<BookableRecord, "priceCents" | "currency" | "week" | "requireLoginToBook" | "bookingMode"> {
   readonly keyHash: string;
   /**
    * The signed-in principal that created this bookable (`iss#sub`), absent for bookables created
@@ -51,6 +63,7 @@ interface StoredRecord extends Omit<BookableRecord, "priceCents" | "currency" | 
   readonly currency?: string;
   readonly week?: WeekHours;
   readonly requireLoginToBook?: boolean;
+  readonly bookingMode?: BookingMode;
 }
 
 interface RegistryFile {
@@ -86,6 +99,7 @@ export interface BookableRegistry {
       currency?: string;
       week?: WeekHours;
       requireLoginToBook?: boolean;
+      bookingMode?: BookingMode;
     }
   ): BookableRecord | undefined;
   /** Owner-gated removal from the registry. deltat resource deletion is the caller's job. */
@@ -112,7 +126,8 @@ function isStoredRecord(value: unknown): value is StoredRecord {
     typeof r.timezone === "string" &&
     typeof r.createdAt === "number" &&
     typeof r.keyHash === "string" &&
-    (r.owner === undefined || typeof r.owner === "string")
+    (r.owner === undefined || typeof r.owner === "string") &&
+    (r.bookingMode === undefined || isBookingMode(r.bookingMode))
   );
 }
 
@@ -137,6 +152,7 @@ function toPublic({
   currency,
   week,
   requireLoginToBook,
+  bookingMode,
   ...record
 }: StoredRecord): BookableRecord {
   return {
@@ -146,6 +162,7 @@ function toPublic({
     week: week ?? {},
     // Default ON, including for records written before the field existed.
     requireLoginToBook: requireLoginToBook ?? true,
+    bookingMode: bookingMode ?? "instant",
   };
 }
 
@@ -230,6 +247,7 @@ export function openBookableRegistry(
         ...(patch.currency !== undefined && { currency: patch.currency }),
         ...(patch.week !== undefined && { week: patch.week }),
         ...(patch.requireLoginToBook !== undefined && { requireLoginToBook: patch.requireLoginToBook }),
+        ...(patch.bookingMode !== undefined && { bookingMode: patch.bookingMode }),
       };
       records.set(id, updated);
       flush();
