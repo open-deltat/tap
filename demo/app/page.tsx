@@ -29,15 +29,16 @@ export default function Home() {
         <header className="mx-auto max-w-2xl text-center">
           <div className="text-[11px] uppercase tracking-[0.25em] text-zinc-500">What is Δt?</div>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-100 sm:text-[2.6rem] sm:leading-[1.1]">
-            A database for time.
+            A real-time database for time.
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-zinc-400">
-            Space has three dimensions; time is the fourth, a single line. Δt is the database for
-            that line, and{" "}
+            Δt keeps your bookings and tells you what is still free. It never overbooks. Every
+            change reaches every screen as it happens, and an agent can hold a slot while it asks
+            the customer, then book it. You talk to it through{" "}
             <a href="/docs/sdk/quickstart" className="text-zinc-200 underline decoration-emerald-400/50 underline-offset-2 transition-colors hover:decoration-emerald-300">
               TAP
-            </a>{" "}
-            is how you manage time in one dimension. Every demo below runs on it, live.
+            </a>
+            , an open protocol with a TypeScript SDK. Every demo below runs on it, live.
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
             <a
