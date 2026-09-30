@@ -76,9 +76,24 @@
         "typescript": "^5",
       },
     },
+    "packages/cli": {
+      "name": "@open-deltat/cli",
+      "version": "0.1.0",
+      "bin": {
+        "deltat-cli": "dist/index.js",
+        "dt": "dist/index.js",
+      },
+      "dependencies": {
+        "@open-deltat/client": "^0.4.0",
+      },
+      "devDependencies": {
+        "@types/node": "^24",
+        "typescript": "^5",
+      },
+    },
     "packages/client": {
       "name": "@open-deltat/client",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "dependencies": {
         "postgres": "^3.4.8",
         "ulid": "^3.0.2",
@@ -125,7 +140,7 @@
       },
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
-        "@open-deltat/client": "^0.3.0",
+        "@open-deltat/client": "^0.4.0",
         "jose": "^6.0.11",
         "zod": "^4.6.5",
       },
@@ -369,6 +384,8 @@
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "^1.6.0" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
 
     "@nolyfill/is-core-module": ["@nolyfill/is-core-module@1.0.39", "", {}, "sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA=="],
+
+    "@open-deltat/cli": ["@open-deltat/cli@workspace:packages/cli"],
 
     "@open-deltat/client": ["@open-deltat/client@workspace:packages/client"],
 

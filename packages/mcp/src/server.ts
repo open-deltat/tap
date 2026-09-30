@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { DeltaT, expandRecurrence } from "@open-deltat/client";
+import { DeltaT, expandRecurrence, classifyRefusal, parseInstant } from "@open-deltat/client";
+import type { CounterOffer, RefusalCode } from "@open-deltat/client";
 
 // The agent-facing tool surface over deltat: create a calendar, set its availability, then the
 // real-time booking loop (find, hold, commit, release) plus read and cancel. Times cross this
@@ -18,19 +19,11 @@ const DAY = 86_400_000;
 const HORIZON_DAYS = 60;
 const HOLD_TTL_MS = 5 * 60_000; // long enough to check with a human before committing
 
-// RFC 3339 with a mandatory offset (Z or ±HH:MM). Enforced because a zoneless datetime is
-// interpreted in the host's local zone by Date.parse, so the same agent input would book a
-// different absolute instant depending on where the process runs. A strict shape also rejects the
-// non-RFC-3339 forms Date.parse leniently accepts.
-const RFC3339 = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}(:\d{2})?(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$/;
-
+// Strict RFC 3339 with an offset; parseInstant says why a zoneless time is refused.
 const toMs = (iso: string): number => {
-  if (!RFC3339.test(iso)) {
-    throw new ToolError("INVALID", `Not an RFC 3339 timestamp with an offset (e.g. 2026-06-01T09:00:00Z): ${iso}`);
-  }
-  const ms = Date.parse(iso);
-  if (Number.isNaN(ms)) throw new ToolError("INVALID", `Unparseable timestamp: ${iso}`);
-  return ms;
+  const parsed = parseInstant(iso);
+  if (!parsed.ok) throw new ToolError("INVALID", parsed.message);
+  return parsed.ms;
 };
 const toIso = (ms: number): string => new Date(ms).toISOString();
 const local = (ms: number, tz: string): string => {
@@ -43,46 +36,89 @@ const local = (ms: number, tz: string): string => {
 
 class ToolError extends Error {
   constructor(
-    readonly code: "CONFLICT" | "EXPIRED" | "INVALID" | "NOT_FOUND" | "INTERNAL",
-    message: string
+    readonly code: RefusalCode,
+    message: string,
+    /** Times the caller could take instead, when the kernel supplied any. */
+    readonly offer?: CounterOffer
   ) {
     super(message);
   }
 }
 
-/**
- * Map a deltat/pg error to the agent-facing typed code.
- *
- * The default is INTERNAL, not INVALID. INVALID tells a model its arguments were wrong, which is an
- * invitation to retry with different ones; for a fault that has nothing to do with the arguments
- * that is an infinite loop, and on `hold_slot` each pass leaves a live hold blocking the slot until
- * the reaper expires it. So INVALID is now reserved for errors that name a specific argument
- * problem, and anything unrecognised says plainly that retrying will not help.
- */
+/** Map a deltat/pg error to the agent-facing typed code. The mapping and its reasons live in the SDK. */
 function classify(err: unknown): ToolError {
   // An error that already carries a code was classified at the throw site, which knew more than
   // any message-text match can recover. Re-deriving it here is how a precise "that timestamp has
   // no offset" got downgraded to an unhelpful INTERNAL.
   if (err instanceof ToolError) return err;
-
-  const msg = err instanceof Error ? err.message : String(err);
-  if (/expired|no longer exists|unknown hold/i.test(msg)) return new ToolError("EXPIRED", msg);
-  if (/conflict|overlap|already|capacity/i.test(msg)) return new ToolError("CONFLICT", msg);
-  if (/not found|unknown resource|no such/i.test(msg)) return new ToolError("NOT_FOUND", msg);
-  if (/invalid|malformed|out of range|must be|cannot parse|unsupported/i.test(msg)) {
-    return new ToolError("INVALID", msg);
-  }
-  return new ToolError(
-    "INTERNAL",
-    `${msg} (this is a server or configuration fault, not a problem with your arguments; retrying the same call will not help)`
-  );
+  const refusal = classifyRefusal(err);
+  return new ToolError(refusal.code, refusal.message, refusal.offer ?? undefined);
 }
 
 const ok = (text: string) => ({ content: [{ type: "text" as const, text }] });
-const fail = (e: ToolError) => ({
-  content: [{ type: "text" as const, text: `${e.code}: ${e.message}` }],
-  isError: true,
-});
+/**
+ * Render a refusal for a model.
+ *
+ * Without alternatives this is the plain `CODE: message` string it has always been, which keeps the
+ * shape stable against a kernel that has counter-offers switched off or predates them. With
+ * alternatives it becomes JSON in the same voice as the `book_slot` refusal, because the model is
+ * about to read these times out loud and needs the local rendering plus an unmissable statement
+ * that none of them is held.
+ */
+const fail = (e: ToolError, timezone = "UTC") => {
+  if (!e.offer || e.offer.alternatives.length === 0) {
+    // An unscheduled calendar is worth saying out loud: it has no opening hours to list, but it
+    // still takes bookings, so "no alternatives" must not read as "no availability".
+    if (e.offer?.schedule === "unscheduled") {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({
+              error: e.code,
+              message: e.message,
+              booked: false,
+              held: false,
+              reserved: false,
+              schedule: "unscheduled",
+              next: "This calendar publishes no opening hours, so there is no list of free times to offer. It still accepts bookings: pick another time and call hold_slot.",
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+    return {
+      content: [{ type: "text" as const, text: `${e.code}: ${e.message}` }],
+      isError: true,
+    };
+  }
+
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify({
+          error: e.code,
+          message: e.message,
+          // The triple exists so a model that skims to `alternatives` cannot narrate
+          // "I moved you to 4pm". Nothing happened, and nothing is being kept for it.
+          booked: false,
+          held: false,
+          reserved: false,
+          retry_same_time: e.offer.retrySameSpan,
+          alternatives: e.offer.alternatives.map((a) => ({
+            start: toIso(a.start),
+            end: toIso(a.end),
+            start_local: local(a.start, timezone),
+          })),
+          next: "These times were free a moment ago but are NOT reserved. Offer one, then call hold_slot on it before you tell anyone it is theirs.",
+        }),
+      },
+    ],
+    isError: true,
+  };
+};
 
 const HOURS_SHAPE = z
   .array(
@@ -147,6 +183,10 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
         "it. Holds expire on their own after a few minutes, so holding one costs nothing and you do",
         "not need to clean up after an abandoned conversation. Release early with release_hold when",
         "you know the time is not wanted.",
+        "",
+        "When a hold or a commit is refused, the reply usually lists other times that were free at",
+        "that moment. Offer one of those straight away rather than starting over with find_slots.",
+        "They are NOT reserved for you: whoever accepts one, you still have to hold_slot it.",
         "",
         "Never tell a human a time is booked until commit_hold has returned. find_slots and hold_slot",
         "are both reversible; only commit_hold is a commitment.",
@@ -250,7 +290,7 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
     {
       title: "Hold a slot",
       description:
-        "Use this the moment you are about to offer a specific time to a human, before you say it out loud. Reserves the slot for a few minutes so nobody else can take it while you confirm, and returns a hold_id. A hold is not a booking: call commit_hold to confirm it, or release_hold to give it back. If you do neither it expires on its own and the slot returns to the pool, so holding costs nothing.",
+        "Use this the moment you are about to offer a specific time to a human, before you say it out loud. Reserves the slot for a few minutes so nobody else can take it while you confirm, and returns a hold_id. A hold is not a booking: call commit_hold to confirm it, or release_hold to give it back. If you do neither it expires on its own and the slot returns to the pool, so holding costs nothing. If the time is already taken or outside opening hours, the refusal lists other free times: offer one of those in the same breath rather than calling find_slots again. They are not reserved for you, so call hold_slot on whichever one is chosen.",
       inputSchema: {
         calendar_id: z.string(),
         start: z.string().describe("RFC 3339"),
@@ -274,7 +314,9 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
           })
         );
       } catch (e) {
-        return fail(classify(e));
+        // The caller's timezone matters most here: a refused hold is the moment the model is about
+        // to say a time out loud, so the alternatives need local rendering.
+        return fail(classify(e), timezone);
       }
     }
   );
@@ -320,15 +362,19 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
     {
       title: "Commit a hold",
       description:
-        "Use this when you have a hold_id from hold_slot and the booking is confirmed. Turns the hold into a booking in one atomic step, so the slot cannot be lost between reserving and confirming. This is the only way to create a booking.",
-      inputSchema: { hold_id: z.string(), label: z.string().max(200).optional().describe("who the booking is for") },
+        "Use this when you have a hold_id from hold_slot and the booking is confirmed. Turns the hold into a booking in one atomic step, so the slot cannot be lost between reserving and confirming. This is the only way to create a booking. If it is refused, the reply may list other free times: offer one and call hold_slot on it, since none of them is reserved for you.",
+      inputSchema: {
+        hold_id: z.string(),
+        label: z.string().max(200).optional().describe("who the booking is for"),
+        timezone: z.string().default("UTC").describe("IANA timezone for rendering any alternative times"),
+      },
     },
-    async ({ hold_id, label }) => {
+    async ({ hold_id, label, timezone }) => {
       try {
         const { bookingId } = await dt.holds.commit(hold_id, label ? { label } : undefined);
         return ok(JSON.stringify({ booking_id: bookingId, status: "confirmed" }));
       } catch (e) {
-        return fail(classify(e));
+        return fail(classify(e), timezone);
       }
     }
   );

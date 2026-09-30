@@ -1,20 +1,25 @@
 import { test, expect, spyOn } from "bun:test";
 import type { Sql } from "postgres";
 import { Events } from "../events.js";
+import type { Listener } from "../subscriptions.js";
 import type { DeltaTEvent } from "../types.js";
 
-// Events.listen only invokes `sql.listen(channel, handler)`. The stub captures the handler so a
-// test can drive it the way postgres.js does: synchronously, inside the socket's data path, where
-// a thrown error destroys the shared LISTEN connection for every subscriber of the client.
+// Events.listen hands each notification's payload over through its Listener. The stub captures the
+// handler so a test can drive it the way postgres.js does: synchronously, inside the socket's data
+// path, where a thrown error destroys the shared LISTEN connection for every subscriber.
 function stubListenSql() {
   const handlers = new Map<string, (payload: string) => void>();
-  const sql = {
-    listen: (channel: string, fn: (payload: string) => void) => {
-      handlers.set(channel, fn);
-      return Promise.resolve({ unlisten: () => Promise.resolve() });
+  const listener: Listener = {
+    listen: async (channel, subscriber) => {
+      handlers.set(channel, subscriber.onNotify);
+      subscriber.onSubscribed();
+      return async () => undefined;
     },
-  } as unknown as Sql;
-  return { sql, handlers };
+    close: async () => undefined,
+  };
+  // listen() never touches the connection itself, only the Listener.
+  const sql = {} as Sql;
+  return { sql, listener, handlers };
 }
 
 function handlerFor(handlers: Map<string, (payload: string) => void>, resourceId: string) {
@@ -26,8 +31,8 @@ function handlerFor(handlers: Map<string, (payload: string) => void>, resourceId
 const deletedPayload = (id: string) => JSON.stringify({ ResourceDeleted: { id } });
 
 test("a throwing subscriber does not propagate into the notification handler", async () => {
-  const { sql, handlers } = stubListenSql();
-  await new Events(sql).listen("r1", () => {
+  const { sql, listener, handlers } = stubListenSql();
+  await new Events(sql, listener).listen("r1", () => {
     throw new Error("subscriber bug");
   });
 
@@ -37,12 +42,12 @@ test("a throwing subscriber does not propagate into the notification handler", a
 });
 
 test("a throwing subscriber is reported to onError and later events still arrive", async () => {
-  const { sql, handlers } = stubListenSql();
+  const { sql, listener, handlers } = stubListenSql();
   const seen: DeltaTEvent[] = [];
   const errors: unknown[] = [];
   let first = true;
 
-  await new Events(sql).listen(
+  await new Events(sql, listener).listen(
     "r1",
     (event) => {
       if (first) {
@@ -64,10 +69,10 @@ test("a throwing subscriber is reported to onError and later events still arrive
 });
 
 test("without onError a subscriber error is logged, not thrown", async () => {
-  const { sql, handlers } = stubListenSql();
+  const { sql, listener, handlers } = stubListenSql();
   const consoleError = spyOn(console, "error").mockImplementation(() => {});
   try {
-    await new Events(sql).listen("r1", () => {
+    await new Events(sql, listener).listen("r1", () => {
       throw new Error("subscriber bug");
     });
 
@@ -79,8 +84,8 @@ test("without onError a subscriber error is logged, not thrown", async () => {
 });
 
 test("a throwing onError hook is contained too", async () => {
-  const { sql, handlers } = stubListenSql();
-  await new Events(sql).listen(
+  const { sql, listener, handlers } = stubListenSql();
+  await new Events(sql, listener).listen(
     "r1",
     () => {
       throw new Error("subscriber bug");
@@ -96,9 +101,9 @@ test("a throwing onError hook is contained too", async () => {
 });
 
 test("ResourceUpdated from a partial update carries null for unmentioned fields", async () => {
-  const { sql, handlers } = stubListenSql();
+  const { sql, listener, handlers } = stubListenSql();
   const seen: DeltaTEvent[] = [];
-  await new Events(sql).listen("01HRES", (event) => seen.push(event));
+  await new Events(sql, listener).listen("01HRES", (event) => seen.push(event));
 
   // Exact serde_json output of deltat's Event::ResourceUpdated for a name-only UPDATE: the enum
   // has no skip_serializing_if, so fields the UPDATE did not mention arrive as JSON null. The
@@ -116,11 +121,33 @@ test("ResourceUpdated from a partial update carries null for unmentioned fields"
 });
 
 test("malformed payloads are skipped without invoking the subscriber", async () => {
-  const { sql, handlers } = stubListenSql();
+  const { sql, listener, handlers } = stubListenSql();
   const seen: DeltaTEvent[] = [];
-  await new Events(sql).listen("r1", (event) => seen.push(event));
+  await new Events(sql, listener).listen("r1", (event) => seen.push(event));
 
   const handler = handlerFor(handlers, "r1");
   expect(() => handler("not json")).not.toThrow();
   expect(seen).toHaveLength(0);
+});
+
+test("a subscriber hears when the connection drops and when it is back, but not on first subscribe", async () => {
+  const captured: { subscriber?: Parameters<Listener["listen"]>[1] } = {};
+  const listener: Listener = {
+    listen: async (_channel, subscriber) => {
+      captured.subscriber = subscriber;
+      subscriber.onSubscribed();
+      return async () => undefined;
+    },
+    close: async () => undefined,
+  };
+  const log: string[] = [];
+  await new Events({} as Sql, listener).listen("r1", () => undefined, {
+    onDisconnected: () => log.push("disconnected"),
+    onResubscribed: () => log.push("resubscribed"),
+  });
+  expect(log).toEqual([]);
+
+  captured.subscriber?.onLost?.();
+  captured.subscriber?.onSubscribed();
+  expect(log).toEqual(["disconnected", "resubscribed"]);
 });

@@ -49,6 +49,16 @@
           "description": "Username presented at connect time.",
           "isRequired": false,
           "default": "user"
+        },
+        {
+          "name": "DELTAT_TLS",
+          "description": "on to encrypt the connection and verify deltat's certificate. Unset means off unless DELTAT_TLS_CA is set; without TLS the password is sent in the clear, so use it for any deltat that is not on this machine.",
+          "isRequired": false
+        },
+        {
+          "name": "DELTAT_TLS_CA",
+          "description": "Path to a PEM certificate to trust instead of the system's authorities, for a deltat with a self-signed certificate. Implies DELTAT_TLS=on.",
+          "isRequired": false
         }
       ]
     }
