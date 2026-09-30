@@ -30,13 +30,30 @@ services:
       DELTAT_PUBLIC_DB: public
       DELTAT_PASSWORD: ${DELTAT_PASSWORD:-deltat}
       PORT: "3000"
+      # Sign-in (any OIDC issuer; blank leaves the site anonymous-only). Signed-in owners get
+      # calendars, and visitors can send meeting requests. See packages/examples/src/lib/auth-session.ts.
+      AUTH_ISSUER: ${AUTH_ISSUER:-}
+      AUTH_CLIENT_ID: ${AUTH_CLIENT_ID:-}
+      AUTH_AUTHORIZE_URL: ${AUTH_AUTHORIZE_URL:-}
+      AUTH_TOKEN_URL: ${AUTH_TOKEN_URL:-}
+      AUTH_JWKS_URI: ${AUTH_JWKS_URI:-}
+      AUTH_USERINFO_URL: ${AUTH_USERINFO_URL:-}
+      AUTH_TRUSTED_ISSUERS: ${AUTH_TRUSTED_ISSUERS:-}
+      AUTH_PROVIDER_PARAM: ${AUTH_PROVIDER_PARAM:-}
+      AUTH_AUDIENCE: ${AUTH_AUDIENCE:-}
+      AUTH_MCP_AUDIENCE: ${AUTH_MCP_AUDIENCE:-}
+      # The public origin, e.g. https://delt.at. Needed for the hosted MCP endpoint (/mcp) and the
+      # review link in owner notifications; /mcp stays off without it.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      # Optional: an https Slack or Discord incoming-webhook URL that hears about each new meeting request.
+      NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
     ports:
       - "3000:3000"
     volumes:
       # Ownership of a public bookable lives in a file here, not in deltat (NOT-02 keeps identity
       # out of the kernel). Without this volume every redeploy would strand every bookable people
       # created: the resource survives in the WAL, the key that manages it does not. The same
-      # volume also persists the demos' app-level resource metadata.
+      # volume also persists the demos' app-level resource metadata and the meeting requests.
       #
       # This is what pins the app to ONE replica. A second container would keep its own copy of the
       # registry and the two would overwrite each other. Scaling out means moving the registry to a

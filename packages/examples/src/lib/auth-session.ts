@@ -43,24 +43,29 @@ export interface AuthConfig {
   extraAuthorizeParams: Record<string, string>;
 }
 
+/**
+ * One AUTH_* setting: trimmed, and blank counts as unset. Compose passes an unset variable through as
+ * an empty string, which `??` would take as a value and use in place of the default.
+ */
+const setting = (name: string): string | undefined => process.env[name]?.trim() || undefined;
+
 /** The auth config, or null when this instance has no sign-in configured. */
 export function authConfig(): AuthConfig | null {
-  const issuer = process.env.AUTH_ISSUER?.replace(/\/$/, "");
-  const clientId = process.env.AUTH_CLIENT_ID;
+  const issuer = setting("AUTH_ISSUER")?.replace(/\/$/, "");
+  const clientId = setting("AUTH_CLIENT_ID");
   if (!issuer || !clientId) return null;
 
-  const extraIssuers =
-    process.env.AUTH_TRUSTED_ISSUERS?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+  const extraIssuers = setting("AUTH_TRUSTED_ISSUERS")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
 
-  const provider = process.env.AUTH_PROVIDER_PARAM?.trim();
+  const provider = setting("AUTH_PROVIDER_PARAM");
 
   return {
     issuer,
     clientId,
-    authorizeUrl: process.env.AUTH_AUTHORIZE_URL ?? `${issuer}/oauth2/authorize`,
-    tokenUrl: process.env.AUTH_TOKEN_URL ?? `${issuer}/oauth2/token`,
-    jwksUri: process.env.AUTH_JWKS_URI ?? `${issuer}/oauth2/jwks`,
-    userinfoUrl: process.env.AUTH_USERINFO_URL ?? `${issuer}/oauth2/userinfo`,
+    authorizeUrl: setting("AUTH_AUTHORIZE_URL") ?? `${issuer}/oauth2/authorize`,
+    tokenUrl: setting("AUTH_TOKEN_URL") ?? `${issuer}/oauth2/token`,
+    jwksUri: setting("AUTH_JWKS_URI") ?? `${issuer}/oauth2/jwks`,
+    userinfoUrl: setting("AUTH_USERINFO_URL") ?? `${issuer}/oauth2/userinfo`,
     trustedIssuers: [issuer, ...extraIssuers],
     extraAuthorizeParams: provider ? { provider } : {},
   };
@@ -83,7 +88,7 @@ function getAdapter(): OidcAdapter | null {
     // Bind the token to this app: a valid signature from the issuer is not enough, since the same
     // JWKS signs tokens minted for other clients/resources of that issuer. Providers that do not
     // stamp an audience leave AUTH_AUDIENCE unset and fall back to issuer-only trust.
-    audience: process.env.AUTH_AUDIENCE || undefined,
+    audience: setting("AUTH_AUDIENCE"),
   });
   return adapter;
 }

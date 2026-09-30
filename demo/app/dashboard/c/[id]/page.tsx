@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, Globe, ListChecks, Settings2, Tag } from "lucide-react";
+import { ArrowLeft, CalendarClock, Globe, Inbox, ListChecks, Settings2, Tag } from "lucide-react";
 import { getCalendar } from "@open-deltat/examples/actions/my-bookables";
+import { calendarMeetingRequests } from "@open-deltat/examples/actions/meeting-requests";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AvailabilityEditor } from "@/components/dashboard/availability-editor";
 import { LiveSchedule } from "@/components/dashboard/live-schedule";
 import { ShareLinks } from "@/components/dashboard/share-links";
 import { BookingAccess } from "@/components/dashboard/booking-access";
+import { BookingMode } from "@/components/dashboard/booking-mode";
+import { MeetingInbox } from "@/components/dashboard/meeting-inbox";
 import { AmbientBackground } from "@/components/ambient-background";
 import { DeleteCalendarButton, RenameField } from "@/components/dashboard/calendar-admin";
 
@@ -27,6 +30,10 @@ export default async function ManageCalendarPage({ params }: { params: Promise<{
   const result = await getCalendar(id);
   if (!result.ok) notFound();
   const { record, bookings } = result.value;
+  const inbox = await calendarMeetingRequests(id);
+  const requests = inbox.ok ? inbox.value : [];
+  const waiting = requests.filter((r) => r.status === "pending").length;
+  const showRequests = record.bookingMode === "request" || requests.length > 0;
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-6 py-8">
@@ -54,8 +61,14 @@ export default async function ManageCalendarPage({ params }: { params: Promise<{
       </div>
 
       {/* Bookings first: it's what an operator looks at daily. Availability and settings behind tabs. */}
-      <Tabs defaultValue="bookings">
+      <Tabs defaultValue={record.bookingMode === "request" ? "requests" : "bookings"}>
         <TabsList className="w-full sm:w-auto">
+          {showRequests ? (
+            <TabsTrigger value="requests">
+              <Inbox /> Requests
+              {waiting > 0 ? <Badge variant="default">{waiting}</Badge> : null}
+            </TabsTrigger>
+          ) : null}
           <TabsTrigger value="bookings">
             <ListChecks /> Bookings
           </TabsTrigger>
@@ -66,6 +79,12 @@ export default async function ManageCalendarPage({ params }: { params: Promise<{
             <Settings2 /> Settings
           </TabsTrigger>
         </TabsList>
+
+        {showRequests ? (
+          <TabsContent value="requests" className="pt-2">
+            <MeetingInbox calendarId={id} timezone={record.timezone} initialRequests={requests} />
+          </TabsContent>
+        ) : null}
 
         <TabsContent value="bookings" className="pt-2">
           <LiveSchedule
@@ -88,6 +107,10 @@ export default async function ManageCalendarPage({ params }: { params: Promise<{
 
         <TabsContent value="settings" className="flex flex-col gap-6 pt-2">
           <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-medium">How visitors book</h3>
+            <BookingMode id={id} initial={record.bookingMode} />
+          </div>
+          <div className="flex flex-col gap-2 border-t pt-6">
             <h3 className="text-sm font-medium">Who can book</h3>
             <BookingAccess id={id} initial={record.requireLoginToBook} />
           </div>

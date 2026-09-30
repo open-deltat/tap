@@ -1,102 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import type { AvailabilitySlot, DeltaT } from "@open-deltat/client";
+import { readFileSync, writeFileSync } from "node:fs";
 import { openBookableRegistry } from "../public-bookables";
-import { openMeetingRequestStore, type RequestContact } from "../meeting-requests";
-import { createMeetingService, effectiveStatus, MAX_PENDING_PER_CALENDAR } from "../meeting-request-service";
+import { openMeetingRequestStore } from "../meeting-requests";
+import { effectiveStatus, MAX_PENDING_PER_CALENDAR } from "../meeting-request-service";
 import { commitHold, holdSlot, REQUESTS_ONLY } from "../bookable-service";
-import type { OwnerNotice } from "../notify";
-
-// Namespaced per process, like the registry tests: two runs must not replay each other's files.
-function tmpPath(name: string): string {
-  const dir = join(tmpdir(), `tap_test_meetings_${process.pid}`);
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, `${name}.json`);
-  rmSync(path, { force: true });
-  return path;
-}
-
-const MIN = 60_000;
-const NOW = Date.UTC(2036, 0, 5, 8); // a Saturday morning, far from the wall clock
-const T = NOW + 26 * 60 * MIN; // tomorrow 10:00 UTC
-const OWNER = "https://issuer.test#owner";
-const ANNA = "https://issuer.test#anna";
-const BEN = "https://issuer.test#ben";
-const annaContact: RequestContact = { name: "Anna Example", email: "anna@example.com", emailVerified: true };
-
-/** The slice of DeltaT the meeting service uses, recording what it did. */
-function fakeDeltaT() {
-  const state = {
-    free: [{ start: NOW, end: NOW + 7 * 24 * 60 * MIN }] as AvailabilitySlot[],
-    holdFails: false,
-    commitFails: false,
-    latencyMs: 0,
-    holds: [] as string[],
-    released: [] as string[],
-    bookings: [] as { id: string; label: string | undefined }[],
-    cancelled: [] as string[],
-  };
-  const pause = () => (state.latencyMs ? Bun.sleep(state.latencyMs) : Promise.resolve());
-  const dt = {
-    availability: {
-      get: async ({ start, end }: { start: number; end: number }) =>
-        state.free
-          .filter((s) => s.end > start && s.start < end)
-          .map((s) => ({ start: Math.max(s.start, start), end: Math.min(s.end, end) })),
-    },
-    holds: {
-      place: async (h: { expiresAt: number }) => {
-        await pause();
-        if (state.holdFails) throw Object.assign(new Error("span is already allocated"), { code: "40001" });
-        const id = `hold${state.holds.length + 1}`;
-        state.holds.push(id);
-        return { id, expiresAt: h.expiresAt };
-      },
-      commit: async (holdId: string, opts?: { label?: string }) => {
-        await pause();
-        if (state.commitFails) throw new Error("hold expired");
-        const booking = { id: `booking${state.bookings.length + 1}`, label: opts?.label };
-        state.bookings.push(booking);
-        return { bookingId: booking.id, holdId };
-      },
-      release: async (holdId: string) => {
-        state.released.push(holdId);
-      },
-    },
-    bookings: {
-      cancel: async (id: string) => {
-        state.cancelled.push(id);
-      },
-    },
-  };
-  // Only the members above exist; the cast stands in for the rest of the client.
-  return { dt: dt as unknown as DeltaT, state };
-}
-
-function setup(opts: { mode?: "instant" | "request"; reviewBase?: string } = {}) {
-  const registry = openBookableRegistry(tmpPath(`registry_${crypto.randomUUID()}`));
-  registry.register({ id: "cal1", name: "Simon's week", slotMinutes: 30, timezone: "Europe/Berlin", owner: OWNER });
-  registry.updateOwned("cal1", OWNER, { bookingMode: opts.mode ?? "request" });
-  const store = openMeetingRequestStore(tmpPath(`requests_${crypto.randomUUID()}`), { now: () => clock.now });
-  const clock = { now: NOW };
-  const notices: OwnerNotice[] = [];
-  const { dt, state } = fakeDeltaT();
-  const service = createMeetingService({
-    dt,
-    registry,
-    store,
-    notify: async (n) => {
-      notices.push(n);
-    },
-    reviewBase: opts.reviewBase ?? null,
-    now: () => clock.now,
-  });
-  const ask = (overrides: Partial<Parameters<typeof service.request>[0]> = {}) =>
-    service.request({ calendarId: "cal1", requester: ANNA, contact: annaContact, start: T, end: T + 30 * MIN, ...overrides });
-  return { registry, store, service, state, notices, clock, dt, ask };
-}
+import { ANNA, BEN, MIN, NOW, OWNER, T, annaContact, setupMeetings as setup, tmpPath } from "./meeting-fixtures";
 
 describe("the request store", () => {
   test("keeps requests across a reopen, newest first, and decides each one once", () => {

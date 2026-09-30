@@ -22,29 +22,16 @@ import {
 import type { BookableRecord } from "@open-deltat/examples/lib/public-bookables";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { sliceIntoSlots, type Slot } from "./slots";
 
 // The prime public booking UI: a month calendar and the selected day's time slots, then hold →
 // confirm. Bound to the real calendar's availability (deltat), theme-aware, with the owner's slot
 // length and price. This is what anyone — or an AI agent — sees at /b/<id>.
 
 const DAY_MS = 86_400_000;
-interface Slot {
-  start: number;
-  end: number;
-}
 interface Held extends Slot {
   holdId: string;
   expiresAt: number;
-}
-
-function sliceIntoSlots(spans: Slot[], slotMs: number, notBefore: number): Slot[] {
-  return spans.flatMap((span) => {
-    const out: Slot[] = [];
-    for (let s = span.start; s + slotMs <= span.end; s += slotMs) {
-      if (s >= notBefore) out.push({ start: s, end: s + slotMs });
-    }
-    return out;
-  });
 }
 
 export function AppointmentsBooker({ record }: { record: BookableRecord }) {
