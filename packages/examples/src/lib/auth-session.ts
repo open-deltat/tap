@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { OidcAdapter, type VerifiedPrincipal } from "@open-deltat/mcp";
-import { authConfig, canonicalPrincipalId, setting } from "./auth-config";
+import { authConfig, canonicalVerifier, setting } from "./auth-config";
 
 export { authConfig, canonicalPrincipalId, type AuthConfig } from "./auth-config";
 
@@ -33,13 +33,16 @@ export function authEnabled(): boolean {
   return authConfig() !== null;
 }
 
-let adapter: OidcAdapter | null = null;
-function getAdapter(): OidcAdapter | null {
-  if (adapter) return adapter;
+type Verify = (token: string) => Promise<VerifiedPrincipal | null>;
+const built: { verify: Verify | null } = { verify: null };
+
+/** The session token verifier, built once sign-in is configured; null while it is not. */
+function sessionVerifier(): Verify | null {
+  if (built.verify) return built.verify;
   const config = authConfig();
   if (!config) return null;
   // Signed-in users share the public tenant with the anonymous secret-link flow.
-  adapter = new OidcAdapter({
+  const adapter = new OidcAdapter({
     jwksUri: config.jwksUri,
     trustedIssuers: config.trustedIssuers,
     tenant: "public",
@@ -48,7 +51,9 @@ function getAdapter(): OidcAdapter | null {
     // stamp an audience leave AUTH_AUDIENCE unset and fall back to issuer-only trust.
     audience: setting("AUTH_AUDIENCE"),
   });
-  return adapter;
+  // One person, one id, whichever of the provider's issuers signed the token (auth-config.ts).
+  built.verify = canonicalVerifier((token) => adapter.verify(token), config);
+  return built.verify;
 }
 
 /** The signed-in principal, or null. Fails closed on a missing, expired, or tampered cookie. */
@@ -61,13 +66,12 @@ export async function getSessionPrincipal(): Promise<VerifiedPrincipal | null> {
  * the token itself: userinfo, which answers only for the token's own subject.
  */
 export async function getSession(): Promise<{ principal: VerifiedPrincipal; token: string } | null> {
-  const verify = getAdapter();
+  const verify = sessionVerifier();
   if (!verify) return null;
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
-  const principal = await verify.verify(token);
-  // One person, one id, whichever of the provider's issuers signed this token (auth-config.ts).
-  return principal ? { principal: { ...principal, principalId: canonicalPrincipalId(principal.principalId) }, token } : null;
+  const principal = await verify(token);
+  return principal ? { principal, token } : null;
 }
 
 /**
