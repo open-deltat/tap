@@ -131,7 +131,7 @@ function isStoredRecord(value: unknown): value is StoredRecord {
   );
 }
 
-function loadRecords(path: string): Map<string, StoredRecord> {
+function loadRecords(path: string, canonicalOwner: (owner: string) => string): Map<string, StoredRecord> {
   try {
     if (!existsSync(path)) return new Map();
     const parsed: unknown = JSON.parse(readFileSync(path, "utf-8"));
@@ -139,7 +139,13 @@ function loadRecords(path: string): Map<string, StoredRecord> {
     if (!Array.isArray(records)) return new Map();
     // A record that fails its shape check is dropped rather than trusted: the file is durable state
     // an operator can hand-edit, and a half-typed entry must not become an unownable bookable.
-    return new Map(records.filter(isStoredRecord).map((r) => [r.id, r]));
+    // Owners written under another of the provider's issuers are read as the one id that person has
+    // now, so they keep their calendars; the next flush stores them that way.
+    return new Map(
+      records
+        .filter(isStoredRecord)
+        .map((r) => [r.id, r.owner === undefined ? r : { ...r, owner: canonicalOwner(r.owner) }])
+    );
   } catch {
     return new Map();
   }
@@ -168,10 +174,14 @@ function toPublic({
 
 export function openBookableRegistry(
   path: string,
-  opts?: { maxEntries?: number }
+  opts?: {
+    maxEntries?: number;
+    /** Maps a stored owner id to the one id its person has now (auth-config.ts canonicalPrincipalId). */
+    canonicalOwner?: (owner: string) => string;
+  }
 ): BookableRegistry {
   const maxEntries = opts?.maxEntries ?? MAX_PUBLIC_BOOKABLES;
-  const records = loadRecords(path);
+  const records = loadRecords(path, opts?.canonicalOwner ?? ((owner) => owner));
 
   // Write to a sibling then rename. A crash during a direct writeFileSync truncates the file first,
   // which would lose every bookable at once rather than the one being written.

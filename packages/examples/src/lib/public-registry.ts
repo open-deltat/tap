@@ -1,4 +1,5 @@
 import { openBookableRegistry, type BookableRegistry } from "./public-bookables";
+import { canonicalPrincipalId } from "./auth-config";
 
 // The one process-wide registry instance. It lives here rather than in `public-bookables.ts` so
 // that module stays pure and its tests never touch the deployed registry file.
@@ -16,5 +17,6 @@ import { openBookableRegistry, type BookableRegistry } from "./public-bookables"
 const shared = globalThis as typeof globalThis & { __deltatPublicRegistry?: BookableRegistry };
 
 export const publicRegistry: BookableRegistry = (shared.__deltatPublicRegistry ??= openBookableRegistry(
-  process.env.PUBLIC_BOOKABLES_PATH ?? "./data/public-bookables.json"
+  process.env.PUBLIC_BOOKABLES_PATH ?? "./data/public-bookables.json",
+  { canonicalOwner: (owner) => canonicalPrincipalId(owner) }
 ));

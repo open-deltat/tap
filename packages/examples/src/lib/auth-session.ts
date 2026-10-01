@@ -1,14 +1,13 @@
 import { cookies } from "next/headers";
 import { OidcAdapter, type VerifiedPrincipal } from "@open-deltat/mcp";
+import { authConfig, canonicalPrincipalId, setting } from "./auth-config";
+
+export { authConfig, canonicalPrincipalId, type AuthConfig } from "./auth-config";
 
 // Optional, vendor-neutral sign-in for the demo. Configure any OIDC issuer through AUTH_* env and
 // the dashboard lights up; configure nothing and the app runs exactly as before, anonymous /new
 // only. No provider is named in this file: a self-hoster points AUTH_ISSUER at Rauthy, Keycloak,
-// Auth0, WorkOS, whatever, and it works the same way.
-//
-// Required to enable: AUTH_ISSUER, AUTH_CLIENT_ID.
-// Optional overrides (for providers whose endpoints are not at the OIDC defaults):
-//   AUTH_AUTHORIZE_URL, AUTH_TOKEN_URL, AUTH_JWKS_URI, AUTH_TRUSTED_ISSUERS (comma-separated).
+// Auth0, WorkOS, whatever, and it works the same way. The settings themselves are in auth-config.ts.
 
 /**
  * Only a same-origin app path is a safe post-login destination. A denylist is not enough: `new URL`
@@ -29,47 +28,6 @@ export const SESSION_COOKIE = "dt_session";
 export const REFRESH_COOKIE = "dt_refresh";
 export const PROFILE_COOKIE = "dt_profile"; // display-only: an initial and optional avatar URL
 export const PKCE_COOKIE = "dt_pkce";
-
-export interface AuthConfig {
-  issuer: string;
-  clientId: string;
-  authorizeUrl: string;
-  tokenUrl: string;
-  jwksUri: string;
-  /** OIDC userinfo, for the name and email a meeting request shows its owner. */
-  userinfoUrl: string;
-  trustedIssuers: string[];
-  /** Optional extra query param some providers require on /authorize, e.g. `provider=authkit`. */
-  extraAuthorizeParams: Record<string, string>;
-}
-
-/**
- * One AUTH_* setting: trimmed, and blank counts as unset. Compose passes an unset variable through as
- * an empty string, which `??` would take as a value and use in place of the default.
- */
-const setting = (name: string): string | undefined => process.env[name]?.trim() || undefined;
-
-/** The auth config, or null when this instance has no sign-in configured. */
-export function authConfig(): AuthConfig | null {
-  const issuer = setting("AUTH_ISSUER")?.replace(/\/$/, "");
-  const clientId = setting("AUTH_CLIENT_ID");
-  if (!issuer || !clientId) return null;
-
-  const extraIssuers = setting("AUTH_TRUSTED_ISSUERS")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
-
-  const provider = setting("AUTH_PROVIDER_PARAM");
-
-  return {
-    issuer,
-    clientId,
-    authorizeUrl: setting("AUTH_AUTHORIZE_URL") ?? `${issuer}/oauth2/authorize`,
-    tokenUrl: setting("AUTH_TOKEN_URL") ?? `${issuer}/oauth2/token`,
-    jwksUri: setting("AUTH_JWKS_URI") ?? `${issuer}/oauth2/jwks`,
-    userinfoUrl: setting("AUTH_USERINFO_URL") ?? `${issuer}/oauth2/userinfo`,
-    trustedIssuers: [issuer, ...extraIssuers],
-    extraAuthorizeParams: provider ? { provider } : {},
-  };
-}
 
 export function authEnabled(): boolean {
   return authConfig() !== null;
@@ -108,7 +66,8 @@ export async function getSession(): Promise<{ principal: VerifiedPrincipal; toke
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const principal = await verify.verify(token);
-  return principal ? { principal, token } : null;
+  // One person, one id, whichever of the provider's issuers signed this token (auth-config.ts).
+  return principal ? { principal: { ...principal, principalId: canonicalPrincipalId(principal.principalId) }, token } : null;
 }
 
 /**
