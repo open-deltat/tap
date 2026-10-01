@@ -16,8 +16,9 @@ export const publicBaseUrl = publicBaseUrlFrom(process.env.PUBLIC_BASE_URL);
 
 /**
  * The origin to send people back to: the configured public one, else the request's own. The fallback
- * is right only when the app is reached directly, as in local development.
+ * is right only when the app is reached directly, as in local development. Read when called, not when
+ * the module loads, so what a sign-in redirect uses never depends on which code loaded this first.
  */
-export function siteOrigin(requestOrigin: string, base: string | null = publicBaseUrl): string {
+export function siteOrigin(requestOrigin: string, base: string | null = publicBaseUrlFrom(process.env.PUBLIC_BASE_URL)): string {
   return base ?? requestOrigin;
 }

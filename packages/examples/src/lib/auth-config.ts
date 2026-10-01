@@ -1,3 +1,5 @@
+import type { VerifiedPrincipal } from "@open-deltat/mcp";
+
 // The sign-in configuration and the one identity a person has under it. Pure (no request context),
 // so the custom server (server.ts) can use it as well as the Next app: the registry it loads must
 // read owners the same way the app writes them.
@@ -66,4 +68,19 @@ export function canonicalPrincipalId(principalId: string, config: AuthConfig | n
   if (!config || at < 0) return principalId;
   const iss = principalId.slice(0, at);
   return config.trustedIssuers.includes(iss) ? `${config.issuer}#${principalId.slice(at + 1)}` : principalId;
+}
+
+/**
+ * A token verifier that answers with that one id. The site's session (auth-session.ts) and the hosted
+ * MCP endpoint (mcp-live.ts) both verify through this, so a person is the same person on either, and
+ * the test that signs real tokens from two issuers exercises exactly what production runs.
+ */
+export function canonicalVerifier(
+  verify: (token: string) => Promise<VerifiedPrincipal | null>,
+  config: AuthConfig
+): (token: string) => Promise<VerifiedPrincipal | null> {
+  return async (token) => {
+    const principal = await verify(token);
+    return principal && { ...principal, principalId: canonicalPrincipalId(principal.principalId, config) };
+  };
 }

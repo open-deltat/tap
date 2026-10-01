@@ -123,6 +123,7 @@
       "devDependencies": {
         "@types/react": "^19",
         "@types/react-dom": "^19",
+        "jose": "^6.0.11",
       },
       "peerDependencies": {
         "next": "*",

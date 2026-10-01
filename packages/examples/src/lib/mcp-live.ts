@@ -1,5 +1,5 @@
 import { OidcAdapter } from "@open-deltat/mcp";
-import { authConfig, canonicalPrincipalId } from "./auth-config";
+import { authConfig, canonicalVerifier } from "./auth-config";
 import { meetings } from "./meetings";
 import { publicRegistry } from "./public-registry";
 import { publicBaseUrl } from "./public-base-url";
@@ -30,10 +30,7 @@ function buildDeps(): McpEndpointDeps | null {
   return {
     // One person, one id, whichever of the provider's issuers signed the token: an MCP client's token
     // and the site's session come from different WorkOS issuers for the same user (auth-config.ts).
-    verify: async (token) => {
-      const principal = await adapter.verify(token);
-      return principal && { ...principal, principalId: canonicalPrincipalId(principal.principalId, config) };
-    },
+    verify: canonicalVerifier((token) => adapter.verify(token), config),
     resourceMetadataUrl: `${publicBaseUrl}${METADATA_PATH}`,
     service: meetings,
     calendarOf: (id) => publicRegistry.get(id),
