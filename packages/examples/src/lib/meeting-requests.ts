@@ -114,14 +114,17 @@ function isMeetingRequest(value: unknown): value is MeetingRequest {
   );
 }
 
-function load(path: string): Map<string, MeetingRequest> {
+function load(path: string, canonicalRequester: (id: string) => string): Map<string, MeetingRequest> {
   try {
     if (!existsSync(path)) return new Map();
     const parsed: unknown = JSON.parse(readFileSync(path, "utf-8"));
     const requests = isRecord(parsed) ? parsed.requests : undefined;
     if (!Array.isArray(requests)) return new Map();
-    // A request that fails its shape check is dropped rather than trusted, as in the registry.
-    return new Map(requests.filter(isMeetingRequest).map((r) => [r.id, r]));
+    // A request that fails its shape check is dropped rather than trusted, as in the registry. Its
+    // requester is read as the one id that person has now, as the registry reads owners.
+    return new Map(
+      requests.filter(isMeetingRequest).map((r) => [r.id, { ...r, requester: canonicalRequester(r.requester) }])
+    );
   } catch {
     return new Map();
   }
@@ -131,12 +134,18 @@ const newestFirst = (a: MeetingRequest, b: MeetingRequest) => b.createdAt - a.cr
 
 export function openMeetingRequestStore(
   path: string,
-  opts?: { maxEntries?: number; now?: () => number; newId?: () => string }
+  opts?: {
+    maxEntries?: number;
+    now?: () => number;
+    newId?: () => string;
+    /** Maps a stored requester id to the one id its person has now (auth-config.ts canonicalPrincipalId). */
+    canonicalRequester?: (id: string) => string;
+  }
 ): MeetingRequestStore {
   const maxEntries = opts?.maxEntries ?? MAX_MEETING_REQUESTS;
   const now = opts?.now ?? Date.now;
   const newId = opts?.newId ?? (() => crypto.randomUUID());
-  const requests = load(path);
+  const requests = load(path, opts?.canonicalRequester ?? ((id) => id));
 
   // Sibling then rename, so a crash mid-write cannot truncate every request at once.
   const flush = (): void => {
