@@ -4,7 +4,7 @@ import { dt } from "../lib/deltat";
 import { BookSlotInput } from "../lib/schemas";
 import { releaseHoldsThenBook, type BookHeldSeatsInput } from "../lib/booking-flow";
 import { getSessionId } from "../lib/session";
-import { trackBookings, untrack } from "../lib/session-bookings";
+import { listBookings, trackBookings, untrack } from "../lib/session-bookings";
 import type { Booking } from "@open-deltat/client";
 
 // Register the bookings the visitor just made so the sidebar can show them and the reaper can
@@ -64,6 +64,19 @@ export async function batchBookSlots(
 }
 
 export async function cancelBooking(id: string): Promise<void> {
+  await dt.bookings.cancel(id);
+  await forgetMine([id]);
+}
+
+/**
+ * Cancel a booking this visitor made, and only one they made: the id must be in their own session's
+ * list, so a guessed or copied id cannot cancel somebody else's time. Prefer this to `cancelBooking`
+ * for anything a visitor can trigger.
+ */
+export async function cancelMyBooking(id: string): Promise<void> {
+  const sid = await getSessionId();
+  const mine = sid ? listBookings(sid).some((t) => t.booking.id === id) : false;
+  if (!mine) throw new Error("That booking is not yours to cancel");
   await dt.bookings.cancel(id);
   await forgetMine([id]);
 }

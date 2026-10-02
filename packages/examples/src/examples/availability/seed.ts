@@ -33,3 +33,17 @@ export async function seedAvailabilityScheduler(): Promise<string> {
 
   return r.id;
 }
+
+// Open hours are a rolling schedule, so the calendar has no end; a caller who scrolls past what is
+// seeded asks for more. Bounded, because the action is public: two years is about 520 rules at most.
+const MIN_HORIZON_DAYS = 14;
+const MAX_HORIZON_DAYS = 730;
+
+/** Lay open hours down through `days` days from today. Idempotent: it only adds what is missing. */
+export async function extendAvailabilityThrough(days: number): Promise<void> {
+  if (!Number.isFinite(days)) return;
+  const id = await findRootByName(NAME);
+  if (!id) return;
+  const horizonDays = Math.min(MAX_HORIZON_DAYS, Math.max(MIN_HORIZON_DAYS, Math.floor(days)));
+  await ensureSchedule(id, OFFICE_HOURS, { horizonDays });
+}

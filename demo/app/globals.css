@@ -49,9 +49,35 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* The demo "instrument" language: flat surfaces, 1px rules, one sharp radius, colour only where it
+     means something (signal = free or chosen, hold = held or just taken). Values live in :root below. */
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
+  --color-hold: var(--hold);
+  --radius-sharp: 3px;
 }
 
 :root {
+  /* ink-2 is the lowest grey that still carries text (about 8:1 on panel); ink-3 is for rules and
+     decoration only, it does not reach 4.5:1. */
+  --canvas: oklch(0.145 0.004 260);
+  --panel: oklch(0.18 0.005 260);
+  --line: oklch(1 0 0 / 0.09);
+  --line-strong: oklch(1 0 0 / 0.2);
+  --ink: oklch(0.965 0.004 260);
+  --ink-2: oklch(0.76 0.01 260);
+  --ink-3: oklch(0.55 0.01 260);
+  --signal: oklch(0.765 0.177 163.2);
+  --signal-ink: oklch(0.2 0.04 172);
+  --hold: oklch(0.83 0.16 85);
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -128,6 +154,40 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* A slot someone just took: it holds amber for a beat, then clears. Opacity and a fill only, 700ms,
+   ease-out, and removed entirely under reduced motion (the feed line still says what happened). */
+@keyframes taken {
+  0% {
+    background-color: var(--hold);
+    opacity: 1;
+  }
+  60% {
+    opacity: 0.7;
+  }
+  100% {
+    background-color: var(--hold);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .animate-taken {
+    animation: taken 700ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+/* A hold or a booking running out: the bar empties across its whole life. The element starts its
+   animation part-way in (a negative delay), at the point the server's clock says it already is. This
+   one stays on under reduced motion: it is the information, not decoration, and it never loops. */
+@keyframes shrink {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
 
 /* Syntax highlighting for docs code fences. rehype-highlight (highlight.js) tags the tokens at
    build time; these are the only colours, so no highlight.js theme stylesheet is imported. Tuned
