@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { cn } from "@open-deltat/shared/utils";
+import { STAGE_CLASS, STAGE_VARS } from "../lib/accent";
 
 export interface StagePrimitive {
   /** What deltat capability this demo proves, e.g. "Collision + Hold · seat timeline". */
@@ -7,73 +9,93 @@ export interface StagePrimitive {
   specId?: string;
 }
 
+// Crosshair registration marks centred on the panel's four corners, the way a technical drawing marks
+// its frame. Decoration, so hidden from assistive tech and from phones, where the panel is full-bleed.
+const MARK =
+  "absolute hidden size-[11px] -translate-x-1/2 -translate-y-1/2 sm:block before:absolute before:left-1/2 before:top-0 before:h-full before:w-px before:bg-ink-3 after:absolute after:left-0 after:top-1/2 after:h-px after:w-full after:bg-ink-3";
+
+function Marks() {
+  return (
+    <>
+      <span aria-hidden className={cn(MARK, "left-0 top-0")} />
+      <span aria-hidden className={cn(MARK, "left-full top-0")} />
+      <span aria-hidden className={cn(MARK, "left-0 top-full")} />
+      <span aria-hidden className={cn(MARK, "left-full top-full")} />
+    </>
+  );
+}
+
 /**
- * The shared single-pane surface for every booking demo: one luminous panel centered on a
- * dark void, a quiet primitive header naming the deltat capability, an optional control
- * ribbon, and an optional floating action tray. There is no left/right chrome, the panel
- * IS the example.
+ * The shared surface for every booking demo, built as an instrument rather than a card: a flat
+ * canvas, one hairline-framed panel with square corners, a left-aligned readout line above it naming
+ * the deltat capability on show, and an optional action tray below. No glass, glow or gradient.
+ *
+ * One scroll container holds everything. The tray sits in the flow directly under the panel, next to
+ * the thing it commits, and sticks to the bottom edge only when the panel is taller than the viewport.
+ * From the small breakpoint up, header, panel and tray centre as a group so a short panel is not left
+ * stranded; on a phone they start at the top.
  */
 export function Stage({
   primitive,
   title,
+  readout,
   ribbon,
   tray,
   children,
   contentMax = "max-w-5xl",
+  flush = false,
 }: {
   primitive?: StagePrimitive;
   title?: string;
+  /** Right end of the header line, for live state such as the stream indicator. */
+  readout?: ReactNode;
   ribbon?: ReactNode;
   tray?: ReactNode;
   children: ReactNode;
   /** Tailwind max-width for the panel. Widen it for multi-column demos (e.g. the live mirrors). */
   contentMax?: string;
+  /** No panel padding: for content that draws its own rules edge to edge. */
+  flush?: boolean;
 }) {
   return (
-    <div className="relative h-full overflow-hidden bg-[#0a0a0c] text-zinc-100">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-1/3 h-[55vh] w-[55vh] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/10 blur-[130px]" />
-        <div className="absolute inset-0 opacity-[0.035] [background-image:radial-gradient(circle,#ffffff_1px,transparent_1px)] [background-size:22px_22px]" />
-      </div>
+    <div className={cn("relative h-full overflow-hidden bg-canvas text-ink", STAGE_CLASS)} style={STAGE_VARS}>
+      <div className="h-full overflow-y-auto overscroll-contain">
+        <div className="flex min-h-full flex-col items-center sm:px-8">
+          <div className={cn("flex w-full flex-col gap-3 py-4 sm:my-auto sm:py-6", contentMax)}>
+            {(title || primitive || readout) && (
+              <header className="flex items-end justify-between gap-4 px-4 sm:px-0">
+                <div className="min-w-0">
+                  {title && <h1 className="text-balance text-base font-medium tracking-tight text-ink">{title}</h1>}
+                  {primitive && (
+                    <p className="flex flex-wrap items-baseline gap-x-2.5 text-[13px] text-ink-2">
+                      {primitive.specId && <span className="font-mono text-xs">{primitive.specId}</span>}
+                      <span className="text-pretty">{primitive.label}</span>
+                    </p>
+                  )}
+                </div>
+                {readout && <div className="shrink-0 pb-px">{readout}</div>}
+              </header>
+            )}
 
-      <div className="relative flex h-full flex-col items-center">
-        <div className="shrink-0 pb-3 pt-8 text-center">
-          {title && <div className="text-sm font-medium text-zinc-300">{title}</div>}
-          {primitive && (
-            <div className="mt-1.5 flex items-center justify-center gap-2 text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">
-              <span>{primitive.label}</span>
-              {primitive.specId && (
-                <span className="rounded border border-white/10 px-1 py-px font-mono text-[9px] tracking-normal text-zinc-500">
-                  {primitive.specId}
-                </span>
-              )}
+            {ribbon && <div className="px-4 sm:px-0">{ribbon}</div>}
+
+            {/* On phones the panel goes edge-to-edge, so seat maps use the full viewport; sm: restores
+                the framed panel. Demos that are not maps pad their own content on a phone. */}
+            <div className={cn("@container relative w-full border-y border-line bg-panel sm:rounded-sharp sm:border", !flush && "sm:p-6")}>
+              <Marks />
+              {children}
             </div>
-          )}
-        </div>
 
-        {ribbon && <div className="shrink-0 pb-4">{ribbon}</div>}
-
-        {/* m-auto (not items-center) so a panel taller than the viewport top-anchors and stays
-            fully scrollable, items-center would clip the top out of reach. */}
-        <div className={`flex w-full flex-1 justify-center overflow-auto px-0 pb-28 sm:px-6 ${contentMax}`}>
-          {/* On phones the panel goes edge-to-edge (no border/bg/padding) so the example uses the
-              full viewport; sm: restores the floating panel, byte-identical to before. */}
-          <div className="m-auto w-full rounded-none border-0 bg-transparent p-0 shadow-none sm:rounded-2xl sm:border sm:border-white/[0.06] sm:bg-white/[0.025] sm:p-6 sm:shadow-2xl sm:shadow-black/50">
-            {children}
+            {tray && (
+              <div className="sticky bottom-0 z-30 sm:bottom-4">
+                <div className="border-y border-line-strong bg-panel p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] transition-none animate-in fade-in-0 slide-in-from-bottom-1 duration-150 ease-out motion-reduce:animate-none sm:rounded-sharp sm:border sm:pb-3">
+                  {tray}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
-
-      {/* fixed (not absolute) on mobile so the tray pins to the visible viewport bottom regardless
-          of the tall scroll content; sm: reverts to absolute-in-Stage (desktop unchanged). The
-          safe-area pad keeps the Book button clear of the iOS home indicator. */}
-      {tray && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:absolute sm:p-4">
-          <div className="pointer-events-auto w-full max-w-2xl rounded-xl border border-white/10 bg-zinc-900/85 p-3 shadow-2xl shadow-black/50 backdrop-blur-md">
-            {tray}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

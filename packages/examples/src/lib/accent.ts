@@ -1,17 +1,39 @@
-// The demo's accent is emerald, applied as Tailwind utility overrides rather than a theme token
-// (globals.css is stock-neutral shadcn). Defining the recurring overrides ONCE here keeps the booker
-// CTA and the pill selectors visually identical across every example instead of re-pasted per file.
+import type { CSSProperties } from "react";
 
-/** The primary "commit the booking" button: the floating tray's action. Confident, not loud. */
+// The demo language is an instrument, not a card: flat surfaces, 1px rules, one sharp radius, and
+// colour only where it means something. `signal` is emerald and means "free" or "chosen"; `hold` is
+// amber and means "held" or "just taken". The values live in demo/app/globals.css as tokens, and a
+// light theme would start from swapping those variables (the other demos still hard-code dark classes).
+//
+// Contrast: signal fill carries signal-ink text (about 9:1). White on emerald-500 was 2.5:1.
+
+/** The primary "commit the booking" button: the tray's action. Flat, no glow. */
 export const ACCENT_CTA =
-  "bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400 disabled:opacity-40";
+  "rounded-[3px] bg-signal text-signal-ink hover:brightness-110 disabled:opacity-40";
 
-/** A rounded-full selector pill (ribbon chips, duration/party toggles, slot chips). */
+/** A square selector chip (ribbon chips, duration/party toggles). */
 export const PILL_BASE =
-  "rounded-full border px-3 py-1 text-xs transition-colors disabled:opacity-40 disabled:pointer-events-none";
-export const PILL_ACTIVE = "border-emerald-400/40 bg-emerald-400/15 text-emerald-200";
-export const PILL_IDLE = "border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200";
+  "rounded-[3px] border px-3 py-1 text-xs transition-colors disabled:opacity-40 disabled:pointer-events-none";
+export const PILL_ACTIVE = "border-signal/60 bg-signal/10 text-signal";
+export const PILL_IDLE = "border-line text-ink-2 hover:border-line-strong hover:text-ink";
 
-/** A quiet, secondary emerald affordance (e.g. the "next opening" suggestion), never as loud as the CTA. */
+/** A quiet, secondary signal affordance, never as loud as the CTA. */
 export const ACCENT_GHOST =
-  "border border-emerald-400/30 bg-emerald-400/10 text-emerald-200 shadow-none hover:border-emerald-400/50 hover:bg-emerald-400/15 hover:text-emerald-100";
+  "rounded-[3px] border border-signal/40 bg-signal/10 text-signal shadow-none hover:border-signal/60 hover:bg-signal/15";
+
+/**
+ * Re-scopes the shadcn theme tokens for the dark canvas the demos live on, whatever the site theme is,
+ * and makes signal the primary. Anything built on `bg-primary` / `text-muted-foreground` inside a
+ * Stage (calendar, default buttons, inputs) then inherits it and passes contrast without a
+ * per-component override.
+ *
+ * The overrides are inline styles, not utilities: globals.css declares `.dark { --primary }` outside any
+ * cascade layer, and unlayered rules beat Tailwind's utilities layer, so a `[--primary:...]` class loses.
+ */
+export const STAGE_CLASS = "dark";
+export const STAGE_VARS = {
+  "--primary": "var(--signal)",
+  "--primary-foreground": "var(--signal-ink)",
+  "--ring": "var(--signal)",
+  "--muted-foreground": "var(--ink-2)",
+} as CSSProperties;
