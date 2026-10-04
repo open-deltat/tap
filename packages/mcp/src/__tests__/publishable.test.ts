@@ -42,6 +42,12 @@ describe("the published manifest", () => {
     expect(pkg.mcpName).toBe(serverJson.name);
   });
 
+  test("the registry accepts the listing's description", () => {
+    // registry.modelcontextprotocol.io answers a longer one with 422 "expected length <= 100",
+    // and only at publish time, after npm already carries the version.
+    expect(serverJson.description.length).toBeLessThanOrEqual(100);
+  });
+
   test("DELTAT_PASSWORD is declared required and secret", () => {
     const password = serverJson.packages[0].environmentVariables.find(
       (v: { name: string }) => v.name === "DELTAT_PASSWORD"

@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
   "name": "io.github.open-deltat/deltat",
-  "description": "Give an agent a calendar it can book on without double-booking. Find free slots, hold one while you confirm, then commit the hold atomically.",
+  "description": "Give an agent a calendar it can book without double-booking: find, hold, then commit atomically.",
   "status": "active",
   "repository": {
     "url": "https://github.com/open-deltat/tap",
