@@ -101,19 +101,21 @@ resolved, the shebang survived, and dependencies installed.
 
 ## Submitting to the MCP registry
 
-One time only. After that, a version bump is just a re-publish.
+After the npm publish, run the `MCP registry` workflow:
 
 ```bash
-brew install mcp-publisher          # or see modelcontextprotocol.io/registry
-cd packages/mcp
-mcp-publisher login github          # opens a browser, authorizes the open-deltat org
-mcp-publisher publish
+gh workflow run mcp-registry.yml --repo open-deltat/tap
 ```
 
-The server name `io.github.open-deltat/deltat` is namespaced to the GitHub org, which is why the
-login has to be against an account with access to it. Ownership is proven by that login plus the
-`mcpName` field in the published npm package, so **publish to npm first**: the registry verifies the
-npm package claims the same name back.
+The server name `io.github.open-deltat/deltat` is namespaced to the GitHub org. The workflow proves
+the run belongs to that org with GitHub OIDC, so it needs no secret and no login. A local
+`mcp-publisher login github` was refused with 403 even for an org admin with public membership,
+because the registry reads org access through its own GitHub app. Ownership is also checked against
+the `mcpName` field in the published npm package, so **publish to npm first**: the registry verifies
+the npm package claims the same name back.
+
+The registry refuses a `server.json` description over 100 characters; `publishable.test.ts` checks
+it.
 
 `registry.modelcontextprotocol.io` is the upstream that Smithery, PulseMCP and mcp.so pull from, so
 one submission propagates without separate accounts on each.
