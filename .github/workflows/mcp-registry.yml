@@ -1,0 +1,36 @@
+name: MCP registry
+
+# Submits packages/mcp/server.json to registry.modelcontextprotocol.io. Run it by hand once the
+# matching @open-deltat/mcp version is on npm: the registry checks that the npm package claims this
+# server's name back.
+#
+# GitHub OIDC is what proves the run belongs to the open-deltat org, so no secret is stored and no
+# one has to log in. The interactive `mcp-publisher login github` path was refused with 403 even
+# for an org admin with public membership, because the registry reads org access through its own
+# GitHub app.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Publish the listing
+    runs-on: ubuntu-latest
+    env:
+      PUBLISHER_VERSION: 1.8.1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mcp-publisher, checked against the release's checksums
+        run: |
+          base="https://github.com/modelcontextprotocol/registry/releases/download/v${PUBLISHER_VERSION}"
+          curl -fsSLO "$base/mcp-publisher_linux_amd64.tar.gz"
+          curl -fsSL "$base/registry_${PUBLISHER_VERSION}_checksums.txt" | grep " mcp-publisher_linux_amd64.tar.gz$" | sha256sum -c -
+          tar -xzf mcp-publisher_linux_amd64.tar.gz mcp-publisher
+      - name: Log in as the open-deltat org
+        run: ./mcp-publisher login github-oidc
+      - name: Publish
+        working-directory: packages/mcp
+        run: ../../mcp-publisher publish
