@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DeltaTEvent } from "@open-deltat/client";
+import { getCalendar } from "@open-deltat/examples/actions/my-bookables";
 import { useWebSocket, type StreamStatus } from "@open-deltat/examples/hooks/use-websocket";
 import {
   LabeledTimeline,
@@ -161,10 +162,18 @@ export function LiveSchedule({
       if ("BookingConfirmed" in event) {
         const b = event.BookingConfirmed;
         setBookings((prev) =>
-          prev.some((x) => x.id === b.id) ? prev : [...prev, { id: b.id, start: b.span.start, end: b.span.end, label: b.label }]
+          prev.some((x) => x.id === b.id) ? prev : [...prev, { id: b.id, start: b.span.start, end: b.span.end, label: null }]
         );
         setHolds((prev) => prev.filter((h) => !(h.start === b.span.start && h.end === b.span.end)));
-        push({ kind: "Booking confirmed", tone: "book", detail: `${timeOnly(b.span.start)}${b.label ? ` · ${b.label}` : ""}` });
+        push({ kind: "Booking confirmed", tone: "book", detail: timeOnly(b.span.start) });
+        // Change notifications never carry the booker's name (anyone watching the calendar hears
+        // them), so it comes from the owner's own read. Only names are filled in: which bookings
+        // exist stays with the events, so a slower reply cannot drop a newer booking.
+        void getCalendar(calendarId).then((fresh) => {
+          if (!fresh.ok) return;
+          const labels = new Map(fresh.value.bookings.map((x) => [x.id, x.label]));
+          setBookings((prev) => prev.map((x) => ({ ...x, label: labels.get(x.id) ?? x.label })));
+        });
       } else if ("BookingCancelled" in event) {
         const id = event.BookingCancelled.id;
         setBookings((prev) => prev.filter((x) => x.id !== id));
@@ -180,7 +189,7 @@ export function LiveSchedule({
         push({ kind: Object.keys(event)[0] ?? "Event", tone: "other", detail: "" });
       }
     },
-    [push, timeOnly, clock]
+    [push, timeOnly, clock, calendarId]
   );
 
   // Owned calendars live in the public tenant; tell the bridge so it LISTENs on the right one.
