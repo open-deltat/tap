@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DeltaTEvent } from "@open-deltat/client";
 import { getCalendar } from "@open-deltat/examples/actions/my-bookables";
 import { useWebSocket, type StreamStatus } from "@open-deltat/examples/hooks/use-websocket";
@@ -38,6 +38,8 @@ interface LogLine {
   kind: string;
   tone: "book" | "cancel" | "hold" | "release" | "other";
   detail: string;
+  /** The booker's name is looked up from the bookings when shown, never copied into the log. */
+  bookingId?: string;
 }
 
 const STATUS: Record<StreamStatus, { label: string; variant: "success" | "muted" | "secondary" }> = {
@@ -157,27 +159,40 @@ export function LiveSchedule({
     setLog((prev) => [{ ...line, key: `${Date.now()}-${seq}`, at: Date.now() }, ...prev].slice(0, 60));
   }, []);
 
+  // Events show a change the moment it happens; the owner's read then says what is true, names
+  // included, since deltat#49 keeps booker names out of change notifications (kernels before it
+  // still send them). One read per burst, and a reply lands only if no newer change came in after
+  // it was asked for, so a slow reply cannot undo what a later event showed.
+  const reads = useRef(0);
+  const readTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const reread = useCallback(() => {
+    const asked = ++reads.current;
+    clearTimeout(readTimer.current);
+    readTimer.current = setTimeout(() => {
+      getCalendar(calendarId)
+        .then((fresh) => {
+          if (fresh.ok && asked === reads.current) setBookings(fresh.value.bookings);
+        })
+        .catch(() => {}); // keep what the events showed; the next change reads again
+    }, 200);
+  }, [calendarId]);
+  useEffect(() => () => clearTimeout(readTimer.current), []);
+
   const onEvent = useCallback(
     (event: DeltaTEvent) => {
       if ("BookingConfirmed" in event) {
         const b = event.BookingConfirmed;
         setBookings((prev) =>
-          prev.some((x) => x.id === b.id) ? prev : [...prev, { id: b.id, start: b.span.start, end: b.span.end, label: null }]
+          prev.some((x) => x.id === b.id) ? prev : [...prev, { id: b.id, start: b.span.start, end: b.span.end, label: b.label }]
         );
         setHolds((prev) => prev.filter((h) => !(h.start === b.span.start && h.end === b.span.end)));
-        push({ kind: "Booking confirmed", tone: "book", detail: timeOnly(b.span.start) });
-        // Change notifications never carry the booker's name (anyone watching the calendar hears
-        // them), so it comes from the owner's own read. Only names are filled in: which bookings
-        // exist stays with the events, so a slower reply cannot drop a newer booking.
-        void getCalendar(calendarId).then((fresh) => {
-          if (!fresh.ok) return;
-          const labels = new Map(fresh.value.bookings.map((x) => [x.id, x.label]));
-          setBookings((prev) => prev.map((x) => ({ ...x, label: labels.get(x.id) ?? x.label })));
-        });
+        push({ kind: "Booking confirmed", tone: "book", detail: timeOnly(b.span.start), bookingId: b.id });
+        reread();
       } else if ("BookingCancelled" in event) {
         const id = event.BookingCancelled.id;
         setBookings((prev) => prev.filter((x) => x.id !== id));
         push({ kind: "Booking cancelled", tone: "cancel", detail: `#${id.slice(-6)}` });
+        reread();
       } else if ("HoldPlaced" in event) {
         const h = event.HoldPlaced;
         setHolds((prev) => [...prev, { id: h.id, start: h.span.start, end: h.span.end }]);
@@ -189,12 +204,14 @@ export function LiveSchedule({
         push({ kind: Object.keys(event)[0] ?? "Event", tone: "other", detail: "" });
       }
     },
-    [push, timeOnly, clock, calendarId]
+    [push, timeOnly, clock, reread]
   );
 
   // Owned calendars live in the public tenant; tell the bridge so it LISTENs on the right one.
   const { status } = useWebSocket({ type: "subscribe", resourceId: calendarId, database: "public", onEvent });
   const badge = STATUS[status];
+
+  const names = useMemo(() => new Map(bookings.map((b) => [b.id, b.label])), [bookings]);
 
   // Filtering is derived, never a second copy of the log: one source of truth, two views of it.
   const visibleLog = useMemo(() => {
@@ -382,7 +399,12 @@ export function LiveSchedule({
                   <span className="text-muted-foreground tabular-nums">{clock(l.at)}</span>
                   <span className={`mt-1 size-1.5 shrink-0 rounded-full ${dotColor(l.tone)}`} aria-hidden />
                   <span className="text-foreground">{l.kind}</span>
-                  {l.detail ? <span className="text-muted-foreground truncate">{l.detail}</span> : null}
+                  {l.detail ? (
+                    <span className="text-muted-foreground truncate">
+                      {l.detail}
+                      {l.bookingId && names.get(l.bookingId) ? ` · ${names.get(l.bookingId)}` : null}
+                    </span>
+                  ) : null}
                 </li>
               ))}
             </ul>
