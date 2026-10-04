@@ -29,9 +29,9 @@ checked first and hoped.
 
 | Tool | Use it when |
 |---|---|
-| `find_slots` | Before offering anyone a time. Lists what is genuinely free. |
-| `hold_slot` | The moment you are about to name a specific time to a human. Returns a `hold_id`. |
-| `commit_hold` | The booking is confirmed. Turns the hold into a booking, atomically. |
+| `find_slots` | Before offering anyone a time. Lists what is genuinely free, on every calendar you name. |
+| `hold_slot` | The moment you are about to name a specific time to a human. Returns `hold_ids`. |
+| `commit_hold` | The booking is confirmed. Turns every hold into a booking, atomically. |
 | `release_hold` | You know the held time is not wanted. Frees it immediately. |
 | `create_calendar` | A new bookable calendar is needed. Returns the `calendar_id`. |
 | `set_availability` | Opening hours change, or `find_slots` returns nothing. Replaces the whole week. |
@@ -77,9 +77,26 @@ A refusal with nothing to offer keeps the plain `CODE: message` shape, so a kern
 counter-offers disabled (`DELTAT_COUNTER_OFFER=0`) or one older than the feature behaves exactly as
 before.
 
+## Book several calendars together
+
+A camera body, its lens and the crew. A surgeon and an operating room. An appointment and the drive
+to it. Pass every calendar to the same three tools:
+
+```
+find_slots({ calendar_ids: [body, lens, crew], from, to })    times when ALL are free
+hold_slot({ calendar_ids: [body, lens, crew], start, end })   holds every one, or none
+commit_hold({ hold_ids, label })                              books every one, or none
+```
+
+One calendar is the same call with a one-item list. The commit is a single record in deltat, so
+neither a competing booker nor a crash can leave the body booked and the lens free.
+
+When a kit is refused, the alternatives are times when **every** calendar is free for the same
+length, never the time just refused, in the same shape as above.
+
 ## Configure it
 
-You need a deltat server. Self-host it with Docker:
+You need a deltat server, 0.4.0 or later. Self-host it with Docker:
 
 ```bash
 docker run -p 5433:5433 -e DELTAT_PASSWORD=<your-password> ghcr.io/open-deltat/deltat

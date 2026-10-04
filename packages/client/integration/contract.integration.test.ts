@@ -72,16 +72,39 @@ async function probeCommitHold(): Promise<Probe> {
   }
 }
 
+/** Kits (several holds in one statement, then one commit) need deltat 0.4.0; older servers refuse. */
+async function probeKits(): Promise<Probe> {
+  const c = client();
+  const a = await openResource({ name: "kit-probe-a" });
+  const b = await openResource({ name: "kit-probe-b" });
+  try {
+    const span = { start: T0, end: T0 + HOUR, expiresAt: Date.now() + HOLD_TTL };
+    await c.holds.placeMany([{ resourceId: a, ...span }, { resourceId: b, ...span }]);
+    return { supported: true };
+  } catch (err) {
+    return { supported: false, reason: err instanceof Error ? err.message : String(err) };
+  } finally {
+    await c.resources.delete(a);
+    await c.resources.delete(b);
+  }
+}
+
 // Top-level await: probes run before test collection so skips register as real skips. A dead or
 // wrong port fails here, failing the whole file, so the suite can never green against no server.
 const commitHold: Probe = enabled
   ? await probeCommitHold()
   : { supported: false, reason: "suite disabled" };
+const kits: Probe = enabled ? await probeKits() : { supported: false, reason: "suite disabled" };
 
 if (!enabled) {
   console.log("integration: DELTAT_INTEGRATION_PORT not set; skipping the live-server contract suite");
-} else if (!commitHold.supported) {
-  console.log(`integration: server lacks holds.commit (${commitHold.reason}); skipping commit-flow tests`);
+} else {
+  if (!commitHold.supported) {
+    console.log(`integration: server lacks holds.commit (${commitHold.reason}); skipping commit-flow tests`);
+  }
+  if (!kits.supported) {
+    console.log(`integration: server lacks kits (${kits.reason}); skipping kit tests`);
+  }
 }
 
 afterAll(async () => {
@@ -327,7 +350,67 @@ describe.skipIf(!enabled || !commitHold.supported)("holds.commit", () => {
   });
 });
 
+describe.skipIf(!enabled || !kits.supported)("kits", () => {
+  const span = () => ({ start: T0, end: T0 + HOUR, expiresAt: Date.now() + HOLD_TTL });
+
+  test("placeMany holds every resource, or none when one of them is taken", async () => {
+    const c = client();
+    const body = await openResource();
+    const lens = await openResource();
+    await c.bookings.create([{ resourceId: lens, start: T0, end: T0 + HOUR }]);
+
+    await expect(
+      c.holds.placeMany([{ resourceId: body, ...span() }, { resourceId: lens, ...span() }])
+    ).rejects.toThrow();
+    expect(await c.holds.get(body)).toEqual([]);
+
+    const later = { start: T0 + 2 * HOUR, end: T0 + 3 * HOUR, expiresAt: Date.now() + HOLD_TTL };
+    const held = await c.holds.placeMany([{ resourceId: body, ...later }, { resourceId: lens, ...later }]);
+    expect((await c.holds.get(body)).map((h) => h.id)).toEqual([held[0].id]);
+    expect((await c.holds.get(lens)).map((h) => h.id)).toEqual([held[1].id]);
+  });
+
+  test("commitMany books every hold at its own span and consumes them, once", async () => {
+    const c = client();
+    const body = await openResource();
+    const lens = await openResource();
+    const held = await c.holds.placeMany([{ resourceId: body, ...span() }, { resourceId: lens, ...span() }]);
+
+    const { bookingIds } = await c.holds.commitMany(held.map((h) => h.id), { label: "kit for Ana" });
+
+    expect(await c.bookings.get(body)).toEqual([
+      { id: bookingIds[0], resourceId: body, start: T0, end: T0 + HOUR, label: "kit for Ana" },
+    ]);
+    expect(await c.bookings.get(lens)).toEqual([
+      { id: bookingIds[1], resourceId: lens, start: T0, end: T0 + HOUR, label: "kit for Ana" },
+    ]);
+    expect(await c.holds.get(body)).toEqual([]);
+    await expect(c.holds.commitMany(held.map((h) => h.id))).rejects.toThrow();
+  });
+});
+
 describe.skipIf(!enabled)("availability", () => {
+  test("getCombined over one resource answers exactly what get does", async () => {
+    // find_slots sends one calendar and several through getCombined alike, so a single calendar's
+    // answer must not change shape on the way.
+    const c = client();
+    for (const capacity of [1, 2]) {
+      const r = await c.resources.create({ name: `one-${ulid()}`, capacity });
+      await c.rules.create([{ resourceId: r.id, start: T0, end: T0 + DAY }]);
+      // Full at 2-3h whatever the capacity; at 5-6h a capacity-2 resource still has a place left.
+      const twoToThree = { resourceId: r.id, start: T0 + 2 * HOUR, end: T0 + 3 * HOUR };
+      await c.bookings.create(capacity === 2 ? [twoToThree, twoToThree] : [twoToThree]);
+      await c.holds.place({ resourceId: r.id, start: T0 + 5 * HOUR, end: T0 + 6 * HOUR, expiresAt: Date.now() + HOLD_TTL });
+
+      for (const minDuration of [undefined, 2 * HOUR]) {
+        const window = { start: T0, end: T0 + DAY, minDuration };
+        expect(await c.availability.getCombined({ resourceIds: [r.id], ...window })).toEqual(
+          await c.availability.get({ resourceId: r.id, ...window })
+        );
+      }
+    }
+  });
+
   test("single resource: a booking splits the open window; minDuration drops short slots", async () => {
     const c = client();
     const r = await c.resources.create({ name: `avail-${ulid()}` });

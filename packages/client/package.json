@@ -1,6 +1,6 @@
 {
   "name": "@open-deltat/client",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "TypeScript SDK for TAP, the Time Allocation Protocol: resources, rules, bookings, holds, availability, and recurrence, over deltat's PostgreSQL wire protocol.",
   "license": "MIT",
   "author": "Simon Orzel",

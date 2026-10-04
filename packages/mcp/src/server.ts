@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { DeltaT, expandRecurrence, classifyRefusal, parseInstant } from "@open-deltat/client";
+import { DeltaT, expandRecurrence, classifyRefusal, parseInstant, sqlstateOf } from "@open-deltat/client";
 import type { CounterOffer, RefusalCode } from "@open-deltat/client";
 
 // The agent-facing tool surface over deltat: create a calendar, set its availability, then the
@@ -13,11 +13,21 @@ import type { CounterOffer, RefusalCode } from "@open-deltat/client";
  * package.json without breaking the dist layout, so this is stated once here and a test asserts it
  * still matches package.json rather than letting the two drift silently.
  */
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 const DAY = 86_400_000;
 const HORIZON_DAYS = 60;
 const HOLD_TTL_MS = 5 * 60_000; // long enough to check with a human before committing
+// What deltat offers after a refused single calendar (COUNTER_OFFER_WINDOW_MS and COUNTER_OFFER_MAX
+// in its limits.rs), so a refused kit reads the same as a refused calendar.
+const OFFER_WINDOW_MS = 7 * DAY;
+const OFFER_MAX = 3;
+
+const CALENDAR_IDS = z
+  .array(z.string())
+  .min(1)
+  .describe("One calendar_id, or several to book together at the same time (a person and a room, a camera and its crew)");
+const HOLD_IDS = z.array(z.string()).min(1).describe("Every hold_id that hold_slot returned");
 
 // Strict RFC 3339 with an offset; parseInstant says why a zoneless time is refused.
 const toMs = (iso: string): number => {
@@ -34,12 +44,15 @@ const local = (ms: number, tz: string): string => {
   }
 };
 
+/** The part of a counter-offer an agent is shown. */
+type Offer = Pick<CounterOffer, "alternatives" | "retrySameSpan" | "schedule">;
+
 class ToolError extends Error {
   constructor(
     readonly code: RefusalCode,
     message: string,
-    /** Times the caller could take instead, when the kernel supplied any. */
-    readonly offer?: CounterOffer
+    /** Times the caller could take instead, from the kernel or, for a kit, from find_slots' query. */
+    readonly offer?: Offer
   ) {
     super(message);
   }
@@ -162,6 +175,34 @@ async function applyHours(
 }
 
 /**
+ * A refused kit, with times that would work. deltat offers alternatives for one calendar but not for
+ * several, because what fits every calendar at once is a joint question its per-calendar sweep does
+ * not answer. find_slots' own query answers it: the earliest free stretches long enough for the same
+ * span, in the week after the requested start, never the span just refused. Like deltat's own
+ * offers, none of them is held.
+ */
+async function withKitAlternatives(
+  dt: DeltaT,
+  refused: unknown,
+  calendarIds: readonly string[],
+  span: { start: number; end: number }
+): Promise<ToolError> {
+  const error = classify(refused);
+  if (calendarIds.length < 2 || error.code !== "CONFLICT") return error;
+  const length = span.end - span.start;
+  const free = await dt.availability
+    .getCombined({ resourceIds: [...calendarIds], start: span.start, end: span.start + OFFER_WINDOW_MS, minDuration: length })
+    .catch(() => []);
+  const alternatives = free
+    .filter((s) => s.start !== span.start)
+    .slice(0, OFFER_MAX)
+    .map((s) => ({ start: s.start, end: s.start + length }));
+  // 23514 is outside opening hours, which waiting will not change.
+  const retrySameSpan = sqlstateOf(refused) !== "23514";
+  return new ToolError(error.code, error.message, { alternatives, retrySameSpan, schedule: "known" });
+}
+
+/**
  * Build the MCP server over a connected DeltaT client. Exposed for embedding and for tests; the
  * stdio entry point wires the transport.
  */
@@ -174,7 +215,7 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
         "",
         "There is no one-step booking verb, on purpose. Booking is always three calls:",
         "  1. find_slots  - what is actually free",
-        "  2. hold_slot   - reserve one before you offer it to anyone, returns a hold_id",
+        "  2. hold_slot   - reserve one before you offer it to anyone, returns hold_ids",
         "  3. commit_hold - confirm it atomically",
         "",
         "The reason is that a free slot you read a second ago may already be gone. Two callers can",
@@ -190,6 +231,11 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
         "",
         "Never tell a human a time is booked until commit_hold has returned. find_slots and hold_slot",
         "are both reversible; only commit_hold is a commitment.",
+        "",
+        "To book several calendars together (a person and a room, a camera and its crew), pass all of",
+        "their ids to the same three tools: find_slots returns only times when every one is free,",
+        "hold_slot holds every one or none, and commit_hold books every hold or none. Nobody can end",
+        "up with half of it.",
       ].join("\n"),
     }
   );
@@ -251,27 +297,27 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
     {
       title: "Find open slots",
       description:
-        "Use this first, before offering anyone a time. Lists the genuinely free slots on a calendar between two RFC 3339 instants (offset required, e.g. 2026-06-01T09:00:00Z). A slot listed here is not reserved for you: another caller can take it a moment later, so call hold_slot before you promise it to anyone. Availability is materialized about 60 days ahead, so searching further out returns nothing rather than an error.",
+        "Use this first, before offering anyone a time. Lists the genuinely free slots between two RFC 3339 instants (offset required, e.g. 2026-06-01T09:00:00Z). With several calendars it lists only the times when every one of them is free. A slot listed here is not reserved for you: another caller can take it a moment later, so call hold_slot before you promise it to anyone. Availability is materialized about 60 days ahead, so searching further out returns nothing rather than an error.",
       annotations: { readOnlyHint: true, idempotentHint: true },
       inputSchema: {
-        calendar_id: z.string(),
+        calendar_ids: CALENDAR_IDS,
         from: z.string().describe("RFC 3339 start of the search window"),
         to: z.string().describe("RFC 3339 end of the search window"),
         timezone: z.string().default("UTC"),
         min_minutes: z.number().int().positive().optional(),
       },
     },
-    async ({ calendar_id, from, to, timezone, min_minutes }) => {
+    async ({ calendar_ids, from, to, timezone, min_minutes }) => {
       try {
-        const slots = await dt.availability.get({
-          resourceId: calendar_id,
+        const slots = await dt.availability.getCombined({
+          resourceIds: calendar_ids,
           start: toMs(from),
           end: toMs(to),
           minDuration: min_minutes ? min_minutes * 60_000 : undefined,
         });
         return ok(
           JSON.stringify({
-            calendar_id,
+            calendar_ids,
             slots: slots.map((s) => ({
               start: toIso(s.start),
               end: toIso(s.end),
@@ -290,27 +336,33 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
     {
       title: "Hold a slot",
       description:
-        "Use this the moment you are about to offer a specific time to a human, before you say it out loud. Reserves the slot for a few minutes so nobody else can take it while you confirm, and returns a hold_id. A hold is not a booking: call commit_hold to confirm it, or release_hold to give it back. If you do neither it expires on its own and the slot returns to the pool, so holding costs nothing. If the time is already taken or outside opening hours, the refusal lists other free times: offer one of those in the same breath rather than calling find_slots again. They are not reserved for you, so call hold_slot on whichever one is chosen.",
+        "Use this the moment you are about to offer a specific time to a human, before you say it out loud. Reserves the slot for a few minutes so nobody else can take it while you confirm, and returns hold_ids. With several calendars it holds every one of them for the same time, or none. A hold is not a booking: call commit_hold to confirm it, or release_hold to give it back. If you do neither it expires on its own and the slot returns to the pool, so holding costs nothing. If the time is already taken or outside opening hours, the refusal lists other free times: offer one of those in the same breath rather than calling find_slots again. They are not reserved for you, so call hold_slot on whichever one is chosen.",
       inputSchema: {
-        calendar_id: z.string(),
+        calendar_ids: CALENDAR_IDS,
         start: z.string().describe("RFC 3339"),
         end: z.string().describe("RFC 3339"),
         timezone: z.string().default("UTC"),
       },
     },
-    async ({ calendar_id, start, end, timezone }) => {
+    async ({ calendar_ids, start, end, timezone }) => {
       try {
+        const span = { start: toMs(start), end: toMs(end) };
         const expiresAt = Date.now() + HOLD_TTL_MS;
-        const hold = await dt.holds.place({ resourceId: calendar_id, start: toMs(start), end: toMs(end), expiresAt });
-        // Read the authoritative server-assigned expiry back.
-        const live = (await dt.holds.get(calendar_id)).find((h) => h.id === hold.id);
-        const exp = live?.expiresAt ?? expiresAt;
+        const held = await dt.holds
+          .placeMany(calendar_ids.map((resourceId) => ({ resourceId, ...span, expiresAt })))
+          .catch(async (e) => {
+            throw await withKitAlternatives(dt, e, calendar_ids, span);
+          });
+        // Read the authoritative server-assigned expiries back. The holds stand or fall together, so
+        // what the agent needs is the earliest of them.
+        const live = await dt.holds.getMany(calendar_ids);
+        const exp = Math.min(...held.map((h) => live[h.resourceId]?.find((l) => l.id === h.id)?.expiresAt ?? h.expiresAt));
         return ok(
           JSON.stringify({
-            hold_id: hold.id,
+            hold_ids: held.map((h) => h.id),
             expires_at: toIso(exp),
             expires_at_local: local(exp, timezone),
-            next: "Call commit_hold with this hold_id to confirm, or release_hold to let it go.",
+            next: "Call commit_hold with these hold_ids to confirm, or release_hold to let them go.",
           })
         );
       } catch (e) {
@@ -348,8 +400,13 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
             booked: false,
             reason: "There is no one-step booking verb. Nothing was booked or reserved by this call.",
             do_this_instead: [
-              { step: 1, tool: "hold_slot", args: { calendar_id, start, end }, note: "reserves the slot for a few minutes" },
-              { step: 2, tool: "commit_hold", args: { hold_id: "<from step 1>" }, note: "confirms it atomically" },
+              {
+                step: 1,
+                tool: "hold_slot",
+                args: { calendar_ids: calendar_id ? [calendar_id] : undefined, start, end },
+                note: "reserves the slot for a few minutes",
+              },
+              { step: 2, tool: "commit_hold", args: { hold_ids: ["<from step 1>"] }, note: "confirms it atomically" },
             ],
             why: "Two callers can check the same free slot at the same moment and both believe they won it. A hold is the reservation that makes the confirmation safe.",
           })
@@ -362,17 +419,17 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
     {
       title: "Commit a hold",
       description:
-        "Use this when you have a hold_id from hold_slot and the booking is confirmed. Turns the hold into a booking in one atomic step, so the slot cannot be lost between reserving and confirming. This is the only way to create a booking. If it is refused, the reply may list other free times: offer one and call hold_slot on it, since none of them is reserved for you.",
+        "Use this when you have the hold_ids from hold_slot and the booking is confirmed. Turns every hold into a booking in one atomic step: all of them or none, so the slot cannot be lost between reserving and confirming and a group can never be half booked. This is the only way to create a booking. If it is refused, the reply may list other free times: offer one and call hold_slot on it, since none of them is reserved for you.",
       inputSchema: {
-        hold_id: z.string(),
+        hold_ids: HOLD_IDS,
         label: z.string().max(200).optional().describe("who the booking is for"),
         timezone: z.string().default("UTC").describe("IANA timezone for rendering any alternative times"),
       },
     },
-    async ({ hold_id, label, timezone }) => {
+    async ({ hold_ids, label, timezone }) => {
       try {
-        const { bookingId } = await dt.holds.commit(hold_id, label ? { label } : undefined);
-        return ok(JSON.stringify({ booking_id: bookingId, status: "confirmed" }));
+        const { bookingIds } = await dt.holds.commitMany(hold_ids, label ? { label } : undefined);
+        return ok(JSON.stringify({ booking_ids: bookingIds, status: "confirmed" }));
       } catch (e) {
         return fail(classify(e), timezone);
       }
@@ -384,13 +441,13 @@ export function createDeltatMcpServer(dt: DeltaT): McpServer {
     {
       title: "Release a hold",
       description:
-        "Use this as soon as you know a held time is not wanted, for example the person picked a different slot or ended the conversation. Frees the slot immediately instead of leaving it blocked until the hold expires. Safe to call on a hold that already expired.",
-      inputSchema: { hold_id: z.string() },
+        "Use this as soon as you know a held time is not wanted, for example the person picked a different slot or ended the conversation. Frees every slot immediately instead of leaving them blocked until the holds expire. Safe to call on a hold that already expired.",
+      inputSchema: { hold_ids: HOLD_IDS },
     },
-    async ({ hold_id }) => {
+    async ({ hold_ids }) => {
       try {
-        await dt.holds.release(hold_id);
-        return ok(JSON.stringify({ hold_id, status: "released" }));
+        await Promise.all(hold_ids.map((id) => dt.holds.release(id)));
+        return ok(JSON.stringify({ hold_ids, status: "released" }));
       } catch (e) {
         return fail(classify(e));
       }
