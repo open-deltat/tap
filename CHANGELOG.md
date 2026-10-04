@@ -19,6 +19,11 @@ may still carry breaking changes.
   to an empty or host-dependent schedule.
 
 ### Added
+- `holds.placeMany` and `holds.commitMany` hold several resources at once and book them, each all
+  or none (a camera body, its lens and the crew). Each is one statement, deliberately never chunked,
+  because the server makes a statement all-or-nothing and a sequence of them is not. Needs deltat
+  0.4.0 for more than one row. `holds.place` is now `placeMany` of one, sending the same single row
+  as before.
 - `expandRecurrence` supports until-midnight windows (`endTime: "00:00"` or `"24:00"`) and
   overnight windows (an `endTime` before `startTime` rolls into the next day, e.g. 22:00 to
   02:00). These previously produced no segments, silently.

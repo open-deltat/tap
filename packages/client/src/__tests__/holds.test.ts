@@ -99,3 +99,74 @@ test("commit() propagates the server's rejection of an unknown, released, or exp
   // No fallback statement: the server's verdict is final and the SDK must not retry around it.
   expect(calls).toHaveLength(1);
 });
+
+// A kit is all or none only because the server sees it as ONE statement. Splitting it (chunking,
+// a loop, a retry of the rows that failed) would hand back a half-held kit, so every test below
+// pins exactly one statement however many rows there are.
+const HOLD_INSERT = 'INSERT INTO holds (id, resource_id, start, "end", expires_at) VALUES';
+
+test("placeMany() holds every resource in one multi-row INSERT, every value a parameter", async () => {
+  const { sql, calls } = recordingSql();
+
+  const holds = await new Holds(sql).placeMany([
+    { resourceId: "body", start: 0, end: 10, expiresAt: 99 },
+    { resourceId: "lens", start: 0, end: 10, expiresAt: 99 },
+  ]);
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].query).toBe(`${HOLD_INSERT} ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10)`);
+  expect(calls[0].params).toEqual([holds[0].id, "body", 0, 10, 99, holds[1].id, "lens", 0, 10, 99]);
+  expect(holds.map((h) => h.resourceId)).toEqual(["body", "lens"]);
+  expect(holds.every((h) => ULID_SHAPE.test(h.id))).toBe(true);
+});
+
+test("place() is placeMany() of one, so a single hold still reaches the server as one row", async () => {
+  const { sql, calls } = recordingSql();
+
+  const hold = await new Holds(sql).place({ resourceId: "r1", start: 0, end: 10, expiresAt: 99 });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].query).toBe(`${HOLD_INSERT} ($1, $2, $3, $4, $5)`);
+  expect(calls[0].params).toEqual([hold.id, "r1", 0, 10, 99]);
+});
+
+test("commitMany() books every hold in one INSERT, the bookings in the order of the holds", async () => {
+  const { sql, calls } = recordingSql();
+
+  const { bookingIds } = await new Holds(sql).commitMany(["h1", "h2"], { label: "kit for Ana" });
+
+  expect(calls).toHaveLength(1);
+  expect(calls[0].query).toBe("INSERT INTO bookings (id, hold_id, label) VALUES ($1, $2, $3), ($4, $5, $6)");
+  expect(calls[0].params).toEqual([bookingIds[0], "h1", "kit for Ana", bookingIds[1], "h2", "kit for Ana"]);
+  expect(bookingIds.every((id) => ULID_SHAPE.test(id))).toBe(true);
+});
+
+test("commitMany() without a label omits the label column, as commit() does", async () => {
+  const { sql, calls } = recordingSql();
+
+  const { bookingIds } = await new Holds(sql).commitMany(["h1"]);
+
+  expect(calls[0].query).toBe("INSERT INTO bookings (id, hold_id) VALUES ($1, $2)");
+  expect(calls[0].params).toEqual([bookingIds[0], "h1"]);
+});
+
+test("an empty kit sends nothing", async () => {
+  const { sql, calls } = recordingSql();
+
+  expect(await new Holds(sql).placeMany([])).toEqual([]);
+  expect(await new Holds(sql).commitMany([])).toEqual({ bookingIds: [] });
+  expect(calls).toHaveLength(0);
+});
+
+test("a refused kit is one rejection with no second statement", async () => {
+  const { sql, calls } = recordingSql(() => true);
+
+  await expect(
+    new Holds(sql).placeMany([
+      { resourceId: "body", start: 0, end: 10, expiresAt: 99 },
+      { resourceId: "lens", start: 0, end: 10, expiresAt: 99 },
+    ])
+  ).rejects.toThrow("stub failure");
+  await expect(new Holds(sql).commitMany(["h1", "h2"])).rejects.toThrow("stub failure");
+  expect(calls).toHaveLength(2);
+});

@@ -112,7 +112,7 @@ jobs:
           DELTAT_INTEGRATION_PORT=5433 \
           DELTAT_INTEGRATION_PASSWORD="$DELTAT_PASSWORD" \
           TZ=Europe/Berlin \
-            bun test packages/client/integration/ packages/examples/integration/ packages/cli/integration/
+            bun test packages/client/integration/ packages/examples/integration/ packages/cli/integration/ packages/mcp/integration/
       - name: Print the server log
         if: failure()
         run: cat "$RUNNER_TEMP/deltat.log"

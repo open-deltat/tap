@@ -1,6 +1,6 @@
 {
   "name": "@open-deltat/mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for real-time scheduling: give an agent a calendar it can find, hold and commit slots on without ever double-booking.",
   "license": "MIT",
   "author": "Simon Orzel",
@@ -56,7 +56,7 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "jose": "^6.0.11",
     "zod": "^4.6.5",
-    "@open-deltat/client": "^0.4.0"
+    "@open-deltat/client": "^0.4.1"
   },
   "devDependencies": {
     "@types/node": "^24",

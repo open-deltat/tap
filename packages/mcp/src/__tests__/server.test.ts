@@ -22,12 +22,12 @@ function spyDeltaT(): { dt: DeltaT; calls: string[] } {
   const dt = {
     resources: { create: record("resources.create") },
     holds: {
-      place: record("holds.place"),
-      commit: record("holds.commit"),
+      placeMany: record("holds.placeMany"),
+      commitMany: record("holds.commitMany"),
       release: record("holds.release"),
-      get: () => {
-        calls.push("holds.get");
-        return Promise.resolve([]);
+      getMany: () => {
+        calls.push("holds.getMany");
+        return Promise.resolve({});
       },
     },
     bookings: {
@@ -38,8 +38,8 @@ function spyDeltaT(): { dt: DeltaT; calls: string[] } {
       cancel: record("bookings.cancel"),
     },
     availability: {
-      get: () => {
-        calls.push("availability.get");
+      getCombined: () => {
+        calls.push("availability.getCombined");
         return Promise.resolve([]);
       },
     },
@@ -119,11 +119,11 @@ describe("the booking verb a model reaches for", () => {
     const dt = {
       resources: { create: () => Promise.resolve({}) },
       holds: {
-        place: () => {
-          calls.push("place");
+        placeMany: () => {
+          calls.push("placeMany");
           return Promise.reject(new TypeError("dt.holds.commit is not a function"));
         },
-        get: () => Promise.resolve([]),
+        getMany: () => Promise.resolve({}),
       },
     } as unknown as DeltaT;
 
@@ -131,7 +131,7 @@ describe("the booking verb a model reaches for", () => {
     const result = await client.callTool({
       name: "hold_slot",
       arguments: {
-        calendar_id: "cal_1",
+        calendar_ids: ["cal_1"],
         start: "2026-06-01T09:00:00Z",
         end: "2026-06-01T09:30:00Z",
       },
@@ -151,7 +151,7 @@ describe("the booking verb a model reaches for", () => {
     const client = await connect(dt);
     const result = await client.callTool({
       name: "hold_slot",
-      arguments: { calendar_id: "cal_1", start: "2026-06-01T09:00", end: "2026-06-01T09:30" },
+      arguments: { calendar_ids: ["cal_1"], start: "2026-06-01T09:00", end: "2026-06-01T09:30" },
     });
 
     expect(result.isError).toBe(true);
@@ -181,14 +181,14 @@ describe("the booking verb a model reaches for", () => {
     });
 
     const dt = {
-      holds: { place: () => Promise.reject(refusal), get: () => Promise.resolve([]) },
+      holds: { placeMany: () => Promise.reject(refusal), getMany: () => Promise.resolve({}) },
     } as unknown as DeltaT;
 
     const client = await connect(dt);
     const result = await client.callTool({
       name: "hold_slot",
       arguments: {
-        calendar_id: "cal_1",
+        calendar_ids: ["cal_1"],
         start: "2026-06-01T09:00:00Z",
         end: "2026-06-01T10:00:00Z",
         timezone: "Europe/Berlin",
@@ -221,13 +221,13 @@ describe("the booking verb a model reaches for", () => {
       code: "23514",
     });
     const dt = {
-      holds: { place: () => Promise.reject(refusal), get: () => Promise.resolve([]) },
+      holds: { placeMany: () => Promise.reject(refusal), getMany: () => Promise.resolve({}) },
     } as unknown as DeltaT;
 
     const client = await connect(dt);
     const result = await client.callTool({
       name: "hold_slot",
-      arguments: { calendar_id: "cal_1", start: "2026-06-01T03:00:00Z", end: "2026-06-01T04:00:00Z" },
+      arguments: { calendar_ids: ["cal_1"], start: "2026-06-01T03:00:00Z", end: "2026-06-01T04:00:00Z" },
     });
 
     expect(result.isError).toBe(true);
@@ -242,13 +242,13 @@ describe("the booking verb a model reaches for", () => {
     // model it had the wrong calendar, when the truth is its hold expired and it should re-place.
     const refusal = Object.assign(new Error("not found: unknown hold 01ARZ"), { code: "42704" });
     const dt = {
-      holds: { commit: () => Promise.reject(refusal) },
+      holds: { commitMany: () => Promise.reject(refusal) },
     } as unknown as DeltaT;
 
     const client = await connect(dt);
     const result = await client.callTool({
       name: "commit_hold",
-      arguments: { hold_id: "01ARZ" },
+      arguments: { hold_ids: ["01ARZ"] },
     });
 
     expect(result.isError).toBe(true);
@@ -260,13 +260,13 @@ describe("the booking verb a model reaches for", () => {
     // DETAIL at all. Both must still produce a readable error rather than an empty JSON husk.
     const refusal = Object.assign(new Error("span is already allocated"), { code: "40001" });
     const dt = {
-      holds: { place: () => Promise.reject(refusal), get: () => Promise.resolve([]) },
+      holds: { placeMany: () => Promise.reject(refusal), getMany: () => Promise.resolve({}) },
     } as unknown as DeltaT;
 
     const client = await connect(dt);
     const result = await client.callTool({
       name: "hold_slot",
-      arguments: { calendar_id: "cal_1", start: "2026-06-01T09:00:00Z", end: "2026-06-01T10:00:00Z" },
+      arguments: { calendar_ids: ["cal_1"], start: "2026-06-01T09:00:00Z", end: "2026-06-01T10:00:00Z" },
     });
 
     expect(result.isError).toBe(true);
@@ -289,13 +289,13 @@ describe("the booking verb a model reaches for", () => {
       }),
     });
     const dt = {
-      holds: { place: () => Promise.reject(refusal), get: () => Promise.resolve([]) },
+      holds: { placeMany: () => Promise.reject(refusal), getMany: () => Promise.resolve({}) },
     } as unknown as DeltaT;
 
     const client = await connect(dt);
     const result = await client.callTool({
       name: "hold_slot",
-      arguments: { calendar_id: "cal_1", start: "2026-06-01T09:00:00Z", end: "2026-06-01T10:00:00Z" },
+      arguments: { calendar_ids: ["cal_1"], start: "2026-06-01T09:00:00Z", end: "2026-06-01T10:00:00Z" },
     });
 
     const body = JSON.parse(textOf(result));
@@ -308,5 +308,160 @@ describe("the booking verb a model reaches for", () => {
     // VERSION is stated in server.ts because rootDir rules out importing package.json. This is the
     // assertion that keeps the two from drifting.
     expect(VERSION).toBe(pkg.version);
+  });
+});
+
+// A kit is several calendars booked together: a camera body, its lens and the crew. The same three
+// tools serve one calendar or many, so these tests pin the many case and what an agent reads back.
+describe("kits", () => {
+  const H = 3_600_000;
+  const at = (iso: string) => Date.parse(iso);
+
+  test("find_slots asks for the times when every calendar is free at once", async () => {
+    const asked: unknown[] = [];
+    const dt = {
+      availability: {
+        getCombined: (opts: unknown) => {
+          asked.push(opts);
+          return Promise.resolve([{ start: at("2026-06-01T12:00:00Z"), end: at("2026-06-01T15:00:00Z") }]);
+        },
+      },
+    } as unknown as DeltaT;
+
+    const result = await (await connect(dt)).callTool({
+      name: "find_slots",
+      arguments: { calendar_ids: ["body", "lens"], from: "2026-06-01T00:00:00Z", to: "2026-06-02T00:00:00Z" },
+    });
+
+    expect(asked).toEqual([
+      { resourceIds: ["body", "lens"], start: at("2026-06-01T00:00:00Z"), end: at("2026-06-02T00:00:00Z"), minDuration: undefined },
+    ]);
+    expect(JSON.parse(textOf(result)).slots[0].start).toBe("2026-06-01T12:00:00.000Z");
+  });
+
+  test("hold_slot holds every calendar in one call and hands back every hold_id", async () => {
+    const placed: unknown[] = [];
+    const dt = {
+      holds: {
+        placeMany: (requests: { resourceId: string; start: number; end: number; expiresAt: number }[]) => {
+          placed.push(requests.map((r) => r.resourceId));
+          return Promise.resolve(requests.map((r, i) => ({ id: `h${i}`, ...r })));
+        },
+        // The server clamps each hold's expiry; the kit is only safe until the earliest one.
+        getMany: () =>
+          Promise.resolve({
+            body: [{ id: "h0", expiresAt: at("2026-06-01T09:05:00Z") }],
+            lens: [{ id: "h1", expiresAt: at("2026-06-01T09:04:00Z") }],
+          }),
+      },
+    } as unknown as DeltaT;
+
+    const result = await (await connect(dt)).callTool({
+      name: "hold_slot",
+      arguments: { calendar_ids: ["body", "lens"], start: "2026-06-01T10:00:00Z", end: "2026-06-01T11:00:00Z" },
+    });
+
+    expect(placed).toEqual([["body", "lens"]]);
+    const body = JSON.parse(textOf(result));
+    expect(body.hold_ids).toEqual(["h0", "h1"]);
+    expect(body.expires_at).toBe("2026-06-01T09:04:00.000Z");
+  });
+
+  test("a refused kit hands the model times when every calendar is free, never the one refused", async () => {
+    // deltat offers alternatives for one calendar, not for a kit, so without this the refusal is a
+    // dead end (PRINCIPLES.md 4). The joint question is find_slots' own query.
+    const wanted = at("2026-06-01T10:00:00Z");
+    const refusal = Object.assign(new Error("span is already allocated"), { code: "40001" });
+    const asked: unknown[] = [];
+    const dt = {
+      holds: { placeMany: () => Promise.reject(refusal) },
+      availability: {
+        getCombined: (opts: unknown) => {
+          asked.push(opts);
+          return Promise.resolve([
+            { start: wanted, end: wanted + 2 * H }, // free when read, but just refused: not offered
+            { start: wanted + 3 * H, end: wanted + 5 * H },
+            { start: wanted + 24 * H, end: wanted + 26 * H },
+            { start: wanted + 48 * H, end: wanted + 50 * H },
+            { start: wanted + 72 * H, end: wanted + 74 * H },
+          ]);
+        },
+      },
+    } as unknown as DeltaT;
+
+    const result = await (await connect(dt)).callTool({
+      name: "hold_slot",
+      arguments: { calendar_ids: ["body", "lens"], start: "2026-06-01T10:00:00Z", end: "2026-06-01T11:00:00Z" },
+    });
+
+    expect(asked).toEqual([
+      { resourceIds: ["body", "lens"], start: wanted, end: wanted + 7 * 24 * H, minDuration: H },
+    ]);
+    const body = JSON.parse(textOf(result));
+    expect(body.error).toBe("CONFLICT");
+    expect(body.alternatives.map((a: { start: string }) => a.start)).toEqual([
+      "2026-06-01T13:00:00.000Z",
+      "2026-06-02T10:00:00.000Z",
+      "2026-06-03T10:00:00.000Z",
+    ]);
+    expect(body.alternatives[0].end).toBe("2026-06-01T14:00:00.000Z");
+    expect(body.retry_same_time).toBe(true);
+    expect([body.booked, body.held, body.reserved]).toEqual([false, false, false]);
+  });
+
+  test("a kit refused for opening hours says retrying the same time will not help", async () => {
+    const refusal = Object.assign(new Error("outside open windows"), { code: "23514" });
+    const dt = {
+      holds: { placeMany: () => Promise.reject(refusal) },
+      availability: { getCombined: () => Promise.resolve([{ start: at("2026-06-02T09:00:00Z"), end: at("2026-06-02T17:00:00Z") }]) },
+    } as unknown as DeltaT;
+
+    const result = await (await connect(dt)).callTool({
+      name: "hold_slot",
+      arguments: { calendar_ids: ["body", "lens"], start: "2026-06-01T03:00:00Z", end: "2026-06-01T04:00:00Z" },
+    });
+
+    expect(JSON.parse(textOf(result)).retry_same_time).toBe(false);
+  });
+
+  test("a refused single calendar keeps deltat's own alternatives and asks no joint question", async () => {
+    const refusal = Object.assign(new Error("span is already allocated"), { code: "40001" });
+    const { dt, calls } = spyDeltaT();
+    Object.assign(dt.holds, { placeMany: () => Promise.reject(refusal) });
+
+    await (await connect(dt)).callTool({
+      name: "hold_slot",
+      arguments: { calendar_ids: ["cal_1"], start: "2026-06-01T09:00:00Z", end: "2026-06-01T10:00:00Z" },
+    });
+
+    expect(calls).not.toContain("availability.getCombined");
+  });
+
+  test("commit_hold books every hold in one call, and release_hold gives every one back", async () => {
+    const committed: unknown[] = [];
+    const released: string[] = [];
+    const dt = {
+      holds: {
+        commitMany: (ids: string[], opts?: { label?: string }) => {
+          committed.push({ ids, opts });
+          return Promise.resolve({ bookingIds: ids.map((id) => `b_${id}`) });
+        },
+        release: (id: string) => {
+          released.push(id);
+          return Promise.resolve();
+        },
+      },
+    } as unknown as DeltaT;
+    const client = await connect(dt);
+
+    const booked = await client.callTool({
+      name: "commit_hold",
+      arguments: { hold_ids: ["h0", "h1"], label: "Ana's shoot" },
+    });
+    expect(committed).toEqual([{ ids: ["h0", "h1"], opts: { label: "Ana's shoot" } }]);
+    expect(JSON.parse(textOf(booked)).booking_ids).toEqual(["b_h0", "b_h1"]);
+
+    await client.callTool({ name: "release_hold", arguments: { hold_ids: ["h2", "h3"] } });
+    expect(released.sort()).toEqual(["h2", "h3"]);
   });
 });

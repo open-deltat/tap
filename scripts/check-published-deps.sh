@@ -47,33 +47,42 @@ for ADAPTER in mcp cli; do
   npm install "@open-deltat/client@$RANGE" typescript@5 --silent >/dev/null 2>&1
 
   # The APIs the adapters call, checked on the REGISTRY copy by importing it, not on the workspace.
+  # Each entry names the adapters that call it, so an adapter's range is held to what that adapter
+  # uses: the MCP needing a newer client must not fail the CLI, whose range is older on purpose.
   # Add a line when an adapter starts using a new one.
   ADAPTER="$ADAPTER" node --input-type=module - <<'NODE'
 const client = await import('@open-deltat/client')
 const method = (cls, name) => typeof client[cls]?.prototype?.[name] === 'function'
 const fn = (name) => typeof client[name] === 'function'
+const BOTH = ['mcp', 'cli']
 
 const required = [
-  [() => method('Holds', 'commit'), 'Holds.commit  (the only way to turn a hold into a booking)'],
-  [() => method('Holds', 'place'), 'Holds.place'],
-  [() => method('Holds', 'release'), 'Holds.release'],
-  [() => method('Holds', 'get'), 'Holds.get'],
-  [() => method('Bookings', 'cancel'), 'Bookings.cancel'],
-  [() => method('Bookings', 'get'), 'Bookings.get'],
-  [() => method('Availability', 'get'), 'Availability.get'],
-  [() => method('Resources', 'find'), 'Resources.find  (the CLI refuses an unknown calendar with it)'],
-  [() => method('Events', 'watch'), 'Events.watch  (deltat-cli watch)'],
-  [() => fn('classifyRefusal'), 'classifyRefusal  (both adapters report refusals through it)'],
-  [() => fn('parseInstant'), 'parseInstant'],
-  [() => fn('tlsSetting'), 'tlsSetting  (DELTAT_TLS / DELTAT_TLS_CA, read the same way by both adapters)'],
-  [() => fn('passwordInClear'), 'passwordInClear'],
-  [() => typeof client.ADAPTER_DEFAULTS?.port === 'number', 'ADAPTER_DEFAULTS  (where both adapters connect by default)'],
+  [() => method('Holds', 'commit'), 'Holds.commit  (the CLI turns a hold into a booking with it)', ['cli']],
+  [() => method('Holds', 'commitMany'), 'Holds.commitMany  (the only way the MCP turns holds into bookings)', ['mcp']],
+  [() => method('Holds', 'place'), 'Holds.place', ['cli']],
+  [() => method('Holds', 'placeMany'), 'Holds.placeMany  (hold_slot holds one calendar or a kit with it)', ['mcp']],
+  [() => method('Holds', 'release'), 'Holds.release', ['mcp']],
+  [() => method('Holds', 'get'), 'Holds.get', ['cli']],
+  [() => method('Holds', 'getMany'), 'Holds.getMany', ['mcp']],
+  [() => method('Bookings', 'cancel'), 'Bookings.cancel', ['mcp']],
+  [() => method('Bookings', 'get'), 'Bookings.get', BOTH],
+  [() => method('Availability', 'get'), 'Availability.get', ['cli']],
+  [() => method('Availability', 'getCombined'), 'Availability.getCombined  (find_slots, and a refused kit\'s alternatives)', ['mcp']],
+  [() => method('Resources', 'find'), 'Resources.find  (the CLI refuses an unknown calendar with it)', ['cli']],
+  [() => method('Events', 'watch'), 'Events.watch  (deltat-cli watch)', ['cli']],
+  [() => fn('classifyRefusal'), 'classifyRefusal  (both adapters report refusals through it)', BOTH],
+  [() => fn('sqlstateOf'), 'sqlstateOf  (a refused kit says whether waiting could help)', ['mcp']],
+  [() => fn('parseInstant'), 'parseInstant', BOTH],
+  [() => fn('tlsSetting'), 'tlsSetting  (DELTAT_TLS / DELTAT_TLS_CA, read the same way by both adapters)', BOTH],
+  [() => fn('passwordInClear'), 'passwordInClear', BOTH],
+  [() => typeof client.ADAPTER_DEFAULTS?.port === 'number', 'ADAPTER_DEFAULTS  (where both adapters connect by default)', BOTH],
 ]
 
-const missing = required.filter(([present]) => {
+const adapter = process.env.ADAPTER
+const mine = required.filter(([, , adapters]) => adapters.includes(adapter))
+const missing = mine.filter(([present]) => {
   try { return !present() } catch { return true }
 })
-const adapter = process.env.ADAPTER
 
 if (missing.length) {
   console.error(`FAIL: the published client is missing APIs that packages/${adapter} calls:\n`)
@@ -83,7 +92,7 @@ if (missing.length) {
   process.exit(1)
 }
 
-console.log(`OK: every runtime API the adapters call is in the published client (${required.length} checked).`)
+console.log(`OK: every runtime API packages/${adapter} calls is in the published client (${mine.length} checked).`)
 NODE
 
   # Types have nothing to import, so the compiler checks them against the published declarations:

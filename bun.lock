@@ -93,7 +93,7 @@
     },
     "packages/client": {
       "name": "@open-deltat/client",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "dependencies": {
         "postgres": "^3.4.8",
         "ulid": "^3.0.2",
@@ -135,14 +135,14 @@
     },
     "packages/mcp": {
       "name": "@open-deltat/mcp",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "bin": {
         "mcp": "dist/stdio.js",
         "deltat-mcp": "dist/stdio.js",
       },
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.30.0",
-        "@open-deltat/client": "^0.4.0",
+        "@open-deltat/client": "^0.4.1",
         "jose": "^6.0.11",
         "zod": "^4.6.5",
       },
