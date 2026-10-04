@@ -38,7 +38,7 @@ interface LogLine {
   kind: string;
   tone: "book" | "cancel" | "hold" | "release" | "other";
   detail: string;
-  /** The booker's name is looked up from the bookings when shown, never copied into the log. */
+  /** The booker's name is looked up when shown, never copied into the log. */
   bookingId?: string;
 }
 
@@ -159,31 +159,49 @@ export function LiveSchedule({
     setLog((prev) => [{ ...line, key: `${Date.now()}-${seq}`, at: Date.now() }, ...prev].slice(0, 60));
   }, []);
 
-  // Events show a change the moment it happens; the owner's read then says what is true, names
-  // included, since deltat#49 keeps booker names out of change notifications (kernels before it
-  // still send them). One read per burst, and a reply lands only if no newer change came in after
-  // it was asked for, so a slow reply cannot undo what a later event showed.
-  const reads = useRef(0);
+  // Names come only from the owner's read: deltat#49 keeps them out of change notifications. A
+  // booking's name never changes, so every reply adds to this, and a log line keeps its name after
+  // the booking is cancelled.
+  const [names, setNames] = useState<ReadonlyMap<string, string | null>>(
+    () => new Map(initialBookings.map((b) => [b.id, b.label]))
+  );
+
+  // Events show a change the moment it happens; the read then says which bookings exist. A read
+  // goes out at most 200 ms after the first change of a burst, so steady traffic cannot starve it.
+  // Its list lands only if no change came in after it was sent, so a slow reply cannot undo what a
+  // later event showed; that change has already asked for the next read.
+  const changes = useRef(0);
   const readTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reread = useCallback(() => {
-    const asked = ++reads.current;
-    clearTimeout(readTimer.current);
+    changes.current += 1;
+    if (readTimer.current !== undefined) return;
     readTimer.current = setTimeout(() => {
+      readTimer.current = undefined;
+      const asked = changes.current;
       getCalendar(calendarId)
         .then((fresh) => {
-          if (fresh.ok && asked === reads.current) setBookings(fresh.value.bookings);
+          if (!fresh.ok) return;
+          setNames((prev) => new Map([...prev, ...fresh.value.bookings.map((b) => [b.id, b.label] as const)]));
+          if (asked === changes.current) setBookings(fresh.value.bookings);
         })
         .catch(() => {}); // keep what the events showed; the next change reads again
     }, 200);
   }, [calendarId]);
-  useEffect(() => () => clearTimeout(readTimer.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(readTimer.current);
+      readTimer.current = undefined;
+      changes.current += 1; // a reply still in flight belongs to the calendar being left
+    },
+    [calendarId]
+  );
 
   const onEvent = useCallback(
     (event: DeltaTEvent) => {
       if ("BookingConfirmed" in event) {
         const b = event.BookingConfirmed;
         setBookings((prev) =>
-          prev.some((x) => x.id === b.id) ? prev : [...prev, { id: b.id, start: b.span.start, end: b.span.end, label: b.label }]
+          prev.some((x) => x.id === b.id) ? prev : [...prev, { id: b.id, start: b.span.start, end: b.span.end, label: null }]
         );
         setHolds((prev) => prev.filter((h) => !(h.start === b.span.start && h.end === b.span.end)));
         push({ kind: "Booking confirmed", tone: "book", detail: timeOnly(b.span.start), bookingId: b.id });
@@ -200,6 +218,10 @@ export function LiveSchedule({
       } else if ("HoldReleased" in event) {
         setHolds((prev) => prev.filter((h) => h.id !== event.HoldReleased.id));
         push({ kind: "Hold released", tone: "release", detail: `#${event.HoldReleased.id.slice(-6)}` });
+      } else if ("Lagged" in event) {
+        // Changes were dropped on the way here, so what the events showed may be stale.
+        push({ kind: "Lagged", tone: "other", detail: "" });
+        reread();
       } else {
         push({ kind: Object.keys(event)[0] ?? "Event", tone: "other", detail: "" });
       }
@@ -211,7 +233,13 @@ export function LiveSchedule({
   const { status } = useWebSocket({ type: "subscribe", resourceId: calendarId, database: "public", onEvent });
   const badge = STATUS[status];
 
-  const names = useMemo(() => new Map(bookings.map((b) => [b.id, b.label])), [bookings]);
+  // Connecting (on mount, back from another tab, after a reconnect) means changes may have been
+  // missed while away, so read.
+  useEffect(() => {
+    if (status === "live") reread();
+  }, [status, reread]);
+
+  const shown = useMemo(() => bookings.map((b) => ({ ...b, label: names.get(b.id) ?? null })), [bookings, names]);
 
   // Filtering is derived, never a second copy of the log: one source of truth, two views of it.
   const visibleLog = useMemo(() => {
@@ -231,7 +259,7 @@ export function LiveSchedule({
 
   const view = useMemo(() => {
     const openRanges = (week[dow] ?? []).map((r) => ({ start: timeToMin(r.start), end: timeToMin(r.end) }));
-    const dayBookings = bookings.filter((b) => dayKey(b.start, timezone) === key);
+    const dayBookings = shown.filter((b) => dayKey(b.start, timezone) === key);
     const dayHolds = holds.filter((h) => dayKey(h.start, timezone) === key);
 
     const mins = [
@@ -276,7 +304,7 @@ export function LiveSchedule({
     for (let h = startHour; h <= endHour; h += step) ticks.push({ value: h * 60, label: `${h}:00` });
 
     return { axisStart, axisEnd, rows, ticks, count: dayBookings.length, open: openRanges.length > 0 };
-  }, [week, dow, bookings, holds, key, timezone]);
+  }, [week, dow, shown, holds, key, timezone]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -323,7 +351,7 @@ export function LiveSchedule({
 
       {mode === "month" ? (
         <BookingsMonth
-          bookings={bookings}
+          bookings={shown}
           timezone={timezone}
           onSelectDay={(d) => {
             // Jump into that day's detail: whole-day difference from today, in the calendar's zone.
