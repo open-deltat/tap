@@ -47,6 +47,9 @@ export function NavHeader({
         <Link href="/docs" className={link(onDocs)}>
           Docs
         </Link>
+        <Link href="/#pilot" className={link(false)}>
+          Pricing
+        </Link>
         <a
           href={SITE.github}
           target="_blank"
