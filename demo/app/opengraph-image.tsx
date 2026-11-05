@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
+import { SITE } from "@/lib/seo";
 
 // A single branded OG card, inherited by every route for link previews on social and chat.
-export const alt = "Δt: a database for time";
+export const alt = SITE.defaultTitle;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -32,9 +33,9 @@ export default function OpengraphImage() {
           }}
         />
         <div style={{ fontSize: 230, fontWeight: 700, lineHeight: 1, letterSpacing: -4 }}>Δt</div>
-        <div style={{ fontSize: 54, marginTop: 24, color: "#e4e4e7" }}>a database for time</div>
+        <div style={{ fontSize: 60, marginTop: 24, color: "#e4e4e7" }}>{SITE.headline}</div>
         <div style={{ fontSize: 30, marginTop: 40, color: "#6ee7b7" }}>
-          TAP · the Time Allocation Protocol
+          Hold a slot. Book it once. Everyone sees it live.
         </div>
         <div style={{ position: "absolute", bottom: 48, fontSize: 26, color: "#71717a" }}>delt.at</div>
       </div>
