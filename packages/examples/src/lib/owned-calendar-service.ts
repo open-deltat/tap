@@ -1,5 +1,6 @@
 import { expandRecurrence, type Booking, type DeltaT } from "@open-deltat/client";
-import type { BookableRecord, BookableRegistry } from "./public-bookables";
+import type { BookableRecord, BookableRegistry, BookingMode } from "./public-bookables";
+import type { Display } from "./calendar-displays";
 import { MAX_PUBLIC_BOOKABLES, normalizeBookableName } from "./public-bookables";
 import { dateRangeFromToday, type WeekHours } from "../examples/builder/schedule";
 import {
@@ -43,11 +44,21 @@ function validateName(raw: string): Outcome<string> {
 /**
  * Create an empty calendar (a deltat resource with no open hours yet), owned by the principal.
  * `capacity` (bookings at the same time) and `bufferMinutes` (turnover after each booking) live in
- * the kernel, the only place they are kept; callers validate their ranges.
+ * the kernel, the only place they are kept; callers validate their ranges. `bookingMode` and
+ * `display` are written with the record, so it is right from its first write: a calendar meant to
+ * take requests never reads as instant while its hours are still being written.
  */
 export async function createOwnedCalendar(
   deps: OwnedDeps,
-  input: { name: string; timezone: string; owner: string; capacity?: number; bufferMinutes?: number }
+  input: {
+    name: string;
+    timezone: string;
+    owner: string;
+    capacity?: number;
+    bufferMinutes?: number;
+    bookingMode?: BookingMode;
+    display?: Display;
+  }
 ): Promise<Outcome<{ id: string }>> {
   const name = validateName(input.name);
   if (!name.ok) return name;
@@ -69,6 +80,8 @@ export async function createOwnedCalendar(
       owner: input.owner,
       priceCents: null,
       week: {},
+      bookingMode: input.bookingMode,
+      display: input.display,
     });
     return { ok: true, value: { id: resource.id } };
   } catch (err) {

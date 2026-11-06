@@ -91,6 +91,8 @@ export interface BookableRegistry {
     priceCents?: number | null;
     currency?: string;
     week?: WeekHours;
+    bookingMode?: BookingMode;
+    display?: Display;
   }): { record: BookableRecord; manageKey: string };
   get(id: string): BookableRecord | undefined;
   /** Every bookable a signed-in principal created, newest first. */
@@ -235,6 +237,8 @@ export function openBookableRegistry(
         currency: input.currency ?? "EUR",
         week: input.week ?? {},
         ...(input.owner !== undefined && { owner: input.owner }),
+        ...(input.bookingMode !== undefined && { bookingMode: input.bookingMode }),
+        ...(input.display !== undefined && { display: input.display }),
       };
       records.set(stored.id, stored);
       flush();

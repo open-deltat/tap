@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { DEFAULT_WEEK, MAX_CALENDARS_PER_OWNER } from "../my-calendars";
 import { BEN, OWNER } from "./meeting-fixtures";
 import { BOOKING_BASE, STRANGER, setupPasses as setup } from "./pass-fixtures";
@@ -80,6 +80,42 @@ describe("creating a calendar", () => {
     expect((await calendars.create(OWNER, consultations)).ok).toBe(false);
     expect(state.resources.size).toBe(before);
     expect(registry.listOwned(OWNER).map((r) => r.name)).toEqual(["Simon's week"]);
+  });
+
+  test("if the hours fail and the kernel cannot even delete the resource, the caller's 'nothing was created' is still true", async () => {
+    const { calendars, state, registry, dt } = setup();
+    state.rulesFail = true;
+    (dt.resources as unknown as { delete: () => Promise<void> }).delete = async () => {
+      throw new Error("read ECONNRESET");
+    };
+    const logged = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      expect((await calendars.create(OWNER, { ...consultations, name: "Ghost" })).ok).toBe(false);
+      // The registry entry is gone: not listed, not counted against the cap, no page that reads as full.
+      expect(registry.listOwned(OWNER).map((r) => r.name)).toEqual(["Simon's week"]);
+      expect(must(await calendars.list(OWNER)).map((c) => c.name)).toEqual(["Simon's week"]);
+      // The kernel resource it could not delete is named in the log, so an operator can remove it.
+      const orphan = [...state.resources.values()].find((r) => r.name === "Ghost");
+      expect(orphan).toBeDefined();
+      expect(logged.mock.calls.some((args) => args.some((a) => String(a).includes(orphan?.id ?? "?")))).toBe(true);
+    } finally {
+      logged.mockRestore();
+    }
+  });
+
+  test("a calendar that takes requests, and its view, are right from the record's first write", async () => {
+    const { calendars, registry, dt } = setup();
+    const rules = dt.rules as unknown as { replaceOpenHours: (id: string, s: unknown[]) => Promise<void> };
+    const real = rules.replaceOpenHours.bind(rules);
+    const seen: { mode?: string; display?: string } = {};
+    rules.replaceOpenHours = async (id, segments) => {
+      // While the hours are written, the calendar is already registered: it must not read as instant.
+      seen.mode = registry.get(id)?.bookingMode;
+      seen.display = registry.get(id)?.display;
+      await real(id, segments);
+    };
+    must(await calendars.create(OWNER, { ...consultations, takesMeetingRequests: true }));
+    expect(seen).toEqual({ mode: "request", display: "appointments" });
   });
 
   test(`one account owns at most ${MAX_CALENDARS_PER_OWNER} calendars, even when asked for at once`, async () => {

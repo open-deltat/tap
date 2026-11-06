@@ -2,7 +2,7 @@ import type { DeltaT } from "@open-deltat/client";
 import type { BookableRecord, BookableRegistry } from "./public-bookables";
 import type { WeekHours } from "../examples/builder/schedule";
 import { ALLOWED_SLOT_MINUTES, isKnownTimeZone, validateWeek, type Outcome } from "./bookable-service";
-import { createOwnedCalendar, deleteOwnedCalendar, saveAvailability } from "./owned-calendar-service";
+import { createOwnedCalendar, saveAvailability } from "./owned-calendar-service";
 import { DEFAULT_DISPLAY, checkDisplay, type Display } from "./calendar-displays";
 
 // The signed-in caller's own calendars, for the hosted MCP: list them and create them. Creating a
@@ -91,6 +91,21 @@ export function createMyCalendars(deps: MyCalendarsDeps): MyCalendarsService {
     bookingLink: deps.bookingBase ? `${deps.bookingBase}/b/${record.id}` : null,
   });
 
+  /**
+   * Take back a calendar whose create failed after it was registered, so that "nothing was created"
+   * stays true. The registry entry goes whatever happens: that is what lists the calendar, counts it
+   * against the cap and serves its page. If deltat cannot delete the resource, the leftover is
+   * invisible without its entry and harmless, and its id is logged so an operator can remove it.
+   * (Deleting an existing calendar is the opposite case, and keeps its entry when deltat fails, so
+   * the owner can retry: see deleteOwnedCalendar.)
+   */
+  const discardHalfMade = async (id: string, owner: string) => {
+    await deps.dt.resources.delete(id).catch((err: unknown) => {
+      console.error(`Calendar create rolled back, but deltat resource ${id} could not be deleted and is left orphaned:`, err);
+    });
+    deps.registry.unregisterOwned(id, owner);
+  };
+
   /** Everything checkable before a resource exists, so a refusal writes nothing. */
   const check = (
     input: CreateCalendarInput
@@ -134,20 +149,25 @@ export function createMyCalendars(deps: MyCalendarsDeps): MyCalendarsService {
 
       adjustCreating(owner, 1);
       try {
-        const made = await createOwnedCalendar(deps, { name: input.name, timezone: input.timezone, owner, capacity, bufferMinutes });
+        const made = await createOwnedCalendar(deps, {
+          name: input.name,
+          timezone: input.timezone,
+          owner,
+          capacity,
+          bufferMinutes,
+          bookingMode: input.takesMeetingRequests ? "request" : "instant",
+          display,
+        });
         if (!made.ok) return made;
         const { id } = made.value;
         const saved = await saveAvailability(deps, { id, owner, week, slotMinutes, priceCents: null }).catch(
           (): Outcome<BookableRecord> => ({ ok: false, error: "The opening hours could not be written, so nothing was created." })
         );
         if (!saved.ok) {
-          // A calendar without its hours would read as permanently full; take it back out.
-          await deleteOwnedCalendar(deps, { id, owner }).catch(() => {});
+          await discardHalfMade(id, owner);
           return saved;
         }
-        const record =
-          deps.registry.updateOwned(id, owner, { display, ...(input.takesMeetingRequests && { bookingMode: "request" as const }) }) ?? saved.value;
-        return ok(view(record, { capacity, bufferAfter: bufferMinutes ? bufferMinutes * 60_000 : null }));
+        return ok(view(saved.value, { capacity, bufferAfter: bufferMinutes ? bufferMinutes * 60_000 : null }));
       } finally {
         adjustCreating(owner, -1);
       }

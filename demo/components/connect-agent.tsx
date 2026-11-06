@@ -10,8 +10,8 @@ export const EXAMPLE_ASK = "Create a calendar called Consultations, Berlin time,
 
 const CLIENTS = [
   { name: "Claude Code", how: "Run once in a terminal", code: `claude mcp add --transport http deltat ${MCP_URL}` },
-  { name: "Claude Desktop or claude.ai", how: "Add a custom connector with this URL", code: MCP_URL },
-  { name: "Any other MCP client", how: "Connect it to this URL", code: MCP_URL },
+  // One row for every client that takes a URL: two rows showing the same URL read as two steps.
+  { name: "Claude Desktop, claude.ai or any MCP client", how: "Add this URL as a connector", code: MCP_URL },
 ] as const;
 
 export function ConnectAgent({ as: Heading = "h2" }: { as?: "h1" | "h2" }) {
