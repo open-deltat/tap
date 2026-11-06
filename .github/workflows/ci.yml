@@ -36,10 +36,14 @@ jobs:
       # is what hid a defect where prepublishOnly ran a bare `tsc`: on a machine that had never
       # built the SDK, @open-deltat/client had no dist, tsc exited 2, and `npm publish` aborted.
       # A release machine is always in this state, so this job reproduces it on purpose.
+      # Not `npm publish --dry-run`: npm refuses that once the version in package.json is on the
+      # registry, so the check went red after every release and stayed red on main. `npm pack`
+      # skips that registry check but also skips prepublishOnly, which is the very script this job
+      # exists to exercise, so it runs first, explicitly.
       - name: The MCP server must build and pack with nothing pre-built
-        run: cd packages/mcp && npm publish --dry-run
+        run: cd packages/mcp && npm run prepublishOnly && npm pack --dry-run
       - name: The CLI must build and pack with nothing pre-built
-        run: cd packages/cli && npm publish --dry-run
+        run: cd packages/cli && npm run prepublishOnly && npm pack --dry-run
       # Every other check resolves @open-deltat/client through the workspace symlink, so none of
       # them can see what the DECLARED range actually resolves to on the registry. That blindness
       # hid a client published without `Holds.commit` while the MCP server called it.
