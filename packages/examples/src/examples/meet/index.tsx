@@ -9,7 +9,7 @@ import { Stage } from "../../components/stage";
 import { Segmented } from "../../components/ui/segmented";
 import { BookButton } from "../../components/book-button";
 import { MeetLanes } from "./meet-lanes";
-import { FRIENDS } from "../../components/friend-avatar";
+import { FRIEND_NAMES } from "../../lib/friends";
 import { BookingConfirmedModal, type BookingResult } from "../../components/booking-confirmed-modal";
 import type { AvailabilitySlot, Resource } from "../../lib/schemas";
 
@@ -44,7 +44,7 @@ function asResource(id: string, name: string): Resource {
   return { id, parentId: null, name, capacity: 1, bufferAfter: null, slotMinutes: 30, price: null, bufferMinutes: 0 };
 }
 
-const friendName = (i: number) => FRIENDS[i]?.name ?? `Friend ${i + 1}`;
+const friendName = (i: number) => FRIEND_NAMES[i] ?? `Friend ${i + 1}`;
 const dayLabel = (ms: number) => new Date(ms).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 const shortDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 const dayOf = (ms: number) => {
@@ -126,7 +126,7 @@ export default function MeetExample() {
     if (!data || !evening) return [];
     const ofDay = (slots: AvailabilitySlot[]) => slots.filter(inDay(evening.dayStart));
     return [
-      ...data.perFriend.map((slots, i) => ({ label: friendName(i), avatar: i, slots: ofDay(slots) })),
+      ...data.perFriend.map((slots, i) => ({ label: friendName(i), slots: ofDay(slots) })),
       { label: "Everyone", slots: ofDay(data.shared), everyone: true },
     ];
   }, [data, evening]);

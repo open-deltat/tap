@@ -175,6 +175,9 @@ export default function Home() {
               Δt is the calendar system that replaces the 40-year-old one, for good. Live, shared, and never
               double-booked.
             </p>
+            {/* The idea underneath, in the agent's own type: every booking is a stretch on one line of
+                time, and a double booking is two stretches colliding. */}
+            <p className="mt-3 font-mono text-[13px] tracking-tight text-dt-ink-3">Time, solved as collisions on a line.</p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a href="#pricing" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-dt-ink px-7 text-[15px] font-semibold text-dt-on-ink transition-[background-color,transform] duration-150 hover:bg-dt-ink/85 active:scale-[0.98] sm:w-auto">
                 Start a pilot

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Check, RefreshCw } from "lucide-react";
-import { FriendAvatar } from "@open-deltat/examples/components/friend-avatar";
+import { FRIEND_NAMES } from "@open-deltat/examples/lib/friends";
 
 // The five things an agent runs into on a normal calendar, each shown twice in the hero's own
 // picture language: "Today" on the left with one amber thing wrong, "Δt" on the right ending in
@@ -8,7 +8,6 @@ import { FriendAvatar } from "@open-deltat/examples/components/friend-avatar";
 // Every Δt picture shows something the kernel does today.
 type Wall = {
   title: string;
-  body: string;
   link: { label: string; href: string };
   today: ReactNode;
   deltat: ReactNode;
@@ -16,8 +15,7 @@ type Wall = {
 
 const WALLS: readonly Wall[] = [
   {
-    title: "It can’t hold a slot while the agent asks.",
-    body: "The agent sees 14:30 free and asks the caller. By the time they say yes, someone else has it.",
+    title: "It can’t hold a slot for you while you ask.",
     link: { label: "How holds work", href: "/docs/guides/booking-holds" },
     today: (
       <Rows>
@@ -37,8 +35,37 @@ const WALLS: readonly Wall[] = [
     ),
   },
   {
-    title: "It lets two bookings land in one slot.",
-    body: "Checking and booking are two steps, and nothing in between says no.",
+    title: "It can’t keep every app up to date.",
+    link: { label: "How live updates work", href: "/docs/guides/real-time-scheduling" },
+    today: (
+      <Rows>
+        <Line who="Website" status={<Stale when="4 min ago" />} />
+        <Line who="Voice agent" status={<Stale when="12 min ago" />} />
+        <Line who="Booking app" status={<Stale when="1 hr ago" warn />} />
+      </Rows>
+    ),
+    deltat: (
+      <Rows>
+        <Line who="Website" status={<Live />} />
+        <Line who="Voice agent" status={<Live />} />
+        <Line who="Booking app" status={<Live />} />
+      </Rows>
+    ),
+  },
+  {
+    title: "It can’t tell you when everyone is free.",
+    link: { label: "Try it live", href: "#live" },
+    today: <Lanes answer={false} />,
+    deltat: <Lanes answer />,
+  },
+  {
+    title: "It can’t book several things together.",
+    link: { label: "All or nothing, in one step", href: "/docs/guides/capacity" },
+    today: <Machines booked={5} failedAt={5} />,
+    deltat: <Machines booked={8} />,
+  },
+  {
+    title: "It can’t stop a double booking.",
     link: { label: "How Δt refuses", href: "/docs/guides/prevent-double-booking" },
     today: (
       <Rows>
@@ -63,50 +90,17 @@ const WALLS: readonly Wall[] = [
       </Rows>
     ),
   },
-  {
-    title: "Every app works from a copy.",
-    body: "Your website, your voice agent and your app each sync on their own timer. Each one is a little behind.",
-    link: { label: "How live updates work", href: "/docs/guides/real-time-scheduling" },
-    today: (
-      <Rows>
-        <Line who="Website" status={<Stale when="4 min ago" />} />
-        <Line who="Voice agent" status={<Stale when="12 min ago" />} />
-        <Line who="Booking app" status={<Stale when="1 hr ago" warn />} />
-      </Rows>
-    ),
-    deltat: (
-      <Rows>
-        <Line who="Website" status={<Live />} />
-        <Line who="Voice agent" status={<Live />} />
-        <Line who="Booking app" status={<Live />} />
-      </Rows>
-    ),
-  },
-  {
-    title: "It can’t answer “when is everyone free?”",
-    body: "It shows one list per person. Working out the overlap is your job, again every time something moves.",
-    link: { label: "Try it live", href: "#live" },
-    today: <Lanes answer={false} />,
-    deltat: <Lanes answer />,
-  },
-  {
-    title: "It books one thing at a time.",
-    body: "Eight machines for one run means eight separate bookings. If the sixth fails, you are holding five.",
-    link: { label: "Booking several as one", href: "/docs/guides/capacity" },
-    today: <Machines booked={5} failedAt={5} />,
-    deltat: <Machines booked={8} />,
-  },
 ];
 
 export function Walls() {
   return (
     <ol className="divide-y divide-dt-line border-y border-dt-line">
       {WALLS.map((w) => (
-        <li key={w.title} className="grid gap-6 py-10 lg:grid-cols-[1fr_1.25fr] lg:gap-12 lg:py-12">
+        <li key={w.title} className="grid gap-6 py-10 lg:grid-cols-[1fr_1.25fr] lg:items-center lg:gap-12 lg:py-12">
+          {/* One line says the pain; the pictures beside it are the proof, so nothing explains them. */}
           <div>
             <h3 className="text-balance text-[22px] font-semibold leading-tight tracking-[-0.02em] sm:text-[26px]">{w.title}</h3>
-            <p className="mt-3 max-w-md text-pretty text-[15.5px] leading-relaxed text-dt-ink-2">{w.body}</p>
-            <a href={w.link.href} className="mt-4 inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-dt-accent-ink hover:text-dt-ink sm:min-h-0">
+            <a href={w.link.href} className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-dt-accent-ink hover:text-dt-ink sm:min-h-0">
               {w.link.label}
               <ArrowRight className="h-4 w-4" />
             </a>
@@ -188,7 +182,7 @@ function Live() {
   );
 }
 
-// The live example's lanes, small: five people's free evenings as bars, each behind its avatar, and
+// The live example's lanes, small: five people's free evenings as bars, each behind its name, and
 // the Everyone lane underneath. With the answer the overlap is drawn in green; without it the lane
 // is empty and the work is yours.
 const FREE = [
@@ -204,9 +198,7 @@ function Lanes({ answer }: { answer: boolean }) {
     <div className="space-y-1.5">
       {FREE.map(([a, b], i) => (
         <div key={i} className="flex items-center gap-2">
-          <span className="flex w-12 shrink-0 justify-end">
-            <FriendAvatar i={i} size={16} />
-          </span>
+          <span className="w-12 shrink-0 truncate text-right text-[11px] text-dt-ink-2">{FRIEND_NAMES[i]}</span>
           <div className="relative h-2 flex-1 rounded-full bg-dt-line/50">
             <div className="absolute inset-y-0 rounded-full bg-dt-ink-3/45" style={{ left: `${a}%`, width: `${b - a}%` }} />
           </div>
@@ -248,7 +240,7 @@ function Machines({ booked, failedAt }: { booked: number; failedAt?: number }) {
       </div>
       <div className={`mt-3 flex items-center gap-1.5 text-[12px] font-medium ${all ? "text-dt-accent-ink" : "text-dt-held-ink"}`}>
         {all && <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
-        {all ? "8 of 8, or none" : "5 of 8, stuck"}
+        {all ? "all 8 machines, or none" : "5 of 8 machines, then stuck"}
       </div>
     </div>
   );
