@@ -24,14 +24,14 @@ export interface TimelineRow {
   boxes: TimelineBox[];
 }
 
-// Each colour carries a light/dark text pair: these boxes render on the dark marketing canvas AND on
-// the theme-aware dashboard, and near-white text over a pale tint is unreadable in light mode.
+// The keys are the callers' names for meaning, mapped onto the dt-* tokens so a box reads the same in
+// light and dark: emerald is free, rose is taken, amber is held, sky is a neutral ink mark.
 const COLOR: Record<BoxColor, string> = {
-  sky: "border-sky-400/40 bg-sky-500/30 text-sky-900 dark:text-sky-50",
-  rose: "border-rose-400/40 bg-rose-500/30 text-rose-900 dark:text-rose-50",
-  emerald: "border-emerald-400/40 bg-emerald-500/30 text-emerald-900 dark:text-emerald-50",
-  amber: "border-amber-300/50 bg-amber-400/30 text-amber-900 dark:text-amber-50",
-  zinc: "border-border bg-muted-foreground/25 text-foreground",
+  sky: "border-dt-ink/20 bg-dt-ink/[0.07] text-dt-ink",
+  rose: "border-dt-line-strong bg-dt-taken text-dt-ink-3",
+  emerald: "border-dt-accent/40 bg-dt-accent-soft text-dt-accent-ink",
+  amber: "border-dt-held/50 bg-dt-held-soft text-dt-held-ink",
+  zinc: "border-dt-line bg-dt-ink-3/20 text-dt-ink",
 };
 
 interface Props {
@@ -70,7 +70,7 @@ export function LabeledTimeline({
   const hasOps = rows.some((r) => r.op);
 
   return (
-    <div className="rounded-lg border bg-muted/30 p-3">
+    <div className="rounded-2xl border border-dt-line bg-dt-sunken p-3.5">
       {ticks && ticks.length > 0 && (
         <div className="mb-1.5 flex items-end gap-2">
           {hasOps && <span className="w-3 shrink-0" />}
@@ -81,7 +81,7 @@ export function LabeledTimeline({
               return (
                 <span
                   key={i}
-                  className="absolute -translate-x-1/2 text-[9px] tabular-nums text-muted-foreground"
+                  className="absolute -translate-x-1/2 text-[9px] tabular-nums text-dt-ink-3"
                   style={{ left: `${left}%` }}
                 >
                   {t.label}
@@ -94,20 +94,20 @@ export function LabeledTimeline({
       <div className="space-y-1.5">
         {rows.map((row, ri) => (
           <div key={ri}>
-            {row.divider && <div className="mb-1.5 h-px bg-emerald-400/20" />}
+            {row.divider && <div className="mb-1.5 h-px bg-dt-accent/25" />}
             {row.heading ? (
-              <div className={cn("pb-0.5 text-[11px] font-semibold uppercase tracking-wider text-foreground", ri > 0 && "pt-2")}>
+              <div className={cn("pb-0.5 text-[12px] font-semibold text-dt-ink", ri > 0 && "pt-2")}>
                 {row.heading}
               </div>
             ) : (
             <div className="flex items-center gap-2">
               {hasOps && (
-                <span className="w-3 shrink-0 text-right font-mono text-[11px] text-muted-foreground">
+                <span className="w-3 shrink-0 text-right font-mono text-[11px] text-dt-ink-3">
                   {row.op ?? ""}
                 </span>
               )}
               {(row.label || labelWidth > 0) && (
-                <span className="shrink-0 text-right text-[10px] text-muted-foreground" style={{ width: labelWidth }}>
+                <span className="shrink-0 text-right text-[10px] font-medium text-dt-ink-3" style={{ width: labelWidth }}>
                   {row.label}
                 </span>
               )}
@@ -119,7 +119,7 @@ export function LabeledTimeline({
                       key={bi}
                       title={b.text}
                       className={cn(
-                        "absolute inset-y-0 flex items-center justify-center overflow-hidden rounded border text-[10px] font-medium",
+                        "absolute inset-y-0 flex items-center justify-center overflow-hidden rounded-md border text-[10px] font-medium",
                         COLOR[b.color]
                       )}
                       style={p}
@@ -136,9 +136,9 @@ export function LabeledTimeline({
       </div>
 
       {showAxis && (
-        <div className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground" style={{ paddingLeft: labelWidth + 8 }}>
+        <div className="mt-2 flex items-center gap-2 text-[10px] text-dt-ink-3" style={{ paddingLeft: labelWidth + 8 }}>
           <span>◀ {pastLabel}</span>
-          <div className="h-px flex-1 bg-white/15" />
+          <div className="h-px flex-1 bg-dt-line-strong" />
           <span>{futureLabel} ▶</span>
         </div>
       )}

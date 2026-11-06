@@ -39,7 +39,7 @@ export default async function DashboardPage({
       <main className="mx-auto flex max-w-md flex-col gap-6 px-6 py-24">
         <h1 className="text-2xl font-semibold">Your dashboard</h1>
         <p className="text-muted-foreground">Your session ended. Sign in again to continue.</p>
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button asChild className="w-fit">
           <a href="/auth/login?returnTo=/dashboard">Sign in</a>
         </Button>
@@ -54,7 +54,7 @@ export default async function DashboardPage({
       <AmbientBackground />
       <div className="flex items-end justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Your calendars</h1>
+          <h1 className="text-balance text-[1.75rem] font-semibold tracking-[-0.02em] text-dt-ink">Your calendars</h1>
           <p className="text-muted-foreground text-sm">
             Real-time calendars anyone, or any AI agent, can book against.
           </p>
@@ -63,7 +63,7 @@ export default async function DashboardPage({
       </div>
 
       {error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40">
+        <p className="rounded-xl border border-dt-held/40 bg-dt-held-soft px-3.5 py-2.5 text-sm text-dt-held-ink">
           {error === "exchange_failed" || error === "state_mismatch" ? "Sign-in did not complete. Try again." : error}
         </p>
       ) : null}

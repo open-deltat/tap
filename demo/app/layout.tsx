@@ -86,7 +86,7 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <div className="flex h-[100dvh] flex-col">
             <NavHeader authEnabled={authEnabled()} profile={profile} />
             <div className="flex-1 min-h-0">{children}</div>

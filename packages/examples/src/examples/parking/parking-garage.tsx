@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Stage } from "../../components/stage";
+import { ACCENT_CTA } from "../../lib/accent";
 import { BookingConfirmedModal, type BookingResult } from "../../components/booking-confirmed-modal";
 import { ParkingControls, DURATIONS } from "./parking-controls";
 import { ParkingGrid, type ZoneTile } from "./parking-grid";
@@ -154,7 +155,7 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+      <div className="dt-canvas flex h-full items-center justify-center text-dt-ink-3">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to Δt…
@@ -177,10 +178,10 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
   const tray = selected ? (
     <div className="flex flex-wrap items-center gap-3">
       <div className="flex-1">
-        <div className="text-sm font-medium text-zinc-100">
+        <div className="text-sm font-semibold text-dt-ink">
           {selected.floorName} · {selected.name}
         </div>
-        <div className="text-xs text-zinc-400">
+        <div className="text-xs tabular-nums text-dt-ink-3">
           {selected.remaining.toLocaleString()} of {selected.capacity} free
           {selected.price > 0 && ` · $${selected.price}/hr`}
         </div>
@@ -188,7 +189,7 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
       <Button
         onClick={book}
         disabled={isPending || selected.remaining <= 0 || selected.closed}
-        className="bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-40"
+        className={`h-11 px-6 text-[14px] font-semibold tabular-nums ${ACCENT_CTA}`}
       >
         Park here
         {selected.price > 0 && ` · $${(selected.price * (duration / 60)).toFixed(0)}`}
@@ -206,12 +207,12 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
       >
         <ParkingGrid floors={grouped} selectedId={selectedId} onSelect={(id) => setSelectedId(id === selectedId ? null : id)} />
 
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
-          <Legend color="bg-emerald-500" label="plenty" />
-          <Legend color="bg-amber-500" label="filling" />
-          <Legend color="bg-rose-500" label="nearly full" />
-          <Legend color="bg-zinc-700" label="full / closed" />
-          <span className="text-zinc-600">one zone is closed for maintenance tonight</span>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-[12px] text-dt-ink-3">
+          <Legend color="bg-dt-accent" label="Plenty" />
+          <Legend color="bg-dt-held" label="Filling" />
+          <Legend color="bg-dt-ink" label="Nearly full" />
+          <Legend color="bg-dt-taken" label="Full or closed" />
+          <span>One zone is closed for maintenance tonight</span>
         </div>
       </Stage>
 
@@ -222,8 +223,8 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
       />
 
       {isPending && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="flex items-center gap-2 text-sm text-zinc-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dt-canvas/60 backdrop-blur-[2px]">
+          <div className="flex items-center gap-2 rounded-full border border-dt-line bg-dt-surface px-4 py-2 text-sm text-dt-ink-2 shadow-dt-float">
             <Loader2 className="h-4 w-4 animate-spin" />
             Working…
           </div>
@@ -236,7 +237,7 @@ export function ParkingGarage({ garageId }: ParkingGarageProps) {
 function Legend({ color, label }: { color: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className={`h-2.5 w-2.5 rounded-sm ${color}`} />
+      <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
       {label}
     </span>
   );

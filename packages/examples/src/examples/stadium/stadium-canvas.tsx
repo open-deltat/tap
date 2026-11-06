@@ -35,46 +35,68 @@ export interface CanvasSection {
 // Clicks while zoomed out (Overview/Close-up) are ignored, zoom changes only via wheel/buttons.
 export type CanvasHit = { kind: "cell"; section: CanvasSection; cell: number };
 
-// Availability ramp + categories: the one source of truth for both the canvas and the legend.
-// On-theme with the rest of the app's tone map: emerald = plenty free, amber = filling,
-// rose = nearly full, dark zinc = sold out. Premium boxes are a brighter mint so they read as
-// special; a picked seat is the seats you're holding, violet fill + white ring, matching the
-// "Holding (you)" tone used across the seat-map examples.
-export const LEGEND_COLORS = {
-  plenty: "#10b981", // emerald-500
-  filling: "#fbbf24", // amber-400
-  nearlyFull: "#f43f5e", // rose-500
-  premium: "#6ee7b7", // emerald-300 (premium box)
-  soldOut: "#27272a", // zinc-800
-  selection: "#8b5cf6", // violet-500, the seats you are holding
+// Availability ramp + categories: the one source of truth for both the canvas and the legend, named
+// by the site's dt-* tokens so both follow light and dark. How much is left is one hue fading out
+// (accent, ramp-2, ramp-3), never amber, which across the examples means someone else is choosing.
+// Sold out is the faint "taken" tone, premium boxes a neutral ink, a picked seat full ink.
+const TOKENS = {
+  plenty: "--dt-accent",
+  filling: "--dt-ramp-2",
+  nearlyFull: "--dt-ramp-3",
+  premium: "--dt-ink-2",
+  soldOut: "--dt-line-strong",
+  selection: "--dt-ink",
 } as const;
 
-const COLORS = {
-  bg: "#08080a",
-  field: "#0c1f14",
-  fieldStroke: "#1f3d2b",
-  fieldText: "#15803d",
-  rampHigh: LEGEND_COLORS.plenty,
-  rampMid: LEGEND_COLORS.filling,
-  rampLow: LEGEND_COLORS.nearlyFull,
-  zinc: LEGEND_COLORS.soldOut,
-  gold: LEGEND_COLORS.premium,
-  selection: LEGEND_COLORS.selection,
-  taken: "#3f3f46",
-  selectStroke: "#ffffff", // section outline, on the dark background
-  selectStrokeDark: "#ffffff", // per-seat ring around the violet picked fill (high contrast)
-  label: "rgba(255,255,255,0.88)",
-  labelHalo: "rgba(0,0,0,0.55)",
-  seatLabel: "rgba(12,12,14,0.72)", // per-seat id, dark text on the light seat fills
-};
+/** CSS colours for DOM swatches (the legend); the canvas resolves the same tokens at draw time. */
+export const LEGEND_COLORS = Object.fromEntries(
+  Object.entries(TOKENS).map(([k, v]) => [k, `var(${v})`])
+) as { [K in keyof typeof TOKENS]: string };
 
-function fillFor(s: CanvasSection): string {
-  if (s.remaining <= 0) return COLORS.zinc;
-  if (s.assigned) return COLORS.gold;
+interface Palette {
+  bg: string;
+  accent: string;
+  accentInk: string;
+  rampHigh: string;
+  rampMid: string;
+  rampLow: string;
+  soldOut: string;
+  premium: string;
+  selection: string;
+  taken: string;
+  ink: string;
+  surface: string;
+  onInk: string;
+}
+
+// A canvas cannot read var(), so the tokens are resolved from the root element once per frame.
+function readPalette(): Palette {
+  const css = getComputedStyle(document.documentElement);
+  const v = (name: string) => css.getPropertyValue(name).trim();
+  return {
+    bg: v("--dt-sunken"),
+    accent: v("--dt-accent"),
+    accentInk: v("--dt-accent-ink"),
+    rampHigh: v(TOKENS.plenty),
+    rampMid: v(TOKENS.filling),
+    rampLow: v(TOKENS.nearlyFull),
+    soldOut: v(TOKENS.soldOut),
+    premium: v(TOKENS.premium),
+    selection: v(TOKENS.selection),
+    taken: v("--dt-ink-3"),
+    ink: v("--dt-ink"),
+    surface: v("--dt-surface"),
+    onInk: v("--dt-on-ink"),
+  };
+}
+
+function fillFor(s: CanvasSection, p: Palette): string {
+  if (s.remaining <= 0) return p.soldOut;
+  if (s.assigned) return p.premium;
   const ratio = s.remaining / s.capacity;
-  if (ratio > 0.5) return COLORS.rampHigh;
-  if (ratio > 0.15) return COLORS.rampMid;
-  return COLORS.rampLow;
+  if (ratio > 0.5) return p.rampHigh;
+  if (ratio > 0.15) return p.rampMid;
+  return p.rampLow;
 }
 
 export function StadiumCanvas({
@@ -137,7 +159,8 @@ export function StadiumCanvas({
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
-    ctx.fillStyle = COLORS.bg;
+    const p = readPalette();
+    ctx.fillStyle = p.bg;
     ctx.fillRect(0, 0, cssW, cssH);
 
     const t = tRef.current;
@@ -157,17 +180,22 @@ export function StadiumCanvas({
     // Field.
     ctx.beginPath();
     ctx.ellipse(FIELD.cx, FIELD.cy, FIELD.rx, FIELD.ry, 0, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS.field;
+    ctx.fillStyle = p.accent;
+    ctx.globalAlpha = 0.12;
     ctx.fill();
+    ctx.globalAlpha = 0.4;
     ctx.lineWidth = 3 / t.scale;
-    ctx.strokeStyle = COLORS.fieldStroke;
+    ctx.strokeStyle = p.accent;
     ctx.stroke();
+    ctx.globalAlpha = 1;
     if (t.scale < SEAT_THRESHOLD) {
-      ctx.fillStyle = COLORS.fieldText;
+      ctx.fillStyle = p.accentInk;
+      ctx.globalAlpha = 0.75;
       ctx.font = "600 28px ui-sans-serif, system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("FIELD", FIELD.cx, FIELD.cy);
+      ctx.globalAlpha = 1;
     }
 
     const seatLOD = t.scale >= SEAT_THRESHOLD;
@@ -187,19 +215,19 @@ export function StadiumCanvas({
         // One shape per section, colored by availability.
         ctx.beginPath();
         roundRect(ctx, r.x, r.y, r.w, r.h, Math.min(8, r.w * 0.15));
-        ctx.fillStyle = fillFor(s);
-        ctx.globalAlpha = s.remaining <= 0 ? 0.5 : 0.92;
+        ctx.fillStyle = fillFor(s, p);
+        ctx.globalAlpha = s.remaining <= 0 ? 0.6 : 0.92;
         ctx.fill();
         ctx.globalAlpha = 1;
         if (s.id === selSectionRef.current) {
           ctx.lineWidth = 3 / t.scale;
-          ctx.strokeStyle = COLORS.selectStroke;
+          ctx.strokeStyle = p.ink;
           ctx.stroke();
         }
-        drawSectionLabel(ctx, s, r, t, f);
+        drawSectionLabel(ctx, s, r, t, f, p);
       } else {
         // Seat grid. taken = first (capacity - remaining) cells; rest are free.
-        drawSeats(ctx, s, r, t, f, viewport, selSectionRef.current, selCellsRef.current);
+        drawSeats(ctx, s, r, t, f, viewport, selSectionRef.current, selCellsRef.current, p);
       }
       ctx.restore();
     }
@@ -219,6 +247,14 @@ export function StadiumCanvas({
   useEffect(() => {
     scheduleDraw();
   }, [transform, selectedSectionId, selectedCells, scheduleDraw]);
+
+  // The palette lives in CSS variables that flip with the `dark` class on <html>, so a theme switch
+  // has to repaint the canvas; nothing else would trigger a draw.
+  useEffect(() => {
+    const mo = new MutationObserver(() => scheduleDraw());
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => mo.disconnect();
+  }, [scheduleDraw]);
 
   // Resize handling.
   useEffect(() => {
@@ -320,7 +356,7 @@ export function StadiumCanvas({
   return (
     <div
       ref={containerRef}
-      className="h-[58vh] w-full cursor-pointer touch-none overflow-hidden rounded-xl bg-[#08080a] active:cursor-grabbing"
+      className="h-[58vh] w-full cursor-pointer touch-none overflow-hidden rounded-2xl bg-dt-sunken active:cursor-grabbing"
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -339,7 +375,8 @@ function drawSeats(
   f: ReturnType<typeof sectionFrame>,
   viewport: Rect,
   selectedSectionId: string | null,
-  selectedCells: Set<number>
+  selectedCells: Set<number>,
+  p: Palette
 ) {
   const { cols, rows } = gridDims(s.capacity, r.w, r.h);
   const cw = r.w / cols;
@@ -352,7 +389,6 @@ function drawSeats(
   const inView = (x: number, y: number) =>
     !(x + cw < localView.x || x > localView.x + localView.w || y + ch < localView.y || y > localView.y + localView.h);
 
-  ctx.fillStyle = COLORS.taken;
   for (let i = 0; i < s.capacity; i++) {
     const col = i % cols;
     const row = (i - col) / cols;
@@ -361,13 +397,13 @@ function drawSeats(
     if (!inView(x, y)) continue;
     const isTaken = s.takenCells.has(i);
     const picked = isSel && selectedCells.has(i);
-    ctx.fillStyle = isTaken ? COLORS.taken : picked ? COLORS.selection : fillFor(s);
-    ctx.globalAlpha = isTaken ? 0.8 : picked ? 1 : 0.85;
+    ctx.fillStyle = isTaken ? p.taken : picked ? p.selection : fillFor(s, p);
+    ctx.globalAlpha = isTaken ? 0.25 : picked ? 1 : 0.85;
     ctx.fillRect(x + pad, y + pad, cw - pad * 2, ch - pad * 2);
     if (picked) {
       ctx.globalAlpha = 1;
       ctx.lineWidth = 2 / t.scale;
-      ctx.strokeStyle = COLORS.selectStrokeDark;
+      ctx.strokeStyle = p.surface;
       ctx.strokeRect(x + pad, y + pad, cw - pad * 2, ch - pad * 2);
     }
   }
@@ -385,7 +421,8 @@ function drawSeats(
     ctx.font = `600 ${Math.min(cw, ch) * 0.42}px ui-sans-serif, system-ui, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = COLORS.seatLabel;
+    ctx.fillStyle = p.onInk;
+    ctx.globalAlpha = 0.85;
     for (let i = 0; i < s.capacity; i++) {
       if (s.takenCells.has(i)) continue; // booked seats don't need an id to pick
       const col = i % cols;
@@ -395,6 +432,7 @@ function drawSeats(
       if (!inView(r.x + col * cw, r.y + row * ch)) continue;
       ctx.fillText(seatId(i, cols), lx * ca - ly * sa, lx * sa + ly * ca);
     }
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 }
@@ -407,7 +445,8 @@ function drawSectionLabel(
   s: CanvasSection,
   r: Rect,
   t: Transform,
-  f: ReturnType<typeof sectionFrame>
+  f: ReturnType<typeof sectionFrame>,
+  p: Palette
 ) {
   if (!s.name) return;
   // Show labels from the close-up level up, so EVERY section is labelled at once (not just the big
@@ -423,9 +462,9 @@ function drawSectionLabel(
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
   ctx.lineWidth = Math.max(2, fontPx * 0.2) / t.scale;
-  ctx.strokeStyle = COLORS.labelHalo;
+  ctx.strokeStyle = p.surface;
   ctx.strokeText(s.name, 0, 0);
-  ctx.fillStyle = COLORS.label;
+  ctx.fillStyle = p.ink;
   ctx.fillText(s.name, 0, 0);
   ctx.restore();
 }

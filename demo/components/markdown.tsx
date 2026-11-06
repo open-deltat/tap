@@ -3,56 +3,60 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 
-// Renders docs markdown with the site's dark zinc/emerald styling, no typography plugin. Internal
-// links go through next/link; fenced code is highlighted, inline code gets a pill.
+// Renders docs markdown on the site's dt-* tokens, no typography plugin. Internal links go through
+// next/link; fenced code is highlighted and stays dark in both themes (the .hljs palette in
+// globals.css is tuned for a dark fence), inline code gets a quiet pill.
+const LINK = "text-dt-accent-ink underline decoration-dt-accent/40 underline-offset-[3px] transition-colors hover:decoration-dt-accent";
+
 const components: Components = {
-  h1: (p) => <h1 className="mt-10 text-2xl font-semibold text-zinc-100" {...p} />,
-  h2: (p) => <h2 className="mt-10 text-xl font-semibold text-zinc-100" {...p} />,
-  h3: (p) => <h3 className="mt-7 text-base font-semibold text-zinc-100" {...p} />,
-  h4: (p) => <h4 className="mt-5 text-sm font-semibold text-zinc-200" {...p} />,
-  p: (p) => <p className="mt-4 text-[14px] leading-relaxed text-zinc-300" {...p} />,
-  ul: (p) => <ul className="mt-4 list-disc space-y-1.5 pl-5 text-[14px] leading-relaxed text-zinc-300" {...p} />,
-  ol: (p) => <ol className="mt-4 list-decimal space-y-1.5 pl-5 text-[14px] leading-relaxed text-zinc-300" {...p} />,
-  li: (p) => <li className="leading-relaxed [&>p]:mt-1" {...p} />,
-  strong: (p) => <strong className="font-semibold text-zinc-100" {...p} />,
-  em: (p) => <em className="text-zinc-200" {...p} />,
-  hr: () => <hr className="my-8 border-white/10" />,
-  blockquote: (p) => <blockquote className="mt-4 border-l-2 border-emerald-400/40 pl-4 text-[14px] leading-relaxed text-zinc-400" {...p} />,
-  pre: (p) => <pre className="mt-4 overflow-x-auto rounded-lg border border-white/10 bg-black/30 p-4 text-[12.5px] leading-relaxed text-zinc-200" {...p} />,
+  h1: (p) => <h1 className="mt-12 text-balance text-[1.6rem] font-semibold tracking-[-0.02em] text-dt-ink" {...p} />,
+  h2: (p) => <h2 className="mt-12 text-balance text-[1.3rem] font-semibold tracking-[-0.015em] text-dt-ink" {...p} />,
+  h3: (p) => <h3 className="mt-8 text-[1.05rem] font-semibold tracking-tight text-dt-ink" {...p} />,
+  h4: (p) => <h4 className="mt-6 text-[15px] font-semibold text-dt-ink" {...p} />,
+  p: (p) => <p className="mt-4 max-w-[68ch] text-pretty text-[15.5px] leading-[1.7] text-dt-ink-2" {...p} />,
+  ul: (p) => <ul className="mt-4 max-w-[68ch] list-disc space-y-2 pl-5 text-[15.5px] leading-[1.7] text-dt-ink-2 marker:text-dt-ink-3" {...p} />,
+  ol: (p) => <ol className="mt-4 max-w-[68ch] list-decimal space-y-2 pl-5 text-[15.5px] leading-[1.7] text-dt-ink-2 marker:text-dt-ink-3" {...p} />,
+  li: (p) => <li className="leading-[1.7] [&>p]:mt-1" {...p} />,
+  strong: (p) => <strong className="font-semibold text-dt-ink" {...p} />,
+  em: (p) => <em className="text-dt-ink" {...p} />,
+  hr: () => <hr className="my-10 border-dt-line" />,
+  blockquote: (p) => (
+    <blockquote className="mt-5 max-w-[68ch] rounded-r-xl border-l-2 border-dt-accent bg-dt-sunken py-3 pl-4 pr-4 text-[15px] leading-[1.7] text-dt-ink-2 [&>p]:mt-0" {...p} />
+  ),
+  // Fences stay dark in both themes on purpose: the highlight palette is tuned for a dark ground,
+  // and a dark block reads as "code" at a glance on a light page too (Stripe, Vercel docs).
+  pre: (p) => (
+    <pre className="mt-5 overflow-x-auto rounded-2xl border border-dt-line bg-[#0b0b0f] p-5 text-[13px] leading-relaxed text-[#e4e4e7]" {...p} />
+  ),
   code: ({ className, children, ...rest }) => {
     const isBlock = /language-/.test(className ?? "");
     if (isBlock) return <code className={`font-mono ${className ?? ""}`} {...rest}>{children}</code>;
-    return <code className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[0.85em] text-emerald-200" {...rest}>{children}</code>;
+    return <code className="rounded-md bg-dt-sunken px-1.5 py-0.5 font-mono text-[0.86em] text-dt-ink ring-1 ring-dt-line" {...rest}>{children}</code>;
   },
   a: ({ href, children, ...rest }) => {
     const target = href ?? "#";
     if (target.startsWith("/")) {
       return (
-        <Link href={target} className="text-emerald-300 underline decoration-emerald-400/40 underline-offset-2 hover:decoration-emerald-300">
+        <Link href={target} className={LINK}>
           {children}
         </Link>
       );
     }
     const external = target.startsWith("http");
     return (
-      <a
-        href={target}
-        {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
-        className="text-emerald-300 underline decoration-emerald-400/40 underline-offset-2 hover:decoration-emerald-300"
-        {...rest}
-      >
+      <a href={target} {...(external ? { target: "_blank", rel: "noreferrer" } : {})} className={LINK} {...rest}>
         {children}
       </a>
     );
   },
   table: (p) => (
-    <div className="mt-4 overflow-x-auto rounded-lg border border-white/10">
-      <table className="w-full text-left text-[13px] text-zinc-300" {...p} />
+    <div className="mt-5 overflow-x-auto rounded-2xl border border-dt-line bg-dt-surface">
+      <table className="w-full text-left text-[14px] tabular-nums text-dt-ink-2" {...p} />
     </div>
   ),
-  thead: (p) => <thead className="bg-white/[0.03] text-zinc-200" {...p} />,
-  th: (p) => <th className="border-b border-white/10 px-3 py-2 font-medium" {...p} />,
-  td: (p) => <td className="border-b border-white/[0.06] px-3 py-2 align-top" {...p} />,
+  thead: (p) => <thead className="bg-dt-sunken text-dt-ink" {...p} />,
+  th: (p) => <th className="border-b border-dt-line px-4 py-2.5 font-medium" {...p} />,
+  td: (p) => <td className="border-b border-dt-line px-4 py-2.5 align-top" {...p} />,
 };
 
 // `detect: false` is the default and is load-bearing: a few fences are deliberately unlabelled

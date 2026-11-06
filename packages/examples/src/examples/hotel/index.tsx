@@ -8,6 +8,7 @@ import { Calendar } from "../../components/ui/calendar";
 import { Segmented } from "../../components/ui/segmented";
 import { Stage } from "../../components/stage";
 import { BookButton } from "../../components/book-button";
+import { ACCENT_GHOST } from "../../lib/accent";
 import type { Booking, Resource } from "../../lib/schemas";
 import { BookingConfirmedModal, type BookingResult } from "../../components/booking-confirmed-modal";
 
@@ -238,7 +239,7 @@ export default function HotelPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+      <div className="dt-canvas flex h-full items-center justify-center text-dt-ink-3">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to Δt…
@@ -250,12 +251,12 @@ export default function HotelPage() {
   const tray =
     nights > 0 && fromMs != null && toMs != null ? (
       <div className="flex items-center justify-between gap-3">
-        <div className="text-sm text-zinc-300">
-          {selType?.name} · {fmt(fromMs)} to {fmt(toMs)} ·{" "}
-          <span className="font-mono">
-            {nights} night{nights > 1 ? "s" : ""}
-          </span>
-          {spanValid && <span className="ml-2 text-emerald-300">all nights open</span>}
+        <div className="min-w-0 text-sm">
+          <div className="truncate font-semibold text-dt-ink">{selType?.name}</div>
+          <div className="text-xs tabular-nums text-dt-ink-3">
+            {fmt(fromMs)} to {fmt(toMs)} · {nights} night{nights > 1 ? "s" : ""}
+            {spanValid && <span className="ml-2 text-dt-accent-ink">all nights open</span>}
+          </div>
         </div>
         <BookButton onClick={book} loading={isPending} disabled={!spanValid}>
           Book {nights} night{nights > 1 ? "s" : ""}
@@ -275,8 +276,8 @@ export default function HotelPage() {
           {/* Front desk: read-only occupancy overview + manage reservations */}
           <section>
             <header className="mb-4">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Front desk</h2>
-              <p className="mt-1 text-xs text-zinc-500">
+              <h2 className="text-[15px] font-semibold tracking-tight text-dt-ink">Front desk</h2>
+              <p className="mt-1 text-[12.5px] text-dt-ink-3">
                 Rooms taken per night, next 30 nights. <Legend />
               </p>
             </header>
@@ -285,7 +286,7 @@ export default function HotelPage() {
               const all = bookingsByType[rt.id] ?? [];
               const sorted = [...all].sort((a, b) => a.start - b.start);
               return (
-                <div key={rt.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+                <div key={rt.id} className="rounded-2xl bg-dt-sunken p-4">
                   <RoomHeader rt={rt} />
                   <div className="mt-3">
                     <AvailabilityStrip capacity={rt.capacity} bookings={all} fromMs={todayMs} />
@@ -297,11 +298,11 @@ export default function HotelPage() {
                       {sorted.slice(0, 6).map((b) => (
                         <li
                           key={b.id}
-                          className="flex items-center justify-between gap-2 rounded bg-white/[0.03] px-2 py-1 text-xs text-zinc-400"
+                          className="flex items-center justify-between gap-2 rounded-xl bg-dt-surface px-3 py-1.5 text-xs text-dt-ink-2"
                         >
                           <span className="truncate">
-                            <span className="text-zinc-300">{b.label || "Reservation"}</span>
-                            <span className="ml-2 font-mono text-[10px] text-zinc-500">
+                            <span className="text-dt-ink">{b.label || "Reservation"}</span>
+                            <span className="ml-2 text-[11px] tabular-nums text-dt-ink-3">
                               {fmt(b.start)} → {fmt(b.end)}
                             </span>
                           </span>
@@ -309,7 +310,7 @@ export default function HotelPage() {
                             type="button"
                             onClick={() => release(b)}
                             disabled={isPending}
-                            className="shrink-0 text-zinc-500 transition-colors hover:text-rose-300"
+                            className="relative shrink-0 text-dt-ink-3 transition-colors after:absolute after:-inset-4 hover:text-dt-ink"
                             aria-label="Cancel reservation"
                           >
                             <X className="h-3 w-3" />
@@ -328,8 +329,8 @@ export default function HotelPage() {
           {/* Book a stay: pick a room, pick your dates, we validate against availability */}
           <section>
             <header className="mb-4">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-400">Book a stay</h2>
-              <p className="mt-1 text-xs text-zinc-500">
+              <h2 className="text-[15px] font-semibold tracking-tight text-dt-ink">Book a stay</h2>
+              <p className="mt-1 text-[12.5px] tabular-nums text-dt-ink-3">
                 Check-in {hourLabel(CHECK_IN_HOUR)} · check-out {hourLabel(CHECK_OUT_HOUR)}.
               </p>
             </header>
@@ -342,7 +343,7 @@ export default function HotelPage() {
                   label: (
                     <>
                       {rt.name}
-                      <span className="ml-1.5 font-mono text-[10px] text-zinc-500">×{rt.capacity}</span>
+                      <span className="ml-1.5 text-[11px] tabular-nums opacity-60">×{rt.capacity}</span>
                     </>
                   ),
                 }))}
@@ -357,21 +358,21 @@ export default function HotelPage() {
             <button
               type="button"
               onClick={() => applyOpening("soonest")}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-zinc-300 transition-colors hover:border-emerald-400/30 hover:text-emerald-200"
+              className={`inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[background-color,transform] duration-150 active:scale-[0.97] sm:h-9 ${ACCENT_GHOST}`}
             >
-              <CalendarRange className="h-3.5 w-3.5" /> Soonest opening
+              <CalendarRange className="h-3.5 w-3.5 text-dt-accent" /> Soonest opening
             </button>
             <button
               type="button"
               onClick={() => applyOpening("longest")}
-              className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-[11px] text-zinc-300 transition-colors hover:border-emerald-400/30 hover:text-emerald-200"
+              className={`inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[background-color,transform] duration-150 active:scale-[0.97] sm:h-9 ${ACCENT_GHOST}`}
             >
-              <Wand2 className="h-3.5 w-3.5" /> Longest stay available
+              <Wand2 className="h-3.5 w-3.5 text-dt-accent" /> Longest stay available
             </button>
           </div>
 
           {/* Range picker: two months; booked nights struck through, the check-out boundary amber */}
-          <div className="flex justify-center rounded-lg border border-white/10 bg-white/[0.02] p-2 [color-scheme:dark]">
+          <div className="flex justify-center overflow-x-auto rounded-2xl bg-dt-sunken p-2">
             <Calendar
               mode="range"
               numberOfMonths={2}
@@ -386,14 +387,14 @@ export default function HotelPage() {
                 checkout: checkoutMs != null ? [new Date(checkoutMs)] : [],
               }}
               modifiersClassNames={{
-                booked: "text-rose-300/50 line-through",
-                checkout: "rounded-md text-amber-200/70 ring-1 ring-amber-500/25",
+                booked: "text-dt-ink-3/60 line-through",
+                checkout: "rounded-md text-dt-held-ink ring-1 ring-dt-held/40",
               }}
-              className="bg-transparent text-zinc-100"
+              className="bg-transparent text-dt-ink"
             />
           </div>
-            <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-              Struck-through nights are booked. The <span className="text-amber-300">amber</span> night is
+            <p className="mt-2.5 text-[12px] leading-relaxed text-dt-ink-3">
+              Struck-through nights are booked. The <span className="text-dt-held-ink">amber</span> night is
               bookable only as your check-out. You sleep the night before and leave that morning.
             </p>
           </section>
@@ -407,8 +408,8 @@ export default function HotelPage() {
       />
 
       {isPending && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="flex items-center gap-2 text-sm text-zinc-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dt-canvas/60 backdrop-blur-[2px]">
+          <div className="flex items-center gap-2 rounded-full border border-dt-line bg-dt-surface px-4 py-2 text-sm text-dt-ink-2 shadow-dt-float">
             <Loader2 className="h-4 w-4 animate-spin" />
             Working…
           </div>
@@ -421,8 +422,8 @@ export default function HotelPage() {
 function RoomHeader({ rt }: { rt: HotelRoomType }) {
   return (
     <div className="flex items-baseline justify-between">
-      <div className="text-sm font-semibold text-zinc-100">{rt.name}</div>
-      <div className="font-mono text-xs text-zinc-500">
+      <div className="text-sm font-semibold text-dt-ink">{rt.name}</div>
+      <div className="text-xs tabular-nums text-dt-ink-3">
         {rt.capacity} room{rt.capacity > 1 ? "s" : ""}
       </div>
     </div>
@@ -431,13 +432,13 @@ function RoomHeader({ rt }: { rt: HotelRoomType }) {
 
 function Legend() {
   const items = [
-    { cls: "bg-emerald-500/70", label: "open room" },
-    { cls: "bg-rose-500/55", label: "booked room" },
+    { cls: "bg-dt-accent", label: "open room" },
+    { cls: "bg-dt-ink-3/35", label: "booked room" },
   ];
   return (
-    <span className="ml-1 inline-flex items-center gap-2 align-middle">
+    <span className="ml-1 inline-flex items-center gap-2.5 align-middle">
       {items.map((it) => (
-        <span key={it.label} className="inline-flex items-center gap-1 text-[10px] text-zinc-500">
+        <span key={it.label} className="inline-flex items-center gap-1 text-[11px] text-dt-ink-3">
           <span className={`inline-block h-2 w-2 rounded-sm ${it.cls}`} />
           {it.label}
         </span>

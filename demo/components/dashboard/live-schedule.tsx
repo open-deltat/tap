@@ -372,9 +372,9 @@ export function LiveSchedule({
           )}
 
           <div className="text-muted-foreground flex items-center gap-4 text-xs">
-            <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-zinc-500/50" /> Open</span>
-            <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-emerald-500/60" /> Booked</span>
-            <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-amber-400/60" /> Hold</span>
+            <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-dt-taken ring-1 ring-dt-line-strong" /> Open</span>
+            <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-dt-accent" /> Booked</span>
+            <span className="flex items-center gap-1.5"><i className="size-2.5 rounded-sm bg-dt-held" /> Hold</span>
           </div>
         </>
       )}
@@ -445,12 +445,12 @@ export function LiveSchedule({
 
 function dotColor(tone: LogLine["tone"]): string {
   return tone === "book"
-    ? "bg-emerald-500"
+    ? "bg-dt-accent"
     : tone === "cancel"
-      ? "bg-red-500"
+      ? "bg-destructive"
       : tone === "hold"
-        ? "bg-amber-500"
+        ? "bg-dt-held"
         : tone === "release"
           ? "bg-muted-foreground"
-          : "bg-blue-500";
+          : "bg-dt-ink-3";
 }

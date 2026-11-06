@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Stage } from "../../components/stage";
+import { ACCENT_CTA } from "../../lib/accent";
 import { WeekHoursEditor } from "../../components/week-hours-editor";
 import { cn } from "@open-deltat/shared/utils";
 import { LabeledTimeline, type TimelineRow, type TimelineBox } from "../../components/labeled-timeline";
@@ -150,7 +151,7 @@ export default function BuilderExample() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+      <div className="dt-canvas flex h-full items-center justify-center text-dt-ink-3">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to Δt…
@@ -192,10 +193,10 @@ export default function BuilderExample() {
   for (let t = lo; t <= hi; t += tickStep) ticks.push({ value: t, label: shortHour(t) });
 
   const tray = (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex-1">
-        <div className="text-sm font-medium text-zinc-100">Weekly availability</div>
-        <div className="text-xs text-zinc-400">
+    <div className="flex flex-wrap items-center gap-2.5">
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium text-dt-ink">Weekly availability</div>
+        <div className="text-xs tabular-nums text-dt-ink-3">
           {ruleCount != null ? `${ruleCount} time blocks in Δt` : "…"} · for the next 4 weeks
         </div>
       </div>
@@ -203,14 +204,14 @@ export default function BuilderExample() {
         variant="outline"
         onClick={bookFirstOpenHour}
         disabled={saving}
-        className="h-10 border-white/15 px-4 text-sm text-zinc-200 hover:bg-white/5"
+        className="h-11 rounded-full border-dt-line-strong bg-dt-surface px-4 text-sm text-dt-ink transition-[transform,background-color] duration-150 hover:bg-dt-sunken active:scale-[0.97]"
       >
         Book first open hour
       </Button>
       <Button
         onClick={save}
         disabled={saving}
-        className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
+        className={cn("h-11 px-6 text-sm font-semibold", ACCENT_CTA)}
       >
         {saving ? "Saving…" : "Save schedule"}
       </Button>
@@ -226,16 +227,16 @@ export default function BuilderExample() {
       >
         <div className="grid gap-7 lg:grid-cols-2">
           <div>
-            <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">Weekly hours</div>
+            <div className="mb-3 text-[13px] font-medium text-dt-ink-2">Weekly hours</div>
             <WeekHoursEditor week={week} onChange={setWeek} />
           </div>
 
           <div>
-            <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">What Δt stores</div>
+            <div className="mb-3 text-[13px] font-medium text-dt-ink-2">What Δt stores</div>
             <LabeledTimeline axisStart={lo} axisEnd={hi} labelWidth={40} rows={stripRows} ticks={ticks} />
-            <p className="mt-3 text-[12px] leading-relaxed text-zinc-400">
+            <p className="mt-3 text-pretty text-[12.5px] leading-relaxed text-dt-ink-3">
               Your weekly hours turn into real blocks of time, one per day. Nothing stores &quot;every
-              Monday&quot;, just the actual days. Edit and save to watch it redraw. Red is already booked.
+              Monday&quot;, just the actual days. Edit and save to watch it redraw. Grey is already booked.
             </p>
           </div>
         </div>

@@ -19,7 +19,7 @@ export default function RestaurantExample() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+      <div className="flex h-full items-center justify-center dt-canvas text-dt-ink-3">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to Δt…

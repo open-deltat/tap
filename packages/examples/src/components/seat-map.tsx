@@ -135,10 +135,10 @@ function SectionGrid({
   return (
     <div className="flex flex-col items-center">
       <div className="mb-2 text-center">
-        <div className="text-sm font-semibold text-zinc-100">{section.name}</div>
-        <div className="text-xs text-zinc-500">
+        <div className="text-[15px] font-semibold tracking-tight text-dt-ink">{section.name}</div>
+        <div className="mt-0.5 text-xs tabular-nums text-dt-ink-3">
           {section.price !== null && (
-            <span className="font-medium text-zinc-300">{formatPrice(section.price)}</span>
+            <span className="font-medium text-dt-ink-2">{formatPrice(section.price)}</span>
           )}
           {section.price !== null && " · "}
           {stats.available} available{stats.held > 0 && ` · ${stats.held} held`} · {stats.booked} booked
@@ -151,7 +151,7 @@ function SectionGrid({
           <div
             key={col}
             className={cn(
-              "w-8 text-center text-[10px] font-medium text-zinc-600",
+              "w-8 text-center text-[10px] font-medium text-dt-ink-3",
               ci === aisleAfter && "mr-4"
             )}
           >
@@ -162,7 +162,7 @@ function SectionGrid({
 
       {grid.rows.map((row, ri) => (
         <div key={ri} className="flex items-center gap-0.5">
-          <div className="w-7 text-right text-[10px] font-medium text-zinc-600 pr-0.5">
+          <div className="w-7 pr-1 text-right text-[10px] font-medium text-dt-ink-3">
             {grid.rowLabels[ri]}
           </div>
           {row.map((seat, ci) => {
@@ -188,26 +188,26 @@ function SectionGrid({
             // A selected seat is one YOU are holding right now. Your own hold removes the seat's
             // availability and is filtered out of holdsByResource, so its recomputed status would
             // otherwise read "unavailable". isSelected therefore wins: always show it as your hold
-            // (violet) and keep it clickable so you can release it.
+            // (ink, the selection colour) and keep it clickable so you can release it. A seat someone
+            // else holds is keyed by its hold, so it flashes once (dt-ping) the moment it changes.
             return (
               <button
-                key={seat.id}
+                key={st === "held" && hold ? `${seat.id}-${hold.id}` : seat.id}
                 className={cn(
-                  "w-8 h-8 rounded text-[10px] font-medium transition-all border",
-                  isSelected &&
-                    "bg-violet-500/80 text-white border-violet-300 ring-2 ring-violet-300/60 cursor-pointer",
+                  "h-8 w-8 rounded-b-[6px] rounded-t-[11px] border text-[10px] font-medium tabular-nums transition-[background-color,border-color,color,transform] duration-150 active:scale-90",
+                  isSelected && "cursor-pointer border-transparent bg-dt-ink text-dt-on-ink shadow-[0_0_0_3px_var(--dt-accent-soft)]",
                   !isSelected &&
                     st === "unavailable" &&
-                    "bg-white/[0.03] text-zinc-600 border-white/[0.06] cursor-not-allowed",
+                    "cursor-not-allowed border-dashed border-dt-line bg-transparent text-dt-ink-3/40",
                   !isSelected &&
                     st === "available" &&
-                    "bg-emerald-500/15 text-emerald-200 border-emerald-400/30 hover:bg-emerald-500/25 hover:border-emerald-400/50 cursor-pointer",
+                    "cursor-pointer border-dt-line-strong bg-dt-surface text-dt-ink-2 hover:border-dt-ink hover:text-dt-ink",
                   !isSelected &&
                     st === "held" &&
-                    "bg-amber-400/55 text-amber-50 border-amber-400/60 hover:bg-amber-400/70 cursor-pointer",
+                    "dt-ping cursor-pointer border-dt-held bg-dt-held-soft text-dt-held-ink",
                   !isSelected &&
                     st === "booked" &&
-                    "bg-rose-500/25 text-rose-200 border-rose-400/40 hover:bg-rose-500/35 cursor-pointer",
+                    "cursor-pointer border-transparent bg-dt-taken text-dt-ink-3/60 line-through decoration-dt-ink-3/40",
                   ci === aisleAfter && "mr-4"
                 )}
                 disabled={!isSelected && st === "unavailable"}
@@ -240,6 +240,15 @@ function SectionGrid({
           })}
         </div>
       ))}
+    </div>
+  );
+}
+
+function Legend({ swatch, label }: { swatch: string; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className={cn("h-3.5 w-3.5 rounded-b-[3px] rounded-t-[5px] border", swatch)} />
+      <span>{label}</span>
     </div>
   );
 }
@@ -314,27 +323,11 @@ export function SeatMap({
         </div>
       </FitToWidth>
 
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 mt-2 text-xs text-zinc-500">
-        <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-emerald-500/15 border border-emerald-400/30" />
-          <span>Available</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-violet-500/80 border border-violet-300" />
-          <span>Holding (you)</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-amber-400/55 border border-amber-400/60" />
-          <span>Held</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-rose-500/25 border border-rose-400/40" />
-          <span>Booked</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="w-3.5 h-3.5 rounded bg-white/[0.03] border border-white/[0.06]" />
-          <span>Unavailable</span>
-        </div>
+      <div className="mt-1 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-dt-ink-3">
+        <Legend swatch="border-dt-line-strong bg-dt-surface" label="Free" />
+        <Legend swatch="border-transparent bg-dt-ink" label="Yours" />
+        <Legend swatch="border-dt-held bg-dt-held-soft" label="Someone is choosing" />
+        <Legend swatch="border-transparent bg-dt-taken" label="Taken" />
       </div>
     </div>
   );

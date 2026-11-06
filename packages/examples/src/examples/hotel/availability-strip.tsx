@@ -62,7 +62,7 @@ export function AvailabilityStrip({
             {Array.from({ length: capacity }).map((_, i) => (
               <div
                 key={i}
-                className={cn("flex-1 rounded-[1px]", i < taken ? "bg-rose-500/55" : "bg-emerald-500/70")}
+                className={cn("flex-1 rounded-[2px]", i < taken ? "bg-dt-ink-3/35" : "bg-dt-accent")}
               />
             ))}
           </div>
@@ -71,7 +71,7 @@ export function AvailabilityStrip({
 
       <div className="mt-2 flex min-h-[2.75rem] flex-wrap gap-1">
         {openings.length === 0 ? (
-          <span className="text-[11px] text-zinc-600">
+          <span className="text-[12px] text-dt-ink-3">
             no {minNights > 1 ? `${minNights}-night ` : ""}opening in {days} days
           </span>
         ) : (
@@ -81,7 +81,7 @@ export function AvailabilityStrip({
               return (
                 <span
                   key={o.start}
-                  className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400"
+                  className="rounded-full border border-dt-line px-2.5 py-1 text-[11px] tabular-nums text-dt-ink-2"
                 >
                   {label}
                 </span>
@@ -93,7 +93,7 @@ export function AvailabilityStrip({
                 type="button"
                 onClick={() => onPick(o.start, minNights > 1 ? minNights : o.nights)}
                 title={`Book ${minNights > 1 ? minNights : o.nights} night${(minNights > 1 ? minNights : o.nights) > 1 ? "s" : ""} from ${fmt(o.start)}`}
-                className="rounded border border-emerald-400/30 bg-emerald-400/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-200 transition-colors hover:bg-emerald-400/20"
+                className="relative rounded-full border border-dt-line-strong bg-dt-surface px-2.5 py-1 text-[11px] tabular-nums text-dt-ink transition-[background-color,border-color,transform] duration-150 after:absolute after:-inset-1.5 hover:border-dt-ink active:scale-[0.97]"
               >
                 {label}
               </button>

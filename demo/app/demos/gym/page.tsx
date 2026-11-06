@@ -24,7 +24,7 @@ export default function Page() {
   if (!isExampleEnabled("gym")) notFound();
 
   return (
-    <div className="h-full overflow-auto bg-[#0a0a0c] text-zinc-100">
+    <div className="dt-canvas h-full overflow-auto text-dt-ink">
       <JsonLd
         graph={[
           webPageLd(SEO),
@@ -34,18 +34,18 @@ export default function Page() {
           ]),
         ]}
       />
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <header className="mb-5">
-          <div className="text-[10.5px] uppercase tracking-[0.2em] text-emerald-300/70">Live embed</div>
-          <p className="mt-2 max-w-xl text-xs leading-relaxed text-zinc-400">
+      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
+        <header className="mb-6 text-center">
+          <h1 className="text-balance text-[1.6rem] font-semibold tracking-[-0.02em] text-dt-ink sm:text-[2rem]">Embedded schedule</h1>
+          <p className="mx-auto mt-2 max-w-xl text-[14px] leading-relaxed text-dt-ink-3">
             The schedule below is the real{" "}
-            <code className="rounded bg-white/[0.06] px-1 py-px font-mono text-[11px]">/embed/gym</code>{" "}
+            <code className="rounded-md bg-dt-sunken px-1.5 py-0.5 font-mono text-[12px] text-dt-ink">/embed/gym</code>{" "}
             widget loaded in an actual iframe, the read-only public schedule that visitors see.
             Copy the snippet underneath to drop it on any site.
           </p>
         </header>
 
-        <div className="overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02]">
+        <div className="overflow-hidden rounded-[28px] border border-dt-line bg-dt-surface shadow-dt-surface">
           <iframe
             src="/embed/gym"
             width="100%"

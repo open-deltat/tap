@@ -111,7 +111,7 @@ export function PublicBookableBooker({ record }: { record: BookableRecord }) {
     return (
       <Stage primitive={{ label: "Hold, then commit", specId: "AVAIL-07" }} title={record.name}>
         <div className="mx-auto max-w-md space-y-4 text-center">
-          <p className="text-sm text-zinc-200">
+          <p className="text-[15px] text-dt-ink">
             Booked for {formatTime(confirmed.slot.start)} on{" "}
             {new Date(confirmed.slot.start).toLocaleDateString(undefined, {
               weekday: "long",
@@ -120,7 +120,7 @@ export function PublicBookableBooker({ record }: { record: BookableRecord }) {
             })}
             .
           </p>
-          <code className="block rounded bg-black/30 px-2 py-1.5 text-[11px] text-zinc-400">
+          <code className="block rounded-xl bg-dt-sunken px-3 py-2 font-mono text-[11px] text-dt-ink-3">
             {confirmed.bookingId}
           </code>
           <button
@@ -146,11 +146,11 @@ export function PublicBookableBooker({ record }: { record: BookableRecord }) {
             onClick={() => setDayOffset((d) => Math.max(0, d - 1))}
             disabled={dayOffset === 0}
             aria-label="Previous day"
-            className="rounded-full p-1 text-zinc-400 hover:bg-white/5 hover:text-zinc-200 disabled:opacity-30"
+            className="grid h-10 w-10 place-items-center rounded-full text-dt-ink-2 transition-colors hover:bg-dt-sunken hover:text-dt-ink disabled:opacity-30"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <span className="min-w-[11rem] text-center text-[12px] text-zinc-300">
+          <span className="min-w-[11rem] text-center text-[14px] font-medium tabular-nums text-dt-ink">
             {new Date(dayStart).toLocaleDateString(undefined, {
               weekday: "long",
               month: "short",
@@ -162,7 +162,7 @@ export function PublicBookableBooker({ record }: { record: BookableRecord }) {
             onClick={() => setDayOffset((d) => Math.min(59, d + 1))}
             disabled={dayOffset >= 59}
             aria-label="Next day"
-            className="rounded-full p-1 text-zinc-400 hover:bg-white/5 hover:text-zinc-200 disabled:opacity-30"
+            className="grid h-10 w-10 place-items-center rounded-full text-dt-ink-2 transition-colors hover:bg-dt-sunken hover:text-dt-ink disabled:opacity-30"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -172,18 +172,18 @@ export function PublicBookableBooker({ record }: { record: BookableRecord }) {
     >
       <div className="mx-auto max-w-2xl">
         {error && (
-          <p className="mb-4 flex items-start gap-2 rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-[12px] text-rose-200">
+          <p className="mb-4 flex items-start gap-2 rounded-xl border border-dt-held/40 bg-dt-held-soft px-3.5 py-2.5 text-[13px] text-dt-held-ink">
             <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {error}
           </p>
         )}
 
         {loading ? (
-          <div className="flex justify-center py-10 text-zinc-500">
+          <div className="flex justify-center py-10 text-dt-ink-3">
             <Loader2 className="h-4 w-4 animate-spin" />
           </div>
         ) : slots.length === 0 ? (
-          <p className="py-10 text-center text-[13px] text-zinc-500">
+          <p className="py-10 text-center text-[14px] text-dt-ink-3">
             Nothing free on this day. Try another.
           </p>
         ) : (
@@ -239,21 +239,22 @@ function HoldTray({
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-2">
-      <span className="text-[12px] text-zinc-400">
-        {formatTime(held.start)} held for <span className="tabular-nums text-emerald-300">{clock}</span>
+      <span className="flex items-center gap-1.5 text-[13px] text-dt-ink-2">
+        <span aria-hidden className="dt-breathe h-1.5 w-1.5 rounded-full bg-dt-accent" />
+        {formatTime(held.start)} is yours for <span className="font-medium tabular-nums text-dt-ink">{clock}</span>
       </span>
       <input
         value={bookedBy}
         onChange={(e) => onName(e.target.value)}
         placeholder="Your name"
         maxLength={80}
-        className="w-40 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[12px] text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-emerald-400/40"
+        className="h-11 w-44 rounded-full border border-dt-line-strong bg-dt-surface px-4 text-base text-dt-ink outline-none placeholder:text-dt-ink-3 focus:border-dt-ink sm:h-10 sm:text-[14px]"
       />
       <button
         type="button"
         onClick={onConfirm}
         disabled={working || seconds === 0 || bookedBy.trim().length === 0}
-        className={cn("rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors", ACCENT_CTA)}
+        className={cn("inline-flex h-11 items-center px-5 text-[14px] font-semibold sm:h-10", ACCENT_CTA)}
       >
         {working ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Confirm"}
       </button>
@@ -261,7 +262,7 @@ function HoldTray({
         type="button"
         onClick={onAbandon}
         disabled={working}
-        className="rounded-full px-3 py-1.5 text-[12px] text-zinc-500 hover:text-zinc-300"
+        className="h-11 rounded-full px-3 text-[13px] text-dt-ink-3 transition-colors hover:text-dt-ink sm:h-10"
       >
         Cancel
       </button>

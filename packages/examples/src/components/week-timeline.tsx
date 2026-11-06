@@ -47,14 +47,14 @@ export function WeekTimeline({ start, dayCount, rows, onPick, selectedDay, label
       const cell = (
         <div
           className={cn(
-            "h-6 flex-1 rounded-[3px] border transition-colors",
+            "h-7 flex-1 rounded-[5px] border transition-colors",
             free
               ? result
-                ? "border-emerald-400/50 bg-emerald-500/40"
-                : "border-emerald-400/30 bg-emerald-500/20"
-              : "border-white/[0.06] bg-white/[0.02]",
-            actionable && "cursor-pointer hover:bg-emerald-400/60",
-            picked && "ring-2 ring-emerald-300 ring-offset-1 ring-offset-[#0a0a0c]"
+                ? "border-dt-accent/60 bg-dt-accent/35"
+                : "border-dt-accent/30 bg-dt-accent-soft"
+              : "border-dt-line bg-dt-surface",
+            actionable && "cursor-pointer hover:bg-dt-accent/55",
+            picked && "border-transparent bg-dt-ink ring-2 ring-dt-ink/20 ring-offset-1 ring-offset-dt-sunken"
           )}
         />
       );
@@ -72,7 +72,7 @@ export function WeekTimeline({ start, dayCount, rows, onPick, selectedDay, label
     });
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-white/10 bg-white/[0.02] p-3">
+    <div className="overflow-x-auto rounded-2xl border border-dt-line bg-dt-sunken p-3.5">
       <div className="min-w-[28rem] sm:min-w-0">
       {/* date axis */}
       <div className="mb-1.5 flex items-end gap-2">
@@ -82,8 +82,8 @@ export function WeekTimeline({ start, dayCount, rows, onPick, selectedDay, label
             const d = dayDate(i);
             return (
               <div key={i} className={cn("flex flex-1 flex-col items-center", i > 0 && i % 7 === 0 && "ml-1.5")}>
-                <span className="text-[8px] uppercase text-zinc-600">{WEEKDAY[d.getDay()]}</span>
-                <span className="text-[9px] tabular-nums text-zinc-500">{d.getDate()}</span>
+                <span className="text-[8px] uppercase text-dt-ink-3">{WEEKDAY[d.getDay()]}</span>
+                <span className="text-[9px] tabular-nums text-dt-ink-2">{d.getDate()}</span>
               </div>
             );
           })}
@@ -93,12 +93,12 @@ export function WeekTimeline({ start, dayCount, rows, onPick, selectedDay, label
       <div className="space-y-1">
         {rows.map((row, ri) => (
           <div key={ri}>
-            {row.result && <div className="my-1 h-px bg-emerald-400/20" />}
+            {row.result && <div className="my-1.5 h-px bg-dt-accent/25" />}
             <div className="flex items-center gap-2">
               <span
                 className={cn(
-                  "shrink-0 truncate text-right text-[10px]",
-                  row.result ? "font-medium text-zinc-300" : "text-zinc-400"
+                  "shrink-0 truncate text-right text-[10.5px]",
+                  row.result ? "font-semibold text-dt-ink" : "text-dt-ink-2"
                 )}
                 style={{ width: labelWidth }}
               >

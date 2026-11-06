@@ -2,6 +2,7 @@
 
 import { Input } from "../../components/ui/input";
 import { cn } from "@open-deltat/shared/utils";
+import { PILL_ACTIVE, PILL_BASE, PILL_IDLE } from "../../lib/accent";
 
 export const DURATIONS = [
   { label: "1h", minutes: 60 },
@@ -27,30 +28,26 @@ export function ParkingControls({
   summary,
 }: ParkingControlsProps) {
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+    <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-2.5">
+        <label className="flex items-center gap-2 text-[13px] text-dt-ink-3">
           Arrive
           <Input
             type="time"
             value={startTime}
             onChange={(e) => onStartTimeChange(e.target.value)}
-            className="h-8 w-28 border-white/10 bg-white/5 text-sm text-zinc-100"
+            className="h-11 w-32 rounded-full border-dt-line-strong bg-dt-surface px-4 tabular-nums text-dt-ink sm:h-9"
           />
         </label>
-        <div className="flex flex-wrap items-center justify-center gap-1">
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
           {DURATIONS.map((d) => {
             const active = duration === d.minutes;
             return (
               <button
                 key={d.minutes}
                 onClick={() => onDurationChange(d.minutes)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs transition-colors",
-                  active
-                    ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-200"
-                    : "border-white/10 text-zinc-400 hover:text-zinc-200"
-                )}
+                aria-pressed={active}
+                className={cn(PILL_BASE, active ? PILL_ACTIVE : PILL_IDLE)}
               >
                 {d.label}
               </button>
@@ -58,7 +55,7 @@ export function ParkingControls({
           })}
         </div>
       </div>
-      <div className="text-[11px] text-zinc-500">{summary}</div>
+      <div className="text-center text-[12px] tabular-nums text-dt-ink-3">{summary}</div>
     </div>
   );
 }

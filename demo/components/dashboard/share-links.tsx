@@ -26,7 +26,7 @@ export function ShareLinks({ path }: { path: string }) {
         {path}
       </code>
       <Button type="button" size="sm" variant="outline" onClick={copy}>
-        {copied ? <Check className="text-emerald-500" /> : <Copy />}
+        {copied ? <Check className="text-dt-accent" /> : <Copy />}
         {copied ? "Copied" : "Copy public URL"}
       </Button>
       <Button asChild size="sm" variant="ghost">

@@ -9,6 +9,30 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* The dt-* palette is the site's one design system: landing, docs, nav and every example read it,
+     so light and dark are both first-class and a surface can never drift from its neighbours. */
+  --color-dt-canvas: var(--dt-canvas);
+  --color-dt-surface: var(--dt-surface);
+  --color-dt-sunken: var(--dt-sunken);
+  --color-dt-raised: var(--dt-raised);
+  --color-dt-line: var(--dt-line);
+  --color-dt-line-strong: var(--dt-line-strong);
+  --color-dt-ink: var(--dt-ink);
+  --color-dt-ink-2: var(--dt-ink-2);
+  --color-dt-ink-3: var(--dt-ink-3);
+  --color-dt-on-ink: var(--dt-on-ink);
+  --color-dt-accent: var(--dt-accent);
+  --color-dt-accent-ink: var(--dt-accent-ink);
+  --color-dt-accent-soft: var(--dt-accent-soft);
+  --color-dt-held: var(--dt-held);
+  --color-dt-held-ink: var(--dt-held-ink);
+  --color-dt-held-soft: var(--dt-held-soft);
+  --color-dt-taken: var(--dt-taken);
+  --color-dt-ramp-2: var(--dt-ramp-2);
+  --color-dt-ramp-3: var(--dt-ramp-3);
+  --shadow-dt-surface: var(--dt-shadow-surface);
+  --shadow-dt-float: var(--dt-shadow-float);
+  --ease-dt: cubic-bezier(0.32, 0.72, 0, 1);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -52,6 +76,32 @@
 }
 
 :root {
+  /* Ink is the action colour (cal.com, Apple): selection and the one primary button. Emerald means
+     free or live, amber means someone else is holding it. Every ink/ink-2/ink-3 pair is at least
+     4.5:1 on canvas and surface. */
+  --dt-canvas: #f5f5f7;
+  --dt-surface: #ffffff;
+  --dt-sunken: #f0f0f3;
+  --dt-raised: rgb(255 255 255 / 0.82);
+  --dt-line: rgb(12 12 20 / 0.08);
+  --dt-line-strong: rgb(12 12 20 / 0.16);
+  --dt-ink: #0a0a0f;
+  --dt-ink-2: #45454f;
+  --dt-ink-3: #6b6b76;
+  --dt-on-ink: #ffffff;
+  --dt-accent: #059669;
+  --dt-accent-ink: #047857;
+  --dt-accent-soft: rgb(5 150 105 / 0.1);
+  --dt-held: #d97706;
+  --dt-held-ink: #92400e;
+  --dt-held-soft: rgb(217 119 6 / 0.14);
+  --dt-taken: rgb(12 12 20 / 0.06);
+  /* How much is left, as one hue fading out: accent (plenty), ramp-2 (filling), ramp-3 (nearly
+     gone). Solid colours, because a canvas cannot resolve color-mix(). */
+  --dt-ramp-2: #6fcaa9;
+  --dt-ramp-3: #c4eadb;
+  --dt-shadow-surface: 0 1px 2px rgb(16 16 24 / 0.04), 0 16px 40px -12px rgb(16 16 24 / 0.12);
+  --dt-shadow-float: 0 2px 6px rgb(16 16 24 / 0.06), 0 24px 56px -12px rgb(16 16 24 / 0.22);
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -87,6 +137,27 @@
 }
 
 .dark {
+  --dt-canvas: #08080a;
+  --dt-surface: #111114;
+  --dt-sunken: #0c0c0f;
+  --dt-raised: rgb(26 26 30 / 0.8);
+  --dt-line: rgb(255 255 255 / 0.08);
+  --dt-line-strong: rgb(255 255 255 / 0.16);
+  --dt-ink: #f5f5f7;
+  --dt-ink-2: #b4b4bd;
+  --dt-ink-3: #8c8c97;
+  --dt-on-ink: #0a0a0f;
+  --dt-accent: #34d399;
+  --dt-accent-ink: #6ee7b7;
+  --dt-accent-soft: rgb(52 211 153 / 0.12);
+  --dt-held: #fbbf24;
+  --dt-held-ink: #fcd34d;
+  --dt-held-soft: rgb(251 191 36 / 0.16);
+  --dt-taken: rgb(255 255 255 / 0.05);
+  --dt-ramp-2: #1f8a67;
+  --dt-ramp-3: #1b4537;
+  --dt-shadow-surface: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 24px 60px -16px rgb(0 0 0 / 0.7);
+  --dt-shadow-float: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 24px 64px -12px rgb(0 0 0 / 0.8);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -125,8 +196,48 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-dt-canvas text-dt-ink;
   }
+}
+
+/* The canvas every page sits on: flat, with one faint light falling from above. No dot grids or
+   glow blobs; depth comes from the surfaces, not the background. */
+.dt-canvas {
+  background-color: var(--dt-canvas);
+  background-image: radial-gradient(120% 55% at 50% -12%, color-mix(in oklab, var(--dt-accent) 9%, transparent), transparent 62%);
+  background-repeat: no-repeat;
+  background-size: 100% 900px;
+  /* Pages scroll inside this element, so the light must scroll away with the content, not stay
+     pinned under the nav. */
+  background-attachment: local;
+}
+
+/* The island: the one place every example acts. It rises in on the product's single ease-out. */
+@keyframes dt-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.dt-rise { animation: dt-rise 420ms var(--ease-dt) both; }
+
+/* A slot or seat that changed because someone else acted: one soft flash, never a loop. */
+@keyframes dt-ping {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--dt-held) 55%, transparent); }
+  100% { box-shadow: 0 0 0 10px transparent; }
+}
+.dt-ping { animation: dt-ping 900ms var(--ease-dt) 1; }
+
+/* The booked tick draws itself once: the peak of every example. */
+@keyframes dt-draw { to { stroke-dashoffset: 0; } }
+.dt-draw-ring { stroke-dasharray: 152; stroke-dashoffset: 152; animation: dt-draw 520ms var(--ease-dt) forwards; }
+.dt-draw-tick { stroke-dasharray: 32; stroke-dashoffset: 32; animation: dt-draw 320ms var(--ease-dt) 380ms forwards; }
+
+/* A live indicator: a slow breath, not a blink. */
+@keyframes dt-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.dt-breathe { animation: dt-breathe 2.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dt-rise, .dt-ping, .dt-breathe { animation: none; }
+  .dt-draw-ring, .dt-draw-tick { animation: none; stroke-dashoffset: 0; }
 }
 
 /* Syntax highlighting for docs code fences. rehype-highlight (highlight.js) tags the tokens at

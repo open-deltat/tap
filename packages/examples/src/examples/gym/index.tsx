@@ -19,9 +19,10 @@ import {
 } from "../../components/ui/kibo-ui/calendar";
 import { getPublicSchedule, getScheduleWindow, bookGymClass, type PublicClass } from "./actions";
 
-const OPEN = "#34d399";
-const FILLING = "#fbbf24";
-const FULL = "#f87171";
+// CSS variables rather than hex so the dots follow the light/dark theme: free, nearly full, full.
+const OPEN = "var(--dt-accent)";
+const FILLING = "var(--dt-held)";
+const FULL = "var(--dt-ink-3)";
 
 function colorFor(c: PublicClass): string {
   if (c.full) return FULL;
@@ -45,7 +46,7 @@ export default function GymExample() {
   }, []);
 
   const ribbon = (
-    <p className="max-w-md text-center text-[11px] leading-relaxed text-zinc-500">{CAPTION}</p>
+    <p className="mx-auto max-w-md text-pretty text-center text-[13px] leading-relaxed text-dt-ink-3">{CAPTION}</p>
   );
 
   return (
@@ -185,7 +186,7 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
 
   if (failed) {
     return (
-      <div className="flex min-h-[20rem] items-center justify-center text-sm text-zinc-400">
+      <div className="flex min-h-[20rem] items-center justify-center text-sm text-dt-ink-3">
         Couldn&apos;t reach the schedule.
       </div>
     );
@@ -198,11 +199,11 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
         <CalendarDatePagination min={nav.min} max={nav.max} />
       </CalendarDate>
 
-      <div className="overflow-hidden rounded-xl border border-white/[0.06]">
+      <div className="overflow-hidden rounded-2xl border border-dt-line bg-dt-surface">
         <CalendarHeader />
         <div className="relative">
           {loading && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#0a0a0c]/50 text-xs text-zinc-400">
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-dt-surface/60 text-xs text-dt-ink-3 backdrop-blur-[2px]">
               <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
               Loading…
             </div>
@@ -220,9 +221,9 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
                     className="h-1.5 w-1.5 shrink-0 rounded-full"
                     style={{ backgroundColor: feature.status.color }}
                   />
-                  <span className="truncate text-zinc-300">{feature.name}</span>
+                  <span className="truncate tabular-nums text-dt-ink-2">{feature.name}</span>
                   {c && (
-                    <span className="ml-auto shrink-0 text-[10px] text-zinc-500">
+                    <span className="ml-auto shrink-0 text-[10px] tabular-nums text-dt-ink-3">
                       {c.full ? "full" : c.spotsLeft}
                     </span>
                   )}
@@ -237,15 +238,15 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
       <div className="mt-5 min-h-[16rem]">
         {selectedLabel ? (
           <>
-            <div className="mb-3 text-sm font-medium text-zinc-200">{selectedLabel}</div>
+            <div className="mb-3 text-[15px] font-semibold tracking-tight text-dt-ink">{selectedLabel}</div>
             {selectedClasses.length === 0 ? (
-              <div className="text-xs text-zinc-500">No classes scheduled.</div>
+              <div className="text-sm text-dt-ink-3">No classes scheduled.</div>
             ) : (
-              <ul className="flex max-h-[13rem] flex-col gap-2 overflow-y-auto">
+              <ul className="flex max-h-[16rem] flex-col gap-2 overflow-y-auto">
                 {selectedClasses.map((c) => (
                 <li
                   key={c.id}
-                  className="flex items-start gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5"
+                  className="flex items-start gap-3 rounded-2xl border border-dt-line bg-dt-sunken px-4 py-3"
                 >
                   <span
                     className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
@@ -253,16 +254,16 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-sm text-zinc-200">{c.title}</span>
-                      <span className="shrink-0 text-xs text-zinc-500">
+                      <span className="text-sm font-medium text-dt-ink">{c.title}</span>
+                      <span className="shrink-0 text-xs tabular-nums text-dt-ink-3">
                         {formatTime(c.start)} – {formatTime(c.end)}
                       </span>
                     </div>
-                    <div className="mt-0.5 text-xs">
+                    <div className="mt-0.5 text-xs tabular-nums">
                       {c.full ? (
-                        <span className="text-red-300/80">Full</span>
+                        <span className="text-dt-ink-3">Full</span>
                       ) : (
-                        <span className={c.spotsLeft <= 3 ? "text-amber-300/90" : "text-emerald-300/90"}>
+                        <span className={c.spotsLeft <= 3 ? "text-dt-held-ink" : "text-dt-accent-ink"}>
                           {c.spotsLeft} {c.spotsLeft === 1 ? "spot" : "spots"} left
                         </span>
                       )}
@@ -273,7 +274,7 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
                       type="button"
                       onClick={() => book(c.id)}
                       disabled={bookingId !== null}
-                      className="inline-flex min-w-[3.5rem] shrink-0 items-center justify-center gap-1 self-center rounded-md border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-xs font-medium text-emerald-200 transition-colors hover:border-emerald-400/50 hover:bg-emerald-400/15 disabled:opacity-50"
+                      className="inline-flex h-10 min-w-[4.5rem] shrink-0 items-center justify-center gap-1 self-center rounded-full bg-dt-ink px-4 text-[13px] font-semibold text-dt-on-ink transition-[transform,background-color,opacity] duration-150 hover:bg-dt-ink/85 active:scale-[0.97] disabled:opacity-50 sm:h-9"
                     >
                       {bookingId === c.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Book"}
                     </button>
@@ -284,7 +285,7 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
             )}
           </>
         ) : (
-          <div className="flex min-h-[16rem] items-center justify-center text-sm text-zinc-500">
+          <div className="flex min-h-[16rem] items-center justify-center text-sm text-dt-ink-3">
             Pick a day to see classes
           </div>
         )}
