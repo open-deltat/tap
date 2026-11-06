@@ -18,6 +18,8 @@ import Meet from "@open-deltat/examples/meet";
 import { InlineStage } from "@open-deltat/examples/components/stage-mode";
 import { pageMetadata, SITE } from "@/lib/seo";
 import { WithWithout } from "@/components/landing/with-without";
+import { Walls } from "@/components/landing/walls";
+import { DeltatMark } from "@/components/deltat-mark";
 import { Faq } from "@/components/landing/faq";
 
 export const metadata = pageMetadata({
@@ -36,21 +38,22 @@ const PILOT_MAILTO = mailto(
 );
 const ENTERPRISE_MAILTO = mailto("Δt enterprise", "Company:\nWhat you want to run on Δt:\nSelf-hosted or managed:\n");
 
-// Every line here is a property the code enforces today; nothing is a roadmap item.
+// Every line here is a property the code enforces today; each links to the page that explains it.
 const SPECS = [
-  { k: "Double bookings", v: "Impossible", note: "The database refuses them" },
-  { k: "Holds", v: "Built in", note: "They let go on their own" },
-  { k: "Protocol", v: "TAP", note: "Works with any Postgres driver" },
-  { k: "Agents", v: "MCP server", note: "On the official registry" },
+  { k: "Double bookings", v: "Impossible", note: "The database says no", href: "/docs/guides/prevent-double-booking" },
+  { k: "Holds", v: "Built in", note: "They let go on their own", href: "/docs/guides/booking-holds" },
+  { k: "Protocol", v: "TAP", note: "Works with any Postgres driver", href: "/docs/protocol-and-engine" },
+  { k: "Agents", v: "MCP server", note: "Plug it into any agent", href: "/docs/guides/ai-agent-scheduling" },
 ] as const;
 
 // The four calls an agent makes, in the order it makes them: the command the agent types is the
-// title, the human word above it, one sentence under it.
+// title, the human word above it, one sentence under it. Each wears the colour its result has in
+// the examples: green is free, amber is held, ink is booked, the live dot is a change arriving.
 const VERBS = [
-  { title: "Find", tool: "find_slots", body: "See what is free right now, across every calendar you name." },
-  { title: "Hold", tool: "hold_slot", body: "Keep a slot for a few minutes while the agent asks. It lets go on its own." },
-  { title: "Book", tool: "commit_hold", body: "Turn the hold into a booking in one step. If the slot is gone, Δt answers with times that still work." },
-  { title: "Listen", tool: "LISTEN", body: "Get told the moment anything changes, on every screen." },
+  { title: "Find", tool: "find_slots", chip: "bg-dt-accent-soft text-dt-accent-ink", body: "See what is free right now, across every calendar you name." },
+  { title: "Hold", tool: "hold_slot", chip: "bg-dt-held-soft text-dt-held-ink", body: "Keep a slot for a few minutes while the agent asks. It lets go on its own." },
+  { title: "Book", tool: "commit_hold", chip: "bg-dt-ink text-dt-on-ink", body: "Turn the hold into a booking in one step. If the slot is gone, Δt answers with times that still work." },
+  { title: "Listen", tool: "LISTEN", chip: "border border-dt-line bg-dt-surface text-dt-ink", live: true, body: "Get told the moment anything changes, on every screen." },
 ] as const;
 
 type UseCase = { icon: LucideIcon; title: string; body: string; demo?: { href: string; label: string } };
@@ -169,8 +172,8 @@ export default function Home() {
               Real-Time Calendars for Agents
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-pretty text-[17px] leading-relaxed text-dt-ink-2 sm:text-lg">
-              Every app that connects to Google Calendar or Outlook keeps its own copy and checks back now and then.
-              Δt is one calendar that people and agents book on at the same moment. Nothing gets booked twice.
+              Δt is the calendar system that replaces the 40-year-old one, for good. Live, shared, and never
+              double-booked.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a href="#pricing" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-dt-ink px-7 text-[15px] font-semibold text-dt-on-ink transition-[background-color,transform] duration-150 hover:bg-dt-ink/85 active:scale-[0.98] sm:w-auto">
@@ -186,21 +189,35 @@ export default function Home() {
           <WithWithout />
         </section>
 
-        {/* Spec strip */}
+        {/* Spec strip: four facts, each a link to the page that proves it */}
         <section className="border-y border-dt-line bg-dt-surface/60">
-          <dl className="mx-auto grid max-w-6xl grid-cols-2 px-5 sm:px-6 lg:grid-cols-4">
+          <div className="mx-auto grid max-w-6xl grid-cols-2 px-5 sm:px-6 lg:grid-cols-4">
             {SPECS.map((s, i) => (
-              <div key={s.k} className={`py-7 sm:py-9 ${i % 2 === 1 ? "pl-5 sm:pl-8" : ""} ${i > 0 ? "lg:border-l lg:border-dt-line lg:pl-8" : ""} ${i >= 2 ? "border-t border-dt-line lg:border-t-0" : ""}`}>
-                <dt className="text-[12.5px] text-dt-ink-3">{s.k}</dt>
-                <dd className="mt-1.5 text-[1.35rem] font-semibold tracking-tight sm:text-2xl">{s.v}</dd>
-                <dd className="mt-1 text-[12.5px] text-dt-ink-3">{s.note}</dd>
+              <div
+                key={s.k}
+                className={`group relative flex items-center gap-3 py-7 transition-colors hover:bg-dt-sunken/60 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset has-[a:focus-visible]:ring-dt-ink sm:py-9 ${i % 2 === 1 ? "pl-5 sm:pl-8" : ""} ${i % 2 === 0 ? "pr-4" : "pr-1"} ${i > 0 ? "lg:border-l lg:border-dt-line lg:pl-8" : ""} ${i >= 2 ? "border-t border-dt-line lg:border-t-0" : ""} lg:pr-6`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12.5px] text-dt-ink-3">{s.k}</div>
+                  <a href={s.href} className="mt-1.5 block text-[1.35rem] font-semibold tracking-tight outline-none after:absolute after:inset-0 sm:text-2xl">
+                    {s.v}
+                  </a>
+                  <div className="mt-1 text-[12.5px] text-dt-ink-3">{s.note}</div>
+                </div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-dt-ink-3 transition-[color,transform] duration-150 group-hover:translate-x-0.5 group-hover:text-dt-ink" />
               </div>
             ))}
-          </dl>
+          </div>
         </section>
+
+        {/* The five walls, each shown today and with Δt */}
+        <Section eyebrow="Why agents fail on today’s calendars" title="Five things a normal calendar can’t do.">
+          <Walls />
+        </Section>
 
         {/* The question a calendar cannot answer, asked of the live example */}
         <Section
+          id="live"
           eyebrow="Live example"
           title="When are five people free for an hour?"
           lead="A calendar can only show you five lists. Δt works out when they overlap, every time you ask. This is the real thing, running on Δt right now. Try it."
@@ -218,7 +235,7 @@ export default function Home() {
           )}
         </Section>
 
-        {/* How it works: the four commands, shown as what the agent types */}
+        {/* How it works: the four commands, shown as what the agent types, in the colour of their result */}
         <Section eyebrow="How it works" title="An agent can do four things.">
           <dl className="grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
             {VERBS.map((v, i) => (
@@ -227,8 +244,8 @@ export default function Home() {
                   <div className="text-[12.5px] text-dt-ink-3">
                     <span className="font-mono">0{i + 1}</span> · {v.title}
                   </div>
-                  <code className="mt-2 inline-flex h-9 items-center gap-2 rounded-lg bg-dt-ink px-3 font-mono text-[13.5px] text-dt-on-ink">
-                    <span className="text-dt-on-ink/50">›</span>
+                  <code className={`mt-2 inline-flex h-9 items-center gap-2 rounded-lg px-3 font-mono text-[13.5px] ${v.chip}`}>
+                    {"live" in v && v.live ? <span className="dt-breathe h-1.5 w-1.5 rounded-full bg-dt-accent" /> : <span className="opacity-50">›</span>}
                     {v.tool}
                   </code>
                 </dt>
@@ -363,7 +380,7 @@ export default function Home() {
       <footer className="border-t border-dt-line">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-10 text-[13px] text-dt-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-6 w-6 place-items-center rounded-[7px] bg-dt-ink text-[11px] font-semibold text-dt-on-ink">Δt</span>
+            <DeltatMark size="sm" />
             <span>Real-Time Calendars for Agents</span>
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-2" aria-label="Footer">

@@ -1,146 +1,160 @@
-"use client";
+import type { ReactNode } from "react";
+import { ArrowDown, ArrowRight, Check, RefreshCw } from "lucide-react";
+import { AppleMark, GoogleCalendarMark, OutlookMark } from "./brand-icons";
+import { DeltatMark } from "@/components/deltat-mark";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { Check, RefreshCw, RotateCcw } from "lucide-react";
-
-const ROWS = ["14:00", "14:30", "15:00", "15:30"] as const;
-type Row = (typeof ROWS)[number];
-
-// The same moment on two calendars. On a calendar that is copied and checked now and then, both
-// bookings land in one slot. On Δt the second is refused with a time that still works, and takes
-// it. Nothing here is invented: the refusal with alternatives is what the kernel and the MCP
-// server answer today.
-type Frame = 0 | 1 | 2 | 3;
-const SCRIPT: readonly { at: number; frame: Frame }[] = [
-  { at: 1000, frame: 1 },
-  { at: 1900, frame: 2 },
-  { at: 2900, frame: 3 },
-];
-const END: Frame = 3;
+// The same Tuesday afternoon on two calendars, shown finished. Three agents booked at the same
+// moment. On a calendar that is copied and checked now and then, three things go wrong, each marked
+// in amber where it happens: the copy is minutes behind, two bookings share one slot, and a slot
+// an agent was still asking about was taken under it. On Δt the same three moments end in green:
+// live, the second booking refused and moved to a time that still worked, the third held while its
+// agent asks. The Δt card wears the logo's own material (dark tile, emerald ring, glow) so old and
+// new are told apart before a word is read. Static on purpose, and nothing under it explains it.
+const OLD_WORLD = [
+  { name: "Google Calendar", Mark: GoogleCalendarMark },
+  { name: "Apple Calendar", Mark: AppleMark },
+  { name: "Outlook", Mark: OutlookMark },
+] as const;
 
 export function WithWithout() {
-  const [frame, setFrame] = useState<Frame>(0);
-  const [run, setRun] = useState(0);
-
-  useEffect(() => {
-    // Under reduced motion the scene shows its end state at once; otherwise it plays from the start.
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const steps: readonly { at: number; frame: Frame }[] = reduce ? [{ at: 0, frame: END }] : [{ at: 0, frame: 0 }, ...SCRIPT];
-    const timers = steps.map((s) => window.setTimeout(() => setFrame(s.frame), s.at));
-    return () => timers.forEach(clearTimeout);
-  }, [run]);
-
   return (
-    <div className="mx-auto mt-14 max-w-4xl sm:mt-20">
-      <div className="grid gap-3 md:grid-cols-2">
-        <Calendar
-          title="Your calendar today"
-          status={
-            <>
-              <RefreshCw className="h-3 w-3" />
-              updated 4 min ago
-            </>
-          }
-          bookings={{ "14:30": frame >= 2 ? ["Agent A", "Agent B"] : frame >= 1 ? ["Agent A"] : [] }}
-          note={frame >= 2 ? "Both bookings went in. Two people, one slot." : ""}
-        />
-        <Calendar
-          title="With Δt"
-          status={
-            <>
-              <span className="dt-breathe h-1.5 w-1.5 rounded-full bg-dt-accent" />
-              live
-            </>
-          }
-          bookings={{ "14:30": frame >= 1 ? ["Agent A"] : [], "15:00": frame >= 3 ? ["Agent B"] : [] }}
-          offered={frame === 2 ? "15:00" : undefined}
-          note={frame >= 3 ? "Both got a time. Nobody got the same one." : frame >= 2 ? "Agent B is told: 14:30 is taken, 15:00 is free." : ""}
-          done={frame >= 3}
-          highlight
-        />
+    <div className="relative mx-auto mt-14 max-w-4xl sm:mt-20">
+      <div className="grid gap-y-4 md:grid-cols-2 md:gap-x-10">
+        <div>
+          <div className="mb-3 flex h-8 flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[12.5px] text-dt-ink-2">
+            {OLD_WORLD.map(({ name, Mark }) => (
+              <span key={name} className="inline-flex items-center gap-1.5">
+                <Mark className="h-3.5 w-3.5" />
+                {name}
+              </span>
+            ))}
+          </div>
+          <OldCalendar />
+        </div>
+
+        {/* From this to this: an arrow down between the stacked cards on a phone. */}
+        <div className="flex justify-center md:hidden" aria-hidden>
+          <span className="grid h-9 w-9 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface">
+            <ArrowDown className="h-4 w-4" />
+          </span>
+        </div>
+
+        <div>
+          <div className="mb-3 flex h-8 items-center px-1">
+            <DeltatMark />
+          </div>
+          <NewCalendar />
+        </div>
       </div>
 
-      <div className="mt-4 flex flex-col items-center justify-center gap-x-5 gap-y-1 text-center text-[13px] text-dt-ink-3 sm:flex-row">
-        <span>Agent A, on a phone call, and Agent B, in a web chat, both book Tuesday 14:30 at the same moment.</span>
-        <button
-          type="button"
-          onClick={() => setRun((n) => n + 1)}
-          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 font-medium text-dt-ink transition-colors hover:text-dt-accent-ink sm:min-h-0"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          Replay
-        </button>
+      {/* The same arrow, between the cards, when they sit side by side. */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 md:block" aria-hidden>
+        <span className="grid h-9 w-9 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface">
+          <ArrowRight className="h-4 w-4" />
+        </span>
       </div>
     </div>
   );
 }
 
-function Calendar({
-  title,
-  status,
-  bookings,
-  offered,
-  note,
-  done,
-  highlight,
-}: {
-  title: string;
-  status: ReactNode;
-  bookings: Partial<Record<Row, readonly string[]>>;
-  /** A row Δt has just offered to the refused agent, drawn as a dashed outline until it is taken. */
-  offered?: Row;
-  note: string;
-  /** The scene has reached its good end on this calendar. */
-  done?: boolean;
-  highlight?: boolean;
-}) {
+function OldCalendar() {
   return (
-    <div className={`rounded-3xl border bg-dt-surface p-5 shadow-dt-float sm:p-6 ${highlight ? "border-dt-accent/40" : "border-dt-line"}`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-[14px] font-semibold">{title}</div>
-        <span className="inline-flex items-center gap-1.5 text-[12px] text-dt-ink-3">{status}</span>
-      </div>
-
-      <div className="mt-4 text-[12px] text-dt-ink-3">Tuesday</div>
-      <div className="mt-1 divide-y divide-dt-line border-y border-dt-line">
-        {ROWS.map((t) => {
-          const who = bookings[t] ?? [];
-          const clash = who.length > 1;
-          return (
-            // Fixed row height: bookings arrive without the calendar growing.
-            <div key={t} className="flex min-h-[48px] items-center gap-3 py-1.5">
-              <span className="w-11 shrink-0 font-mono text-[12px] tabular-nums text-dt-ink-3">{t}</span>
-              <div className="flex min-w-0 flex-1 gap-1.5">
-                {who.map((name, k) => (
-                  // The second booking into one slot lands with the amber ping the examples use for
-                  // "someone else just acted": the moment the old calendar goes wrong.
-                  <span
-                    key={name}
-                    className={`dt-rise inline-flex h-8 flex-1 items-center justify-center rounded-lg text-[12.5px] font-medium ${
-                      clash ? `border border-dt-held/40 bg-dt-held-soft text-dt-held-ink ${k === 1 ? "dt-ping" : ""}` : "bg-dt-ink text-dt-on-ink"
-                    }`}
-                  >
-                    {name}
-                  </span>
-                ))}
-                {offered === t && (
-                  <span className="dt-rise inline-flex h-8 flex-1 items-center justify-center rounded-lg border border-dashed border-dt-accent text-[12.5px] text-dt-accent-ink">
-                    free for Agent B
-                  </span>
-                )}
-              </div>
-              {clash && <span className="dt-rise shrink-0 text-[11.5px] font-medium text-dt-held-ink">double booked</span>}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Fixed line height, so the sentence fades in without moving the card. The Δt side ends on a
-          tick: the settled end of the scene, the same mark the examples use when a booking lands. */}
-      <p className={`mt-4 flex min-h-5 items-center gap-1.5 text-[13.5px] leading-5 text-dt-ink-2 transition-opacity duration-300 ${note ? "opacity-100" : "opacity-0"}`}>
-        {done && <Check className="dt-rise h-4 w-4 shrink-0 text-dt-accent" strokeWidth={2.5} />}
-        {note || " "}
-      </p>
+    <div className="rounded-3xl border border-dt-line bg-dt-surface p-5 shadow-dt-float sm:p-6">
+      <Head
+        day="Tuesday"
+        status={
+          <span className="inline-flex items-center gap-1.5 text-dt-held-ink">
+            <RefreshCw className="h-3 w-3" />4 min behind
+          </span>
+        }
+      />
+      <Rows>
+        <Row t="14:30" tag="double booked">
+          <OldChip tone="clash">Agent A</OldChip>
+          <OldChip tone="clash">Agent B</OldChip>
+        </Row>
+        <Row t="15:00" tag="no hold">
+          <OldChip tone="ghost">Agent C · asking…</OldChip>
+          <OldChip tone="clash">Someone else</OldChip>
+        </Row>
+        <Row t="15:30" />
+      </Rows>
     </div>
   );
+}
+
+function NewCalendar() {
+  return (
+    <div className="relative overflow-hidden rounded-3xl border border-[#34d399]/60 bg-[#0a0f0d] p-5 text-white shadow-dt-float sm:p-6">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_112%,rgba(52,211,153,0.38),transparent)]" />
+      <div className="relative">
+        <Head
+          day="Tuesday"
+          status={
+            <span className="inline-flex items-center gap-1.5 text-[#6ee7b7]">
+              <span className="dt-breathe h-1.5 w-1.5 rounded-full bg-[#34d399]" />
+              live
+            </span>
+          }
+          dark
+        />
+        <Rows dark>
+          <Row t="14:30" dark>
+            <NewChip tone="booked">Agent A</NewChip>
+            <NewChip tone="moved">Agent B → 15:00</NewChip>
+          </Row>
+          <Row t="15:00" dark>
+            <NewChip tone="booked">
+              Agent B
+              <Check className="ml-1.5 h-3.5 w-3.5 text-[#34d399]" strokeWidth={2.5} />
+            </NewChip>
+          </Row>
+          <Row t="15:30" dark>
+            <NewChip tone="booked">Agent C</NewChip>
+            <NewChip tone="held">held · 4:59</NewChip>
+          </Row>
+        </Rows>
+      </div>
+    </div>
+  );
+}
+
+function Head({ day, status, dark }: { day: string; status: ReactNode; dark?: boolean }) {
+  return (
+    <div className={`flex items-center justify-between gap-3 text-[12.5px] ${dark ? "text-white/60" : "text-dt-ink-3"}`}>
+      <span className={`font-medium ${dark ? "text-white/80" : "text-dt-ink-2"}`}>{day}</span>
+      {status}
+    </div>
+  );
+}
+
+function Rows({ dark, children }: { dark?: boolean; children: ReactNode }) {
+  return <div className={`mt-2 divide-y border-y ${dark ? "divide-white/10 border-white/10" : "divide-dt-line border-dt-line"}`}>{children}</div>;
+}
+
+function Row({ t, tag, dark, children }: { t: string; tag?: string; dark?: boolean; children?: ReactNode }) {
+  return (
+    // Fixed row height; the tag wraps under the chips only when a narrow card leaves it no room.
+    <div className="flex min-h-[48px] flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
+      <span className={`w-11 shrink-0 font-mono text-[12px] tabular-nums ${dark ? "text-white/45" : "text-dt-ink-3"}`}>{t}</span>
+      <div className="flex min-w-0 flex-auto gap-1.5">{children}</div>
+      {tag && <span className="ml-auto shrink-0 text-[11.5px] font-medium text-dt-held-ink">{tag}</span>}
+    </div>
+  );
+}
+
+// On the old calendar: amber for a booking that collides, dashed grey for an agent still asking.
+function OldChip({ tone, children }: { tone: "clash" | "ghost"; children: ReactNode }) {
+  const look = tone === "clash" ? "border border-dt-held/40 bg-dt-held-soft text-dt-held-ink" : "border border-dashed border-dt-line-strong text-dt-ink-3";
+  return <span className={`inline-flex h-8 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-2 text-[12.5px] font-medium ${look}`}>{children}</span>;
+}
+
+// On Δt: white for a booking that stands, dashed for the one that was sent on, green for a hold.
+function NewChip({ tone, children }: { tone: "booked" | "moved" | "held"; children: ReactNode }) {
+  const look = {
+    booked: "flex-1 bg-white text-[#0a0f0d]",
+    moved: "flex-1 border border-dashed border-white/30 text-white/60",
+    held: "shrink-0 bg-[#34d399]/15 text-[#6ee7b7]",
+  }[tone];
+  return <span className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2.5 text-[12.5px] font-medium ${look}`}>{children}</span>;
 }

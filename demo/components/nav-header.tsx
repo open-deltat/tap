@@ -7,6 +7,7 @@ import { useTheme } from "next-themes";
 import { Sun, Moon, Github, Menu, X } from "lucide-react";
 import type { DisplayProfile } from "@open-deltat/examples/lib/auth-session";
 import { ProfileAvatar } from "@/components/profile-avatar";
+import { DeltatMark } from "@/components/deltat-mark";
 import { cn } from "@/lib/utils";
 import { SITE } from "@/lib/seo";
 
@@ -41,7 +42,7 @@ export function NavHeader({
     <header className="relative z-40 shrink-0 border-b border-dt-line bg-dt-canvas/80 backdrop-blur-xl backdrop-saturate-150">
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">
         <Link href="/" aria-label="Δt home" onClick={() => setOpen(false)} className="relative flex select-none items-center after:absolute after:-inset-1.5">
-          <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-dt-ink text-[14px] font-semibold tracking-tight text-dt-on-ink">Δt</span>
+          <DeltatMark />
         </Link>
 
         <nav className="hidden items-center gap-1 sm:flex" aria-label="Main">
