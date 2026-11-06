@@ -41,7 +41,8 @@ export interface PassDeps {
  * The one answer for a pass that is wrong, expired, spent, revoked or someone else's: which one is
  * not said. Not "any more": a wrong string never worked, and the wording must not tell it apart.
  */
-export const PASS_NOT_VALID = "That pass is not valid. Ask the person who sent it for a new one.";
+export const PASS_NOT_VALID =
+  "That pass is not valid. Ask the person who sent it for a new one. If you already booked with it, that booking stands.";
 export const PASS_PREFIX = "dtp_";
 /** 256 bits; base64url of 32 bytes is 43 characters, so a pass is 47 with its prefix. */
 const PASS_BYTES = 32;
@@ -115,7 +116,10 @@ export interface PassView {
   readonly to: number;
   readonly lengthsMinutes: readonly number[];
   readonly uses: number;
+  /** Bookings it can still make: 0 once it is spent, revoked or expired. */
   readonly usesLeft: number;
+  /** Bookings it allowed that were never made; for a revoked or expired pass, what it left behind. */
+  readonly bookingsUnused: number;
   readonly status: PassStatus;
   readonly createdAt: number;
   readonly expiresAt: number;
@@ -146,7 +150,18 @@ export interface CreatePassInput {
   label?: string | null;
 }
 
+/** A calendar as its owner needs it to mint a pass or read its requests. */
+export interface OwnedCalendar {
+  readonly id: string;
+  readonly name: string;
+  readonly timezone: string;
+  readonly slotMinutes: number;
+  readonly takesMeetingRequests: boolean;
+}
+
 export interface BookingPassService {
+  /** The calendars this principal owns, newest first; nobody else's, ever. */
+  ownedCalendars(owner: string): OwnedCalendar[];
   /** The pass is in this result and nowhere else, ever. */
   create(input: CreatePassInput): Outcome<{ token: string; pass: PassView }>;
   /** Passes on one calendar the owner owns, or on all of them; newest first. */
@@ -189,25 +204,31 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
   // through", it has stopped working, and its owner may revoke it.
   const spendingHere = new Set<string>();
 
-  const viewOf = (pass: BookingPass, record: BookableRecord | undefined, at: number): PassView => ({
-    id: pass.id,
-    calendar: calendarOf(pass.calendarId, record),
-    label: pass.label,
-    from: pass.from,
-    to: pass.to,
-    lengthsMinutes: pass.lengthsMinutes,
-    uses: pass.uses,
-    usesLeft: usesLeft(pass),
-    status: passStatus(pass, at),
-    createdAt: pass.createdAt,
-    expiresAt: pass.expiresAt,
-    claimedBy: pass.claim ? (pass.claim.name ?? pass.claim.principal) : null,
-    bookings: pass.holds.flatMap((h) =>
+  const viewOf = (pass: BookingPass, record: BookableRecord | undefined, at: number): PassView => {
+    const status = passStatus(pass, at);
+    const bookings = pass.holds.flatMap((h) =>
       h.outcome.status === "booked"
         ? [{ bookingId: h.outcome.bookingId, start: h.start, end: h.end, bookedBy: h.outcome.bookedBy, note: h.outcome.note }]
         : []
-    ),
-  });
+    );
+    return {
+      id: pass.id,
+      calendar: calendarOf(pass.calendarId, record),
+      label: pass.label,
+      from: pass.from,
+      to: pass.to,
+      lengthsMinutes: pass.lengthsMinutes,
+      uses: pass.uses,
+      // What can still be used: nothing once the pass is over, even if its state still counts uses.
+      usesLeft: status === "active" || status === "spending" ? usesLeft(pass) : 0,
+      bookingsUnused: pass.uses - bookings.length,
+      status,
+      createdAt: pass.createdAt,
+      expiresAt: pass.expiresAt,
+      claimedBy: pass.claim ? (pass.claim.name ?? pass.claim.principal) : null,
+      bookings,
+    };
+  };
 
   const scopeOf = (pass: BookingPass, record: BookableRecord): PassScope => ({
     calendar: calendarOf(pass.calendarId, record),
@@ -309,6 +330,17 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
   };
 
   return {
+    ownedCalendars(owner) {
+      // listOwned matches the stored owner exactly, the same test authorizeOwner applies.
+      return deps.registry.listOwned(owner).map((record) => ({
+        id: record.id,
+        name: record.name,
+        timezone: record.timezone,
+        slotMinutes: record.slotMinutes,
+        takesMeetingRequests: record.bookingMode === "request",
+      }));
+    },
+
     create(input) {
       const record = deps.registry.authorizeOwner(input.calendarId, input.owner);
       if (!record) return fail("You do not own this calendar.");

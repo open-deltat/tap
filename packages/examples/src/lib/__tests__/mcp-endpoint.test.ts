@@ -125,6 +125,7 @@ describe("asking for and answering a meeting through MCP", () => {
       "hold_with_pass",
       "list_booking_passes",
       "list_meeting_requests",
+      "list_my_calendars",
       "my_meeting_requests",
       "release_with_pass",
       "request_meeting",
@@ -153,7 +154,10 @@ describe("asking for and answering a meeting through MCP", () => {
     expect(meetings.state.holds).toEqual([]);
 
     const inbox = await call(owner, "list_meeting_requests", { calendar_id: "cal1" });
-    expect(inbox.body.requests).toEqual([expect.objectContaining({ requested_by: annaContact, note: "Coffee?" })]);
+    // The old fields stay (the tool is live); the grouped key marks what the requester wrote.
+    expect(inbox.body.requests).toEqual([
+      expect.objectContaining({ requested_by: annaContact, note: "Coffee?", written_by_requester: { name: "Anna Example", note: "Coffee?" } }),
+    ]);
 
     // Anna cannot answer her own request on someone else's calendar, nor read its inbox.
     expect((await call(anna, "approve_meeting_request", { request_id: asked.body.request_id })).isError).toBe(true);
@@ -221,9 +225,10 @@ describe("booking directly with a pass through MCP", () => {
         status: "spent",
         bookings_left: 0,
         claimed_by: "Anna Example",
-        bookings: [expect.objectContaining({ booked_by: "Anna Example", note: "Intro" })],
+        bookings: [expect.objectContaining({ written_by_booker: { name: "Anna Example", note: "Intro" } })],
       }),
     ]);
+    expect(JSON.stringify(listed.body)).not.toContain('"booked_by"'); // only the grouped, marked shape
 
     const again = await call(anna, "find_times_with_pass", { pass: token });
     later.push(again.body);
@@ -266,5 +271,19 @@ describe("booking directly with a pass through MCP", () => {
     expect(meetings.state.placed.map((p) => p.id)).toEqual([holdId]);
     const listed = await call(owner, "list_booking_passes", { calendar_id: "cal1" });
     expect(listed.body.passes).toEqual([expect.objectContaining({ pass_id: passId, status: "active", bookings_left: 1, claimed_by: "Anna Example" })]);
+
+    // Revoked, it can book nothing more, and says the one booking it allowed went unused.
+    const revoked = await call(owner, "revoke_booking_pass", { pass_id: passId });
+    expect(revoked.body).toMatchObject({ status: "revoked", bookings_left: 0, bookings_unused: 1 });
+  });
+
+  test("an owner finds their calendar ids with list_my_calendars; another account sees none of them", async () => {
+    const { deps } = endpoint();
+    const owner = await connect(deps, "owner");
+    const stranger = await connect(deps, "stranger");
+    expect((await call(owner, "list_my_calendars", {})).body).toEqual({
+      calendars: [{ calendar_id: "cal1", name: "Simon's week", timezone: "Europe/Berlin", slot_minutes: 30, takes_meeting_requests: true }],
+    });
+    expect((await call(stranger, "list_my_calendars", {})).body).toEqual({ calendars: [] });
   });
 });

@@ -79,6 +79,27 @@ describe("minting a pass", () => {
     expect(must(await passes.revoke({ owner: OWNER, passId: pass.id })).status).toBe("revoked");
     expect((await passes.revoke({ owner: OWNER, passId: pass.id })).ok).toBe(false);
   });
+
+  test("a revoked or expired pass shows no bookings left, but says how many went unused", async () => {
+    const { mint, passes, clock } = setup();
+    const { token, pass } = mint({ uses: 3 });
+    const held = must(await passes.hold({ token, caller: GUEST, start: T }));
+    must(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina" }));
+    expect(must(await passes.revoke({ owner: OWNER, passId: pass.id }))).toMatchObject({ status: "revoked", usesLeft: 0, bookingsUnused: 2 });
+
+    const lapsed = mint({ uses: 2, expiresInMinutes: 1 });
+    clock.now += MIN;
+    expect(must(passes.list({ owner: OWNER })).find((p) => p.id === lapsed.pass.id)).toMatchObject({ status: "expired", usesLeft: 0, bookingsUnused: 2 });
+  });
+
+  test("an owner sees only their own calendars, so a stranger gets nothing", () => {
+    const { passes } = setup();
+    expect(passes.ownedCalendars(OWNER)).toEqual([
+      { id: "cal1", name: "Simon's week", timezone: "Europe/Berlin", slotMinutes: 30, takesMeetingRequests: true },
+    ]);
+    expect(passes.ownedCalendars(BEN)).toEqual([{ id: "cal2", name: "Ben's week", timezone: "UTC", slotMinutes: 60, takesMeetingRequests: false }]);
+    expect(passes.ownedCalendars(STRANGER)).toEqual([]);
+  });
 });
 
 describe("booking with a pass", () => {
