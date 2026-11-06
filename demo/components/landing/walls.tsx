@@ -137,10 +137,11 @@ function Rows({ children }: { children: ReactNode }) {
 
 function Row({ t, tag, children }: { t: string; tag?: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-[46px] items-center gap-2.5 py-1.5">
+    // The tag wraps under the chips when the pane is too narrow for all three side by side.
+    <div className="flex min-h-[46px] flex-wrap items-center gap-x-2.5 gap-y-1 py-1.5">
       <span className="w-10 shrink-0 font-mono text-[11.5px] tabular-nums text-dt-ink-3">{t}</span>
       <div className="flex min-w-0 flex-1 gap-1.5">{children}</div>
-      {tag && <span className="shrink-0 text-[11px] font-medium text-dt-held-ink">{tag}</span>}
+      {tag && <span className="ml-auto shrink-0 text-[11px] font-medium text-dt-held-ink">{tag}</span>}
     </div>
   );
 }
