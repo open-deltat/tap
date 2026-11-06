@@ -6,9 +6,9 @@ import { RotateCcw } from "lucide-react";
 const SLOTS = ["13:30", "14:00", "14:30", "15:00", "15:30", "16:00"] as const;
 const HOLD_SECONDS = 5 * 60;
 
-// The race every agent loses on a copied calendar, played as Δt answers it. Frame by frame: both
-// agents read the same free slot, A holds it, B's identical hold is refused and the refusal already
-// carries two times that still work. Every line is what the kernel and the MCP server answer today.
+// The race every agent loses on a copied calendar, played as Δt answers it: A holds the slot, B's
+// identical hold a moment later is refused and already carries two times that still work. Every
+// line is what the kernel and the MCP server answer today.
 type Frame = 0 | 1 | 2 | 3 | 4;
 const SCRIPT: readonly { at: number; frame: Frame }[] = [
   { at: 900, frame: 1 },
@@ -47,17 +47,14 @@ export function RaceModule() {
   const refused = frame >= 4;
 
   return (
-    <div className="relative mx-auto mt-14 max-w-4xl sm:mt-20">
-      <div className="rounded-[28px] border border-dt-line bg-dt-surface p-3 shadow-dt-float sm:p-4">
-        <div className="flex items-center justify-between px-2 pb-3 pt-1 sm:px-3">
-          <div className="flex items-center gap-2 text-[13px] font-medium">
-            <span className="dt-breathe h-2 w-2 rounded-full bg-dt-accent" />
-            Dr. Chen · Tuesday
-          </div>
-          <span className="font-mono text-[11.5px] text-dt-ink-3">one calendar · live</span>
+    <div className="mx-auto mt-14 max-w-3xl sm:mt-20">
+      <div className="rounded-[28px] border border-dt-line bg-dt-surface p-4 shadow-dt-float sm:p-5">
+        <div className="flex items-center gap-2 px-1 pb-4 text-[13px] font-medium">
+          <span className="dt-breathe h-2 w-2 rounded-full bg-dt-accent" />
+          Dr. Chen · Tuesday
         </div>
 
-        <div className="grid grid-cols-3 gap-1.5 px-2 sm:grid-cols-6 sm:px-3">
+        <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
           {SLOTS.map((t) => {
             const isHeld = t === "14:30" && held;
             const taken = t === "13:30";
@@ -66,7 +63,7 @@ export function RaceModule() {
               <div
                 key={t}
                 className={[
-                  "relative rounded-xl border py-3 text-center text-[13.5px] tabular-nums transition-[background-color,border-color,color,box-shadow] duration-300",
+                  "relative rounded-xl border py-3 text-center text-[13.5px] tabular-nums transition-[background-color,border-color,color] duration-300",
                   isHeld
                     ? "border-dt-ink bg-dt-ink font-semibold text-dt-on-ink"
                     : taken
@@ -78,7 +75,7 @@ export function RaceModule() {
                 {t}
                 {isHeld && (
                   <span
-                    key={`${run}-${frame >= 4 ? "ping" : "dot"}`}
+                    key={`${run}-${refused ? "ping" : "dot"}`}
                     className={`absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-dt-surface bg-dt-accent ${refused ? "dt-ping" : ""}`}
                   />
                 )}
@@ -87,60 +84,38 @@ export function RaceModule() {
           })}
         </div>
 
-        <div className="mx-2 mt-4 grid divide-y divide-dt-line border-y border-dt-line sm:mx-3 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-          <AgentCard
-            who="Agent A"
-            via="voice call"
-            lines={[
-              frame >= 0 ? "read · 14:30 free" : "",
-              frame >= 1 ? "→ hold_slot 14:30" : "",
-              frame >= 2 ? `← held · expires in ${mmss(left)}` : "",
-            ]}
-            tone="ok"
-          />
-          <AgentCard
-            who="Agent B"
-            via="web chat"
-            lines={[
-              frame >= 0 ? "read · 14:30 free" : "",
-              frame >= 3 ? "→ hold_slot 14:30" : "",
-              frame >= 4 ? "← CONFLICT · offers 15:00, 15:30" : "",
-            ]}
-            tone="refused"
-          />
+        <div className="mt-5 grid divide-y divide-dt-line border-t border-dt-line sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+          <Agent who="Agent A" via="on a phone call" ask={frame >= 1 ? "hold 14:30" : ""} reply={frame >= 2 ? `held · ${mmss(left)} left` : ""} tone="ok" />
+          <Agent who="Agent B" via="in a web chat" ask={frame >= 3 ? "hold 14:30" : ""} reply={frame >= 4 ? "taken · try 15:00 or 15:30" : ""} tone="refused" />
         </div>
+      </div>
 
-        <div className="mt-4 flex flex-col items-center justify-between gap-3 px-2 pb-1 sm:flex-row sm:px-3">
-          <p className="text-pretty text-center text-[13px] text-dt-ink-3 sm:text-left">
-            Two agents, one slot, the same second. The second answer is a refusal that already carries times that still work.
-          </p>
-          <button
-            type="button"
-            onClick={() => setRun((n) => n + 1)}
-            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-dt-line-strong bg-dt-surface px-4 text-[13px] font-medium text-dt-ink transition-colors hover:bg-dt-sunken sm:h-9"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Run it again
-          </button>
-        </div>
+      <div className="mt-4 flex flex-col items-center justify-center gap-x-5 gap-y-1 text-center text-[13px] text-dt-ink-3 sm:flex-row">
+        <span>Two agents want the same slot at the same moment. One gets it. The other gets two times that still work.</span>
+        <button
+          type="button"
+          onClick={() => setRun((n) => n + 1)}
+          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 font-medium text-dt-ink transition-colors hover:text-dt-accent-ink sm:min-h-0"
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Replay
+        </button>
       </div>
     </div>
   );
 }
 
-function AgentCard({ who, via, lines, tone }: { who: string; via: string; lines: readonly string[]; tone: "ok" | "refused" }) {
-  const [read, ask, reply] = lines;
+function Agent({ who, via, ask, reply, tone }: { who: string; via: string; ask: string; reply: string; tone: "ok" | "refused" }) {
   return (
-    <div className="py-4 sm:px-4 sm:first:pl-0 sm:last:pr-0">
-      <div className="flex items-center justify-between text-[13px]">
+    <div className="py-4 sm:px-5 sm:first:pl-1 sm:last:pr-1">
+      <div className="text-[13px]">
         <span className="font-semibold">{who}</span>
-        <span className="text-dt-ink-3">{via}</span>
+        <span className="text-dt-ink-3"> {via}</span>
       </div>
-      {/* Three fixed lines: the card never changes height as the race plays. */}
-      <div className="mt-3 space-y-1 font-mono text-[12.5px]">
-        <Line text={read} className="text-dt-ink-3" />
-        <Line text={ask} className="text-dt-ink-2" />
-        <Line text={reply} className={tone === "ok" ? "text-dt-accent-ink" : "text-dt-held-ink"} />
+      {/* Two fixed lines, so the card never changes height as the race plays. */}
+      <div className="mt-2 space-y-1 font-mono text-[12.5px]">
+        <Line text={ask ? `→ ${ask}` : ""} className="text-dt-ink-2" />
+        <Line text={reply ? `← ${reply}` : ""} className={tone === "ok" ? "text-dt-accent-ink" : "text-dt-held-ink"} />
       </div>
     </div>
   );
