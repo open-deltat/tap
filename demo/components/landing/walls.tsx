@@ -35,32 +35,6 @@ const WALLS: readonly Wall[] = [
     ),
   },
   {
-    title: "It can’t stop two people booking the same slot.",
-    link: { label: "How Δt refuses", href: "/docs/guides/prevent-double-booking" },
-    today: (
-      <Rows>
-        <Row t="14:30" tag="double booked">
-          <Chip tone="clash">Agent A</Chip>
-          <Chip tone="clash">Agent B</Chip>
-        </Row>
-      </Rows>
-    ),
-    deltat: (
-      <Rows>
-        <Row t="14:30">
-          <Chip tone="booked">Agent A</Chip>
-          <Chip tone="ghost">Agent B → 15:00</Chip>
-        </Row>
-        <Row t="15:00">
-          <Chip tone="booked">
-            Agent B
-            <Tick />
-          </Chip>
-        </Row>
-      </Rows>
-    ),
-  },
-  {
     title: "Every app sees an outdated calendar.",
     link: { label: "How live updates work", href: "/docs/guides/real-time-scheduling" },
     today: (
@@ -89,6 +63,32 @@ const WALLS: readonly Wall[] = [
     link: { label: "All or nothing, in one step", href: "/docs/guides/capacity" },
     today: <Machines booked={5} failedAt={5} />,
     deltat: <Machines booked={8} />,
+  },
+  {
+    title: "It can’t stop a double booking.",
+    link: { label: "How Δt refuses", href: "/docs/guides/prevent-double-booking" },
+    today: (
+      <Rows>
+        <Row t="14:30" tag="double booked">
+          <Chip tone="clash">Agent A</Chip>
+          <Chip tone="clash">Agent B</Chip>
+        </Row>
+      </Rows>
+    ),
+    deltat: (
+      <Rows>
+        <Row t="14:30">
+          <Chip tone="booked">Agent A</Chip>
+          <Chip tone="ghost">Agent B → 15:00</Chip>
+        </Row>
+        <Row t="15:00">
+          <Chip tone="booked">
+            Agent B
+            <Tick />
+          </Chip>
+        </Row>
+      </Rows>
+    ),
   },
 ];
 
