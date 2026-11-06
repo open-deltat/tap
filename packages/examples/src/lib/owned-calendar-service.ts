@@ -3,7 +3,8 @@ import type { BookableRecord, BookableRegistry, BookingMode } from "./public-boo
 import type { Display } from "./calendar-displays";
 import type { HeldSpan } from "./schedule-diff";
 import { MAX_PUBLIC_BOOKABLES, normalizeBookableName } from "./public-bookables";
-import { dateRangeFromToday, type WeekHours } from "../examples/builder/schedule";
+import { dateRangeInZone, type WeekHours } from "../examples/builder/schedule";
+import { calendarWrites } from "./calendar-writes";
 import {
   HORIZON_DAYS,
   ALLOWED_SLOT_MINUTES,
@@ -25,6 +26,34 @@ const ALLOWED_CURRENCIES = ["EUR", "USD", "GBP", "CHF", "SEK", "NOK", "DKK", "PL
 export interface OwnedDeps {
   dt: DeltaT;
   registry: BookableRegistry;
+  /** The wall clock, injected so tests can stand on any day. */
+  now?: () => number;
+}
+
+type WeekRanges = readonly { dow: number; startTime: string; endTime: string }[];
+
+const hasHours = (week: WeekHours): boolean => Object.values(week).some((r) => r && r.length > 0);
+
+/**
+ * The open-hour rules a weekly pattern means, from the calendar's today through HORIZON_DAYS ahead.
+ * The one expansion both a save and the daily roll-forward use, so they cannot disagree on what a
+ * pattern means. Throws if the recurrence cannot be expanded.
+ */
+function openHourSegments(ranges: WeekRanges, timeZone: string, now: number): { start: number; end: number }[] {
+  const { fromDate, toDate } = dateRangeInZone(now, timeZone, HORIZON_DAYS);
+  return ranges
+    .flatMap((range) =>
+      expandRecurrence({
+        daysOfWeek: [range.dow],
+        startTime: range.startTime,
+        endTime: range.endTime,
+        fromDate,
+        toDate,
+        timeZone,
+        blocking: false,
+      })
+    )
+    .map((s) => ({ start: s.start, end: s.end }));
 }
 
 export interface CalendarView {
@@ -122,41 +151,84 @@ export async function saveAvailability(
 
   // Same guarded gate the create path uses: bounded range count, HH:MM times. Empty hours is legal
   // (it means "no availability yet"): an empty week skips validation and clears the rules.
-  const hasHours = Object.values(input.week).some((r) => r && r.length > 0);
-  const ranges = hasHours ? validateWeek(input.week) : ({ ok: true, value: [] } as const);
+  const ranges = hasHours(input.week) ? validateWeek(input.week) : ({ ok: true, value: [] } as const);
   if (!ranges.ok) return ranges;
 
-  const { fromDate, toDate } = dateRangeFromToday(HORIZON_DAYS);
-  let segments: { start: number; end: number }[];
+  return calendarWrites(input.id, async (): Promise<Outcome<BookableRecord>> => {
+    const segments = expandOrFail(ranges.value, record.timezone, (deps.now ?? Date.now)());
+    if (!segments.ok) return segments;
+
+    await deps.dt.rules.replaceOpenHours(input.id, segments.value);
+
+    const updated = deps.registry.updateOwned(input.id, input.owner, {
+      slotMinutes: input.slotMinutes,
+      priceCents: input.priceCents,
+      currency,
+      week: input.week,
+    });
+    if (!updated) return { ok: false, error: "You do not own this calendar." };
+    return { ok: true, value: updated };
+  });
+}
+
+function expandOrFail(ranges: WeekRanges, timeZone: string, now: number): Outcome<{ start: number; end: number }[]> {
   try {
-    segments = ranges.value
-      .flatMap((range) =>
-        expandRecurrence({
-          daysOfWeek: [range.dow],
-          startTime: range.startTime,
-          endTime: range.endTime,
-          fromDate,
-          toDate,
-          timeZone: record.timezone,
-          blocking: false,
-        })
-      )
-      .map((s) => ({ start: s.start, end: s.end }));
+    return { ok: true, value: openHourSegments(ranges, timeZone, now) };
   } catch (err) {
-    console.error("saveAvailability expansion failed:", err);
+    console.error("open hours expansion failed:", err);
     return { ok: false, error: "Those hours could not be turned into a schedule. Check the times." };
   }
+}
 
-  await deps.dt.rules.replaceOpenHours(input.id, segments);
+export interface RollReport {
+  /** Calendars whose rules now run HORIZON_DAYS from today. */
+  rolled: string[];
+  /** Calendars left as they were, with why. Their existing rules still stand. */
+  failed: { id: string; error: string }[];
+}
 
-  const updated = deps.registry.updateOwned(input.id, input.owner, {
-    slotMinutes: input.slotMinutes,
-    priceCents: input.priceCents,
-    currency,
-    week: input.week,
-  });
-  if (!updated) return { ok: false, error: "You do not own this calendar." };
-  return { ok: true, value: updated };
+/**
+ * Write every calendar's open hours forward to HORIZON_DAYS from today, from its stored weekly
+ * pattern. Rules are only ever written HORIZON_DAYS ahead on a save, so without this a calendar
+ * nobody re-saves runs out of open hours two months later and stops taking bookings.
+ *
+ * The stored pattern is the only input, so the result is what a save of the same pattern would
+ * write today: running it twice, or a hundred times, changes nothing more. It never adds hours the
+ * pattern does not have. replaceOpenHours writes the new rules before deleting the old, so a crash
+ * mid-roll leaves the old rules, or old and new together (the same pattern twice, which merge),
+ * never fewer hours than the pattern gives a day already covered. A calendar with no hours in its
+ * pattern is skipped: there is nothing to roll, and clearing rules it may have from elsewhere would
+ * be a guess. One calendar failing does not stop the rest.
+ */
+export async function rollOpenHours(deps: OwnedDeps & { now: () => number }): Promise<RollReport> {
+  const outcomes: ({ ok: true; id: string } | { ok: false; id: string; error: string })[] = [];
+  // One calendar at a time: this runs beside live traffic and is not in a hurry.
+  for (const { id } of deps.registry.list()) {
+    const outcome = await calendarWrites(id, () => rollOne(deps, id)).catch((err: unknown) => ({
+      ok: false as const,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+    if (outcome !== null) outcomes.push({ id, ...outcome });
+  }
+  return {
+    rolled: outcomes.flatMap((o) => (o.ok ? [o.id] : [])),
+    failed: outcomes.flatMap((o) => (o.ok ? [] : [{ id: o.id, error: o.error }])),
+  };
+}
+
+/** Null when there is nothing to roll. Reads the record inside the queue, so a save just before wins. */
+async function rollOne(
+  deps: OwnedDeps & { now: () => number },
+  id: string
+): Promise<{ ok: true } | { ok: false; error: string } | null> {
+  const record = deps.registry.get(id);
+  if (!record || !hasHours(record.week)) return null;
+  const ranges = validateWeek(record.week);
+  if (!ranges.ok) return ranges;
+  const segments = expandOrFail(ranges.value, record.timezone, deps.now());
+  if (!segments.ok) return segments;
+  await deps.dt.rules.replaceOpenHours(id, segments.value);
+  return { ok: true };
 }
 
 /** The calendar plus its current bookings and holds, for the management page. */

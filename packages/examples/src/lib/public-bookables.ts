@@ -95,6 +95,8 @@ export interface BookableRegistry {
     display?: Display;
   }): { record: BookableRecord; manageKey: string };
   get(id: string): BookableRecord | undefined;
+  /** Every bookable, for jobs that keep all of them current (the open-hours roll-forward). */
+  list(): BookableRecord[];
   /** Every bookable a signed-in principal created, newest first. */
   listOwned(owner: string): BookableRecord[];
   /** The record if this principal owns it, otherwise undefined. Authorization for owned calendars. */
@@ -248,6 +250,10 @@ export function openBookableRegistry(
     get(id) {
       const record = records.get(id);
       return record && toPublic(record);
+    },
+
+    list() {
+      return [...records.values()].map(toPublic);
     },
 
     listOwned(owner) {

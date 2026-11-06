@@ -58,6 +58,8 @@ export function fakeDeltaT() {
     openHours: new Map<string, { start: number; end: number }[]>(),
     /** The next `rules.replaceOpenHours` throws, as a kernel refusal would. */
     rulesFail: false,
+    /** How long each `rules.replaceOpenHours` takes, one entry per call in order; it lands at the end. */
+    rulesLatencyMs: [] as number[],
     /** `resources.delete` throws, as during an outage. */
     deleteFails: false,
     /** Bookings seeded straight onto one calendar (by resource id), beside the ones holds became. */
@@ -114,6 +116,8 @@ export function fakeDeltaT() {
     },
     rules: {
       replaceOpenHours: async (resourceId: string, segments: { start: number; end: number }[]) => {
+        const delay = state.rulesLatencyMs.shift();
+        if (delay) await Bun.sleep(delay);
         if (state.rulesFail) throw Object.assign(new Error("span is outside the parent's availability"), { code: "23514" });
         state.openHours.set(resourceId, segments);
       },

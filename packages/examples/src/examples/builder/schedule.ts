@@ -57,6 +57,18 @@ export function dateRangeFromToday(days: number): { fromDate: string; toDate: st
   return { fromDate: toDateStr(from), toDate: toDateStr(to) };
 }
 
+/**
+ * The calendar's own today through `days` later, inclusive. Today is the date in the calendar's time
+ * zone, not the server's: on a UTC server, a calendar in the Americas is still on yesterday each
+ * evening, and starting from the server's date would drop the rest of its day.
+ */
+export function dateRangeInZone(now: number, timeZone: string, days: number): { fromDate: string; toDate: string } {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "numeric", day: "numeric" }).formatToParts(now);
+  const part = (type: "year" | "month" | "day") => Number(parts.find((p) => p.type === type)?.value);
+  const at = (offset: number) => new Date(Date.UTC(part("year"), part("month") - 1, part("day") + offset)).toISOString().slice(0, 10);
+  return { fromDate: at(0), toDate: at(days) };
+}
+
 /** Four weeks from today, the window the builder's recurrence is expanded over. */
 export function builderDateRange(): { fromDate: string; toDate: string } {
   return dateRangeFromToday(27);
