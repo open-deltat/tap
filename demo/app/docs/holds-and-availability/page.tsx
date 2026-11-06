@@ -1,21 +1,24 @@
 import { HoldsStatic } from "@/examples/explainer/holds/holds-static";
 import { DocHeader } from "@/components/doc-header";
-import { Markdown } from "@/components/markdown";
+import { DocBody } from "@/components/doc-body";
 import { JsonLd } from "@/components/json-ld";
+import { VERBS, VerbChip } from "@/components/landing/verbs";
 import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "Holds and availability",
+  title: "Find, hold, book, listen",
   description:
-    "Holds settle races with a self-expiring timer, and availability is the gaps recomputed on every read, with atomic batch bookings and live updates.",
+    "The four steps every booking takes on Δt: find what is free, hold a slot while you ask, book it in one step, and hear every change the moment it happens.",
   path: "/docs/holds-and-availability",
 };
 
 export const metadata = pageMetadata({ ...SEO, ogType: "article" });
 
+// Each section opens with its command, in the same colour the landing and the examples give it.
+const chip = (i: number) => ({ node: <VerbChip verb={VERBS[i]} />, tight: true });
+
 export default function HoldsAndAvailabilityPage() {
-  const [intro, detail] = docContent("holds-and-availability").split("<!--HOLDS_WIDGET-->");
   return (
     <article className="mx-auto max-w-3xl">
       <JsonLd
@@ -24,16 +27,15 @@ export default function HoldsAndAvailabilityPage() {
           breadcrumbLd([
             { name: "Home", path: "/" },
             { name: "What is Δt", path: "/docs" },
-            { name: "Holds and availability", path: "/docs/holds-and-availability" },
+            { name: "Find, hold, book, listen", path: "/docs/holds-and-availability" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="Δt · the database" title="Holds and availability" />
-      <Markdown>{intro}</Markdown>
-      <div className="mt-6">
-        <HoldsStatic />
-      </div>
-      <Markdown>{detail}</Markdown>
+      <DocHeader title="Find, hold, book, listen" path={SEO.path} />
+      <DocBody
+        source={docContent("holds-and-availability")}
+        slots={{ HOLDS_WIDGET: <HoldsStatic />, FIND: chip(0), HOLD: chip(1), BOOK: chip(2), LISTEN: chip(3) }}
+      />
     </article>
   );
 }

@@ -26,7 +26,7 @@ export default function RecurringAvailabilityPage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Guides · in practice" title="Recurring availability" />
+      <DocHeader title="Recurring hours" path={SEO.path} />
       <Markdown>{docContent("guides/recurring-availability")}</Markdown>
     </article>
   );

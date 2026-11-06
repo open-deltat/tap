@@ -51,10 +51,11 @@ export function Stage({
       <div className={cn("flex min-h-0 flex-1 flex-col items-center", inline ? "pb-24 sm:pb-28" : "overflow-auto pb-32", !chrome && !inline && "pt-4 sm:pt-6")}>
         {chrome && (title || primitive) && (
           <header className="w-full shrink-0 px-5 pb-5 pt-8 text-center sm:pt-12">
+            {/* h2: the page that hosts an example owns the h1 (the demo route renders it on the server). */}
             {title && (
-              <h1 className="text-balance text-[1.6rem] font-semibold leading-tight tracking-[-0.02em] text-dt-ink sm:text-[2rem]">
+              <h2 className="text-balance text-[1.6rem] font-semibold leading-tight tracking-[-0.02em] text-dt-ink sm:text-[2rem]">
                 {title}
-              </h1>
+              </h2>
             )}
             {primitive && (
               <p className="mx-auto mt-2 flex max-w-md flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13px] text-dt-ink-3">
@@ -70,7 +71,8 @@ export function Stage({
         )}
 
         <div className={cn("w-full", inline ? "max-w-none px-0" : `px-0 sm:px-6 ${contentMax}`)}>
-          <div className="w-full bg-transparent px-4 py-2 sm:rounded-[28px] sm:border sm:border-dt-line sm:bg-dt-surface sm:p-7 sm:shadow-dt-surface">
+          {/* The example's one surface wears the Δt glow, like the Δt side of every card on the site. */}
+          <div className="dt-glow w-full bg-transparent px-4 py-2 sm:rounded-[28px] sm:border sm:border-dt-line sm:bg-dt-surface sm:p-7 sm:shadow-dt-surface">
             {ribbon && <div className="mb-6 border-b border-dt-line pb-5">{ribbon}</div>}
             {children}
           </div>

@@ -81,4 +81,4 @@ const stop = await db.events.listen(sectionA.id, (event) => {
 });
 ```
 
-That is the whole loop behind a live seat map: holds claim, events broadcast, availability answers. Watch it run in the [realtime seats demo](/demos/live), then see [Holds and availability](/docs/holds-and-availability) for how holds and free time interact in detail.
+That is the whole loop behind a live seat map: holds claim, events broadcast, availability answers. Watch it run in the [realtime seats demo](/demos/live), then see [find, hold, book, listen](/docs/holds-and-availability) for how holds and free time interact in detail.

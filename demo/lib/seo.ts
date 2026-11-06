@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { docsSectionOf } from "./docs-nav";
 
 // One place for the site's SEO identity and structured-data builders. Titles stay short, descriptions
 // land in the 140 to 160 character range, every page gets a canonical, and the JSON-LD nodes share
@@ -13,7 +14,17 @@ export const SITE = {
   headline: "Real-Time Calendars for Agents",
   defaultTitle: "Δt: Real-Time Calendars for Agents",
   description:
-    "One calendar as the source of truth. Agents and frontends read it live, hold a slot while they decide, and book in one step. No polling, no double bookings.",
+    "Δt is the calendar system that replaces the 40-year-old one: people and agents find, hold and book on one live calendar, and nothing is ever booked twice.",
+  keywords: [
+    "calendar for AI agents",
+    "real-time calendar",
+    "scheduling API",
+    "booking holds",
+    "prevent double booking",
+    "MCP calendar server",
+    "availability API",
+    "open source scheduling database",
+  ],
 } as const;
 
 // The brand suffix every page title carries. A layout that defines its own `title` replaces the
@@ -94,12 +105,26 @@ export function softwareApplicationLd(): Ld {
     name: SITE.name,
     alternateName: SITE.altNames,
     applicationCategory: "DeveloperApplication",
+    applicationSubCategory: "Scheduling and booking",
     operatingSystem: "Linux, macOS, Windows",
     description: SITE.description,
     url: SITE.url,
     softwareHelp: `${SITE.url}/docs`,
+    license: "https://www.gnu.org/licenses/agpl-3.0.html",
+    keywords: SITE.keywords.join(", "),
     isAccessibleForFree: true,
-    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    // The two ways to have it: free to run yourself, or the hosted founding pilot on the landing.
+    offers: [
+      { "@type": "Offer", name: "Open source", price: "0", priceCurrency: "EUR" },
+      {
+        "@type": "Offer",
+        name: "Founding pilot",
+        price: "990",
+        priceCurrency: "EUR",
+        priceSpecification: { "@type": "UnitPriceSpecification", price: "990", priceCurrency: "EUR", unitText: "MONTH" },
+        url: `${SITE.url}/#pricing`,
+      },
+    ],
     author: { "@id": `${SITE.url}/#org` },
     publisher: { "@id": `${SITE.url}/#org` },
   };
@@ -107,18 +132,35 @@ export function softwareApplicationLd(): Ld {
 
 export function techArticleLd(opts: { title: string; description: string; path: string }): Ld {
   const url = abs(opts.path);
+  const section = opts.path.startsWith("/docs") ? docsSectionOf(opts.path) : undefined;
   return {
     "@type": "TechArticle",
     "@id": `${url}#article`,
     headline: opts.title,
     description: opts.description,
     url,
+    mainEntityOfPage: url,
     inLanguage: "en",
     image: abs(OG_IMAGE_PATH),
+    ...(section ? { articleSection: section } : {}),
     isPartOf: { "@id": `${SITE.url}/#website` },
     about: { "@id": `${SITE.url}/#software` },
     author: { "@id": `${SITE.url}/#org` },
     publisher: { "@id": `${SITE.url}/#org` },
+  };
+}
+
+// Questions and answers exactly as the page shows them, so the structured data never says more
+// than a reader can see.
+export function faqPageLd(path: string, items: readonly { q: string; a: string }[]): Ld {
+  return {
+    "@type": "FAQPage",
+    "@id": `${abs(path)}#faq`,
+    mainEntity: items.map((it) => ({
+      "@type": "Question",
+      name: it.q,
+      acceptedAnswer: { "@type": "Answer", text: it.a },
+    })),
   };
 }
 

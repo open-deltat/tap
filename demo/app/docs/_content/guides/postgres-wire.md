@@ -45,12 +45,21 @@ VALUES ('01J9G6Z5R80000000000000004', '01J9G6Z5R80000000000000002',
 DELETE FROM bookings WHERE id = '01J9G6Z5R80000000000000004';
 ```
 
-**Holds**, tentative claims with an expiry instant:
+**Holds**, tentative claims with an expiry instant. The server keeps the expiry no later than its own clock plus `DELTAT_MAX_HOLD_TTL_MS` (one hour by default), and a multi-row insert holds every row or none, even across resources:
 
 ```sql
 INSERT INTO holds (id, resource_id, start, "end", expires_at)
 VALUES ('01J9G6Z5R80000000000000005', '01J9G6Z5R80000000000000002',
         1706000000000, 1706003600000, 1706000900000);
+
+DELETE FROM holds WHERE id = '01J9G6Z5R80000000000000005';  -- release it now
+```
+
+**Committing a hold** turns it into a booking in one step, with no moment where the slot is free. Insert a booking that names the hold instead of a span; several rows commit all together or not at all:
+
+```sql
+INSERT INTO bookings (id, hold_id, label)
+VALUES ('01J9G6Z5R80000000000000009', '01J9G6Z5R80000000000000005', 'order-4417');
 ```
 
 **Availability**, the derived one. There is no availability table to write; selecting from it computes [the gaps](/docs/holds-and-availability) fresh:
@@ -71,7 +80,7 @@ WHERE resource_id IN ('01J9G6Z5R80000000000000006',
   AND min_available = 2;
 ```
 
-**Events**, pushed over the same connection:
+**Events**, pushed over the same connection. A change on a resource is also sent to every resource above it, and you only listen: Δt sends the notifications itself, and `NOTIFY` is not accepted.
 
 ```sql
 LISTEN resource_01J9G6Z5R80000000000000002;
@@ -82,8 +91,10 @@ UNLISTEN resource_01J9G6Z5R80000000000000002;
 
 ## The edges, stated plainly
 
-This is a small dialect wearing Postgres clothing, and it is deliberately not SQL in the general sense. There are no joins, no aggregates, and no arbitrary expressions, and only one statement per query. Unsupported statements are rejected with an error; unsupported clauses inside a supported statement (a projection list, a join) are silently ignored rather than rejected, so keep to the shapes above. A few limits are worth knowing before you hit them: availability queries are capped at a 90-day window, batch inserts at 1,000 rows, and `IN` lists at 1,000 ids.
+This is a small dialect wearing Postgres clothing, and it is deliberately not SQL in the general sense. Reads are `SELECT *` only; there are no joins, no aggregates, no `ORDER BY` or `LIMIT`, no `RETURNING`, and only one statement per query. Anything outside the shapes above is refused with an error rather than quietly ignored, so a query that runs is a query that means what it says. There is no `pg_catalog`, so graphical database browsers that inspect the schema will not connect; `psql` and drivers do. A few limits are worth knowing before you hit them: availability queries are capped at a 90-day window, batch inserts at 1,000 rows, and `IN` lists at 1,000 ids.
 
-The wire protocol itself is a transitional choice, and the project says so openly. A framed v2 protocol with HTTP and MCP adapters is planned to replace it; the SQL layer goes when it lands. The typed SDK is the surface built to outlast that swap, which is why the [reference](/docs/sdk/reference) documents verbs instead of statements. Treat raw SQL as a power tool for poking at a node and for clients that do not have an SDK yet.
+When a booking or hold collides, the error carries times that still work in its detail, as JSON; the TypeScript client's `counterOffer(err)` reads it, and any driver can read the same detail field.
+
+The wire protocol is the current transport, not the final one; an HTTP/JSON way in is planned and not built. The typed SDK and the [MCP server](/docs/quickstart) are the surfaces built to outlast a change of transport, which is why the [reference](/docs/sdk/reference) documents verbs instead of statements. Treat raw SQL as a power tool for poking at a node and for languages without an SDK yet.
 
 For what actually answers these queries (one binary, in-memory state, an append-only log), see [Under the hood](/docs/protocol-and-engine). For why the model is five tables and not fifty, start at [What is Δt](/docs).

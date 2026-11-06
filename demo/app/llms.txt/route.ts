@@ -34,7 +34,9 @@ function body(): string {
     "check runs inside the write, so a stale read cannot become a double booking. Holds are tentative",
     "claims with a server-enforced TTL that convert to bookings in one atomic statement, which is the",
     "primitive an AI agent needs when its decision takes seconds. Δt speaks the PostgreSQL wire",
-    "protocol, so any Postgres client can talk to it; TAP is the typed TypeScript SDK on top.",
+    "protocol, so any Postgres client can talk to it. TAP, the Time Allocation Protocol, is the model",
+    "every surface shares; @open-deltat/client is its typed TypeScript SDK.",
+    "Agents connect through the MCP server (npx @open-deltat/mcp): find_slots, hold_slot, commit_hold.",
     "",
     ...DOCS_SECTIONS.map((s) => `${section(s.title, s.links)}\n`),
     section("Try it", [

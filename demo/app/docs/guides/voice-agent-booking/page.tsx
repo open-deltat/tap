@@ -26,7 +26,7 @@ export default function VoiceAgentBookingPage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Agents · in real time" title="Voice agents that book" />
+      <DocHeader title="Voice agents that book" path={SEO.path} />
       <Markdown>{docContent("guides/voice-agent-booking")}</Markdown>
     </article>
   );

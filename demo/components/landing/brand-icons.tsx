@@ -20,6 +20,13 @@ export function AppleMark({ className }: { className?: string }) {
   return <Glyph d={siApple.path} title="Apple" className={className} />;
 }
 
+// The three calendars most people use today, in the order the hero and the walls show them.
+export const OLD_WORLD = [
+  { name: "Google Calendar", Mark: GoogleCalendarMark },
+  { name: "Apple Calendar", Mark: AppleMark },
+  { name: "Outlook", Mark: OutlookMark },
+] as const;
+
 export function OutlookMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd" role="img" aria-label="Outlook" className={className}>

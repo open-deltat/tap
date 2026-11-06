@@ -10,12 +10,12 @@ Machine clients make this sharper. An agent that fast-polls availability while a
 
 ## Subscribe to the resource, then re-read
 
-Δt exposes a change stream per resource over the PostgreSQL `LISTEN`/`NOTIFY` mechanism. The SDK wraps it:
+Δt sends every change on a resource to anyone listening, over the PostgreSQL `LISTEN` mechanism. The SDK gives you two ways in. `events.watch` hands you a plain change (`held`, `booked`, `hold_ended`, `cancelled`), reconnects on its own, and re-reads the calendar if it fell behind; it is the one to use for a screen. `events.listen` is the raw stream underneath it. Either way, the pattern is the same:
 
 ```ts
 import { DeltaT } from "@open-deltat/client";
 
-const db = new DeltaT({ database: "theatre" });
+const db = new DeltaT({ database: "theatre", password: process.env.DELTAT_PASSWORD });
 
 const unsubscribe = await db.events.listen(screen.id, async () => {
   const slots = await db.availability.get({

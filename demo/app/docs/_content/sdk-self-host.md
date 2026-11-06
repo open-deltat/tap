@@ -1,83 +1,26 @@
-Δt is one binary. No Postgres, no Redis, no sidecar to babysit. You build it, you run it, and it keeps your time-allocation state in memory while writing every change to a small append-only log on disk so a restart picks up exactly where it left off.
+Δt is one binary. No Postgres, no Redis, no sidecar to babysit. It keeps your calendars in memory while writing every change to a small append-only log on disk, so a restart picks up exactly where it left off. If you can run a single process and give it a port and a folder, you can host it.
 
-If you can run a single process and give it a port and a folder, you can host it.
-
-## Build and run
-
-It is a Rust binary, so a release build and a run is the whole story:
+## Run it with Docker
 
 ```bash
-cargo build --release
-DELTAT_PASSWORD=<your-password> ./target/release/deltat
+docker run -d --name deltat -p 5433:5433 \
+  -v deltat-data:/data \
+  -e DELTAT_PASSWORD=<your-password> \
+  ghcr.io/open-deltat/deltat
 ```
 
-That starts the server listening on port 5433. Point the TAP client at it and you are talking to it:
+The image is `ghcr.io/open-deltat/deltat`, tagged with each release (`0.5.0`, `0.5`, `latest`) and built for both x86 and ARM. It listens on 5433 and keeps its data in `/data`; the named volume keeps that across restarts.
 
-```ts
-import { DeltaT } from "@open-deltat/client";
-
-const db = new DeltaT({
-  host: "localhost",
-  port: 5433,
-  database: "acme-tickets",
-  password: process.env.DELTAT_PASSWORD,
-});
-```
-
-The `database` value is the only thing that picks your tenant. More on that below.
-
-## Configuration
-
-Everything is set through environment variables, and every one has a default. The defaults are fine for poking at it on your laptop. The one you must set for anything reachable over a network is the password.
-
-| Variable | What it does | Default |
-| --- | --- | --- |
-| `DELTAT_PORT` | TCP port the server listens on | `5433` |
-| `DELTAT_BIND` | Address to bind to | `0.0.0.0` |
-| `DELTAT_DATA_DIR` | Folder where the write-ahead logs live | `./data` |
-| `DELTAT_PASSWORD` | The single cleartext password checked on every connection | (has a built-in default) |
-| `DELTAT_GC_RETENTION_MS` | How long past bookings and expired holds are kept before cleanup | `604800000` (7 days) |
-
-A note on `DELTAT_PASSWORD`: auth is a single shared password, sent in cleartext, checked when a client connects. If you leave it unset it falls back to a built-in default. That is harmless on localhost and wrong the moment the port is reachable by anyone else, so set it.
-
-## The data directory
-
-`DELTAT_DATA_DIR` is where durability lives. Each tenant gets its own append-only write-ahead log file in that folder. Every change is written to the log first and only then applied in memory, so the log is the source of truth and memory is just the fast projection of it.
-
-That makes backups boring in the best way: copy the data directory and you have copied the state. Delete it and you have a clean slate.
-
-## Tenants are just the database name
-
-There is no tenant table and no shared column to filter on. The `database` name on the connection *is* the tenant. The first time a client connects with a new database name, Δt creates a dedicated engine and its own log file for it, on the spot.
-
-```ts
-const acme = new DeltaT({ database: "acme-tickets", password: pw });
-const other = new DeltaT({ database: "another-org", password: pw });
-```
-
-Those two are fully isolated because they are backed by separate files, not by a query filter you have to remember to add. The name is sanitized down to letters, digits, underscores, and hyphens before it becomes a filename, so a tenant name can never wander out of the data directory.
-
-## Cleanup runs itself
-
-You do not schedule anything. A background reaper inside each tenant quietly handles three jobs on its own:
-
-- Hold expiry. A hold carries its own self-destruct time, so it stops blocking a slot the moment it expires whether or not anything has swept it yet. The reaper is just there to physically remove the dead ones so the list does not grow forever.
-- Log compaction. Once a log grows past a threshold it gets compacted in place.
-- Garbage collection. Past bookings and expired past holds older than `DELTAT_GC_RETENTION_MS` are collected. Rules are never collected, so your open-hours and blackout schedule always stays put.
-
-## Docker Compose
-
-The repository ships a `docker-compose.yaml` that brings up Δt and the demo together. If you just want Δt on its own, a minimal service is enough: build it from the public source, publish the port, set the password, and mount a named volume at the data directory so state survives a container restart.
+With Docker Compose:
 
 ```yaml
 services:
   deltat:
-    build: https://github.com/open-deltat/deltat.git#main
+    image: ghcr.io/open-deltat/deltat:0.5
     ports:
       - "5433:5433"
     environment:
       DELTAT_PASSWORD: ${DELTAT_PASSWORD}
-      DELTAT_DATA_DIR: /data
     volumes:
       - deltat-data:/data
 
@@ -85,8 +28,81 @@ volumes:
   deltat-data: {}
 ```
 
-`DELTAT_DATA_DIR` is set to match the mount, so the write-ahead logs ride on the named volume. Drop the volume for a fully ephemeral instance.
+## Or run the binary
 
-## What is not here yet
+Δt is a Rust crate, so `cargo` builds it:
 
-The transport today is the PostgreSQL wire protocol, which is why the TAP client connects like a Postgres client would. That is transitional. HTTP and MCP adapters are planned but do not exist yet, so for now the wire protocol is the only way in.
+```bash
+cargo install deltat
+DELTAT_PASSWORD=<your-password> deltat
+```
+
+That listens on port 5433 and writes its logs to `./data`.
+
+## Connect to it
+
+An agent connects through the MCP server ([agent quickstart](/docs/quickstart)). Code connects through the TypeScript client or any Postgres driver:
+
+```ts
+import { DeltaT } from "@open-deltat/client";
+
+const db = new DeltaT({
+  host: "localhost",
+  port: 5433,
+  database: "acme",
+  password: process.env.DELTAT_PASSWORD,
+});
+```
+
+The `database` value picks your tenant. More on that below.
+
+## Configuration
+
+Everything is set through environment variables, and every one has a default.
+
+| Variable | What it does | Default |
+| --- | --- | --- |
+| `DELTAT_PASSWORD` | The password every connection must give | a random one, printed once at start |
+| `DELTAT_PORT` | Port to listen on | `5433` |
+| `DELTAT_BIND` | Address to listen on | `0.0.0.0` |
+| `DELTAT_DATA_DIR` | Folder for the logs | `./data` (`/data` in the image) |
+| `DELTAT_MAX_HOLD_TTL_MS` | The longest a hold may last | `3600000` (1 hour) |
+| `DELTAT_GC_RETENTION_MS` | How long past bookings and expired holds are kept | `604800000` (7 days) |
+| `DELTAT_COUNTER_OFFER` | How many alternative times a refusal carries (0 turns it off, 3 at most) | `3` |
+| `DELTAT_TLS_CERT`, `DELTAT_TLS_KEY` | Serve TLS with this certificate and key (set both) | off |
+| `DELTAT_MAX_CONNECTIONS` | Connections at once | `256` |
+| `DELTAT_METRICS_PORT` | Serve Prometheus metrics on this port at `/metrics` | off |
+| `DELTAT_LOG_FORMAT` | `json` for JSON logs, anything else for text | text |
+
+**Set `DELTAT_PASSWORD`.** Without it, Δt makes up a random password at every start and prints it once, so nothing that stored the old one can reconnect after a restart. There is one shared password for the whole instance; `DELTAT_TENANT_PASSWORDS` (`tenant:password,tenant:password`) sets one per tenant, but a tenant without its own entry falls back to the shared one. Anything reachable from outside should also get TLS.
+
+## The data directory
+
+Each tenant gets its own append-only log file in the data directory, and the log is the source of truth: a change is confirmed only once it is on disk, and a restart replays the log. ([Under the hood](/docs/protocol-and-engine) has the exact order.) Backups are simple: copy the directory and you have copied the state. Delete it and you have a clean slate.
+
+## Tenants are just the database name
+
+There is no tenant table. The `database` name on the connection is the tenant, and the first connection with a new name creates its engine and log file on the spot.
+
+```ts
+const acme = new DeltaT({ database: "acme", password: pw });
+const other = new DeltaT({ database: "another-org", password: pw });
+```
+
+Those two are fully separate because they are separate files, not a filter you have to remember to add. The name is cleaned down to letters, digits, `_` and `-` before it becomes a file name, so it can never point outside the data directory.
+
+## Cleanup runs itself
+
+A background sweep inside each tenant does three jobs without being asked:
+
+- **Expired holds.** A hold stops counting the moment it expires; the sweep removes it from the list every few seconds.
+- **Log compaction.** A log that grows past a threshold is rewritten smaller.
+- **Old bookings.** Past bookings and expired holds older than `DELTAT_GC_RETENTION_MS` are removed. Open hours and blackouts are never removed.
+
+## Updating
+
+Pull a newer image or `cargo install` a newer version and restart with the same data directory. Back up the directory first: each release's notes say whether its log format changed, and a log written by a newer Δt is not meant to be read by an older one.
+
+## Rather not run it?
+
+A [founding pilot](/#pricing) gets you Δt hosted in the EU, run by the person who wrote it.

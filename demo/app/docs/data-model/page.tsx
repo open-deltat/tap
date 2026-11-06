@@ -29,7 +29,7 @@ export default function DataModelPage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Δt · the database" title="Data model" />
+      <DocHeader title="Data model" path={SEO.path} />
       <Markdown>{intro}</Markdown>
       <div className="my-4">
         <HierarchyViz />

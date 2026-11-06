@@ -26,7 +26,7 @@ export default function BufferTimePage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Guides · in practice" title="Buffer time" />
+      <DocHeader title="Buffer time" path={SEO.path} />
       <Markdown>{docContent("guides/buffer-time")}</Markdown>
     </article>
   );

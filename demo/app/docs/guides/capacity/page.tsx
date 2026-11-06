@@ -26,7 +26,7 @@ export default function CapacityPage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Guides · in practice" title="Capacity and pools" />
+      <DocHeader title="Capacity and pools" path={SEO.path} />
       <Markdown>{docContent("guides/capacity")}</Markdown>
     </article>
   );

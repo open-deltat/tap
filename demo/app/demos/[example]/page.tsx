@@ -71,6 +71,9 @@ export default async function DemoPage({ params }: { params: Promise<{ example: 
           ]}
         />
       )}
+      {/* The page's one h1, in the server HTML: the example draws its visible title only after it
+          has connected, so without this a crawler that does not wait would find no heading. */}
+      {seo && <h1 className="sr-only">{seo.title}</h1>}
       <Example />
     </>
   );

@@ -14,12 +14,12 @@ So the fix cannot be a faster read. The slot has to stop being available at the 
 
 ## Hold when you offer, commit when they agree
 
-Place the hold before the sentence leaves the agent's mouth, with a TTL sized to the call.
+Place the hold before the sentence leaves the agent's mouth, with a TTL sized to the call. If your voice platform speaks MCP, that is `hold_slot` before the agent reads out a time and `commit_hold` when the caller picks one (the MCP server holds for five minutes); see the [agent quickstart](/docs/quickstart). In code it looks like this:
 
 ```ts
 import { DeltaT } from "@open-deltat/client";
 
-const db = new DeltaT({ database: "salon" });
+const db = new DeltaT({ database: "salon", password: process.env.DELTAT_PASSWORD });
 
 const slots = await db.availability.get({
   resourceId: chair.id,
@@ -94,4 +94,4 @@ An agent that fails loudly and offers the next slot ends the call with a real ap
 
 ## Next
 
-[Scheduling for AI agents](/docs/guides/ai-agent-scheduling) is the same pattern without the phone line, including retries and multi-item bookings. [What a booking hold is](/docs/guides/booking-holds) covers holds, expiry, and renewal on their own. [Real-time scheduling](/docs/guides/real-time-scheduling) is how a dashboard watching the same calendar stays current while the agent works.
+[Scheduling for AI agents](/docs/guides/ai-agent-scheduling) is the same pattern without the phone line, including retries and multi-item bookings. [What a booking hold is](/docs/guides/booking-holds) covers holds, expiry, and renewal on their own. [Live updates](/docs/guides/real-time-scheduling) is how a dashboard watching the same calendar stays current while the agent works.

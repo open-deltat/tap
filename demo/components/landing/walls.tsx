@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Check, RefreshCw } from "lucide-react";
 import { FRIEND_NAMES } from "@open-deltat/examples/lib/friends";
+import { DeltatMark } from "@/components/deltat-mark";
+import { OLD_WORLD } from "./brand-icons";
+import { Asking, Countdown } from "./motion";
 
 // The five things an agent runs into on a normal calendar, each shown twice in the hero's own
 // picture language: "Today" on the left with one amber thing wrong, "Δt" on the right ending in
@@ -19,8 +22,10 @@ const WALLS: readonly Wall[] = [
     link: { label: "How holds work", href: "/docs/guides/booking-holds" },
     today: (
       <Rows>
-        <Row t="14:30" tag="gone">
-          <Chip tone="ghost">Agent A · asking…</Chip>
+        <Row t="14:30" tag="taken while A asked">
+          <Chip tone="ghost">
+            <Asking who="Agent A" />
+          </Chip>
           <Chip tone="clash">Someone else</Chip>
         </Row>
       </Rows>
@@ -29,7 +34,9 @@ const WALLS: readonly Wall[] = [
       <Rows>
         <Row t="14:30">
           <Chip tone="booked">Agent A</Chip>
-          <Chip tone="held">held · 4:59</Chip>
+          <Chip tone="held">
+            held ·&nbsp;<Countdown />
+          </Chip>
         </Row>
       </Rows>
     ),
@@ -39,9 +46,9 @@ const WALLS: readonly Wall[] = [
     link: { label: "How live updates work", href: "/docs/guides/real-time-scheduling" },
     today: (
       <Rows>
-        <Line who="Website" status={<Stale when="4 min ago" />} />
-        <Line who="Voice agent" status={<Stale when="12 min ago" />} />
-        <Line who="Booking app" status={<Stale when="1 hr ago" warn />} />
+        <Line who="Website" status={<Stale when="updated 4 min ago" />} />
+        <Line who="Voice agent" status={<Stale when="updated 12 min ago" />} />
+        <Line who="Booking app" status={<Stale when="updated 1 hr ago" warn />} />
       </Rows>
     ),
     deltat: (
@@ -70,8 +77,12 @@ const WALLS: readonly Wall[] = [
     today: (
       <Rows>
         <Row t="14:30" tag="double booked">
-          <Chip tone="clash">Agent A</Chip>
-          <Chip tone="clash">Agent B</Chip>
+          <Chip tone="clash" pulse>
+            Agent A
+          </Chip>
+          <Chip tone="clash" pulse>
+            Agent B
+          </Chip>
         </Row>
       </Rows>
     ),
@@ -92,35 +103,86 @@ const WALLS: readonly Wall[] = [
   },
 ];
 
+// A zigzag: the line and its picture swap sides on every row, so the eye travels left and right
+// down the page instead of only down. Each picture is one card holding "today" and "Δt" with an
+// arrow between them: the hero's "from this to this", told again small, five times.
 export function Walls() {
   return (
-    <ol className="divide-y divide-dt-line border-y border-dt-line">
-      {WALLS.map((w) => (
-        <li key={w.title} className="grid gap-6 py-10 lg:grid-cols-[1fr_1.25fr] lg:items-center lg:gap-12 lg:py-12">
-          {/* One line says the pain; the pictures beside it are the proof, so nothing explains them. */}
-          <div>
-            <h3 className="text-balance text-[22px] font-semibold leading-tight tracking-[-0.02em] sm:text-[26px]">{w.title}</h3>
-            <a href={w.link.href} className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-dt-accent-ink hover:text-dt-ink sm:min-h-0">
-              {w.link.label}
-              <ArrowRight className="h-4 w-4" />
-            </a>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Mini label="Today">{w.today}</Mini>
-            <Mini label="Δt" good>
-              {w.deltat}
-            </Mini>
-          </div>
-        </li>
-      ))}
+    <ol className="space-y-6 sm:space-y-4">
+      {WALLS.map((w, i) => {
+        const flip = i % 2 === 1;
+        return (
+          <li key={w.title} className="grid items-center gap-6 py-6 lg:grid-cols-[1fr_1.35fr] lg:gap-14 lg:py-8">
+            <div className={`flex gap-5 ${flip ? "lg:order-2" : ""}`}>
+              <span aria-hidden className="font-mono text-[44px] font-semibold leading-none tracking-tighter text-dt-line-strong sm:text-[56px]">
+                0{i + 1}
+              </span>
+              <div className="pt-1 sm:pt-2">
+                <h3 className="text-balance text-[22px] font-semibold leading-tight tracking-[-0.02em] sm:text-[26px]">{w.title}</h3>
+                <a href={w.link.href} className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-dt-accent-ink hover:text-dt-ink sm:min-h-0">
+                  {w.link.label}
+                  <ArrowRight className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+            <BeforeAfter today={w.today} deltat={w.deltat} className={flip ? "lg:order-1" : ""} />
+          </li>
+        );
+      })}
     </ol>
   );
 }
 
-function Mini({ label, good, children }: { label: string; good?: boolean; children: ReactNode }) {
+// One card, two halves: the old calendar on the left, Δt on the right in the logo's faint emerald,
+// a small arrow on the seam. Stacked on a phone, with the arrow pointing down.
+function BeforeAfter({ today, deltat, className = "" }: { today: ReactNode; deltat: ReactNode; className?: string }) {
   return (
-    <div className={`flex min-h-[150px] flex-col rounded-2xl border bg-dt-surface p-4 ${good ? "border-dt-accent/40" : "border-dt-line"}`}>
-      <div className={`text-[12px] font-medium ${good ? "text-dt-accent-ink" : "text-dt-ink-3"}`}>{label}</div>
+    <div className={`relative grid overflow-hidden rounded-3xl border border-dt-line bg-dt-surface shadow-dt-surface sm:grid-cols-2 ${className}`}>
+      <Half label={<OldWorldMarks />}>{today}</Half>
+      {/* Stacked on a phone the arrow sits in the flow on the seam, whatever the halves' heights;
+          side by side it is centred on the seam. */}
+      <div aria-hidden className="relative z-10 -my-4 flex justify-center sm:hidden">
+        <SeamArrow down />
+      </div>
+      <Half label={<DeltatMark size="sm" className="!h-5 !w-5 !rounded-[6px] !text-[9px]" />} good>
+        {deltat}
+      </Half>
+      <span aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 sm:block">
+        <SeamArrow />
+      </span>
+    </div>
+  );
+}
+
+function SeamArrow({ down }: { down?: boolean }) {
+  return (
+    <span className="grid h-8 w-8 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface">
+      <ArrowRight className={`h-3.5 w-3.5 ${down ? "rotate-90" : ""}`} />
+    </span>
+  );
+}
+
+// The old side is named by the logos people already know, no words: Google Calendar, Apple, Outlook.
+function OldWorldMarks() {
+  return (
+    <span className="flex h-5 items-center gap-2 text-dt-ink-3">
+      {OLD_WORLD.map(({ name, Mark }) => (
+        <Mark key={name} className="h-4 w-4" />
+      ))}
+    </span>
+  );
+}
+
+function Half({ label, good, children }: { label: ReactNode; good?: boolean; children: ReactNode }) {
+  return (
+    <div
+      className={`flex min-h-[170px] flex-col p-5 ${
+        good
+          ? "dt-glow border-t border-dt-line sm:border-l sm:border-t-0"
+          : ""
+      }`}
+    >
+      <div className="flex h-5 items-center">{label}</div>
       <div className="mt-3 flex flex-1 flex-col justify-center">{children}</div>
     </div>
   );
@@ -141,32 +203,39 @@ function Row({ t, tag, children }: { t: string; tag?: string; children: ReactNod
   );
 }
 
-function Chip({ tone, children }: { tone: "booked" | "clash" | "ghost" | "held"; children: ReactNode }) {
+// `pulse` gives a double-booked pair one soft amber pulse every five seconds.
+function Chip({ tone, pulse, children }: { tone: "booked" | "clash" | "ghost" | "held"; pulse?: boolean; children: ReactNode }) {
   const look = {
     booked: "flex-1 bg-dt-ink text-dt-on-ink",
     clash: "flex-1 border border-dt-held/40 bg-dt-held-soft text-dt-held-ink",
     ghost: "flex-1 border border-dashed border-dt-line-strong text-dt-ink-3",
     held: "shrink-0 bg-dt-accent-soft text-dt-accent-ink",
   }[tone];
-  return <span className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2 text-[12px] font-medium ${look}`}>{children}</span>;
+  return (
+    <span className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2 text-[12px] font-medium ${look} ${pulse ? "dt-clash" : ""}`}>
+      {children}
+    </span>
+  );
 }
 
 function Tick() {
   return <Check className="ml-1.5 h-3.5 w-3.5 text-dt-accent" strokeWidth={2.5} />;
 }
 
+// The app's name, with what last happened to it on a line of its own underneath, so a precise
+// status ("updated 12 min ago") fits even in the narrow half of a card.
 function Line({ who, status }: { who: string; status: ReactNode }) {
   return (
-    <div className="flex h-[38px] items-center justify-between gap-3 text-[12.5px]">
+    <div className="flex min-h-[46px] flex-col justify-center py-1.5 text-[12.5px]">
       <span className="text-dt-ink-2">{who}</span>
-      {status}
+      <span className="mt-0.5">{status}</span>
     </div>
   );
 }
 
 function Stale({ when, warn }: { when: string; warn?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 font-mono text-[11.5px] tabular-nums ${warn ? "text-dt-held-ink" : "text-dt-ink-3"}`}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[11.5px] tabular-nums ${warn ? "text-dt-held-ink" : "text-dt-ink-3"}`}>
       <RefreshCw className="h-3 w-3" />
       {when}
     </span>
@@ -177,7 +246,7 @@ function Live() {
   return (
     <span className="inline-flex items-center gap-1.5 text-[11.5px] text-dt-accent-ink">
       <span className="dt-breathe h-1.5 w-1.5 rounded-full bg-dt-accent" />
-      listening
+      <span className="dt-breathe-soft">listening</span>
     </span>
   );
 }
@@ -195,7 +264,14 @@ const FREE = [
 
 function Lanes({ answer }: { answer: boolean }) {
   return (
-    <div className="space-y-1.5">
+    <div className="relative space-y-1.5 pb-2">
+      {/* With the answer, the same box the live example draws, around the whole time everyone is
+          free (the full green stretch), with room below so its bottom edge stays visible. */}
+      {answer && (
+        <div aria-hidden className="pointer-events-none absolute -top-1 bottom-0 left-14 right-0">
+          <div className="absolute inset-y-0 rounded-md bg-dt-ink/[0.07] ring-1 ring-dt-ink/25" style={{ left: "21%", width: "42%" }} />
+        </div>
+      )}
       {FREE.map(([a, b], i) => (
         <div key={i} className="flex items-center gap-2">
           <span className="w-12 shrink-0 truncate text-right text-[11px] text-dt-ink-2">{FRIEND_NAMES[i]}</span>
@@ -227,7 +303,8 @@ function Machines({ booked, failedAt }: { booked: number; failedAt?: number }) {
   const all = booked === 8;
   return (
     <div>
-      <div className="grid grid-cols-8 gap-1.5">
+      {/* On Δt the eight sit in one box, the same grouping the live example draws: one request. */}
+      <div className={`grid grid-cols-8 gap-1.5 ${all ? "rounded-lg bg-dt-ink/[0.05] p-1.5 ring-1 ring-dt-ink/25" : "p-1.5"}`}>
         {Array.from({ length: 8 }, (_, i) => {
           const look =
             i < booked

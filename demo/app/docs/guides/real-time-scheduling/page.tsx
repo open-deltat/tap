@@ -5,7 +5,7 @@ import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "Real-time scheduling",
+  title: "Live updates: real-time scheduling without polling",
   description:
     "Polling makes a schedule either stale or expensive. Subscribe to the resource, treat the event as a tick, and re-read availability that is computed rather than cached.",
   path: "/docs/guides/real-time-scheduling",
@@ -22,11 +22,11 @@ export default function RealTimeSchedulingPage() {
           breadcrumbLd([
             { name: "Home", path: "/" },
             { name: "What is Δt", path: "/docs" },
-            { name: "Real-time scheduling", path: "/docs/guides/real-time-scheduling" },
+            { name: "Live updates", path: "/docs/guides/real-time-scheduling" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="Agents · in real time" title="Real-time scheduling" />
+      <DocHeader title="Live updates" path={SEO.path} />
       <Markdown>{docContent("guides/real-time-scheduling")}</Markdown>
     </article>
   );
