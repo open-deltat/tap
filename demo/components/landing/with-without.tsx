@@ -13,7 +13,7 @@ import { DeltatMark } from "@/components/deltat-mark";
 // One card, two halves, the arrow on the seam: the same shape as each of the five walls below.
 export function WithWithout() {
   return (
-    <div className="relative mx-auto mt-14 grid max-w-4xl overflow-hidden rounded-[28px] border border-dt-line bg-dt-surface shadow-dt-float sm:mt-20 md:grid-cols-2">
+    <div className="relative mx-auto mt-14 grid max-w-5xl overflow-hidden rounded-[32px] border border-dt-line bg-dt-surface shadow-dt-float sm:mt-20 md:grid-cols-2">
       <OldCalendar />
       <NewCalendar />
       <span
@@ -28,7 +28,7 @@ export function WithWithout() {
 
 function OldCalendar() {
   return (
-    <div className="p-5 sm:p-6">
+    <div className="p-5 sm:p-8">
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-dt-ink-2">
         {OLD_WORLD.map(({ name, Mark }) => (
           <span key={name} className="inline-flex items-center gap-1.5">
@@ -62,7 +62,7 @@ function OldCalendar() {
 
 function NewCalendar() {
   return (
-    <div className="relative overflow-hidden bg-[#0a0f0d] p-5 text-white sm:p-6">
+    <div className="relative overflow-hidden bg-[#0a0f0d] p-5 text-white sm:p-8">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_112%,rgba(52,211,153,0.38),transparent)]" />
       <div className="relative">
         <div className="mb-4 flex h-[18px] items-center gap-2 text-[12.5px] font-medium text-white/80">
@@ -116,7 +116,7 @@ function Rows({ dark, children }: { dark?: boolean; children: ReactNode }) {
 function Row({ t, tag, dark, children }: { t: string; tag?: string; dark?: boolean; children?: ReactNode }) {
   return (
     // Fixed row height; the tag wraps under the chips only when a narrow card leaves it no room.
-    <div className="flex min-h-[48px] flex-wrap items-center gap-x-3 gap-y-1 py-1.5">
+    <div className="flex min-h-[48px] flex-wrap items-center gap-x-3 gap-y-1 py-1.5 sm:min-h-[56px]">
       <span className={`w-11 shrink-0 font-mono text-[12px] tabular-nums ${dark ? "text-white/45" : "text-dt-ink-3"}`}>{t}</span>
       <div className="flex min-w-0 flex-auto gap-1.5">{children}</div>
       {tag && <span className="ml-auto shrink-0 text-[11.5px] font-medium text-dt-held-ink">{tag}</span>}
@@ -127,7 +127,7 @@ function Row({ t, tag, dark, children }: { t: string; tag?: string; dark?: boole
 // On the old calendar: amber for a booking that collides, dashed grey for an agent still asking.
 function OldChip({ tone, children }: { tone: "clash" | "ghost"; children: ReactNode }) {
   const look = tone === "clash" ? "border border-dt-held/40 bg-dt-held-soft text-dt-held-ink" : "border border-dashed border-dt-line-strong text-dt-ink-3";
-  return <span className={`inline-flex h-8 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-2 text-[12.5px] font-medium ${look}`}>{children}</span>;
+  return <span className={`inline-flex h-8 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-2 text-[12.5px] font-medium sm:h-9 sm:text-[13.5px] ${look}`}>{children}</span>;
 }
 
 // On Δt: white for a booking that stands, dashed for the one that was sent on, green for a hold.
@@ -137,5 +137,5 @@ function NewChip({ tone, children }: { tone: "booked" | "moved" | "held"; childr
     moved: "flex-1 border border-dashed border-white/30 text-white/60",
     held: "shrink-0 bg-[#34d399]/15 text-[#6ee7b7]",
   }[tone];
-  return <span className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2.5 text-[12.5px] font-medium ${look}`}>{children}</span>;
+  return <span className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2.5 text-[12.5px] font-medium sm:h-9 sm:text-[13.5px] ${look}`}>{children}</span>;
 }
