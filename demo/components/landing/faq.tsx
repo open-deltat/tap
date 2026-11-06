@@ -5,27 +5,27 @@ import { ChevronDown } from "lucide-react";
 const FAQ = [
   {
     q: "My calendar already shows free and busy. What is different?",
-    a: "It shows you a list and leaves the work to you. It cannot keep a slot for an agent that is still asking, it cannot refuse a second booking of the same time, and it cannot tell anyone the moment something changed. Δt does all three inside the storage engine, so no code path can skip them.",
+    a: "Your calendar shows you a list and leaves the work to you. It cannot keep a slot for an agent that is still asking, it cannot refuse a second booking of the same time, and it cannot tell everyone the moment something changes. Δt does all three inside the database, so nothing can skip them.",
   },
   {
     q: "Does Δt replace Google Calendar or Outlook?",
-    a: "Δt is the source of truth for whatever your agent books: rooms, machines, seats, people's hours. Your calendar app stays the thing you look at. There is no connector to Google or Outlook in the box today; a pilot scopes one if you need it.",
+    a: "Δt holds whatever your agent books: rooms, machines, seats, people's hours. You keep your calendar app for looking at your day. There is no connector to Google or Outlook today; a pilot can include one.",
   },
   {
     q: "What is TAP?",
-    a: "The Time Allocation Protocol: four verbs (find, hold, commit, listen) spoken over the Postgres wire. Any Postgres driver connects to Δt, and the MCP server exposes the same four verbs to agents.",
+    a: "The Time Allocation Protocol: find, hold, book, listen, spoken over the Postgres wire. Any Postgres driver can connect to Δt, and the MCP server gives agents the same four actions.",
   },
   {
     q: "What happens when a hold runs out?",
-    a: "The slot is free again, and everyone listening hears it at once. A hold is a promise with a clock, not a booking, so an agent that goes quiet never blocks a time for good.",
+    a: "The slot is free again and everyone listening hears it at once. A hold is a promise with a clock, not a booking, so an agent that goes quiet never blocks a time for good.",
   },
   {
     q: "How does an agent talk to it?",
-    a: "Through the MCP server (npx @open-deltat/mcp), which gives any agent find_slots, hold_slot and commit_hold. Or through the TypeScript client, or straight over the Postgres wire from any language.",
+    a: "Through the MCP server (npx @open-deltat/mcp), the TypeScript client, or straight over the Postgres wire from any language.",
   },
   {
     q: "Can I run it myself?",
-    a: "Yes. The whole database is open source under AGPL-3.0: one Rust binary or a Docker image, every feature included. The founding pilot is for teams that want it hosted, wired in and reviewed by its author instead.",
+    a: "Yes. The whole database is open source (AGPL-3.0): one Rust binary or a Docker image, every feature included. The founding pilot is for teams that want it hosted, wired in and checked by its author.",
   },
 ] as const;
 

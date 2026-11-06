@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { cn } from "@open-deltat/shared/utils";
 import { formatTime } from "@open-deltat/shared/time";
 import { Stage } from "../../components/stage";
 import { Segmented } from "../../components/ui/segmented";
@@ -117,7 +118,8 @@ export default function MeetExample() {
   const chosenStart =
     pickedStart != null && evenings.some((e) => e.starts.includes(pickedStart)) ? pickedStart : evenings[0]?.starts[0];
   const chosen = chosenStart != null ? { start: chosenStart, end: chosenStart + durMs } : undefined;
-  const evening = chosen ? evenings.find((e) => e.dayStart === dayOf(chosen.start)) : undefined;
+  const eveningIndex = chosen ? evenings.findIndex((e) => e.dayStart === dayOf(chosen.start)) : -1;
+  const evening = eveningIndex >= 0 ? evenings[eveningIndex] : undefined;
 
   const lanes = useMemo(() => {
     if (!data || !evening) return [];
@@ -127,6 +129,17 @@ export default function MeetExample() {
       { label: "Everyone", slots: ofDay(data.shared), everyone: true },
     ];
   }, [data, evening]);
+
+  // The pager steps between evenings; landing on one picks its first start.
+  function stepEvening(delta: -1 | 1) {
+    const next = evenings[eveningIndex + delta];
+    if (next) setPickedStart(next.starts[0]);
+  }
+
+  function pickDuration(m: Duration) {
+    setDuration(m);
+    setPickedStart(null);
+  }
 
   function book() {
     if (!ids || !chosen) return;
@@ -169,7 +182,7 @@ export default function MeetExample() {
           <span className="hidden sm:inline">{shortDay(chosen.start)} · </span>
           {formatTime(chosen.start)} to {formatTime(chosen.end)}
         </div>
-        <div className="hidden text-[12px] text-dt-ink-3 sm:block">Written to all five calendars in one step</div>
+        <div className="hidden text-[12px] text-dt-ink-3 sm:block">Goes into all five calendars at once</div>
       </div>
       <BookButton onClick={book} loading={isPending}>
         Book for all five
@@ -180,79 +193,107 @@ export default function MeetExample() {
   return (
     <>
       <Stage primitive={{ label: "The free time several calendars share", specId: "AVAIL-08" }} title="When is everyone free?" tray={tray}>
-        <div className="mx-auto max-w-xl">
-          <div className="text-center">
+        {/* Like the appointments example: the choice on the left, the day on the right, one hairline between. */}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-[12rem_1fr]">
+          <div className="sm:border-r sm:border-dt-line sm:pr-6">
             <h3 className="text-[15px] font-semibold tracking-tight text-dt-ink">Five friends, five calendars</h3>
-            <p className="mx-auto mt-1 max-w-md text-pretty text-[13px] leading-relaxed text-dt-ink-2">
-              Pick how long. Δt shows only the evenings that fit all five.
+            <p className="mt-1 text-pretty text-[13px] leading-relaxed text-dt-ink-2">
+              Pick how long. Δt finds the evenings when all five are free.
             </p>
+
+            <div className="mt-4 text-[12px] text-dt-ink-3">How long</div>
+            <div className="mt-2 sm:hidden">
+              <Segmented
+                className="justify-start"
+                items={DURATIONS.map((m) => ({ value: m, label: durationLabel(m) }))}
+                value={duration}
+                onChange={pickDuration}
+                ariaLabel="How long"
+              />
+            </div>
+            <div role="radiogroup" aria-label="How long" className="mt-1 hidden divide-y divide-dt-line sm:block">
+              {DURATIONS.map((m) => {
+                const active = m === duration;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => pickDuration(m)}
+                    className={cn(
+                      "flex h-11 w-full items-center gap-2.5 text-left text-[14px] tabular-nums transition-colors",
+                      active ? "font-semibold text-dt-ink" : "text-dt-ink-2 hover:text-dt-ink"
+                    )}
+                  >
+                    <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full border transition-colors", active ? "border-dt-ink bg-dt-ink" : "border-dt-line-strong")} />
+                    {durationLabel(m)}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="mt-5">
-            <Segmented
-              items={DURATIONS.map((m) => ({ value: m, label: durationLabel(m) }))}
-              value={duration}
-              onChange={(m) => {
-                setDuration(m);
-                setPickedStart(null);
-              }}
-              ariaLabel="How long"
-            />
-          </div>
-
-          {/* The chosen time drawn across all five calendars: the why behind every chip below. Fixed
-              height so a change of length or time never moves the list. */}
-          <div className="mt-6 min-h-[236px] border-t border-dt-line pt-5">
+          <div className="flex min-h-[22rem] flex-col">
             {evening && chosen ? (
               <>
-                <div className="mb-3 flex items-baseline justify-between gap-3">
-                  <div className="text-sm font-medium text-dt-ink">{dayLabel(evening.dayStart)}</div>
-                  <div className="text-[12px] tabular-nums text-dt-ink-3">
-                    {formatTime(chosen.start)} to {formatTime(chosen.end)}
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0 truncate text-[15px] font-semibold tracking-tight text-dt-ink">{dayLabel(evening.dayStart)}</div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="mr-1 text-[12px] tabular-nums text-dt-ink-3">
+                      {eveningIndex + 1} of {evenings.length}
+                    </span>
+                    <PagerButton label="Previous evening" disabled={eveningIndex === 0} onClick={() => stepEvening(-1)}>
+                      <ChevronLeft className="h-4 w-4" />
+                    </PagerButton>
+                    <PagerButton label="Next evening" disabled={eveningIndex === evenings.length - 1} onClick={() => stepEvening(1)}>
+                      <ChevronRight className="h-4 w-4" />
+                    </PagerButton>
                   </div>
                 </div>
+
                 <MeetLanes
                   lanes={lanes}
                   axisStart={evening.dayStart + AXIS_START_HOUR * H}
                   axisEnd={evening.dayStart + AXIS_END_HOUR * H}
                   selected={chosen}
                 />
+
+                <div className="mt-5 border-t border-dt-line pt-4">
+                  <div className="mb-2 text-[12px] text-dt-ink-3">Start at</div>
+                  <Segmented
+                    className="justify-start"
+                    items={evening.starts.map((s) => ({ value: s, label: <span className="tabular-nums">{formatTime(s)}</span> }))}
+                    value={chosen.start}
+                    onChange={setPickedStart}
+                    ariaLabel="Start time"
+                  />
+                </div>
               </>
             ) : (
-              <div className="flex min-h-[200px] items-center justify-center text-center text-sm text-dt-ink-3">
+              <div className="flex flex-1 items-center justify-center text-center text-sm text-dt-ink-3">
                 No evening fits {durationLabel(duration)} for all five in the next {HORIZON_DAYS} days. Try a shorter time.
               </div>
             )}
           </div>
-
-          {evenings.length > 0 && (
-            <div className="mt-5 border-t border-dt-line pt-4">
-              <div className="mb-1 flex items-baseline justify-between text-[12px] text-dt-ink-3">
-                <span>Start at</span>
-                <span className="tabular-nums">
-                  {evenings.length} evening{evenings.length === 1 ? "" : "s"} in the next {HORIZON_DAYS} days
-                </span>
-              </div>
-              <div className="divide-y divide-dt-line">
-                {evenings.map((e) => (
-                  <div key={e.dayStart} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-start sm:gap-4">
-                    <div className="shrink-0 text-[13px] font-medium text-dt-ink sm:w-28 sm:pt-2.5">{shortDay(e.dayStart)}</div>
-                    <Segmented
-                      className="justify-start"
-                      items={e.starts.map((s) => ({ value: s, label: <span className="tabular-nums">{formatTime(s)}</span> }))}
-                      value={chosen?.start ?? null}
-                      onChange={setPickedStart}
-                      ariaLabel={`Start time on ${dayLabel(e.dayStart)}`}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </Stage>
 
       <BookingConfirmedModal result={result} onClose={() => setResult(null)} onBookAnother={() => setResult(null)} />
     </>
+  );
+}
+
+function PagerButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="grid h-10 w-10 place-items-center rounded-full border border-dt-line text-dt-ink transition-colors hover:bg-dt-sunken disabled:opacity-30 disabled:hover:bg-transparent sm:h-9 sm:w-9"
+    >
+      {children}
+    </button>
   );
 }

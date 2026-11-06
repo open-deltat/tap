@@ -14,10 +14,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { enabledExamples, type ExampleMeta } from "@open-deltat/examples/manifest";
+import Meet from "@open-deltat/examples/meet";
+import { InlineStage } from "@open-deltat/examples/components/stage-mode";
 import { pageMetadata, SITE } from "@/lib/seo";
 import { RaceModule } from "@/components/landing/race-module";
 import { DifferenceModule } from "@/components/landing/difference-module";
-import { VerbsBento } from "@/components/landing/verbs-bento";
 import { Faq } from "@/components/landing/faq";
 
 export const metadata = pageMetadata({
@@ -38,10 +39,18 @@ const ENTERPRISE_MAILTO = mailto("Δt enterprise", "Company:\nWhat you want to r
 
 // Every line here is a property the code enforces today; nothing is a roadmap item.
 const SPECS = [
-  { k: "Double bookings", v: "Impossible", note: "Enforced by the storage engine" },
-  { k: "Holds", v: "Built in", note: "Expire on their own" },
-  { k: "Protocol", v: "TAP", note: "Time Allocation Protocol, over Postgres wire" },
+  { k: "Double bookings", v: "Impossible", note: "The database refuses them" },
+  { k: "Holds", v: "Built in", note: "They let go on their own" },
+  { k: "Protocol", v: "TAP", note: "Works with any Postgres driver" },
   { k: "Agents", v: "MCP server", note: "On the official registry" },
+] as const;
+
+// The four calls an agent makes, in the order it makes them. Human verb first, the tool name beside it.
+const VERBS = [
+  { title: "Find", tool: "find_slots", body: "See what is free right now, across every calendar you name." },
+  { title: "Hold", tool: "hold_slot", body: "Keep a slot for a few minutes while the agent asks. It lets go on its own." },
+  { title: "Book", tool: "commit_hold", body: "Turn the hold into a booking in one step. If the slot is gone, Δt answers with times that still work." },
+  { title: "Listen", tool: "LISTEN", body: "Get told the moment anything changes, on every screen." },
 ] as const;
 
 type UseCase = { icon: LucideIcon; title: string; body: string; demo?: { href: string; label: string } };
@@ -50,7 +59,7 @@ const USE_CASES: readonly UseCase[] = [
   {
     icon: Cpu,
     title: "GPU clusters",
-    body: "Eight nodes booked as one block for a training run: all of them or none. The agent holds the block while the budget clears.",
+    body: "Eight machines booked together for one training run: all of them or none. The agent holds them while the budget is approved.",
   },
   {
     icon: CalendarDays,
@@ -60,7 +69,7 @@ const USE_CASES: readonly UseCase[] = [
   {
     icon: HomeIcon,
     title: "Rentals on every channel",
-    body: "A flat’s nights live in one calendar. Your site and every channel you connect hear the moment a night is taken.",
+    body: "A flat’s nights live in one calendar. Your site and every channel you connect see the moment a night is taken.",
   },
   {
     icon: PhoneCall,
@@ -71,7 +80,7 @@ const USE_CASES: readonly UseCase[] = [
   {
     icon: Camera,
     title: "Equipment and kit rental",
-    body: "A camera, two lenses and a light go out as one kit. Nobody leaves with the body and no glass.",
+    body: "A camera, two lenses and a light go out as one kit. Nobody leaves with the camera and no lens.",
   },
   {
     icon: FlaskConical,
@@ -81,7 +90,7 @@ const USE_CASES: readonly UseCase[] = [
   {
     icon: Ticket,
     title: "Event seats",
-    body: "Thousands of people and their agents pick seats at once. A held seat changes on every screen immediately.",
+    body: "Thousands of people and their agents pick seats at once. A held seat shows as held on every screen at once.",
     demo: { href: "/demos/live", label: "Live demo" },
   },
   {
@@ -114,9 +123,9 @@ const PLANS: readonly Plan[] = [
     blurb: "For a team putting an agent in front of something scarce, on a calendar it owns.",
     features: [
       "Hosted Δt in the EU, run by the person who wrote it",
-      "Your resources and hours imported for you",
+      "Your rooms, machines and hours set up for you",
       "MCP server and client wired into your agent",
-      "A race review of your booking flow before go-live",
+      "Your booking flow checked for double bookings before go-live",
       "A direct line to the founder",
     ],
     cta: { label: "Start a pilot", href: PILOT_MAILTO },
@@ -127,8 +136,8 @@ const PLANS: readonly Plan[] = [
     id: "enterprise",
     name: "Enterprise",
     price: "Custom",
-    blurb: "For closed-source products and fleets of calendars.",
-    features: ["Commercial licence, no AGPL duties", "Dedicated deployment, yours or ours", "Connectors to your systems, scoped together", "Architecture review with the author"],
+    blurb: "For closed-source products and many calendars.",
+    features: ["Commercial licence, no AGPL obligations", "Dedicated deployment, yours or ours", "Connectors to your systems, planned with you", "Architecture review with the author"],
     cta: { label: "Talk to us", href: ENTERPRISE_MAILTO },
   },
 ];
@@ -160,9 +169,9 @@ export default function Home() {
               Real-Time Calendars for Agents
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-pretty text-[17px] leading-relaxed text-dt-ink-2 sm:text-lg">
-              A calendar is a list that gets copied around. Δt is a database of time. Agents query it, hold a slot
-              while they decide, and commit in one step. Every screen hears it the moment it is written. Nothing is
-              ever booked twice.
+              Your calendar is a list that gets copied around. Δt is a database for time. An agent asks it what is
+              free, holds a slot while it decides, and books it in one step. Everyone sees the change at once.
+              Nothing gets booked twice.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a href="#pricing" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-dt-ink px-7 text-[15px] font-semibold text-dt-on-ink transition-[background-color,transform] duration-150 hover:bg-dt-ink/85 active:scale-[0.98] sm:w-auto">
@@ -170,7 +179,7 @@ export default function Home() {
                 <ArrowRight className="h-4 w-4" />
               </a>
               <a href="/docs/guides/ai-agent-scheduling" className="inline-flex h-12 w-full items-center justify-center rounded-full border border-dt-line-strong bg-dt-surface px-7 text-[15px] font-medium text-dt-ink transition-colors hover:bg-dt-sunken sm:w-auto">
-                How agents book on it
+                See how it works
               </a>
             </div>
             <div className="mt-5 font-mono text-[12.5px] text-dt-ink-3">
@@ -197,33 +206,44 @@ export default function Home() {
         {/* The difference: why "my calendar already does that" is not true */}
         <Section
           eyebrow="Why not my calendar?"
-          title="A calendar is a list. Δt is a database of time."
-          lead="Google Calendar, Outlook and every .ics feed hand you a list of events and leave the rest to you. An agent needs an answer, a hold, and a write that fails when it should. Ask both the same four things."
+          title="A calendar is a list. Δt is a database for time."
+          lead="Google Calendar, Outlook and every calendar feed give you a list of events. Everything else is up to you. Ask a calendar and Δt the same four things."
         >
           <DifferenceModule />
         </Section>
 
         {/* How it works */}
-        <Section eyebrow="How it works" title="Four verbs. No race left to lose.">
-          <VerbsBento />
-          <p className="mt-8 max-w-3xl text-[15px] leading-relaxed text-dt-ink-2">
-            Underneath is Δt, a database whose one rule is that two bookings never occupy the same time. The refusal
-            comes from the storage engine, not from code that checked first and hoped. It speaks TAP, the Time
-            Allocation Protocol, over the Postgres wire, so the Postgres driver you already use connects to it.
+        <Section eyebrow="How it works" title="An agent can do four things.">
+          <dl className="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
+            {VERBS.map((v, i) => (
+              <div key={v.title} className="border-t border-dt-line pt-4">
+                <dt className="flex items-baseline gap-2.5">
+                  <span className="font-mono text-[12px] text-dt-ink-3">0{i + 1}</span>
+                  <span className="text-[17px] font-semibold tracking-tight">{v.title}</span>
+                  <code className="font-mono text-[12px] text-dt-accent-ink">{v.tool}</code>
+                </dt>
+                <dd className="mt-1.5 text-[14.5px] leading-relaxed text-dt-ink-2">{v.body}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-10 max-w-3xl text-[15px] leading-relaxed text-dt-ink-2">
+            Underneath is Δt, a database with one rule: two bookings never share the same time. The database itself
+            says no, not a check in your code. It speaks TAP, the Time Allocation Protocol, over the Postgres wire,
+            so any Postgres driver can talk to it.
           </p>
         </Section>
 
         {/* The question a calendar cannot answer, asked of the live example */}
         <Section
-          eyebrow="Ask time a question"
-          title="When are five people free for an hour? One query."
-          lead="A calendar can list what is in it. It cannot answer this. Δt computes the gaps across every calendar you name on each read, and holds the answer while you confirm. This is the live example, running on Δt now: pick a length."
+          eyebrow="Live example"
+          title="When are five people free for an hour?"
+          lead="A calendar can only show you five lists. Δt works out when they overlap, every time you ask. This is the real thing, running on Δt right now. Try it."
         >
-          <div className="overflow-hidden rounded-[28px] border border-dt-line bg-dt-canvas shadow-dt-float">
-            <iframe src="/embed/meet" title="Group bookings, live" loading="lazy" className="block h-[820px] w-full border-0 sm:h-[860px]" />
-          </div>
+          <InlineStage>
+            <Meet />
+          </InlineStage>
           {meet && (
-            <div className="mt-4 text-center">
+            <div className="mt-2 text-center">
               <a href={meet.href} className="inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-dt-ink hover:text-dt-accent-ink">
                 Open the full example
                 <ArrowRight className="h-4 w-4" />
@@ -233,7 +253,7 @@ export default function Home() {
         </Section>
 
         {/* Use cases */}
-        <Section eyebrow="What teams run on Δt" title="Anything scarce, with a time on it.">
+        <Section eyebrow="What runs on Δt" title="Anything with limited places and a time.">
           <div className="grid gap-px overflow-hidden rounded-3xl border border-dt-line bg-dt-line sm:grid-cols-2 lg:grid-cols-4">
             {USE_CASES.map((u) => (
               <div key={u.title} className="relative flex flex-col bg-dt-surface p-6">
@@ -252,7 +272,7 @@ export default function Home() {
         </Section>
 
         {/* Pricing */}
-        <Section id="pricing" eyebrow="Pricing" title="We run it. You ship the agent.">
+        <Section id="pricing" eyebrow="Pricing" title="We run it. You build the agent.">
           <div className="mx-auto grid max-w-4xl gap-4 md:grid-cols-2 md:items-stretch">
             {PLANS.map((p) => (
               <div
@@ -299,11 +319,11 @@ export default function Home() {
             ))}
           </div>
           <p className="mx-auto mt-6 max-w-2xl text-pretty text-center text-[13.5px] leading-relaxed text-dt-ink-3">
-            Running it yourself is free: the whole database is open source under AGPL-3.0, every feature included.{" "}
+            Running it yourself is free. The whole database is open source (AGPL-3.0), every feature included.{" "}
             <a href="/docs/sdk/self-host" className="whitespace-nowrap font-medium text-dt-ink underline decoration-dt-line-strong underline-offset-4 hover:decoration-dt-ink">
               Self-host it
             </a>
-            . Connectors to outside calendars and booking channels are scoped per customer.
+            .
           </p>
         </Section>
 
@@ -322,7 +342,7 @@ export default function Home() {
         </Section>
 
         {/* FAQ */}
-        <Section eyebrow="Questions" title="The ones people ask with their calendar open in the next tab.">
+        <Section eyebrow="Questions" title="Common questions.">
           <Faq />
         </Section>
 
@@ -333,7 +353,7 @@ export default function Home() {
               Give your agent a calendar it can’t double-book.
             </h2>
             <p className="mx-auto mt-4 max-w-lg text-[16px] leading-relaxed opacity-75">
-              Five founding teams get Δt hosted, wired in and reviewed by its author. The price holds for a year.
+              Five founding teams get Δt hosted, wired in and checked by its author. The price holds for a year.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a href={PILOT_MAILTO} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-dt-on-ink px-7 text-[15px] font-semibold text-dt-ink transition-[opacity,transform] duration-150 hover:opacity-90 active:scale-[0.98] sm:w-auto">

@@ -235,16 +235,8 @@
 @keyframes dt-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 .dt-breathe { animation: dt-breathe 2.4s ease-in-out infinite; }
 
-/* A change radiating to every listener. Loops slowly because the tile is a picture of a stream,
-   not a report of one event. */
-@keyframes dt-radiate {
-  0% { transform: scale(1); opacity: 0.55; }
-  100% { transform: scale(3.2); opacity: 0; }
-}
-.dt-radiate { animation: dt-radiate 2.8s var(--ease-dt) infinite; }
-
 @media (prefers-reduced-motion: reduce) {
-  .dt-rise, .dt-ping, .dt-breathe, .dt-radiate { animation: none; }
+  .dt-rise, .dt-ping, .dt-breathe { animation: none; }
   .dt-draw-ring, .dt-draw-tick { animation: none; stroke-dashoffset: 0; }
 }
 
