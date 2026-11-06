@@ -56,7 +56,7 @@ export function PersonalCalendarProvider({ children }: { children: React.ReactNo
 
   useWebSocket(
     calendarId
-      ? { type: "subscribe", resourceId: calendarId, onEvent: onWsEvent }
+      ? { type: "subscribe", resourceId: calendarId, onChange: onWsEvent }
       : null
   );
 

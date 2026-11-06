@@ -107,7 +107,7 @@ export default function BuilderExample() {
     })();
   }, [loadStrip]);
 
-  useWebSocket(resourceId ? { type: "subscribe", resourceId, onEvent: () => resourceId && loadStrip(resourceId) } : null);
+  useWebSocket(resourceId ? { type: "subscribe", resourceId, onChange: () => resourceId && loadStrip(resourceId) } : null);
 
   function save() {
     if (!resourceId) return;

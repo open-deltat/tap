@@ -151,6 +151,12 @@ export function fakeDeltaT() {
         if (state.releaseFails === "gone") throw Object.assign(new Error("unknown hold"), { code: "42704" });
         state.released.push(holdId);
       },
+      get: async (resourceId: string) => {
+        readOrFail();
+        return state.placed
+          .filter((h) => !state.released.includes(h.id) && !committed.has(h.id))
+          .map((h) => ({ ...h, resourceId }));
+      },
     },
     bookings: {
       cancel: async (id: string) => {

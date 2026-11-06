@@ -7,6 +7,7 @@ import { dt, dtPublic } from "@open-deltat/examples/lib/deltat";
 import { trackBookings } from "@open-deltat/examples/lib/session-bookings";
 import { publicRegistry } from "@open-deltat/examples/lib/public-registry";
 import * as bookable from "@open-deltat/examples/lib/bookable-service";
+import { forwardChanges } from "@open-deltat/examples/lib/live-changes";
 
 // A subscription names its tenant; only these two exist. Default is the demo tenant (the examples'
 // resources); user-owned calendars live in the public tenant. An unknown value maps to demo rather
@@ -84,13 +85,16 @@ async function handleInit(ws: WebSocket, state: WsState, msg: InitMessage) {
   }
   state.resourceId = msg.resourceId;
   state.database = msg.database;
-  state.client = clientFor(msg.database);
+  const client = clientFor(msg.database);
+  state.client = client;
 
-  state.unlisten = await state.client.events.listen(msg.resourceId, (event) => {
-    if (ws.readyState === ws.OPEN) {
-      ws.send(JSON.stringify(event));
+  state.unlisten = await forwardChanges(
+    (resourceId, onEvent) => client.events.listen(resourceId, onEvent),
+    msg.resourceId,
+    (frame) => {
+      if (ws.readyState === ws.OPEN) ws.send(frame);
     }
-  });
+  );
 
   if (msg.type === "hold") {
     state.start = msg.start;

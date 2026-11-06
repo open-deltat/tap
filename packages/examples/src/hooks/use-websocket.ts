@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import type { DeltaTEvent } from "@open-deltat/client";
 
 interface SubscribeOptions {
   type: "subscribe";
   resourceId: string;
   /** Which tenant the resource lives in. Omitted = the demo tenant (the examples' default). */
   database?: string;
-  onEvent: (event: DeltaTEvent) => void;
+  /** Something on the calendar changed. The bridge never says what (a kernel notification carries
+   *  hold ids, which are authority), so read again through your own path. */
+  onChange: () => void;
 }
 
 /** "live" = streaming; "expiring" = server warned it will pause soon; "paused" = server closed it by
@@ -60,8 +61,7 @@ export function useWebSocket(options: SubscribeOptions | null): StreamControl {
           const data = JSON.parse(e.data);
           if (data.type === "__expiring") { setStatus("expiring"); return; }
           if (data.type === "__closing") return; // a close event follows immediately
-          if (data.type === "error") return;
-          optionsRef.current?.onEvent(data as DeltaTEvent);
+          if (data.type === "changed") optionsRef.current?.onChange();
         } catch {}
       };
 

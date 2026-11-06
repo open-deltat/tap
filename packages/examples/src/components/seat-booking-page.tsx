@@ -128,7 +128,7 @@ export function SeatBookingPage({
       if (seatIds.length > 0) loadSeatData(seatIds, selectedSlot.start, selectedSlot.end);
     }
   }, [selectedSlot, venueId, resources, loadSeatData, isPending]);
-  useWebSocket(venueId ? { type: "subscribe", resourceId: venueId, onEvent: onWsEvent } : null);
+  useWebSocket(venueId ? { type: "subscribe", resourceId: venueId, onChange: onWsEvent } : null);
 
   useEffect(() => {
     async function init() {

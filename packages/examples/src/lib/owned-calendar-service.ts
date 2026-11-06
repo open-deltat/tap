@@ -1,6 +1,7 @@
 import { expandRecurrence, type Booking, type DeltaT } from "@open-deltat/client";
 import type { BookableRecord, BookableRegistry, BookingMode } from "./public-bookables";
 import type { Display } from "./calendar-displays";
+import type { HeldSpan } from "./schedule-diff";
 import { MAX_PUBLIC_BOOKABLES, normalizeBookableName } from "./public-bookables";
 import { dateRangeFromToday, type WeekHours } from "../examples/builder/schedule";
 import {
@@ -29,6 +30,7 @@ export interface OwnedDeps {
 export interface CalendarView {
   record: BookableRecord;
   bookings: Booking[];
+  holds: HeldSpan[];
 }
 
 const MAX_PRICE_CENTS = 1_000_000; // €10,000 a slot: a sanity ceiling, not a business rule
@@ -157,15 +159,17 @@ export async function saveAvailability(
   return { ok: true, value: updated };
 }
 
-/** The calendar plus its current bookings, for the management page. */
+/** The calendar plus its current bookings and holds, for the management page. */
 export async function getOwnedCalendar(
   deps: OwnedDeps,
   input: { id: string; owner: string }
 ): Promise<Outcome<CalendarView>> {
   const record = deps.registry.authorizeOwner(input.id, input.owner);
   if (!record) return { ok: false, error: "You do not own this calendar." };
-  const bookings = await deps.dt.bookings.get(input.id);
-  return { ok: true, value: { record, bookings } };
+  const [bookings, held] = await Promise.all([deps.dt.bookings.get(input.id), deps.dt.holds.get(input.id)]);
+  // The id is left behind on purpose: it is what release and commit accept as authority.
+  const holds = held.map(({ start, end, expiresAt }) => ({ start, end, expiresAt }));
+  return { ok: true, value: { record, bookings, holds } };
 }
 
 export async function renameOwnedCalendar(

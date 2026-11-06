@@ -298,7 +298,7 @@ export default function StadiumExample() {
 
   useEffect(() => () => clearTimeout(reloadTimerRef.current), []);
 
-  useWebSocket(rootId ? { type: "subscribe", resourceId: rootId, onEvent: liveReload } : null);
+  useWebSocket(rootId ? { type: "subscribe", resourceId: rootId, onChange: liveReload } : null);
 
   function book() {
     if (!selected || !slot) return;

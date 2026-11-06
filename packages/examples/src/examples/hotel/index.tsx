@@ -96,7 +96,7 @@ export default function HotelPage() {
     reloadTimer.current = setTimeout(() => void refresh(typesRef.current), 200);
   }, [refresh]);
   useEffect(() => () => clearTimeout(reloadTimer.current), []);
-  useWebSocket(rootId ? { type: "subscribe", resourceId: rootId, onEvent: liveReload } : null);
+  useWebSocket(rootId ? { type: "subscribe", resourceId: rootId, onChange: liveReload } : null);
 
   const selType = types.find((t) => t.id === selTypeId) ?? types[0] ?? null;
   const selBookings = useMemo(

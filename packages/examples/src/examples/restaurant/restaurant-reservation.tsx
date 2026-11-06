@@ -119,7 +119,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
     if (isPending) return;
     refresh();
   }, [isPending, refresh]);
-  useWebSocket(restaurantId ? { type: "subscribe", resourceId: restaurantId, onEvent: onWsEvent } : null);
+  useWebSocket(restaurantId ? { type: "subscribe", resourceId: restaurantId, onChange: onWsEvent } : null);
 
   // Seed-independent: pull full Resource rows once for the modal's deltat record.
   useEffect(() => {
