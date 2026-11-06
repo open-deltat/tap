@@ -187,7 +187,7 @@ export default function MeetExample() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+      <div className="dt-canvas flex h-full items-center justify-center text-dt-ink-3">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to Δt…
@@ -197,13 +197,13 @@ export default function MeetExample() {
   }
 
   if (!grid) {
-    return <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-sm text-zinc-500">Could not reach Δt.</div>;
+    return <div className="dt-canvas flex h-full items-center justify-center text-sm text-dt-ink-3">Could not reach Δt.</div>;
   }
 
   const tray =
     activeStart != null ? (
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 text-sm text-zinc-300">
+        <div className="min-w-0 flex-1 text-sm tabular-nums text-dt-ink-2">
           {dayLabel(activeStart)} · {formatTime(activeStart)} to {formatTime(activeStart + durMs)} · books all five at once
         </div>
         <BookButton onClick={book} loading={isPending}>
@@ -217,15 +217,15 @@ export default function MeetExample() {
       <Stage primitive={{ label: "A time several calendars all share", specId: "AVAIL-08" }} title="Find a time the group shares" tray={tray}>
         <div className="mx-auto max-w-2xl">
           <div className="text-center">
-            <h3 className="text-sm font-semibold text-zinc-100">Dinner with five friends</h3>
-            <p className="mx-auto mt-1 max-w-lg text-[12px] leading-relaxed text-zinc-400">
+            <h3 className="text-[15px] font-semibold tracking-tight text-dt-ink">Dinner with five friends</h3>
+            <p className="mx-auto mt-1 max-w-lg text-pretty text-[13px] leading-relaxed text-dt-ink-2">
               The bottom row is when all five are free at once. Pick a length, a green{" "}
-              <span className="text-emerald-300">Everyone</span> evening, then a time.
+              <span className="font-medium text-dt-accent-ink">Everyone</span> evening, then a time.
             </p>
           </div>
 
-          <div className="mb-3 mt-5 flex items-center justify-center gap-2">
-            <span className="text-[11px] text-zinc-500">Dinner length</span>
+          <div className="mb-3 mt-5 flex flex-wrap items-center justify-center gap-2">
+            <span className="text-[12px] text-dt-ink-3">Dinner length</span>
             <Segmented
               items={DURATIONS.map((m) => ({ value: m, label: durationLabel(m) }))}
               value={duration}
@@ -238,19 +238,19 @@ export default function MeetExample() {
           </div>
 
           <WeekTimeline start={grid.start} dayCount={HORIZON_DAYS} rows={rows} onPick={pickDay} selectedDay={selectedDay ?? undefined} labelWidth={52} />
-          <div className="mt-2 text-center text-[11px] text-zinc-500">
+          <div className="mt-2 text-center text-[12px] tabular-nums text-dt-ink-3">
             {openCount > 0
               ? `${openCount} evening${openCount > 1 ? "s" : ""} fit a ${durationLabel(duration)} dinner for all five`
               : `No evening fits a ${durationLabel(duration)} dinner for all five in the next three weeks`}
           </div>
 
           {/* Reserved so picking a day swaps content in place instead of growing the panel. */}
-          <div className="mt-5 min-h-[23rem] rounded-lg border border-white/[0.07] bg-white/[0.02] p-4">
+          <div className="mt-5 min-h-[23rem] rounded-2xl border border-dt-line bg-dt-sunken p-4">
             {detail ? (
               <>
                 <div className="mb-3 text-center">
-                  <div className="text-sm font-medium text-zinc-100">{dayLabel(detail.dayStart)}</div>
-                  <div className="text-[12px] text-zinc-400">
+                  <div className="text-sm font-medium text-dt-ink">{dayLabel(detail.dayStart)}</div>
+                  <div className="text-[12px] text-dt-ink-3">
                     {slotOptions.length > 0 ? "Pick a start time on the All free lane" : `No ${durationLabel(duration)} window all five share this evening`}
                   </div>
                 </div>
@@ -264,7 +264,7 @@ export default function MeetExample() {
                 />
               </>
             ) : (
-              <div className="flex min-h-[21rem] items-center justify-center text-center text-sm text-zinc-500">
+              <div className="flex min-h-[21rem] items-center justify-center text-center text-sm text-dt-ink-3">
                 Pick a day to see common times
               </div>
             )}
@@ -275,8 +275,8 @@ export default function MeetExample() {
       <BookingConfirmedModal result={result} onClose={() => setResult(null)} onBookAnother={() => setResult(null)} />
 
       {isPending && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="flex items-center gap-2 text-sm text-zinc-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dt-canvas/40 backdrop-blur-[3px]">
+          <div className="flex items-center gap-2 rounded-full border border-dt-line bg-dt-raised px-4 py-2 text-sm text-dt-ink-2 shadow-dt-float">
             <Loader2 className="h-4 w-4 animate-spin" />
             Working…
           </div>

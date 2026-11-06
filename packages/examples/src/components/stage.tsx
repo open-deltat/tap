@@ -8,10 +8,10 @@ export interface StagePrimitive {
 }
 
 /**
- * The shared single-pane surface for every booking demo: one luminous panel centered on a
- * dark void, a quiet primitive header naming the deltat capability, an optional control
- * ribbon, and an optional floating action tray. There is no left/right chrome, the panel
- * IS the example.
+ * The shared surface for every booking demo: a title, one quiet line naming the Δt capability it
+ * proves, one surface holding the example, and the island: a floating bar at the bottom that is the
+ * only place you ever act. On phones the surface goes edge to edge (no card inside the page) and the
+ * island pins to the visible viewport bottom, clear of the home indicator.
  */
 export function Stage({
   primitive,
@@ -30,46 +30,38 @@ export function Stage({
   contentMax?: string;
 }) {
   return (
-    <div className="relative h-full overflow-hidden bg-[#0a0a0c] text-zinc-100">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute left-1/2 top-1/3 h-[55vh] w-[55vh] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/10 blur-[130px]" />
-        <div className="absolute inset-0 opacity-[0.035] [background-image:radial-gradient(circle,#ffffff_1px,transparent_1px)] [background-size:22px_22px]" />
-      </div>
-
-      <div className="relative flex h-full flex-col items-center">
-        <div className="shrink-0 pb-3 pt-8 text-center">
-          {title && <div className="text-sm font-medium text-zinc-300">{title}</div>}
+    <div className="dt-canvas relative flex h-full flex-col overflow-hidden text-dt-ink">
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-auto pb-32">
+        <header className="w-full shrink-0 px-5 pb-5 pt-8 text-center sm:pt-12">
+          {title && (
+            <h1 className="text-balance text-[1.6rem] font-semibold leading-tight tracking-[-0.02em] text-dt-ink sm:text-[2rem]">
+              {title}
+            </h1>
+          )}
           {primitive && (
-            <div className="mt-1.5 flex items-center justify-center gap-2 text-[10.5px] uppercase tracking-[0.2em] text-zinc-500">
-              <span>{primitive.label}</span>
+            <p className="mx-auto mt-2 flex max-w-md flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13px] text-dt-ink-3">
+              <span className="text-balance">{primitive.label}</span>
               {primitive.specId && (
-                <span className="rounded border border-white/10 px-1 py-px font-mono text-[9px] tracking-normal text-zinc-500">
+                <span className="rounded-full border border-dt-line px-2 py-px font-mono text-[10.5px] text-dt-ink-3">
                   {primitive.specId}
                 </span>
               )}
-            </div>
+            </p>
           )}
-        </div>
+        </header>
 
-        {ribbon && <div className="shrink-0 pb-4">{ribbon}</div>}
+        {ribbon && <div className="w-full shrink-0 px-4 pb-5">{ribbon}</div>}
 
-        {/* m-auto (not items-center) so a panel taller than the viewport top-anchors and stays
-            fully scrollable, items-center would clip the top out of reach. */}
-        <div className={`flex w-full flex-1 justify-center overflow-auto px-0 pb-28 sm:px-6 ${contentMax}`}>
-          {/* On phones the panel goes edge-to-edge (no border/bg/padding) so the example uses the
-              full viewport; sm: restores the floating panel, byte-identical to before. */}
-          <div className="m-auto w-full rounded-none border-0 bg-transparent p-0 shadow-none sm:rounded-2xl sm:border sm:border-white/[0.06] sm:bg-white/[0.025] sm:p-6 sm:shadow-2xl sm:shadow-black/50">
+        <div className={`w-full px-0 sm:px-6 ${contentMax}`}>
+          <div className="w-full bg-transparent px-4 py-2 sm:rounded-[28px] sm:border sm:border-dt-line sm:bg-dt-surface sm:p-7 sm:shadow-dt-surface">
             {children}
           </div>
         </div>
       </div>
 
-      {/* fixed (not absolute) on mobile so the tray pins to the visible viewport bottom regardless
-          of the tall scroll content; sm: reverts to absolute-in-Stage (desktop unchanged). The
-          safe-area pad keeps the Book button clear of the iOS home indicator. */}
       {tray && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:absolute sm:p-4">
-          <div className="pointer-events-auto w-full max-w-2xl rounded-xl border border-white/10 bg-zinc-900/85 p-3 shadow-2xl shadow-black/50 backdrop-blur-md">
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:absolute sm:pb-6">
+          <div className="dt-rise pointer-events-auto w-full max-w-xl rounded-[22px] border border-dt-line bg-dt-raised p-2.5 pl-4 shadow-dt-float backdrop-blur-xl backdrop-saturate-150">
             {tray}
           </div>
         </div>

@@ -35,21 +35,12 @@ const EMPTY_STATE: SeatState = {
   holds: new Map(),
 };
 
-const ACCENT = {
-  emerald: {
-    border: "border-emerald-400/20",
-    borderLive: "border-emerald-400/50 ring-1 ring-emerald-400/30",
-    dot: "bg-emerald-400",
-    pulseOn: "border-emerald-400/40 bg-emerald-400/15 text-emerald-200",
-  },
-  sky: {
-    border: "border-sky-400/20",
-    borderLive: "border-sky-400/50 ring-1 ring-sky-400/30",
-    dot: "bg-sky-400",
-    pulseOn: "border-sky-400/40 bg-sky-400/15 text-sky-200",
-  },
+// Who each panel is: you in ink (the selection colour), the other person in a quieter grey.
+const PERSON = {
+  you: "bg-dt-ink",
+  other: "bg-dt-ink-3",
 } as const;
-type Accent = keyof typeof ACCENT;
+type Person = keyof typeof PERSON;
 
 /**
  * The same cinema showtime rendered as TWO independent bookers: "You" and "Viewer 1". Each is a
@@ -100,7 +91,7 @@ export function LiveRoom() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+      <div className="dt-canvas flex h-full items-center justify-center text-dt-ink-3">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to Δt…
@@ -111,26 +102,26 @@ export function LiveRoom() {
 
   return (
     <Stage
-      primitive={{ label: "Holds that update live for everyone", specId: "PROTO-01" }}
-      title="Live Cinema"
-      contentMax="max-w-none"
+      primitive={{ label: "Two screens, one cinema. Hold a seat on one and watch it change on the other.", specId: "PROTO-01" }}
+      title="Live cinema"
+      contentMax="max-w-[1400px]"
     >
-      <div className="space-y-3">
+      <div className="space-y-4">
         {(streamStatus === "expiring" || streamStatus === "paused") && (
           <StreamNotice status={streamStatus} onResume={() => setStreamKey((k) => k + 1)} />
         )}
         {/* Two independent bookers: side-by-side on desktop, stacked top/bottom on mobile. */}
-        <div key={streamKey} className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div key={streamKey} className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Booker
             label="You"
-            accent="emerald"
+            person="you"
             venueId={venueId}
             slot={slot}
             sections={sections}
             resources={resources}
             onStatus={setStreamStatus}
           />
-          <Booker label="Viewer 1" accent="sky" venueId={venueId} slot={slot} sections={sections} resources={resources} />
+          <Booker label="Someone else" person="other" venueId={venueId} slot={slot} sections={sections} resources={resources} />
         </div>
       </div>
     </Stage>
@@ -140,7 +131,7 @@ export function LiveRoom() {
 /** A self-contained booker: its own seat-state read, holds, selection, atomic booking and socket. */
 function Booker({
   label,
-  accent,
+  person,
   venueId,
   slot,
   sections,
@@ -148,7 +139,7 @@ function Booker({
   onStatus,
 }: {
   label: string;
-  accent: Accent;
+  person: Person;
   venueId: string | null;
   slot: { start: number; end: number } | null;
   sections: Sections;
@@ -167,7 +158,6 @@ function Booker({
   const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const seatIds = useMemo(() => allSeatIds(sections), [sections]);
-  const a = ACCENT[accent];
 
   function closeAllHolds() {
     for (const ws of holdWsRef.current.values()) ws.close();
@@ -312,31 +302,40 @@ function Booker({
 
   return (
     <>
-      <div className={cn("rounded-xl border bg-white/[0.02] p-2 transition-colors sm:p-3", a.border, live && a.borderLive)}>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2 text-xs font-medium text-zinc-200">
-            <span className={cn("h-2 w-2 rounded-full", a.dot)} />
-            {label}
+      {/* A well, not a card: the Stage surface is already the card, so the two screens sit in it as
+          sunken panels. A notify from the other screen lights the panel's ring once. */}
+      <div
+        className={cn(
+          "rounded-3xl bg-dt-sunken p-3 ring-1 ring-inset transition-[box-shadow] duration-300 sm:p-4",
+          live ? "ring-dt-accent/60" : "ring-transparent"
+        )}
+      >
+        <div className="flex items-center justify-between gap-3 px-1">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-dt-ink">
+              <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", PERSON[person])} />
+              {label}
+            </div>
             {slot && (
-              <span className="font-normal text-[10.5px] text-zinc-500">
-                · {formatTime(slot.start)}–{formatTime(slot.end)} · tap a free seat to hold it
-              </span>
+              <div className="mt-0.5 text-[12.5px] tabular-nums text-dt-ink-3">
+                Showtime {formatTime(slot.start)} to {formatTime(slot.end)}
+              </div>
             )}
-          </span>
+          </div>
           <span
             className={cn(
-              "flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] uppercase tracking-wider transition-colors",
-              live ? a.pulseOn : "border-white/10 text-zinc-500"
+              "flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors duration-300",
+              live ? "bg-dt-accent-soft text-dt-accent-ink" : "bg-dt-surface text-dt-ink-3"
             )}
           >
-            <Wifi className="h-2.5 w-2.5" />
-            <span className="inline-block w-[2.75rem] text-center">{live ? "notify" : "live"}</span>
+            <Wifi className="h-3.5 w-3.5" />
+            <span className="inline-block w-[3.6rem] text-center">{live ? "Updated" : "Live"}</span>
           </span>
         </div>
 
         <PerfBar perf={perf} />
 
-        <div className="mt-2 rounded-lg border-0 bg-transparent p-0 text-zinc-100 sm:border sm:border-white/[0.06] sm:bg-white/[0.025] sm:p-3">
+        <div className="mt-3 rounded-2xl bg-dt-surface p-3 text-dt-ink sm:p-5">
           {noSurface ? (
             <EmptySurface />
           ) : (
@@ -357,20 +356,20 @@ function Booker({
         {/* Always rendered, so the 0-to-1 selection never changes the card height: the Book button
             (fixed h-10) is always present, and the chips replace the hint in the same row. It only
             grows if many chips wrap, which is genuine content, not a pop-in. */}
-        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-2">
-          <div className="flex flex-1 flex-wrap items-center gap-1.5">
+        <div className="mt-3 flex flex-wrap items-center gap-3 px-1">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             {slot && selectedSeats.size > 0 ? (
               Array.from(selectedSeats)
                 .map((id) => ({ id, name: seatName(id), price: sectionOf(id)?.price }))
                 .sort((x, y) => x.name.localeCompare(y.name))
                 .map(({ id, name, price }) => (
-                  <span key={id} className="rounded bg-emerald-400/15 px-1.5 py-0.5 text-xs font-medium text-emerald-200">
+                  <span key={id} className="dt-rise inline-flex h-7 items-center gap-1 rounded-full bg-dt-surface px-2.5 text-[12.5px] font-medium tabular-nums text-dt-ink">
                     {name}
-                    {price != null && <span className="ml-0.5 text-emerald-300/70">${price}</span>}
+                    {price != null && <span className="text-dt-ink-3">${price}</span>}
                   </span>
                 ))
             ) : (
-              <span className="text-[11px] text-zinc-600">Tap a free seat to hold it, then book.</span>
+              <span className="text-[13px] text-dt-ink-3">Tap a free seat. It is held for you until you book or let go.</span>
             )}
           </div>
           <BookButton onClick={handleBookHeld} loading={isPending} disabled={selectedSeats.size === 0}>
@@ -386,7 +385,7 @@ function Booker({
 }
 
 function EmptySurface() {
-  return <div className="py-16 text-center text-sm text-zinc-400">No showtime available right now.</div>;
+  return <div className="py-16 text-center text-sm text-dt-ink-3">No showtime available right now.</div>;
 }
 
 function fmtMs(n: number): string {
@@ -396,21 +395,17 @@ function fmtMs(n: number): string {
 /** Real round-trip timings to Δt for this client: a read, the hold→broadcast loop, and a booking. */
 function PerfBar({ perf }: { perf: { read?: number; book?: number; live?: number } }) {
   const stats: { label: string; hint: string; value?: number }[] = [
-    { label: "read", hint: "availability + holds", value: perf.read },
-    { label: "live", hint: "hold to broadcast", value: perf.live },
-    { label: "book", hint: "atomic batch", value: perf.book },
+    { label: "Read", hint: "Availability and holds, one round trip", value: perf.read },
+    { label: "Broadcast", hint: "Your hold reaching every other screen", value: perf.live },
+    { label: "Book", hint: "Every held seat booked in one step", value: perf.book },
   ];
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="mt-3 grid grid-cols-3 gap-1.5">
       {stats.map((s) => (
-        <span
-          key={s.label}
-          className="flex items-baseline gap-1 rounded-md border border-white/[0.06] bg-white/[0.02] px-1.5 py-0.5"
-          title={s.hint}
-        >
-          <span className="text-[9px] text-zinc-500">{s.label}</span>
-          <span className="inline-block min-w-[3rem] text-right font-mono text-[10px] font-semibold tabular-nums text-emerald-300">
-            {s.value != null ? fmtMs(s.value) : "n/a"}
+        <span key={s.label} className="rounded-xl bg-dt-surface/70 px-3 py-2" title={s.hint}>
+          <span className="block text-[11.5px] text-dt-ink-3">{s.label}</span>
+          <span className="mt-0.5 block font-mono text-[13px] font-semibold tabular-nums text-dt-ink">
+            {s.value != null ? fmtMs(s.value) : <span className="font-sans font-normal text-dt-ink-3">waiting</span>}
           </span>
         </span>
       ))}
@@ -424,15 +419,15 @@ function StreamNotice({ status, onResume }: { status: StreamStatus; onResume: ()
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-xl border px-3 py-2 text-sm",
-        expiring ? "border-amber-400/40 bg-amber-400/10 text-amber-200" : "border-white/15 bg-white/[0.03] text-zinc-300"
+        "flex flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-2xl px-4 py-2.5 text-sm",
+        expiring ? "bg-dt-held-soft text-dt-held-ink" : "bg-dt-sunken text-dt-ink-2"
       )}
     >
       <span>{expiring ? "Live updates pause soon to keep the demo fast." : "Live updates paused."}</span>
       <button
         type="button"
         onClick={onResume}
-        className="rounded-lg border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-200 transition-colors hover:bg-emerald-500/25"
+        className="inline-flex h-9 items-center rounded-full bg-dt-ink px-4 text-[13px] font-medium text-dt-on-ink transition-[background-color,transform] duration-150 hover:bg-dt-ink/85 active:scale-[0.97]"
       >
         {expiring ? "Keep watching" : "Resume"}
       </button>

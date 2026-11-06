@@ -53,29 +53,29 @@ export function NextAvailability({
   }, [key]);
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-2xl bg-[#0a0a0c]/35 px-6 text-center backdrop-blur-[2px]">
-      <div className="text-sm font-medium text-zinc-300">{title}</div>
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 rounded-2xl bg-dt-surface/70 px-6 text-center backdrop-blur-[3px]">
+      <div className="text-[15px] font-medium text-dt-ink">{title}</div>
 
       <div role="status" aria-live="polite">
         {state.loading ? (
-          <div className="flex items-center gap-2 text-xs text-zinc-500">
+          <div className="flex items-center gap-2 text-xs text-dt-ink-3">
             <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" /> Finding the next opening…
           </div>
         ) : state.next ? (
           <Button
             onClick={() => state.next && onJump(state.next)}
-            className={cn("h-9 gap-1.5 rounded-full px-4 text-[13px] font-medium", ACCENT_GHOST)}
+            className={cn("h-11 gap-1.5 rounded-full px-5 text-[13px] font-medium", ACCENT_GHOST)}
           >
-            <CalendarClock aria-hidden className="h-3.5 w-3.5" />
+            <CalendarClock aria-hidden className="h-3.5 w-3.5 text-dt-accent" />
             Next opening
-            <span className="font-normal text-emerald-300/70">
+            <span className="font-normal tabular-nums text-dt-ink-3">
               · {dayLabel(state.next.start)}
               {showTime ? `, ${formatTime(state.next.start)}` : ""}
             </span>
             <ArrowRight aria-hidden className="h-3.5 w-3.5" />
           </Button>
         ) : (
-          <div className="text-xs text-zinc-500">Nothing open in the next {horizonDays} days.</div>
+          <div className="text-xs text-dt-ink-3">Nothing open in the next {horizonDays} days.</div>
         )}
       </div>
     </div>

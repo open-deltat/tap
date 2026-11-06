@@ -37,7 +37,7 @@ export function RenameField({ id, initialName }: { id: string; initialName: stri
         />
         {pending ? <span className="text-xs text-muted-foreground">saving…</span> : null}
       </div>
-      {error ? <span className="text-xs text-red-600">{error}</span> : null}
+      {error ? <span className="text-xs text-destructive">{error}</span> : null}
     </div>
   );
 }
@@ -55,7 +55,7 @@ export function CancelBookingButton({ id, bookingId }: { id: string; bookingId: 
           router.refresh();
         })
       }
-      className="text-xs text-red-600 underline disabled:opacity-60"
+      className="text-xs text-destructive underline underline-offset-2 disabled:opacity-60"
     >
       {pending ? "cancelling…" : "cancel"}
     </button>
@@ -72,7 +72,7 @@ export function DeleteCalendarButton({ id, name }: { id: string; name: string })
       <button
         type="button"
         onClick={() => setArmed(true)}
-        className="text-sm text-red-600 underline"
+        className="text-sm text-dt-ink-3 underline underline-offset-4 transition-colors hover:text-destructive"
       >
         Delete calendar
       </button>
@@ -90,7 +90,7 @@ export function DeleteCalendarButton({ id, name }: { id: string; name: string })
             if (result.ok) router.push("/dashboard");
           })
         }
-        className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white disabled:opacity-60"
+        className="h-9 rounded-full bg-destructive px-4 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
       >
         {pending ? "deleting…" : "Yes, delete"}
       </button>

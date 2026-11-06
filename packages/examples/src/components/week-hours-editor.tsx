@@ -45,10 +45,10 @@ export function WeekHoursEditor({
         return (
           <div
             key={dow}
-            className="flex min-h-[4.5rem] items-start gap-3 rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2.5"
+            className="flex min-h-[4.5rem] items-start gap-3 rounded-2xl border border-dt-line bg-dt-sunken px-3.5 py-3"
           >
             <div className="flex w-14 shrink-0 flex-col items-start gap-1.5">
-              <span className="text-[12px] font-medium text-zinc-200">{DOW_LABEL[dow]}</span>
+              <span className="text-[13px] font-medium text-dt-ink">{DOW_LABEL[dow]}</span>
               <Toggle
                 size="sm"
                 pressed={on}
@@ -68,7 +68,7 @@ export function WeekHoursEditor({
                       disabled={disabled}
                       onChange={(v) => editRange(dow, idx, "start", v)}
                     />
-                    <span className="text-zinc-500">to</span>
+                    <span className="text-[12px] text-dt-ink-3">to</span>
                     <TimeSelect
                       value={r.end}
                       disabled={disabled}
@@ -78,7 +78,7 @@ export function WeekHoursEditor({
                       type="button"
                       disabled={disabled}
                       onClick={() => removeRange(dow, idx)}
-                      className="ml-0.5 rounded p-1 text-zinc-500 hover:bg-white/5 hover:text-zinc-300 disabled:opacity-40"
+                      className="relative ml-0.5 rounded-full p-1.5 text-dt-ink-3 transition-colors after:absolute after:-inset-2.5 hover:bg-dt-taken hover:text-dt-ink disabled:opacity-40"
                       aria-label="Remove range"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -89,13 +89,13 @@ export function WeekHoursEditor({
                   type="button"
                   disabled={disabled}
                   onClick={() => addRange(dow)}
-                  className="flex w-fit items-center gap-1 rounded px-1 py-0.5 text-[11px] text-emerald-300/80 hover:text-emerald-200 disabled:opacity-40"
+                  className="flex min-h-10 w-fit items-center gap-1 rounded-full px-1.5 text-[12px] font-medium text-dt-ink-2 transition-colors hover:text-dt-ink disabled:opacity-40"
                 >
                   <Plus className="h-3 w-3" /> Add a range
                 </button>
               </div>
             ) : (
-              <div className="flex-1 self-center text-[12px] text-zinc-600">Closed</div>
+              <div className="flex-1 self-center text-[12.5px] text-dt-ink-3">Closed</div>
             )}
           </div>
         );
@@ -118,10 +118,10 @@ function TimeSelect({
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
-      className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[12px] text-zinc-200 outline-none focus:border-emerald-400/40 disabled:opacity-40"
+      className="h-10 rounded-xl border border-dt-line-strong bg-dt-surface px-2.5 text-base tabular-nums text-dt-ink outline-none transition-colors focus-visible:border-dt-ink sm:h-8 sm:text-[12.5px] disabled:opacity-40"
     >
       {TIME_OPTIONS.map((t) => (
-        <option key={t} value={t} className="bg-zinc-900">
+        <option key={t} value={t} className="bg-dt-surface text-dt-ink">
           {t}
         </option>
       ))}

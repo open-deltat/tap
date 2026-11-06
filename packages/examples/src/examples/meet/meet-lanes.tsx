@@ -50,7 +50,7 @@ export function MeetLanes({
   // One gridline every tick interval, drawn as a single repeating gradient so every line is exactly
   // evenly spaced, per-element 1px dividers drift visibly from sub-pixel rounding.
   const tickPct = ((tickHours * 3_600_000) / range) * 100;
-  const gridBg = `repeating-linear-gradient(to right, rgba(255,255,255,0.05) 0, rgba(255,255,255,0.05) 1px, transparent 1px, transparent ${tickPct}%)`;
+  const gridBg = `repeating-linear-gradient(to right, var(--dt-line) 0, var(--dt-line) 1px, transparent 1px, transparent ${tickPct}%)`;
 
   const intersectionLabel = lanes.find((l) => l.intersection)?.label ?? "shared";
 
@@ -80,7 +80,7 @@ export function MeetLanes({
         {ticks.map((t) => (
           <div
             key={t}
-            className="absolute -translate-x-1/2 text-[10px] tabular-nums text-zinc-500"
+            className="absolute -translate-x-1/2 text-[10px] tabular-nums text-dt-ink-3"
             style={{ left: `${clampPct(pct(t))}%` }}
           >
             {formatTime(t)}
@@ -96,7 +96,7 @@ export function MeetLanes({
               <div
                 className={cn(
                   "w-12 shrink-0 self-center text-right text-xs font-medium sm:w-[68px]",
-                  lane.intersection ? "text-emerald-300" : "text-zinc-400"
+                  lane.intersection ? "font-semibold text-dt-accent-ink" : "text-dt-ink-2"
                 )}
               >
                 {lane.label}
@@ -104,7 +104,8 @@ export function MeetLanes({
 
               <div
                 className={cn(
-                  "relative h-8 flex-1 overflow-hidden rounded-md bg-white/[0.03]",
+                  "relative flex-1 overflow-hidden rounded-lg bg-dt-surface ring-1 ring-dt-line",
+                  lane.intersection ? "h-11 sm:h-9" : "h-8",
                   clickable && "cursor-pointer"
                 )}
                 style={{ backgroundImage: gridBg }}
@@ -121,7 +122,7 @@ export function MeetLanes({
                       aria-hidden
                       className={cn(
                         "pointer-events-none absolute inset-y-1 rounded",
-                        lane.intersection ? "bg-emerald-500/10 ring-1 ring-emerald-400/15" : "bg-zinc-500/25 ring-1 ring-white/10"
+                        lane.intersection ? "bg-dt-accent-soft ring-1 ring-dt-accent/30" : "bg-dt-ink-3/20 ring-1 ring-dt-line"
                       )}
                       style={{ left: `${left}%`, width: `${width}%` }}
                     />
@@ -139,7 +140,7 @@ export function MeetLanes({
                         <div
                           key={s.start}
                           aria-hidden
-                          className="pointer-events-none absolute inset-y-0.5 rounded bg-emerald-400/80 shadow-[0_0_0_2px_rgba(255,255,255,0.55)]"
+                          className="pointer-events-none absolute inset-y-0.5 rounded-md bg-dt-ink shadow-[0_0_0_3px_var(--dt-accent-soft)]"
                           style={{ left: `${left}%`, width: `${Math.max(width, 1)}%` }}
                         />
                       );
@@ -148,7 +149,7 @@ export function MeetLanes({
                       <div
                         key={s.start}
                         aria-hidden
-                        className="pointer-events-none absolute inset-y-[38%] w-px bg-emerald-300/40"
+                        className="pointer-events-none absolute inset-y-[38%] w-px bg-dt-accent/50"
                         style={{ left: `${left}%` }}
                       />
                     );
@@ -160,8 +161,8 @@ export function MeetLanes({
       </div>
 
       {onPickSlot && (
-        <p className="mt-2 text-center text-[10.5px] text-zinc-500">
-          Click the <span className="text-emerald-300">{intersectionLabel}</span> lane to pick a time
+        <p className="mt-2.5 text-center text-[12px] text-dt-ink-3">
+          Tap the <span className="font-medium text-dt-accent-ink">{intersectionLabel}</span> lane to pick a time
         </p>
       )}
     </div>

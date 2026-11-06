@@ -88,7 +88,7 @@ type OutOfBoundsDayProps = {
 };
 
 const OutOfBoundsDay = ({ day }: OutOfBoundsDayProps) => (
-  <div className="relative h-full w-full bg-muted/30 p-1 text-right text-[11px] text-muted-foreground/70">
+  <div className="relative h-full w-full bg-dt-sunken p-1.5 text-right text-[11px] tabular-nums text-dt-ink-3/60">
     {day}
   </div>
 );
@@ -175,12 +175,12 @@ export const CalendarBody = ({
 
     const content = (
       <>
-        <span className="text-right text-[11px] text-muted-foreground">{day}</span>
+        <span className="text-right text-[11px] font-medium tabular-nums text-dt-ink-2">{day}</span>
         <div className="flex flex-col gap-1">
           {featuresForDay.slice(0, max).map((feature) => children({ feature }))}
         </div>
         {featuresForDay.length > max && (
-          <span className="mt-auto block text-[10px] text-emerald-600 dark:text-emerald-300/80">
+          <span className="mt-auto block text-[10px] font-medium text-dt-ink-3">
             +{featuresForDay.length - max} more
           </span>
         )}
@@ -198,7 +198,7 @@ export const CalendarBody = ({
           onClick={() => onSelectDay?.(new Date(year, month, day), featuresForDay)}
           className={cn(
             cellClass,
-            "cursor-pointer transition-colors hover:bg-emerald-400/[0.07] focus:outline-none focus-visible:bg-emerald-400/[0.07]"
+            "cursor-pointer transition-colors hover:bg-dt-sunken focus:outline-none focus-visible:bg-dt-sunken focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-dt-ink/30"
           )}
         >
           {content}
@@ -227,7 +227,7 @@ export const CalendarBody = ({
       {days.map((day, index) => (
         <div
           className={cn(
-            "relative min-h-[5.5rem] overflow-hidden border-t border-r border-border",
+            "relative min-h-[5.5rem] overflow-hidden border-t border-r border-dt-line",
             index % 7 === 6 && "border-r-0"
           )}
           key={index}
@@ -282,6 +282,8 @@ export const CalendarDatePagination = ({
         onClick={handlePreviousMonth}
         size="icon"
         variant="ghost"
+        aria-label="Previous month"
+        className="size-11 rounded-full text-dt-ink-2 hover:bg-dt-taken hover:text-dt-ink sm:size-9"
       >
         <ChevronLeftIcon size={16} />
       </Button>
@@ -290,6 +292,8 @@ export const CalendarDatePagination = ({
         onClick={handleNextMonth}
         size="icon"
         variant="ghost"
+        aria-label="Next month"
+        className="size-11 rounded-full text-dt-ink-2 hover:bg-dt-taken hover:text-dt-ink sm:size-9"
       >
         <ChevronRightIcon size={16} />
       </Button>
@@ -312,7 +316,7 @@ export const CalendarLabel = ({ className }: CalendarLabelProps) => {
     [locale, month, year]
   );
 
-  return <span className={cn("text-sm font-medium text-foreground", className)}>{label}</span>;
+  return <span className={cn("text-[15px] font-semibold tracking-tight text-dt-ink", className)}>{label}</span>;
 };
 
 export type CalendarDateProps = {
@@ -336,7 +340,7 @@ export const CalendarHeader = ({ className }: CalendarHeaderProps) => {
     <div className={cn("grid flex-grow grid-cols-7", className)}>
       {daysData.map((day) => (
         <div
-          className="p-2 text-right text-[10px] uppercase tracking-wider text-muted-foreground"
+          className="p-2 text-right text-[10px] font-medium uppercase tracking-wider text-dt-ink-3"
           key={day}
         >
           {day}
@@ -357,7 +361,7 @@ export const CalendarItem = memo(({ feature, className }: CalendarItemProps) => 
       className="h-1.5 w-1.5 shrink-0 rounded-full"
       style={{ backgroundColor: feature.status.color }}
     />
-    <span className="truncate text-foreground">{feature.name}</span>
+    <span className="truncate text-dt-ink">{feature.name}</span>
   </div>
 ));
 

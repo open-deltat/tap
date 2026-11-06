@@ -57,7 +57,7 @@ export function PublicBookableCreate() {
           type="button"
           onClick={submit}
           disabled={submitting || name.trim().length === 0}
-          className={cn("rounded-full px-5 py-2 text-sm font-medium transition-colors", ACCENT_CTA)}
+          className={cn("ml-auto flex h-11 items-center px-6 text-[14px] font-semibold", ACCENT_CTA)}
         >
           {submitting ? (
             <span className="flex items-center gap-2">
@@ -74,7 +74,7 @@ export function PublicBookableCreate() {
           <div>
             <label
               htmlFor="bookable-name"
-              className="mb-2 block text-[11px] uppercase tracking-[0.18em] text-zinc-500"
+              className="mb-2 block text-[13px] font-medium text-dt-ink"
             >
               What is it
             </label>
@@ -84,12 +84,12 @@ export function PublicBookableCreate() {
               onChange={(e) => setName(e.target.value)}
               placeholder="Dentist chair, meeting room 2, the good desk"
               maxLength={80}
-              className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-emerald-400/40"
+              className="h-11 w-full rounded-xl border border-dt-line-strong bg-dt-surface px-3.5 text-base text-dt-ink outline-none placeholder:text-dt-ink-3 focus:border-dt-ink sm:text-[14px]"
             />
           </div>
 
           <div>
-            <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+            <div className="mb-2 text-[13px] font-medium text-dt-ink">
               How long is one booking
             </div>
             <Segmented
@@ -102,24 +102,24 @@ export function PublicBookableCreate() {
           </div>
 
           {error && (
-            <p className="flex items-start gap-2 rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-[12px] text-rose-200">
+            <p className="flex items-start gap-2 rounded-xl border border-dt-held/40 bg-dt-held-soft px-3.5 py-2.5 text-[13px] text-dt-held-ink">
               <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {error}
             </p>
           )}
 
-          <p className="text-[12px] leading-relaxed text-zinc-400">
+          <p className="text-[13px] leading-relaxed text-dt-ink-3">
             You get two links. One to share with whoever books, one to keep. There is no account and
             no password, so the link you keep is the only way back in.
           </p>
         </div>
 
         <div>
-          <div className="mb-3 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+          <div className="mb-3 text-[13px] font-medium text-dt-ink">
             When is it open
           </div>
           <WeekHoursEditor week={week} onChange={setWeek} disabled={submitting} />
-          <p className="mt-3 text-[12px] leading-relaxed text-zinc-400">
+          <p className="mt-3 text-[13px] leading-relaxed text-dt-ink-3">
             These hours become real blocks of time in Δt, one per day for the next 60 days. Nothing
             stores &quot;every Monday&quot;, just the actual days.
           </p>
@@ -154,7 +154,7 @@ function CreatedLinks({ created }: { created: Created }) {
         <div className="flex items-center justify-center gap-3 pt-2">
           <Link
             href={`/b/${created.id}`}
-            className={cn("rounded-full px-4 py-1.5 text-xs transition-colors", ACCENT_GHOST)}
+            className={cn("inline-flex h-11 items-center rounded-full px-5 text-[14px] font-medium transition-colors", ACCENT_GHOST)}
           >
             Open the booking page
           </Link>
@@ -186,28 +186,28 @@ function LinkRow({
   return (
     <div
       className={cn(
-        "rounded-lg border px-3 py-3",
-        danger ? "border-amber-400/25 bg-amber-400/[0.06]" : "border-white/[0.07] bg-white/[0.02]"
+        "rounded-2xl border p-4",
+        danger ? "border-dt-held/40 bg-dt-held-soft" : "border-dt-line bg-dt-sunken"
       )}
     >
-      <div className="mb-1 flex items-center gap-2">
-        <span className="text-[11px] uppercase tracking-[0.18em] text-zinc-400">{label}</span>
-        {danger && <TriangleAlert className="h-3 w-3 text-amber-300/80" />}
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-[13px] font-medium text-dt-ink">{label}</span>
+        {danger && <TriangleAlert className="h-3.5 w-3.5 text-dt-held-ink" />}
       </div>
       <div className="flex items-center gap-2">
-        <code className="flex-1 overflow-x-auto whitespace-nowrap rounded bg-black/30 px-2 py-1.5 text-[11px] text-zinc-300">
+        <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-xl border border-dt-line bg-dt-surface px-3 py-2.5 font-mono text-[12px] text-dt-ink-2">
           {url}
         </code>
         <button
           type="button"
           onClick={copy}
           aria-label={`Copy ${label}`}
-          className="shrink-0 rounded-md border border-white/10 p-1.5 text-zinc-400 hover:border-white/20 hover:text-zinc-200"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-dt-line-strong bg-dt-surface text-dt-ink-2 transition-colors hover:text-dt-ink sm:h-10 sm:w-10"
         >
-          {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? <Check className="h-4 w-4 text-dt-accent" /> : <Copy className="h-4 w-4" />}
         </button>
       </div>
-      <p className="mt-1.5 text-[11.5px] leading-relaxed text-zinc-500">{hint}</p>
+      <p className="mt-2 text-[12.5px] leading-relaxed text-dt-ink-3">{hint}</p>
     </div>
   );
 }

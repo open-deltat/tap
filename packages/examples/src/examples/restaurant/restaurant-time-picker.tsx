@@ -26,12 +26,12 @@ interface TimePickerProps {
 
 export function RestaurantTimePicker({ slots, selectedStart, onSelect }: TimePickerProps) {
   if (slots.length === 0) {
-    return <div className="text-[11px] text-zinc-500">No available times today</div>;
+    return <div className="text-[13px] text-dt-ink-3">No available times today</div>;
   }
 
   // One dropdown rather than a wall of pills: a 90-min seating starting at the chosen time.
   return (
-    <label className="flex items-center gap-2 text-[11px] text-zinc-500">
+    <label className="flex items-center gap-2 text-[13px] text-dt-ink-3">
       Seating
       <select
         value={selectedStart ?? ""}
@@ -40,10 +40,10 @@ export function RestaurantTimePicker({ slots, selectedStart, onSelect }: TimePic
           const slot = slots.find((s) => s.start === start);
           if (slot) onSelect(slot.start, slot.end);
         }}
-        className="h-8 rounded-md border border-white/10 bg-white/5 px-2.5 text-xs text-zinc-200 [color-scheme:dark] focus:border-emerald-400/40 focus:outline-none"
+        className="h-11 rounded-full border border-dt-line-strong bg-dt-surface px-4 text-base tabular-nums text-dt-ink transition-colors focus:border-dt-ink focus:outline-none sm:h-9 sm:text-[13px]"
       >
         {slots.map((slot) => (
-          <option key={slot.start} value={slot.start} className="bg-zinc-900 text-zinc-100">
+          <option key={slot.start} value={slot.start} className="bg-dt-surface text-dt-ink">
             {formatTime(slot.start)} to {formatTime(slot.end)}
           </option>
         ))}

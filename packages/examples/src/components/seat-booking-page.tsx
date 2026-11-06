@@ -247,7 +247,7 @@ export function SeatBookingPage({
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+      <div className="dt-canvas flex h-full items-center justify-center text-dt-ink-3">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to Δt…
@@ -285,17 +285,17 @@ export function SeatBookingPage({
   const bookingTray =
     selectedSeats.size > 0 && selectedSlot ? (
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex flex-1 flex-wrap items-center gap-1.5">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           {Array.from(selectedSeats)
             .map((id) => ({ id, name: seatName(id), price: getSeatSection(id)?.price }))
             .sort((a, b) => a.name.localeCompare(b.name))
             .map(({ id, name, price }) => (
               <span
                 key={id}
-                className="rounded bg-emerald-400/15 px-1.5 py-0.5 text-xs font-medium text-emerald-200"
+                className="rounded-full bg-dt-ink/[0.07] px-2.5 py-1 text-xs font-medium tabular-nums text-dt-ink"
               >
                 {name}
-                {price != null && <span className="ml-0.5 text-emerald-300/70">${price}</span>}
+                {price != null && <span className="ml-1 text-dt-ink-3">${price}</span>}
               </span>
             ))}
         </div>
@@ -308,9 +308,9 @@ export function SeatBookingPage({
 
   const surface =
     !venueId || venueSlots.length === 0 ? (
-      <div className="py-16 text-center text-sm text-zinc-400">No availability right now.</div>
+      <div className="py-16 text-center text-sm text-dt-ink-3">No availability right now.</div>
     ) : !selectedSlot || sections.length === 0 ? (
-      <div className="py-16 text-center text-sm text-zinc-400">Loading seats…</div>
+      <div className="py-16 text-center text-sm text-dt-ink-3">Loading seats…</div>
     ) : (
       <SeatMap
         sections={sections}
@@ -350,8 +350,8 @@ export function SeatBookingPage({
       />
 
       {isPending && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="flex items-center gap-2 text-sm text-zinc-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dt-canvas/40 backdrop-blur-[3px]">
+          <div className="flex items-center gap-2 rounded-full border border-dt-line bg-dt-raised px-4 py-2 text-sm text-dt-ink-2 shadow-dt-float">
             <Loader2 className="h-4 w-4 animate-spin" />
             Working…
           </div>

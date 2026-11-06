@@ -63,7 +63,7 @@ export function PublicBookableManage({
   if (deleted) {
     return (
       <Stage title="Gone">
-        <p className="mx-auto max-w-md text-center text-[13px] text-zinc-400">
+        <p className="mx-auto max-w-md text-center text-[15px] leading-relaxed text-dt-ink-2">
           Deleted, along with every booking on it. The share link is dead and this page will not come
           back.
         </p>
@@ -78,26 +78,26 @@ export function PublicBookableManage({
     >
       <div className="mx-auto max-w-xl space-y-7">
         {error && (
-          <p className="flex items-start gap-2 rounded-lg border border-rose-400/25 bg-rose-400/10 px-3 py-2 text-[12px] text-rose-200">
+          <p className="flex items-start gap-2 rounded-xl border border-dt-held/40 bg-dt-held-soft px-3.5 py-2.5 text-[13px] text-dt-held-ink">
             <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {error}
           </p>
         )}
 
         <div>
-          <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-zinc-500">Name</div>
+          <div className="mb-2 text-[13px] font-medium text-dt-ink">Name</div>
           <div className="flex gap-2">
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={80}
-              className="flex-1 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-zinc-100 outline-none focus:border-emerald-400/40"
+              className="h-11 min-w-0 flex-1 rounded-xl border border-dt-line-strong bg-dt-surface px-3.5 text-base text-dt-ink outline-none focus:border-dt-ink sm:text-[14px]"
             />
             <button
               type="button"
               onClick={rename}
               disabled={working || name.trim() === record.name}
-              className={cn("rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors", ACCENT_CTA)}
+              className={cn("h-11 px-5 text-[14px] font-semibold", ACCENT_CTA)}
             >
               Save
             </button>
@@ -105,26 +105,26 @@ export function PublicBookableManage({
         </div>
 
         <div>
-          <div className="mb-2 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+          <div className="mb-2 text-[13px] font-medium tabular-nums text-dt-ink">
             Booked ({bookings?.length ?? 0})
           </div>
           {bookings === null ? (
-            <div className="flex justify-center py-6 text-zinc-500">
+            <div className="flex justify-center py-6 text-dt-ink-3">
               <Loader2 className="h-4 w-4 animate-spin" />
             </div>
           ) : bookings.length === 0 ? (
-            <p className="py-4 text-[13px] text-zinc-500">Nothing booked yet.</p>
+            <p className="py-4 text-[14px] text-dt-ink-3">Nothing booked yet.</p>
           ) : (
-            <ul className="space-y-1">
+            <ul className="divide-y divide-dt-line overflow-hidden rounded-2xl border border-dt-line bg-dt-surface">
               {bookings
                 .slice()
                 .sort((a, b) => a.start - b.start)
                 .map((b) => (
                   <li
                     key={b.id}
-                    className="flex items-center justify-between rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2 text-[12.5px]"
+                    className="flex min-h-11 items-center justify-between px-4 py-2 text-[14px] tabular-nums"
                   >
-                    <span className="text-zinc-300">
+                    <span className="text-dt-ink">
                       {new Date(b.start).toLocaleDateString(undefined, {
                         weekday: "short",
                         month: "short",
@@ -132,24 +132,24 @@ export function PublicBookableManage({
                       })}{" "}
                       {formatTime(b.start)}
                     </span>
-                    <span className="text-zinc-500">{b.label ?? "no name"}</span>
+                    <span className="text-dt-ink-3">{b.label ?? "no name"}</span>
                   </li>
                 ))}
             </ul>
           )}
         </div>
 
-        <div className="border-t border-white/[0.07] pt-5">
+        <div className="border-t border-dt-line pt-5">
           {confirmingDelete ? (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[12px] text-zinc-400">
+              <span className="text-[13px] text-dt-ink-2">
                 Delete it and every booking on it? This cannot be undone.
               </span>
               <button
                 type="button"
                 onClick={destroy}
                 disabled={working}
-                className="rounded-full border border-rose-400/40 bg-rose-400/15 px-3 py-1 text-xs text-rose-200 hover:bg-rose-400/25"
+                className="h-10 rounded-full bg-destructive px-4 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
               >
                 {working ? "Deleting" : "Yes, delete"}
               </button>
@@ -165,7 +165,7 @@ export function PublicBookableManage({
             <button
               type="button"
               onClick={() => setConfirmingDelete(true)}
-              className="text-[12px] text-zinc-500 underline-offset-4 hover:text-rose-300 hover:underline"
+              className="min-h-11 text-[13px] text-dt-ink-3 underline-offset-4 transition-colors hover:text-destructive hover:underline"
             >
               Delete this bookable
             </button>

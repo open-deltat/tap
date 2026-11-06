@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Loader2, Minus, Plus, Users } from "lucide-r
 import { Button } from "../../components/ui/button";
 import { cn } from "@open-deltat/shared/utils";
 import { Stage } from "../../components/stage";
+import { ACCENT_CTA, PILL_ACTIVE, PILL_IDLE } from "../../lib/accent";
 import { BookingConfirmedModal, type BookingResult } from "../../components/booking-confirmed-modal";
 import { RestaurantFloorPlan, type FloorTable, type FloorBar } from "./restaurant-floor-plan";
 import { RestaurantTimePicker, restaurantTimeSlots } from "./restaurant-time-picker";
@@ -218,36 +219,38 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
   const ribbon = (
     <div className="flex flex-col items-center gap-2.5">
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <div className="flex items-center gap-1.5 text-zinc-400">
+        <div className="flex items-center gap-1 text-dt-ink-2">
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-zinc-300"
+            aria-label="Previous day"
+            className="h-11 w-11 rounded-full text-dt-ink-2 hover:bg-dt-sunken hover:text-dt-ink sm:h-9 sm:w-9"
             onClick={() => shiftDay(-1)}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="min-w-[150px] text-center text-xs text-zinc-300">{dateLabel}</span>
+          <span className="min-w-[150px] text-center text-[14px] font-medium text-dt-ink">{dateLabel}</span>
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-zinc-300"
+            aria-label="Next day"
+            className="h-11 w-11 rounded-full text-dt-ink-2 hover:bg-dt-sunken hover:text-dt-ink sm:h-9 sm:w-9"
             onClick={() => shiftDay(1)}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Users className="h-3.5 w-3.5 text-zinc-500" />
+        {/* Eight sizes must fit a 390px phone on one row: 40px targets, tight gap, icon hidden. */}
+        <div role="group" aria-label="Party size" className="flex items-center gap-1 sm:gap-1.5">
+          <Users aria-hidden className="mr-0.5 hidden h-4 w-4 text-dt-ink-3 sm:block" />
           {Array.from({ length: MAX_PARTY }, (_, i) => i + 1).map((n) => (
             <button
               key={n}
               onClick={() => setPartySize(n)}
+              aria-pressed={partySize === n}
               className={cn(
-                "h-7 w-7 rounded-md text-xs font-medium transition-colors",
-                partySize === n
-                  ? "bg-emerald-500 text-white"
-                  : "bg-white/5 text-zinc-400 hover:bg-white/10"
+                "h-10 w-10 shrink-0 rounded-full border text-[13px] font-medium tabular-nums transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.97] sm:h-9 sm:w-9",
+                partySize === n ? PILL_ACTIVE : PILL_IDLE
               )}
             >
               {n}
@@ -271,17 +274,17 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
     selectedTable && slot ? (
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex-1">
-          <div className="text-sm font-medium text-zinc-100">
+          <div className="text-sm font-semibold text-dt-ink">
             {selectedTable.section} · {selectedTable.name}
           </div>
-          <div className="text-xs text-zinc-400">
+          <div className="text-xs tabular-nums text-dt-ink-3">
             {partySize} guest{partySize > 1 ? "s" : ""} · {formatTime(slot.start)} to {formatTime(slot.end)}
           </div>
         </div>
         <Button
           onClick={bookTable}
           disabled={isPending}
-          className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
+          className={cn("h-11 px-6 text-[14px] font-semibold", ACCENT_CTA)}
         >
           Reserve table
         </Button>
@@ -289,27 +292,29 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
     ) : bar && barSelected && barRemaining > 0 && slot ? (
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex-1">
-          <div className="text-sm font-medium text-zinc-100">{bar.name}</div>
-          <div className="text-xs text-zinc-400">
+          <div className="text-sm font-semibold text-dt-ink">{bar.name}</div>
+          <div className="text-xs tabular-nums text-dt-ink-3">
             {barRemaining} of {bar.capacity} free · {formatTime(slot.start)} to {formatTime(slot.end)}
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-zinc-300"
+            aria-label="Fewer seats"
+            className="h-11 w-11 rounded-full text-dt-ink-2 hover:bg-dt-sunken hover:text-dt-ink sm:h-9 sm:w-9"
             onClick={() => setPartySize((p) => Math.max(1, p - 1))}
           >
             <Minus className="h-3.5 w-3.5" />
           </Button>
-          <span className="w-6 text-center font-mono text-sm text-zinc-100">
+          <span className="w-6 text-center text-sm font-semibold tabular-nums text-dt-ink">
             {Math.min(partySize, barRemaining)}
           </span>
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-zinc-300"
+            aria-label="More seats"
+            className="h-11 w-11 rounded-full text-dt-ink-2 hover:bg-dt-sunken hover:text-dt-ink sm:h-9 sm:w-9"
             onClick={() => setPartySize((p) => Math.min(MAX_PARTY, barRemaining, p + 1))}
           >
             <Plus className="h-3.5 w-3.5" />
@@ -318,7 +323,7 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
         <Button
           onClick={bookBar}
           disabled={isPending}
-          className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400"
+          className={cn("h-11 px-6 text-[14px] font-semibold", ACCENT_CTA)}
         >
           Book {Math.min(partySize, barRemaining)} seat{Math.min(partySize, barRemaining) > 1 ? "s" : ""}
         </Button>
@@ -329,9 +334,9 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
     // Reserved so swapping between an empty state and the floor plan does not collapse the panel.
     <div className="min-h-[26rem]">
       {timeSlots.length === 0 ? (
-        <div className="flex min-h-[26rem] items-center justify-center text-sm text-zinc-400">No service today.</div>
+        <div className="flex min-h-[26rem] items-center justify-center text-[15px] text-dt-ink-2">No service today.</div>
       ) : tables.length === 0 && !bar ? (
-        <div className="flex min-h-[26rem] items-center justify-center text-sm text-zinc-400">
+        <div className="flex min-h-[26rem] items-center justify-center text-[15px] text-dt-ink-2">
           No tables fit a party of {partySize}.
         </div>
       ) : (
@@ -365,8 +370,8 @@ export function RestaurantReservation({ restaurantId }: ReservationProps) {
       />
 
       {isPending && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="flex items-center gap-2 text-sm text-zinc-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dt-canvas/60 backdrop-blur-[2px]">
+          <div className="flex items-center gap-2 rounded-full border border-dt-line bg-dt-surface px-4 py-2 text-sm text-dt-ink-2 shadow-dt-float">
             <Loader2 className="h-4 w-4 animate-spin" />
             Working…
           </div>

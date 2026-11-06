@@ -6,6 +6,7 @@ import { Loader2, ZoomIn, ZoomOut, Maximize, Locate } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { cn } from "@open-deltat/shared/utils";
 import { Stage } from "../../components/stage";
+import { ACCENT_CTA, PILL_ACTIVE, PILL_BASE, PILL_IDLE } from "../../lib/accent";
 import { BookingConfirmedModal, type BookingResult } from "../../components/booking-confirmed-modal";
 import type { Resource, SectionLayout, AvailabilitySlot, Booking } from "../../lib/schemas";
 import { toLocalDateString, formatTime } from "@open-deltat/shared/time";
@@ -367,7 +368,7 @@ export default function StadiumExample() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+      <div className="dt-canvas flex h-full items-center justify-center text-dt-ink-3">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to Δt…
@@ -390,12 +391,7 @@ export default function StadiumExample() {
               <button
                 key={i}
                 onClick={() => setSlot({ start: s.start, end: s.end })}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs transition-colors",
-                  active
-                    ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-200"
-                    : "border-white/10 text-zinc-400 hover:text-zinc-200"
-                )}
+                className={cn(PILL_BASE, active ? PILL_ACTIVE : PILL_IDLE)}
               >
                 {formatTime(s.start)}
               </button>
@@ -403,17 +399,17 @@ export default function StadiumExample() {
           })}
         </div>
       )}
-      <div className="text-[11px] text-zinc-500">
-        {totalRemaining.toLocaleString()} of {totalCapacity.toLocaleString()} seats open across{" "}
-        {sections.length} sections
+      <div className="text-[13px] tabular-nums text-dt-ink-2">
+        <span className="font-semibold text-dt-ink">{totalRemaining.toLocaleString()}</span> of{" "}
+        {totalCapacity.toLocaleString()} seats open across {sections.length} sections
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] text-zinc-500 sm:gap-x-4">
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[12px] text-dt-ink-3 sm:gap-x-4">
         <Legend color={LEGEND_COLORS.plenty} label="plenty" />
         <Legend color={LEGEND_COLORS.filling} label="filling" />
         <Legend color={LEGEND_COLORS.nearlyFull} label="nearly full" />
         <Legend color={LEGEND_COLORS.premium} label="premium box" />
         <Legend color={LEGEND_COLORS.soldOut} label="sold out" />
-        <Legend color={LEGEND_COLORS.selection} label="holding (you)" />
+        <Legend color={LEGEND_COLORS.selection} label="yours" />
       </div>
     </div>
   );
@@ -422,17 +418,17 @@ export default function StadiumExample() {
   const tray =
     selected && n > 0 ? (
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1">
-          <div className="text-sm font-medium text-zinc-100">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium text-dt-ink">
             {selected.tier} · {selected.res.name}
           </div>
-          <div className="text-xs text-zinc-400">
+          <div className="text-xs tabular-nums text-dt-ink-3">
             {n} {selected.assigned ? "box" : `seat${n > 1 ? "s" : ""}`} selected ·{" "}
             {selected.remaining.toLocaleString()} open
             {selected.price > 0 && ` · $${selected.price}/seat`}
           </div>
         </div>
-        <Button onClick={book} disabled={isPending} className="h-10 px-6 text-sm font-semibold bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-400">
+        <Button onClick={book} disabled={isPending} className={cn("h-11 px-6 text-sm font-semibold tabular-nums", ACCENT_CTA)}>
           {isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
           Book {n}
           {selected.price > 0 && ` · $${(n * selected.price).toLocaleString()}`}
@@ -465,49 +461,49 @@ export default function StadiumExample() {
               type="button"
               onClick={findOpenSeats}
               disabled={totalRemaining === 0}
-              className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-[12px] font-medium text-emerald-200 shadow-sm backdrop-blur-sm transition-colors hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-40"
+              className="pointer-events-auto flex h-10 items-center gap-1.5 rounded-full border border-dt-line bg-dt-raised px-4 text-[13px] font-medium text-dt-ink shadow-dt-float backdrop-blur-xl transition-[background-color,transform] duration-150 hover:bg-dt-surface active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              <Locate className="h-3.5 w-3.5" />
+              <Locate className="h-3.5 w-3.5 text-dt-accent" />
               Find open seats
             </button>
           </div>
 
           {/* Zoom control pinned bottom-right: current-level label above reset + a vertical +/- stack. */}
           <div className="pointer-events-none absolute bottom-3 right-3 flex flex-col items-end gap-1.5">
-            <span className="rounded-md border border-white/15 bg-zinc-900/80 px-2 py-0.5 text-[11px] font-medium text-zinc-200 shadow-sm backdrop-blur-sm">
+            <span className="rounded-full border border-dt-line bg-dt-raised px-2.5 py-0.5 text-[11px] font-medium text-dt-ink-2 shadow-dt-float backdrop-blur-xl">
               {levelLabel}
             </span>
-            <div className="pointer-events-auto flex flex-col overflow-hidden rounded-lg border border-white/15 bg-zinc-900/80 shadow-md backdrop-blur-sm">
+            <div className="pointer-events-auto flex flex-col overflow-hidden rounded-2xl border border-dt-line bg-dt-raised shadow-dt-float backdrop-blur-xl">
               <button
                 type="button"
                 onClick={resetView}
                 aria-label="Reset view to the whole stadium"
-                className="flex h-9 w-9 items-center justify-center text-zinc-200 transition-colors hover:bg-white/10 active:bg-white/20"
+                className="flex h-11 w-11 items-center justify-center text-dt-ink transition-colors hover:bg-dt-taken active:bg-dt-line-strong sm:h-9 sm:w-9"
               >
                 <Maximize className="h-4 w-4" />
               </button>
-              <div className="h-px w-full bg-white/10" />
+              <div className="h-px w-full bg-dt-line" />
               <button
                 type="button"
                 onClick={() => stepZoom(1)}
                 aria-label="Zoom in one level"
-                className="flex h-9 w-9 items-center justify-center text-zinc-200 transition-colors hover:bg-white/10 active:bg-white/20"
+                className="flex h-11 w-11 items-center justify-center text-dt-ink transition-colors hover:bg-dt-taken active:bg-dt-line-strong sm:h-9 sm:w-9"
               >
                 <ZoomIn className="h-4 w-4" />
               </button>
-              <div className="h-px w-full bg-white/10" />
+              <div className="h-px w-full bg-dt-line" />
               <button
                 type="button"
                 onClick={() => stepZoom(-1)}
                 aria-label="Zoom out one level"
-                className="flex h-9 w-9 items-center justify-center text-zinc-200 transition-colors hover:bg-white/10 active:bg-white/20"
+                className="flex h-11 w-11 items-center justify-center text-dt-ink transition-colors hover:bg-dt-taken active:bg-dt-line-strong sm:h-9 sm:w-9"
               >
                 <ZoomOut className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          <div className="pointer-events-none absolute bottom-3 left-3 text-[11px] text-zinc-500/80">
+          <div className="pointer-events-none absolute bottom-3 left-3 text-[11px] text-dt-ink-3">
             <span className="hidden sm:inline">scroll to zoom · drag to pan</span>
             <span className="sm:hidden">pinch to zoom · drag to pan</span>
           </div>
@@ -515,7 +511,7 @@ export default function StadiumExample() {
           {/* Always rendered; opacity toggles so zooming to seat level never adds height. */}
           <div
             className={cn(
-              "pointer-events-none mt-2 text-center text-[11px] text-zinc-600 transition-opacity",
+              "pointer-events-none mt-2.5 text-center text-[12px] text-dt-ink-3 transition-opacity",
               seatLOD ? "opacity-100" : "opacity-0"
             )}
             aria-hidden={!seatLOD}
@@ -532,8 +528,8 @@ export default function StadiumExample() {
       />
 
       {isPending && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="flex items-center gap-2 text-sm text-zinc-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-dt-canvas/40 backdrop-blur-[3px]">
+          <div className="flex items-center gap-2 rounded-full border border-dt-line bg-dt-raised px-4 py-2 text-sm text-dt-ink-2 shadow-dt-float">
             <Loader2 className="h-4 w-4 animate-spin" />
             Working…
           </div>
@@ -546,7 +542,7 @@ export default function StadiumExample() {
 function Legend({ color, label }: { color: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
+      <span className="h-2.5 w-2.5 rounded-[3px]" style={{ backgroundColor: color }} />
       {label}
     </span>
   );

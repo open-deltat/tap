@@ -169,7 +169,7 @@ export default function AvailabilityExample() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#0a0a0c] text-zinc-400">
+      <div className="dt-canvas flex h-full items-center justify-center text-dt-ink-3">
         <div className="flex items-center gap-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           Connecting to Δt…
@@ -186,8 +186,11 @@ export default function AvailabilityExample() {
 
   const tray = selected ? (
     <div className="flex items-center justify-between gap-3">
-      <div className="text-sm text-zinc-300">
-        <span className="text-zinc-500">{dateLabel}</span> · {formatTime(selected.start)} to {formatTime(selected.end)}
+      <div className="min-w-0">
+        <div className="truncate text-[12.5px] text-dt-ink-3">{dateLabel}</div>
+        <div className="text-[15px] font-semibold tabular-nums text-dt-ink">
+          {formatTime(selected.start)} to {formatTime(selected.end)}
+        </div>
       </div>
       <BookButton onClick={confirm} loading={isPending}>
         Book appointment
@@ -197,10 +200,10 @@ export default function AvailabilityExample() {
 
   return (
     <>
-      <Stage primitive={{ label: "Free time is open hours minus busy", specId: "AVAIL-01" }} title={NAME} contentMax="max-w-3xl" tray={tray}>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-[auto_1fr]">
+      <Stage primitive={{ label: "Free time is open hours minus what is booked, computed on every read.", specId: "AVAIL-01" }} title={NAME} contentMax="max-w-3xl" tray={tray}>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-[auto_1fr]">
           {/* Date picker: greyed days have nothing open */}
-          <div className="sm:border-r sm:border-white/[0.06] sm:pr-5 [color-scheme:dark]">
+          <div className="flex justify-center sm:border-r sm:border-dt-line sm:pr-6">
             <Calendar
               mode="single"
               required
@@ -215,20 +218,25 @@ export default function AvailabilityExample() {
               onMonthChange={setMonth}
               startMonth={windowStart}
               disabled={isDayDisabled}
-              className="bg-transparent text-zinc-100"
+              className="bg-transparent text-dt-ink"
             />
           </div>
 
           {/* That day's 30-min slots */}
           <div className="flex min-h-[24rem] flex-col">
-            <div className="mb-3 flex items-baseline justify-between">
-              <div className="text-sm font-medium text-zinc-200">{dateLabel}</div>
-              {slots.length > 0 && <div className="text-[11px] text-zinc-500">{slots.length} open</div>}
+            <div className="mb-4 flex items-baseline justify-between">
+              <div className="text-[15px] font-semibold tracking-tight text-dt-ink">{dateLabel}</div>
+              {slots.length > 0 && (
+                <div className="flex items-center gap-1.5 text-[12.5px] tabular-nums text-dt-ink-3">
+                  <span className="dt-breathe h-1.5 w-1.5 rounded-full bg-dt-accent" />
+                  {slots.length} open
+                </div>
+              )}
             </div>
 
             <div className="relative flex-1">
               {slotsLoading ? (
-                <div className="flex h-full items-center justify-center text-xs text-zinc-500">
+                <div className="flex h-full items-center justify-center text-xs text-dt-ink-3">
                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                   Loading…
                 </div>
@@ -256,12 +264,13 @@ export default function AvailabilityExample() {
                     return (
                       <button
                         key={s.start}
+                        aria-pressed={active}
                         onClick={() => setSelected({ start: s.start, end: s.end })}
                         className={cn(
-                          "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                          "h-11 rounded-xl border text-[14px] font-medium tabular-nums transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.97]",
                           active
                             ? PILL_ACTIVE
-                            : "border-white/10 text-zinc-300 hover:border-emerald-400/30 hover:bg-white/[0.04]"
+                            : "border-dt-line bg-dt-surface text-dt-ink hover:border-dt-ink/40"
                         )}
                       >
                         {formatTime(s.start)}

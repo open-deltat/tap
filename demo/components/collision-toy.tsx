@@ -56,19 +56,24 @@ export function CollisionToy() {
   };
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
-      <div className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[0.18em]">
+    <div className="mt-5 rounded-2xl border border-dt-line bg-dt-surface p-4 shadow-dt-surface sm:p-5">
+      <div className="mb-3 flex items-center justify-between text-[12px]">
         <span
           className={cn(
-            "flex items-center gap-1.5 rounded-full px-2 py-0.5",
-            touched ? "text-zinc-500" : "animate-pulse bg-emerald-400/10 text-emerald-300"
+            "flex items-center gap-1.5 rounded-full px-2.5 py-1",
+            touched ? "text-dt-ink-3" : "dt-breathe bg-dt-sunken text-dt-ink"
           )}
         >
           <MoveHorizontal className="h-3 w-3" />
-          drag the green booking
+          Drag the new booking
         </span>
-        <span className={cn("rounded px-1.5 py-0.5 font-medium", colliding ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300")}>
-          {colliding ? "collision" : "clear"}
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-1 font-medium",
+            colliding ? "bg-destructive/10 text-destructive" : "bg-dt-accent-soft text-dt-accent-ink"
+          )}
+        >
+          {colliding ? "Collision" : "Clear"}
         </span>
       </div>
 
@@ -77,24 +82,24 @@ export function CollisionToy() {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        className="relative h-20 cursor-grab touch-none select-none rounded-md bg-black/20 active:cursor-grabbing"
+        className="relative h-24 cursor-grab touch-none select-none rounded-xl bg-dt-sunken active:cursor-grabbing"
       >
         {/* the time axis */}
-        <div className="absolute inset-x-3 top-1/2 h-px -translate-y-1/2 bg-white/15" />
-        <div className="absolute bottom-1 left-3 text-[9px] text-zinc-600">past</div>
-        <div className="absolute bottom-1 right-3 text-[9px] text-zinc-600">future</div>
+        <div className="absolute inset-x-3 top-1/2 h-px -translate-y-1/2 bg-dt-line-strong" />
+        <div className="absolute bottom-1 left-3 text-[10px] text-dt-ink-3">past</div>
+        <div className="absolute bottom-1 right-3 text-[10px] text-dt-ink-3">future</div>
 
         {/* overlap band, only while colliding */}
         {colliding && overlapWidth > 0 && (
-          <div aria-hidden className="absolute inset-y-0 bg-rose-500/15" style={{ left: `${overlapLeft}%`, width: `${overlapWidth}%` }} />
+          <div aria-hidden className="absolute inset-y-0 bg-destructive/10" style={{ left: `${overlapLeft}%`, width: `${overlapWidth}%` }} />
         )}
 
         {/* fixed booking */}
         <div
           aria-hidden
           className={cn(
-            "absolute top-3 flex h-6 items-center justify-center rounded border text-[10px] text-zinc-100 transition-colors",
-            colliding ? "border-rose-400/50 bg-rose-500/30" : "border-sky-400/40 bg-sky-500/25"
+            "absolute top-3 flex h-7 items-center justify-center rounded-lg border text-[11px] transition-colors",
+            colliding ? "border-destructive/50 bg-destructive/10 text-destructive" : "border-dt-line-strong bg-dt-surface text-dt-ink-2"
           )}
           style={{ left: `${A_START}%`, width: `${A_WIDTH}%` }}
         >
@@ -111,9 +116,9 @@ export function CollisionToy() {
           aria-valuenow={Math.round(bStart)}
           onKeyDown={onKeyDown}
           className={cn(
-            "absolute bottom-3 flex h-6 cursor-grab items-center justify-center gap-1 rounded border text-[10px] font-medium text-zinc-100 shadow-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 active:cursor-grabbing",
-            colliding ? "border-rose-400/60 bg-rose-500/40" : "border-emerald-400/60 bg-emerald-500/40",
-            !touched && "ring-2 ring-white/40"
+            "absolute bottom-4 flex h-7 cursor-grab items-center justify-center gap-1 rounded-lg border border-transparent text-[11px] font-medium shadow-dt-float transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-dt-accent active:cursor-grabbing",
+            colliding ? "bg-destructive text-white" : "bg-dt-ink text-dt-on-ink",
+            !touched && "ring-2 ring-dt-accent/50"
           )}
           style={{ left: `${bStart}%`, width: `${B_WIDTH}%` }}
         >
@@ -122,7 +127,7 @@ export function CollisionToy() {
         </div>
       </div>
 
-      <p className="mt-3 text-[12px] leading-relaxed text-zinc-400">
+      <p className="mt-3 text-[13.5px] leading-relaxed text-dt-ink-2">
         The whole conflict model is one comparison: two stretches collide only when they actually share a moment.
         There is no third state.
       </p>

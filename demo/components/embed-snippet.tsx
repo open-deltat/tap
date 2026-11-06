@@ -39,18 +39,18 @@ export function EmbedSnippet({
   }
 
   return (
-    <div className={cn("rounded-xl border border-white/[0.06] bg-white/[0.02] p-4", className)}>
-      <div className="mb-2 flex items-center justify-between gap-3">
+    <div className={cn("rounded-2xl border border-dt-line bg-dt-surface p-4 shadow-dt-surface", className)}>
+      <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-medium text-zinc-200">Embed this schedule</div>
-          <div className="text-[11px] text-zinc-500">
+          <div className="text-[14px] font-medium text-dt-ink">Embed this schedule</div>
+          <div className="text-[12.5px] text-dt-ink-3">
             Paste it on any site. It loads the read-only public schedule, no internal data.
           </div>
         </div>
         <button
           onClick={copy}
           className={cn(
-            "inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs transition-colors",
+            "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-colors",
             ACCENT_GHOST
           )}
         >
@@ -58,7 +58,8 @@ export function EmbedSnippet({
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-black/40 p-3 text-[11px] leading-relaxed text-zinc-400">
+      {/* Code stays dark in both themes, matching the docs fences. */}
+      <pre className="overflow-x-auto rounded-xl bg-[#0b0b0f] p-3.5 font-mono text-[12px] leading-relaxed text-[#c4c4cc]">
         <code>{snippet}</code>
       </pre>
     </div>
