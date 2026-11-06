@@ -1,6 +1,6 @@
 Every booking, by an agent or a person, is the same four steps: find what is free, hold the slot you are about to offer, book it when the answer is yes, and listen so the next answer is never stale. This page takes them one at a time. The examples use the TypeScript client; the [MCP tools](/docs/quickstart) and plain SQL do the same things.
 
-Two people reach for Seat 12 at the same second. Whoever holds first gets it; the other sees it go. Play with it:
+Two people reach for the same seat at the same second. Whoever holds first gets it, and the other is told no straight away:
 
 <!--HOLDS_WIDGET-->
 

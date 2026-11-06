@@ -1,12 +1,14 @@
-// The four calls an agent makes, in the order it makes them: the command the agent types is the
-// title, the human word above it, one sentence under it. Each wears the colour its result has in
+// The four calls an agent makes, in the order it makes them: the call itself is the title, the
+// human word above it, one sentence under it. The first three are MCP tools; listening is the
+// client's events.watch, because the MCP server has no listen tool, and a chip must never name a
+// call that does not exist. Each wears the colour its result has in
 // the examples: green is free, amber is held, ink is booked, the live dot is a change arriving.
 // Shared by the landing ("An agent can do four things.") and the docs, so the two never disagree.
 export const VERBS = [
   { title: "Find", tool: "find_slots", chip: "bg-dt-accent-soft text-dt-accent-ink", body: "See what is free right now, across every calendar you name." },
   { title: "Hold", tool: "hold_slot", chip: "bg-dt-held-soft text-dt-held-ink", body: "Keep a slot for a few minutes while the agent asks. It lets go on its own." },
   { title: "Book", tool: "commit_hold", chip: "bg-dt-ink text-dt-on-ink", body: "Turn the hold into a booking in one step. If the slot is gone, Δt answers with times that still work." },
-  { title: "Listen", tool: "LISTEN", chip: "border border-dt-line bg-dt-surface text-dt-ink", live: true, body: "Get told the moment anything changes, on every screen." },
+  { title: "Listen", tool: "events.watch", chip: "border border-dt-line bg-dt-surface text-dt-ink", live: true, body: "Hear every change the moment it happens, so the next answer is never stale." },
 ] as const;
 
 export function VerbChip({ verb }: { verb: (typeof VERBS)[number] }) {
