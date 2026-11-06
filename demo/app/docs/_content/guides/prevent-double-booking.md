@@ -22,7 +22,7 @@ If you are building on a general-purpose database, you have three honest options
 
 **Make the slot a row and constrain it.** When bookable time is a fixed grid (30-minute appointment slots, one row per slot), a unique constraint on `(resource, slot)` does the job. The second insert violates the constraint and fails. This works well until slots stop being uniform: variable durations, overlapping ranges, and multi-slot bookings do not fit a grid.
 
-**Constrain the range itself.** Postgres can reject overlapping ranges at the constraint level with an exclusion constraint over a range column. This is the strongest general answer inside a relational database, and it genuinely works. What it covers and where it runs out is a page of its own: [Do you need a scheduling database?](/docs/guides/scheduling-database)
+**Constrain the range itself.** Postgres can reject overlapping ranges at the constraint level with an exclusion constraint over a range column. This is the strongest general answer inside a relational database, and it genuinely works for single bookings. Where it runs out is everything around the write: it cannot hold a slot while someone decides, answer "when is everyone free", or tell other screens that something changed.
 
 **Serialize the check and the write.** Take a lock (application mutex, advisory lock, `SELECT ... FOR UPDATE` on the resource row) so only one request can be inside check-then-insert at a time. Correct when done right, and easy to get wrong the moment there is a second app server, a retry, or a code path that forgets the lock.
 

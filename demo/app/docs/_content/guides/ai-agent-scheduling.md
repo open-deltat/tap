@@ -24,12 +24,14 @@ An agent needs two separate moments, and a backend that can tell them apart.
 
 **Confirm.** When the user says yes, turn that exact claim into a booking, atomically, without ever letting go of it.
 
-In Δt that is a hold and a commit.
+In Δt that is a hold and a commit. If your agent speaks MCP, it already has both as tools: add `npx @open-deltat/mcp` (the [agent quickstart](/docs/quickstart) takes five minutes) and the agent calls `find_slots`, then `hold_slot` before it names a time, then `commit_hold` when the user agrees. There is deliberately no one-step booking tool, so the agent cannot skip the hold.
+
+In code, with the TypeScript client, the same shape looks like this:
 
 ```ts
 import { DeltaT } from "@open-deltat/client";
 
-const db = new DeltaT({ database: "clinic" });
+const db = new DeltaT({ database: "clinic", password: process.env.DELTAT_PASSWORD });
 
 // 1. read
 const slots = await db.availability.get({
@@ -97,13 +99,22 @@ await db.bookings.create([
 // both, or neither
 ```
 
-Multi-hold atomic commit, where several separate holds convert together or not at all, is on the roadmap and not shipped. Today, batch the bookings when you can and hold the single scarce resource when you cannot.
+When the agent has to ask first, hold them together too. `holds.placeMany` lands every hold or none, and `holds.commitMany` books every one of them or none. Over MCP it is the same three tools with several calendars: `find_slots` returns only times when all of them are free, `hold_slot` holds all or none, `commit_hold` books all or none.
+
+```ts
+const holds = await db.holds.placeMany([
+  { resourceId: doctor.id, start, end, expiresAt },
+  { resourceId: room.id, start, end, expiresAt },
+]);
+// ...the user says yes...
+await db.holds.commitMany(holds.map((h) => h.id), { label: "consult" });
+```
 
 ## What Δt does not do for you
 
 Δt is a database for time. It does not know what a customer is, does not send the confirmation email, and does not decide which slot the agent should offer. It answers what is free, holds a claim, and refuses a write that would double-book. Identity, payment, and the conversation stay in your application, where an agent framework already has them.
 
-There is no hosted Δt MCP server yet. Δt speaks the PostgreSQL wire protocol, so an agent reaches it through the TypeScript SDK or any Postgres client in any language your tooling already supports; wiring that into a tool definition is a few lines.
+An agent reaches Δt three ways: the MCP server for any MCP client, the TypeScript SDK inside your own agent, or any Postgres driver in any language, since Δt speaks the PostgreSQL wire protocol.
 
 ## Next
 

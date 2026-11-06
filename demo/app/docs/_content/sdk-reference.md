@@ -2,7 +2,7 @@ This is the full verb surface of the TAP TypeScript SDK, one entry per verb, gro
 
 The running example throughout is a ticketing setup: Acme Tickets owns a Stadium, the Stadium has Section A, and Section A has Seat 12. Resources nest like that, and only the leaves (the seats) carry a real timeline.
 
-New to the model these verbs act on? Start with [What is Δt](/docs), then the [Data model](/docs/data-model) and [Holds and availability](/docs/holds-and-availability).
+New to the model these verbs act on? Start with [What is Δt](/docs), then the [data model](/docs/data-model) and [find, hold, book, listen](/docs/holds-and-availability). For an agent, the [agent quickstart](/docs/quickstart) needs no code.
 
 ## Three things to know first
 
@@ -17,7 +17,7 @@ These hold for every verb, so they are stated once here.
 ```ts
 import { DeltaT } from "@open-deltat/client";
 
-const db = new DeltaT({ host: "localhost", port: 5433, database: "acme", password: "deltat" });
+const db = new DeltaT({ host: "localhost", port: 5433, database: "acme", password: process.env.DELTAT_PASSWORD });
 ```
 
 ## client
@@ -30,10 +30,10 @@ One `DeltaT` per database, and reuse it. The `database` value is the tenant, so 
 constructor(options?: DeltaTOptions | Sql)
 ```
 
-Open a connection from options (`host`, `port`, `database`, `username`, `password`), or wrap an existing postgres `Sql` instance. Unspecified options fall back to sensible defaults (`localhost`, `5433`, database `default`, username `user`, password `deltat`).
+Open a connection from options (`host`, `port`, `database`, `username`, `password`, `tls`), or wrap an existing postgres `Sql` instance. Unspecified options fall back to `localhost`, `5433`, database `default` and username `user` (the server ignores the username). Always pass the password the server was started with: the client's own fallback, `deltat`, only works if you started the server with that password. `tls: true` (or `{ ca }` for a private certificate) connects over TLS, always verified.
 
 ```ts
-const db = new DeltaT({ host: "localhost", port: 5433, database: "acme", password: "deltat" });
+const db = new DeltaT({ host: "localhost", port: 5433, database: "acme", password: process.env.DELTAT_PASSWORD });
 ```
 
 ### close
@@ -111,6 +111,20 @@ List resources. No filter returns everything, `{ roots: true }` returns only top
 ```ts
 const sections = await db.resources.get({ parentId: stadium.id });
 ```
+
+### find
+
+```ts
+async find(id: string): Promise<Resource | undefined>
+```
+
+Look up one resource by id.
+
+```ts
+const seat = await db.resources.find(seat12.id);
+```
+
+A resource that still has children cannot be deleted; delete the children first.
 
 ## rules
 
@@ -258,6 +272,33 @@ Convert a live hold into a booking in one atomic server-side statement. The book
 const { bookingId } = await db.holds.commit(hold.id, { label: "order-4417" });
 ```
 
+### placeMany
+
+```ts
+async placeMany(items: { resourceId: string; start: number; end: number; expiresAt: number; }[]): Promise<Hold[]>
+```
+
+Place several holds as one: every hold lands, or none does, even across different resources. Use it to hold a room, a person and the equipment together while you ask. Needs Δt 0.4.0 or later for more than one hold.
+
+```ts
+const holds = await db.holds.placeMany([
+  { resourceId: room.id, start, end, expiresAt },
+  { resourceId: doctor.id, start, end, expiresAt },
+]);
+```
+
+### commitMany
+
+```ts
+async commitMany(holdIds: string[], opts?: { label?: string }): Promise<{ bookingIds: string[] }>
+```
+
+Turn several holds into bookings in one step: all of them, or none if any hold has expired or is gone.
+
+```ts
+const { bookingIds } = await db.holds.commitMany(holds.map((h) => h.id), { label: "consult" });
+```
+
 ### release
 
 ```ts
@@ -296,7 +337,7 @@ const bySeat = await db.holds.getMany([seat11.id, seat12.id]);
 
 ## availability
 
-Availability is never stored, always computed on the spot: open hours, minus blackouts, minus active allocations (bookings plus live holds), with each allocation stretched by its `bufferAfter`. These reads give you the free gaps. The [Holds and availability](/docs/holds-and-availability) page walks through how it is computed.
+Availability is never stored, always computed on the spot: open hours, minus blackouts, minus active allocations (bookings plus live holds), with each allocation stretched by its `bufferAfter`. These reads give you the free gaps. The [find, hold, book, listen](/docs/holds-and-availability) page walks through how it is computed.
 
 ### get
 
@@ -338,28 +379,55 @@ const bySeat = await db.availability.getMany({ resourceIds: [seat11.id, seat12.i
 
 Real-time change notifications over a per-resource channel (`resource_<id>`). Events also bubble up to ancestors, so a subscriber on the Stadium hears about changes to Seat 12.
 
+### watch
+
+```ts
+async watch(resourceId: string, onChange: (change: Change) => void, options?: WatchOptions): Promise<() => Promise<void>>
+```
+
+The one to reach for first. You get a plain change (`held`, `booked`, `hold_ended` or `cancelled`) for the resource and everything under it. It reconnects on its own, and if it falls behind it re-reads the calendar so you are never left with a wrong picture. `options` takes an optional `window` and callbacks such as `onReady` and `onLagged`.
+
+```ts
+const stop = await db.events.watch(section.id, (change) => render(change));
+await stop();
+```
+
 ### listen
 
 ```ts
-async listen(resourceId: string, callback: (event: DeltaTEvent) => void): Promise<() => Promise<void>>
+async listen(resourceId: string, callback: (event: DeltaTEvent) => void, handlers?: { onError?; onDisconnected?; onResubscribed?; onGone?; onRetryFailing? }): Promise<() => Promise<void>>
 ```
 
-Subscribe to changes on a resource. Returns an async unsubscribe function. Anything that arrives malformed is ignored.
+The raw stream underneath `watch`: every event exactly as the server sends it. It reconnects on its own. Returns an async unsubscribe function; anything that arrives malformed is ignored.
 
 ```ts
 const stop = await db.events.listen(seat12.id, (e) => console.log(e));
 await stop();
 ```
 
-## A few honest notes
+## errors
 
-**Recurrence lives in your code, not here.** There is no recurrence verb. Expand a recurring pattern into concrete `[start, end)` segments yourself, then hand them to `rules.replaceOpenHours` (to swap a whole schedule) or `rules.create` (to add some). The schedule and time-mask helpers that exist in the package are deliberately left off this verb surface.
+The client throws the driver's own errors. Three helpers read them, and none of them throws.
+
+- **`classifyRefusal(err)`** gives `{ code, message, offer }`, where `code` is `CONFLICT` (the time is taken, or outside open hours), `EXPIRED` (the hold ran out), `NOT_FOUND`, `INVALID` or `INTERNAL`.
+- **`counterOffer(err)`** gives the times that still work, when the refusal carried them.
+- **`sqlstateOf(err)`** gives the raw Postgres error code, for anything else.
 
 ```ts
-const segments = expandWeeklyHours(weekStart);
-await db.rules.replaceOpenHours(seat12.id, segments);
+import { classifyRefusal } from "@open-deltat/client";
+
+try {
+  await db.holds.commit(hold.id);
+} catch (err) {
+  const { code, offer } = classifyRefusal(err);
+  if (code === "CONFLICT" && offer) offerTimes(offer.alternatives);
+}
 ```
+
+## helpers
+
+**Recurrence lives in your code, not in the database.** There is no recurring rule inside Δt. `expandRecurrence` turns a weekly pattern (with an IANA `timeZone` and optional excluded dates) into concrete `[start, end)` segments, which you then hand to `rules.replaceOpenHours` or `rules.create`. [Recurring hours](/docs/guides/recurring-availability) walks through it.
 
 **`db.sql` is an escape hatch, not a verb.** It hands you the raw postgres connection. It is real and public, but reaching for it ties your code to the current transport. Use the verbs above; drop to `db.sql` only when nothing else covers the case.
 
-**Convert holds with `holds.commit`, never with release-then-create.** The two-step version leaves an instant where the slot is free and a competing caller can take the very span the hold was protecting. `commit` does it in one statement. The pairing that is still missing is a *multi*-hold commit, where several holds convert together or not at all; until that ships, batch what you can through `bookings.create` and hold only the one scarce resource.
+**Convert holds with `holds.commit` or `holds.commitMany`, never with release-then-create.** The two-step version leaves an instant where the slot is free and a competing caller can take the very span the hold was protecting.
