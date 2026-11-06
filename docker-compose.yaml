@@ -45,6 +45,7 @@ services:
       AUTH_TRUSTED_ISSUERS: ${AUTH_TRUSTED_ISSUERS:-}
       AUTH_PROVIDER_PARAM: ${AUTH_PROVIDER_PARAM:-}
       AUTH_AUDIENCE: ${AUTH_AUDIENCE:-}
+      # The audience /mcp tokens must carry. Blank means PUBLIC_BASE_URL/mcp; it is always checked.
       AUTH_MCP_AUDIENCE: ${AUTH_MCP_AUDIENCE:-}
       # The public origin, e.g. https://delt.at. Needed for the hosted MCP endpoint (/mcp) and the
       # review link in owner notifications; /mcp stays off without it.

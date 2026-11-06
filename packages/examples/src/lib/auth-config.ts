@@ -1,4 +1,6 @@
-import type { VerifiedPrincipal } from "@open-deltat/mcp";
+import { OidcAdapter, type VerifiedPrincipal } from "@open-deltat/mcp";
+import { liveIdentityLinks, type IdentityLinks } from "./identity-links";
+import { mcpResourceUrl } from "./public-base-url";
 
 // The sign-in configuration and the one identity a person has under it. Pure (no request context),
 // so the custom server (server.ts) can use it as well as the Next app: the registry it loads must
@@ -62,12 +64,21 @@ export function authConfig(): AuthConfig | null {
  *
  * An id from an issuer outside the trusted set is returned unchanged; it never verified anyway. The id
  * is split at its first "#", which is safe because an OIDC `iss` is a URL without a fragment.
+ *
+ * Then the identity's link, if it has one (identity-links.ts): after an identity provider move, the
+ * new identity acts as the principal its records were stored under. Stored ids pass through here on
+ * load too; they are principals, never link keys, so they come back unchanged.
  */
-export function canonicalPrincipalId(principalId: string, config: AuthConfig | null = authConfig()): string {
+export function canonicalPrincipalId(
+  principalId: string,
+  config: AuthConfig | null = authConfig(),
+  links: IdentityLinks = liveIdentityLinks()
+): string {
   const at = principalId.indexOf("#");
   if (!config || at < 0) return principalId;
   const iss = principalId.slice(0, at);
-  return config.trustedIssuers.includes(iss) ? `${config.issuer}#${principalId.slice(at + 1)}` : principalId;
+  const identity = config.trustedIssuers.includes(iss) ? `${config.issuer}#${principalId.slice(at + 1)}` : principalId;
+  return links.get(identity) ?? identity;
 }
 
 /**
@@ -77,10 +88,38 @@ export function canonicalPrincipalId(principalId: string, config: AuthConfig | n
  */
 export function canonicalVerifier(
   verify: (token: string) => Promise<VerifiedPrincipal | null>,
-  config: AuthConfig
+  config: AuthConfig,
+  /** Omitted: this process's links file. */
+  links?: IdentityLinks
 ): (token: string) => Promise<VerifiedPrincipal | null> {
   return async (token) => {
     const principal = await verify(token);
-    return principal && { ...principal, principalId: canonicalPrincipalId(principal.principalId, config) };
+    return principal && { ...principal, principalId: canonicalPrincipalId(principal.principalId, config, links) };
   };
+}
+
+/**
+ * The audience a token must carry at /mcp, normalised once here. Set, it is AUTH_MCP_AUDIENCE.
+ * Unset or blank, it is this server's own MCP resource, the `resource` its RFC 9728 metadata
+ * advertises and the one MCP clients ask the issuer for (RFC 8707). There is no value that turns the
+ * check off: unset used to mean "any token this issuer signed", the site's own session included.
+ *
+ * Deploying this changes nothing for the website (its sessions use AUTH_AUDIENCE). An MCP client
+ * whose token carries a different audience is refused and has to sign in again; if the issuer stamps
+ * one environment-wide audience instead of the resource (WorkOS does when the resource is not
+ * registered with it), register `${PUBLIC_BASE_URL}/mcp` there, or set AUTH_MCP_AUDIENCE to what it
+ * stamps, before deploying.
+ */
+export function mcpAudience(publicBaseUrl: string): string {
+  return setting("AUTH_MCP_AUDIENCE") ?? mcpResourceUrl(publicBaseUrl);
+}
+
+/** The /mcp token verifier: the issuer's signature, the MCP audience, and the one id a person has. */
+export function mcpVerifier(
+  config: AuthConfig,
+  audience: string,
+  links?: IdentityLinks
+): (token: string) => Promise<VerifiedPrincipal | null> {
+  const adapter = new OidcAdapter({ jwksUri: config.jwksUri, trustedIssuers: config.trustedIssuers, tenant: "public", audience });
+  return canonicalVerifier((token) => adapter.verify(token), config, links);
 }

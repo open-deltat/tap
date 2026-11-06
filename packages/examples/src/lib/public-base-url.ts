@@ -14,6 +14,9 @@ export function publicBaseUrlFrom(raw: string | undefined): string | null {
 
 export const publicBaseUrl = publicBaseUrlFrom(process.env.PUBLIC_BASE_URL);
 
+/** The hosted MCP endpoint's resource identifier: what its OAuth metadata names and tokens must carry. */
+export const mcpResourceUrl = (base: string): string => `${base}/mcp`;
+
 /**
  * The origin to send people back to: the configured public one, else the request's own. The fallback
  * is right only when the app is reached directly, as in local development. Read when called, not when
