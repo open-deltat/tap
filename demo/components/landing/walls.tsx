@@ -85,8 +85,8 @@ const WALLS: readonly Wall[] = [
     deltat: <Lanes answer />,
   },
   {
-    title: "It can’t book a whole set at once.",
-    link: { label: "How a set is booked", href: "/docs/guides/capacity" },
+    title: "It can’t book several things together.",
+    link: { label: "All or nothing, in one step", href: "/docs/guides/capacity" },
     today: <Machines booked={5} failedAt={5} />,
     deltat: <Machines booked={8} />,
   },
