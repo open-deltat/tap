@@ -11,9 +11,9 @@ import { DeltatMark } from "@/components/deltat-mark";
 // agent asks. The Δt card wears the logo's own material (dark tile, emerald ring, glow) so old and
 // new are told apart before a word is read. Static on purpose, and nothing under it explains it.
 // One card, two halves, the arrow on the seam: the same shape as each of the five walls below.
-export function WithWithout() {
+export function WithWithout({ className = "mt-14 sm:mt-20" }: { className?: string }) {
   return (
-    <div className="relative mx-auto mt-14 grid max-w-5xl overflow-hidden rounded-[32px] border border-dt-line bg-dt-surface shadow-dt-float sm:mt-20 md:grid-cols-2">
+    <div className={`relative mx-auto grid max-w-5xl overflow-hidden rounded-[32px] border border-dt-line bg-dt-surface shadow-dt-float md:grid-cols-2 ${className}`}>
       <OldCalendar />
       <NewCalendar />
       <span

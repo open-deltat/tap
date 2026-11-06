@@ -1,21 +1,22 @@
 import { CollisionToy } from "@/components/collision-toy";
 import { DocHeader } from "@/components/doc-header";
-import { Markdown } from "@/components/markdown";
+import { DocBody } from "@/components/doc-body";
 import { JsonLd } from "@/components/json-ld";
+import { WithWithout } from "@/components/landing/with-without";
+import { Verbs } from "@/components/landing/verbs";
 import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
-  title: "What is Δt? A database for time",
+  title: "What is Δt? A calendar for agents",
   description:
-    "Δt makes time itself the data: a booking is a stretch on one line, a conflict is an overlap, and availability is the gaps, computed in an instant on every read.",
+    "Δt is a calendar people and agents book on at the same moment: find what is free, hold a slot while you ask, book it in one step, and every screen sees it at once.",
   path: "/docs",
 };
 
 export const metadata = pageMetadata({ ...SEO, ogType: "article", absoluteTitle: true });
 
 export default function WhatIsDeltatPage() {
-  const [before, after] = docContent("what-is-deltat").split("<!--COLLISION-->");
   return (
     <article className="mx-auto max-w-3xl">
       <JsonLd
@@ -28,11 +29,14 @@ export default function WhatIsDeltatPage() {
         ]}
       />
       <DocHeader title="What is Δt" />
-      <Markdown>{before}</Markdown>
-      <div className="my-2">
-        <CollisionToy />
-      </div>
-      <Markdown>{after}</Markdown>
+      <DocBody
+        source={docContent("what-is-deltat")}
+        slots={{
+          WITH_WITHOUT: <WithWithout className="" />,
+          VERBS: <Verbs columns={2} />,
+          COLLISION: <CollisionToy />,
+        }}
+      />
     </article>
   );
 }

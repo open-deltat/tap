@@ -21,7 +21,7 @@ const WALLS: readonly Wall[] = [
     link: { label: "How holds work", href: "/docs/guides/booking-holds" },
     today: (
       <Rows>
-        <Row t="14:30" tag="gone">
+        <Row t="14:30" tag="taken while A asked">
           <Chip tone="ghost">Agent A · asking…</Chip>
           <Chip tone="clash">Someone else</Chip>
         </Row>
@@ -238,7 +238,13 @@ const FREE = [
 
 function Lanes({ answer }: { answer: boolean }) {
   return (
-    <div className="space-y-1.5">
+    <div className="relative space-y-1.5">
+      {/* With the answer, the same box the live example draws: the chosen time, across every lane. */}
+      {answer && (
+        <div aria-hidden className="pointer-events-none absolute -bottom-1 -top-1 left-14 right-0">
+          <div className="absolute inset-y-0 rounded-md bg-dt-ink/[0.07] ring-1 ring-dt-ink/25" style={{ left: "22%", width: "18%" }} />
+        </div>
+      )}
       {FREE.map(([a, b], i) => (
         <div key={i} className="flex items-center gap-2">
           <span className="w-12 shrink-0 truncate text-right text-[11px] text-dt-ink-2">{FRIEND_NAMES[i]}</span>
@@ -270,7 +276,8 @@ function Machines({ booked, failedAt }: { booked: number; failedAt?: number }) {
   const all = booked === 8;
   return (
     <div>
-      <div className="grid grid-cols-8 gap-1.5">
+      {/* On Δt the eight sit in one box, the same grouping the live example draws: one request. */}
+      <div className={`grid grid-cols-8 gap-1.5 ${all ? "rounded-lg bg-dt-ink/[0.05] p-1.5 ring-1 ring-dt-ink/25" : "p-1.5"}`}>
         {Array.from({ length: 8 }, (_, i) => {
           const look =
             i < booked
