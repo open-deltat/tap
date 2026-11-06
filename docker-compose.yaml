@@ -2,12 +2,16 @@
 #
 #   DELTAT_PASSWORD=<choose-a-secret> docker compose up --build -d   ->  http://localhost:3000
 #
-# deltat is public, so it builds straight from its Git URL (no sibling checkout needed). The demo
-# is a bun-workspace member, so its build context is this repo root. Only the demo's port 3000 is
-# published; it reaches deltat over the internal compose network via pgwire.
+# deltat runs its released image, the same release the integration suite tests this repo against
+# (scripts/kernel-pin.test.ts keeps the two equal). The demo is a bun-workspace member, so its
+# build context is this repo root. Only the demo's port 3000 is published; it reaches deltat over
+# the internal compose network via pgwire.
 services:
   deltat:
-    build: https://github.com/open-deltat/deltat.git#main
+    # Upgrade: bump DELTAT_CRATE_VERSION in .github/workflows/ci.yml and this tag plus its digest
+    # (the Docker-Content-Digest of ghcr.io/v2/open-deltat/deltat/manifests/<version>) in one PR,
+    # after reading that release's notes for a WAL FORMAT_VERSION change, which is one-way.
+    image: ghcr.io/open-deltat/deltat:0.5.0@sha256:211161d189b278d6a9490f8093934e955bf53f70fffd732284df43f655abdccc
     restart: unless-stopped
     environment:
       DELTAT_PASSWORD: ${DELTAT_PASSWORD:-deltat}
