@@ -2,10 +2,13 @@
 
 import { cn } from "@open-deltat/shared/utils";
 import type { AvailabilitySlot } from "../../lib/schemas";
+import { FriendAvatar } from "./friends";
 
 export interface MeetLane {
   label: string;
   slots: AvailabilitySlot[];
+  /** Index into FRIENDS: the lane is labelled with that person's avatar instead of text. */
+  avatar?: number;
   /** The "everyone" lane: the only one drawn in colour, because it is the answer. */
   everyone?: boolean;
 }
@@ -34,8 +37,8 @@ export function MeetLanes({ lanes, axisStart, axisEnd, selected }: MeetLanesProp
   const band = (s: AvailabilitySlot) => ({ left: `${pct(s.start)}%`, width: `${pct(s.end) - pct(s.start)}%` });
 
   return (
-    <div className="select-none" aria-hidden>
-      <div className="relative ml-[4.5rem] h-4">
+    <div className="select-none">
+      <div className="relative ml-[4.5rem] h-4" aria-hidden>
         {ticks.map((t, i) => (
           <span
             key={t}
@@ -53,10 +56,10 @@ export function MeetLanes({ lanes, axisStart, axisEnd, selected }: MeetLanesProp
       <div className="relative mt-1.5 space-y-1.5">
         {lanes.map((lane) => (
           <div key={lane.label} className={cn("flex items-center gap-2", lane.everyone && "mt-3 border-t border-dt-line pt-3")}>
-            <span className={cn("w-16 shrink-0 truncate text-right text-[12px]", lane.everyone ? "font-semibold text-dt-ink" : "text-dt-ink-2")}>
-              {lane.label}
+            <span className={cn("flex w-16 shrink-0 items-center justify-end text-right text-[12px]", lane.everyone ? "font-semibold text-dt-ink" : "text-dt-ink-2")}>
+              {lane.avatar != null ? <FriendAvatar i={lane.avatar} size={22} /> : <span className="truncate">{lane.label}</span>}
             </span>
-            <div className={cn("relative flex-1 rounded-full bg-dt-line/50", lane.everyone ? "h-3" : "h-2")}>
+            <div className={cn("relative flex-1 rounded-full bg-dt-line/50", lane.everyone ? "h-3" : "h-2")} aria-hidden>
               {lane.slots.map((s) => (
                 <div
                   key={s.start}
@@ -69,7 +72,7 @@ export function MeetLanes({ lanes, axisStart, axisEnd, selected }: MeetLanesProp
         ))}
 
         {selected && (
-          <div className="pointer-events-none absolute inset-y-[-4px] left-[4.5rem] right-0">
+          <div className="pointer-events-none absolute inset-y-[-4px] left-[4.5rem] right-0" aria-hidden>
             <div
               className="absolute inset-y-0 rounded-md bg-dt-ink/[0.07] ring-1 ring-dt-ink/25 transition-[left,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
               style={band(selected)}

@@ -9,6 +9,7 @@ import { Stage } from "../../components/stage";
 import { Segmented } from "../../components/ui/segmented";
 import { BookButton } from "../../components/book-button";
 import { MeetLanes } from "./meet-lanes";
+import { FRIENDS } from "./friends";
 import { BookingConfirmedModal, type BookingResult } from "../../components/booking-confirmed-modal";
 import type { AvailabilitySlot, Resource } from "../../lib/schemas";
 
@@ -43,7 +44,7 @@ function asResource(id: string, name: string): Resource {
   return { id, parentId: null, name, capacity: 1, bufferAfter: null, slotMinutes: 30, price: null, bufferMinutes: 0 };
 }
 
-const friendName = (i: number) => `Friend ${i + 1}`;
+const friendName = (i: number) => FRIENDS[i]?.name ?? `Friend ${i + 1}`;
 const dayLabel = (ms: number) => new Date(ms).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 const shortDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 const dayOf = (ms: number) => {
@@ -125,7 +126,7 @@ export default function MeetExample() {
     if (!data || !evening) return [];
     const ofDay = (slots: AvailabilitySlot[]) => slots.filter(inDay(evening.dayStart));
     return [
-      ...data.perFriend.map((slots, i) => ({ label: friendName(i), slots: ofDay(slots) })),
+      ...data.perFriend.map((slots, i) => ({ label: friendName(i), avatar: i, slots: ofDay(slots) })),
       { label: "Everyone", slots: ofDay(data.shared), everyone: true },
     ];
   }, [data, evening]);
@@ -194,14 +195,9 @@ export default function MeetExample() {
     <>
       <Stage primitive={{ label: "The free time several calendars share", specId: "AVAIL-08" }} title="When is everyone free?" tray={tray}>
         {/* Like the appointments example: the choice on the left, the day on the right, one hairline between. */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-[12rem_1fr]">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-[10rem_1fr] sm:gap-6">
           <div className="sm:border-r sm:border-dt-line sm:pr-6">
-            <h3 className="text-[15px] font-semibold tracking-tight text-dt-ink">Five friends, five calendars</h3>
-            <p className="mt-1 text-pretty text-[13px] leading-relaxed text-dt-ink-2">
-              Pick how long. Δt finds the evenings when all five are free.
-            </p>
-
-            <div className="mt-4 text-[12px] text-dt-ink-3">How long</div>
+            <div className="text-[12px] text-dt-ink-3">How long</div>
             <div className="mt-2 sm:hidden">
               <Segmented
                 className="justify-start"

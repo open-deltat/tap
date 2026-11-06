@@ -2,15 +2,23 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
-// An example rendered inside another page (the landing) must not bring its own page: no scroller of
-// its own, no title, and the island at the bottom of the block rather than the viewport. The example
-// does not know where it is rendered, so the host says so with this provider and Stage reads it.
-const InlineStageContext = createContext(false);
+// How an example is shown. "page": its own page, with title, scroller and an island pinned to the
+// viewport. "inline": a block inside another page (the landing): the page scrolls, the host
+// supplies the title, the island sits at the block's foot. "bare": its own page without the title
+// and caption, for the landing gallery's previews, where the card is the whole picture. The
+// example does not know where it is rendered, so the host says so here and Stage reads it.
+export type StageMode = "page" | "inline" | "bare";
 
-export function InlineStage({ children }: { children: ReactNode }) {
-  return <InlineStageContext.Provider value={true}>{children}</InlineStageContext.Provider>;
+const StageModeContext = createContext<StageMode>("page");
+
+export function StageModeProvider({ mode, children }: { mode: StageMode; children: ReactNode }) {
+  return <StageModeContext.Provider value={mode}>{children}</StageModeContext.Provider>;
 }
 
-export function useInlineStage(): boolean {
-  return useContext(InlineStageContext);
+export function InlineStage({ children }: { children: ReactNode }) {
+  return <StageModeProvider mode="inline">{children}</StageModeProvider>;
+}
+
+export function useStageMode(): StageMode {
+  return useContext(StageModeContext);
 }
