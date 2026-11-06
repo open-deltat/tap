@@ -2,66 +2,15 @@
 
 import { dt } from "../../lib/deltat";
 import { ensureSchedule, ensureOpenWindow, findRootByName } from "../../actions/seed-helpers";
+import { COURSES, NAME, type CourseDef } from "./structure";
 
-const NAME = "FitFlow Studio";
+// The courses (capacity and weekly slots) are in ./structure, which the hosted MCP's modelling guide
+// reads too; this file only builds them and fills them with enrollments.
+
 const DAY = 86_400_000;
 const ENROLL_WINDOW_DAYS = 35; // only fill upcoming classes, so "spots left" varies where it matters
 
 export type GymCourse = { id: string; name: string; capacity: number };
-
-type CourseDef = {
-  name: string;
-  capacity: number;
-  schedule: Record<number, { h: number; m: number; dur: number }[]>;
-};
-
-// Each course is ONE capacity-N resource; the weekly slots become non-blocking rules (open class
-// windows). Enrollments are bookings inside those windows, so the capacity sweep gives per-class
-// spots-left for free.
-const COURSES: CourseDef[] = [
-  {
-    name: "Vinyasa Yoga",
-    capacity: 12,
-    schedule: {
-      2: [{ h: 18, m: 0, dur: 60 }],
-      4: [{ h: 18, m: 0, dur: 60 }],
-      6: [{ h: 9, m: 0, dur: 60 }],
-    },
-  },
-  {
-    name: "Spin",
-    capacity: 20,
-    schedule: {
-      1: [{ h: 7, m: 0, dur: 45 }],
-      3: [{ h: 7, m: 0, dur: 45 }],
-      5: [{ h: 7, m: 0, dur: 45 }],
-    },
-  },
-  {
-    name: "HIIT",
-    capacity: 16,
-    schedule: {
-      1: [{ h: 18, m: 30, dur: 45 }],
-      3: [{ h: 18, m: 30, dur: 45 }],
-    },
-  },
-  {
-    name: "Boxing",
-    capacity: 10,
-    schedule: {
-      2: [{ h: 19, m: 30, dur: 60 }],
-      6: [{ h: 10, m: 30, dur: 60 }],
-    },
-  },
-  {
-    name: "Reformer Pilates",
-    capacity: 8,
-    schedule: {
-      2: [{ h: 9, m: 30, dur: 50 }],
-      4: [{ h: 9, m: 30, dur: 50 }],
-    },
-  },
-];
 
 function monthStartMs(): number {
   const now = new Date();

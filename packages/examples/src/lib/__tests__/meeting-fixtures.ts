@@ -52,6 +52,12 @@ export function fakeDeltaT() {
     released: [] as string[],
     bookings: [] as { id: string; label: string | undefined }[],
     cancelled: [] as string[],
+    /** Kernel resources by id, as `resources.create` made them (or a test seeded them). */
+    resources: new Map<string, { id: string; parentId: string | null; name: string | null; capacity: number; bufferAfter: number | null }>(),
+    /** Open-hour segments each resource was given by `rules.replaceOpenHours`. */
+    openHours: new Map<string, { start: number; end: number }[]>(),
+    /** The next `rules.replaceOpenHours` throws, as a kernel refusal would. */
+    rulesFail: false,
   };
   /** holdId -> bookingId for every commit the kernel applied: the hold is consumed, the booking takes its span. */
   const committed = new Map<string, string>();
@@ -78,6 +84,25 @@ export function fakeDeltaT() {
     if (state.readsFail) throw connectionReset();
   };
   const dt = {
+    resources: {
+      create: async (opts?: { name?: string; capacity?: number; bufferAfter?: number | null }) => {
+        const id = `res${state.resources.size + 1}`;
+        const resource = { id, parentId: null, name: opts?.name ?? null, capacity: opts?.capacity ?? 1, bufferAfter: opts?.bufferAfter ?? null };
+        state.resources.set(id, resource);
+        return resource;
+      },
+      find: async (id: string) => state.resources.get(id) ?? null,
+      delete: async (id: string) => {
+        state.resources.delete(id);
+        state.openHours.delete(id);
+      },
+    },
+    rules: {
+      replaceOpenHours: async (resourceId: string, segments: { start: number; end: number }[]) => {
+        if (state.rulesFail) throw Object.assign(new Error("span is outside the parent's availability"), { code: "23514" });
+        state.openHours.set(resourceId, segments);
+      },
+    },
     availability: {
       get: async ({ start, end }: { start: number; end: number }) =>
         state.free
@@ -141,6 +166,8 @@ export function setupMeetings(opts: { mode?: "instant" | "request"; reviewBase?:
   const store = openMeetingRequestStore(tmpPath(`requests_${crypto.randomUUID()}`), { now: () => clock.now });
   const notices: OwnerNotice[] = [];
   const { dt, state } = fakeDeltaT();
+  // The registry entry's kernel twin, so a read of the calendar's resource finds it.
+  state.resources.set("cal1", { id: "cal1", parentId: null, name: "Simon's week", capacity: 1, bufferAfter: null });
   const service = createMeetingService({
     dt,
     registry,

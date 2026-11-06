@@ -91,15 +91,6 @@ describe("minting a pass", () => {
     clock.now += MIN;
     expect(must(passes.list({ owner: OWNER })).find((p) => p.id === lapsed.pass.id)).toMatchObject({ status: "expired", usesLeft: 0, bookingsUnused: 2 });
   });
-
-  test("an owner sees only their own calendars, so a stranger gets nothing", () => {
-    const { passes } = setup();
-    expect(passes.ownedCalendars(OWNER)).toEqual([
-      { id: "cal1", name: "Simon's week", timezone: "Europe/Berlin", slotMinutes: 30, takesMeetingRequests: true },
-    ]);
-    expect(passes.ownedCalendars(BEN)).toEqual([{ id: "cal2", name: "Ben's week", timezone: "UTC", slotMinutes: 60, takesMeetingRequests: false }]);
-    expect(passes.ownedCalendars(STRANGER)).toEqual([]);
-  });
 });
 
 describe("booking with a pass", () => {

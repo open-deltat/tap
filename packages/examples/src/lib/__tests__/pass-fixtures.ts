@@ -2,7 +2,11 @@ import { openBookingPassStore } from "../booking-passes";
 import { createBookingPassService } from "../booking-pass-service";
 import { createRateLimiter } from "../rate-limit";
 import type { Notifier } from "../notify";
+import { createMyCalendars } from "../my-calendars";
 import { BEN, MIN, OWNER, T, setupMeetings, tmpPath } from "./meeting-fixtures";
+
+/** The public origin the fixtures' booking links are built from. */
+export const BOOKING_BASE = "https://delt.at";
 
 // Shared by the booking-pass tests: the meeting fixture's calendar ("cal1", owned by OWNER, which
 // takes requests), a second calendar owned by BEN, and a pass service over the same fake deltat and
@@ -15,6 +19,8 @@ export const STRANGER = "https://issuer.test#stranger";
 export function setupPasses(opts: { lookupLimit?: number; notify?: Notifier } = {}) {
   const meetings = setupMeetings();
   meetings.registry.register({ id: "cal2", name: "Ben's week", slotMinutes: 60, timezone: "UTC", owner: BEN });
+  meetings.state.resources.set("cal2", { id: "cal2", parentId: null, name: "Ben's week", capacity: 1, bufferAfter: null });
+  const calendars = createMyCalendars({ dt: meetings.dt, registry: meetings.registry, bookingBase: BOOKING_BASE });
   const storePath = tmpPath(`passes_${crypto.randomUUID()}`);
   const store = openBookingPassStore(storePath, { now: () => meetings.clock.now });
   const passes = createBookingPassService({
@@ -35,5 +41,5 @@ export function setupPasses(opts: { lookupLimit?: number; notify?: Notifier } = 
     if (!made.ok) throw new Error(made.error);
     return made.value;
   };
-  return { ...meetings, passes, store, storePath, mint };
+  return { ...meetings, passes, calendars, store, storePath, mint };
 }

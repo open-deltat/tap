@@ -134,18 +134,7 @@ export interface CreatePassInput {
   label?: string | null;
 }
 
-/** A calendar as its owner needs it to mint a pass or read its requests. */
-export interface OwnedCalendar {
-  readonly id: string;
-  readonly name: string;
-  readonly timezone: string;
-  readonly slotMinutes: number;
-  readonly takesMeetingRequests: boolean;
-}
-
 export interface BookingPassService {
-  /** The calendars this principal owns, newest first; nobody else's, ever. */
-  ownedCalendars(owner: string): OwnedCalendar[];
   /** The pass is in this result and nowhere else, ever. */
   create(input: CreatePassInput): Outcome<{ token: string; pass: PassView }>;
   /** Passes on one calendar the owner owns, or on all of them; newest first. */
@@ -285,17 +274,6 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
   };
 
   return {
-    ownedCalendars(owner) {
-      // listOwned matches the stored owner exactly, the same test authorizeOwner applies.
-      return deps.registry.listOwned(owner).map((record) => ({
-        id: record.id,
-        name: record.name,
-        timezone: record.timezone,
-        slotMinutes: record.slotMinutes,
-        takesMeetingRequests: record.bookingMode === "request",
-      }));
-    },
-
     create(input) {
       const record = deps.registry.authorizeOwner(input.calendarId, input.owner);
       if (!record) return fail("You do not own this calendar.");

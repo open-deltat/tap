@@ -40,10 +40,14 @@ function validateName(raw: string): Outcome<string> {
   }
 }
 
-/** Create an empty calendar (a deltat resource with no open hours yet), owned by the principal. */
+/**
+ * Create an empty calendar (a deltat resource with no open hours yet), owned by the principal.
+ * `capacity` (bookings at the same time) and `bufferMinutes` (turnover after each booking) live in
+ * the kernel, the only place they are kept; callers validate their ranges.
+ */
 export async function createOwnedCalendar(
   deps: OwnedDeps,
-  input: { name: string; timezone: string; owner: string }
+  input: { name: string; timezone: string; owner: string; capacity?: number; bufferMinutes?: number }
 ): Promise<Outcome<{ id: string }>> {
   const name = validateName(input.name);
   if (!name.ok) return name;
@@ -51,7 +55,11 @@ export async function createOwnedCalendar(
     return { ok: false, error: "That time zone is not one this server recognises." };
   }
 
-  const resource = await deps.dt.resources.create({ name: name.value });
+  const resource = await deps.dt.resources.create({
+    name: name.value,
+    capacity: input.capacity ?? 1,
+    bufferAfter: input.bufferMinutes ? input.bufferMinutes * 60_000 : null,
+  });
   try {
     deps.registry.register({
       id: resource.id,

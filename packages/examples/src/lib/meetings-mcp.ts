@@ -7,15 +7,17 @@ import type { MeetingRequest, RequestContact } from "./meeting-requests";
 import type { Outcome } from "./bookable-service";
 import type { BookingPassService } from "./booking-pass-service";
 import { BOOKING_PASS_INSTRUCTIONS, registerBookingPassTools } from "./booking-passes-mcp";
+import type { MyCalendarsService } from "./my-calendars";
+import { CALENDAR_INSTRUCTIONS, registerCalendarTools } from "./calendars-mcp";
 
-// The hosted MCP surface: meeting requests and booking passes, nothing else. Deliberately not the
-// full deltat MCP server, which runs with a tenant's password and can cancel any booking in it;
-// exposing that to everyone who can sign in would hand the whole public tenant to strangers. Every
-// tool here acts as the verified caller, and the services decide what that caller may do: anyone
-// signed in may look and ask, only a calendar's owner may answer, and booking directly takes a pass
-// the owner handed out (booking-passes-mcp.ts).
+// The hosted MCP surface: the caller's own calendars, meeting requests and booking passes, nothing
+// else. Deliberately not the full deltat MCP server, which runs with a tenant's password and can
+// cancel any booking in it; exposing that to everyone who can sign in would hand the whole public
+// tenant to strangers. Every tool here acts as the verified caller, and the services decide what that
+// caller may do: anyone signed in may create their own calendars, look and ask, only a calendar's
+// owner may answer, and booking directly takes a pass the owner handed out (booking-passes-mcp.ts).
 
-export const MEETINGS_MCP_VERSION = "0.2.0";
+export const MEETINGS_MCP_VERSION = "0.3.0";
 
 export interface MeetingsCaller {
   /** `iss#sub`, verified by the endpoint before this server is built. */
@@ -65,19 +67,21 @@ export function createMeetingsMcpServer(
   service: MeetingService,
   caller: MeetingsCaller,
   calendarOf: CalendarLookup,
-  passes: BookingPassService
+  passes: BookingPassService,
+  calendars: MyCalendarsService
 ): McpServer {
   const zoneOf = (calendarId: string) => calendarOf(calendarId)?.timezone ?? "UTC";
   const server = new McpServer(
     { name: "deltat-meetings", version: MEETINGS_MCP_VERSION },
     {
-      instructions: `Ask for a meeting on a person's calendar, and, if you are that calendar's owner, answer the requests. A request is not a booking: it waits until the owner approves it, and only then is the time booked. Look with find_meeting_times, ask with request_meeting, and check the answer later with my_meeting_requests. ${BOOKING_PASS_INSTRUCTIONS} Times are RFC 3339 with an offset.`,
+      instructions: `${CALENDAR_INSTRUCTIONS} Ask for a meeting on a person's calendar, and, if you are that calendar's owner, answer the requests. A request is not a booking: it waits until the owner approves it, and only then is the time booked. Look with find_meeting_times, ask with request_meeting, and check the answer later with my_meeting_requests. ${BOOKING_PASS_INSTRUCTIONS} Times are RFC 3339 with an offset.`,
     }
   );
   const contactOnce = ((): (() => Promise<RequestContact | null>) => {
     const memo: { value: Promise<RequestContact | null> | null } = { value: null };
     return () => (memo.value ??= caller.contact());
   })();
+  registerCalendarTools(server, calendars, { principalId: caller.principalId, contact: contactOnce });
   registerBookingPassTools(server, passes, { principalId: caller.principalId, contact: contactOnce });
 
   server.registerTool(

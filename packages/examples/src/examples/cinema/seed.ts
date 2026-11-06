@@ -1,38 +1,11 @@
 "use server";
 
 import { dt } from "../../lib/deltat";
-import {
-  createVenue,
-  createSection,
-  createSeats,
-  ensureSchedule,
-  daily,
-  prebookSeats,
-  findRootByName,
-  baseMs,
-} from "../../actions/seed-helpers";
+import { createVenue, createSection, createSeats, ensureSchedule, prebookSeats, findRootByName, baseMs } from "../../actions/seed-helpers";
+import { BUFFER_MINUTES, HOUSE_HOURS, NAME, RUNTIME, SCREENS, SEAT_NUMBERS, SEAT_ROWS, showtimes } from "./structure";
 
-const NAME = "Cineplex Odeon";
-
-// A multiplex: one cinema, four screens. Each screen shows a different film on its OWN
-// showtimes (a per-resource schedule), with its own seating, the deltat tree models this
-// as Cinema → Screen → Seats, where seats inherit their screen's showtimes.
-const SCREENS = [
-  { film: "Dune: Part Two", firstShow: 12, price: 17 },
-  { film: "Inside Out 2", firstShow: 13, price: 15 },
-  { film: "The Batman", firstShow: 14, price: 15 },
-  { film: "Oppenheimer", firstShow: 18, price: 16 },
-];
-
-const RUNTIME = 150; // minutes
-
-// The cinema is open 08:00–01:00; each screen runs two staggered showtimes inside that.
-const HOUSE_HOURS = daily([{ h: 8, m: 0, dur: 1020 }]);
-const showtimes = (firstShow: number) =>
-  daily([
-    { h: firstShow, m: 0, dur: RUNTIME },
-    { h: firstShow + 4, m: 0, dur: RUNTIME },
-  ]);
+// The screens, seating and showtimes are in ./structure, which the hosted MCP's modelling guide
+// reads too; this file only builds them.
 
 // Returns the SCREEN ids (not the cinema root): each screen is its own "venue" in the seat
 // booker, so its two showtimes become the selectable slot pills. Booking against the cinema
@@ -52,7 +25,7 @@ export async function seedCinema(): Promise<string[]> {
   }
 
   const base = baseMs();
-  const cinema = await createVenue(NAME, { slotMinutes: RUNTIME, bufferMinutes: 30 });
+  const cinema = await createVenue(NAME, { slotMinutes: RUNTIME, bufferMinutes: BUFFER_MINUTES });
 
   await ensureSchedule(cinema.id, HOUSE_HOURS);
 
@@ -61,16 +34,11 @@ export async function seedCinema(): Promise<string[]> {
     const { film, firstShow, price } = SCREENS[i];
     const screen = await createSection(cinema.id, `Screen ${i + 1} · ${film}`, {
       slotMinutes: RUNTIME,
-      bufferMinutes: 30,
+      bufferMinutes: BUFFER_MINUTES,
       price,
     });
     screenIds.push(screen.id);
-    const seats = await createSeats(
-      screen.id,
-      ["A", "B", "C", "D", "E"],
-      [1, 2, 3, 4, 5, 6, 7, 8],
-      { slotMinutes: RUNTIME, bufferMinutes: 30, price }
-    );
+    const seats = await createSeats(screen.id, SEAT_ROWS, SEAT_NUMBERS, { slotMinutes: RUNTIME, bufferMinutes: BUFFER_MINUTES, price });
     await ensureSchedule(screen.id, showtimes(firstShow));
     // Each screen's first showtime opens partly sold.
     await prebookSeats(seats, 6 + i * 2, base + firstShow * 3_600_000, RUNTIME, "Sold");

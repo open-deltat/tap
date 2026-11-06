@@ -1,4 +1,24 @@
-This page gets an agent booking on a real calendar in about five minutes. You run Δt, add the MCP server to your agent, and ask it to book something. No code.
+This page gets an agent working on a real calendar in a few minutes, with no code. The quickest way is the hosted Δt at delt.at/mcp. You can also run your own.
+
+## Use the hosted Δt
+
+<!--CONNECT_AGENT-->
+
+The first time your agent connects, it asks you to sign in. Every calendar it creates belongs to your account: you see it on your dashboard at delt.at, nobody else can see or change it, and other people reach it only through what you hand out, its booking link or a booking pass. Calendars are created this way only; the website shows them but does not make them.
+
+| Tool | The agent uses it to |
+| --- | --- |
+| `create_calendar` | Make a calendar in your account: name, time zone, slot length, weekly hours, places at the same time, time between bookings |
+| `list_my_calendars` | See your calendars, with their ids and booking links |
+| `how_to_model_calendars` | Learn how to set up a business as calendars, from the examples on this site, before creating them |
+| `find_meeting_times`, `request_meeting` | Ask for a meeting on someone's calendar; nothing is booked until its owner approves |
+| `list_meeting_requests`, `approve_meeting_request` | Answer the requests on your own calendars |
+| `create_booking_pass` | Let one person's agent book directly on your calendar, once, within a window |
+| `find_times_with_pass`, `hold_with_pass`, `book_with_pass` | Book with a pass someone gave you |
+
+## Or run your own Δt
+
+The rest of this page sets up your own Δt and the open-source MCP server, which can do more (several calendars in one booking, cancelling, changing hours) on data you keep.
 
 ## 1. Run Δt
 
@@ -65,7 +85,7 @@ The agent creates the calendar, finds what is free on Tuesday, holds a slot, and
 
 The hold is the point. When the agent is about to say "how about 14:30?", it holds 14:30 first, so the time it offers is the time it can book. The hold lasts five minutes and lets go on its own if nobody says yes. Then `commit_hold` turns it into a booking in one step, with no moment where the slot is free in between.
 
-## Every tool
+## Every tool on your own Δt
 
 | Tool | The agent uses it to |
 | --- | --- |
@@ -103,7 +123,7 @@ So the agent can say "that one just went, I can do 3:00 or 3:30" in the same tur
 
 - **Times are written with their zone.** Every time goes in as `2026-11-10T14:30:00+01:00` or with a `Z`. A time without a zone is refused rather than guessed. Answers come back in UTC plus a `start_local` in the zone the agent asked for.
 - **Opening hours run 60 days ahead.** `create_calendar` and `set_availability` write the next 60 days of hours. Call `set_availability` again to roll them forward.
-- **The agent needs the calendar id.** There is no tool to list calendars yet, so give the agent the `calendar_id` it got back from `create_calendar`, or keep it in your system prompt.
+- **The agent needs the calendar id.** On your own Δt there is no tool to list calendars yet, so give the agent the `calendar_id` it got back from `create_calendar`, or keep it in your system prompt. On the hosted Δt, `list_my_calendars` has them.
 - **Several things at once.** Pass several `calendar_ids` to find, hold and commit a room, a person and the equipment together: all of them or none.
 
 ## Next

@@ -2,6 +2,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { VerifiedPrincipal } from "@open-deltat/mcp";
 import type { MeetingService } from "./meeting-request-service";
 import type { BookingPassService } from "./booking-pass-service";
+import type { MyCalendarsService } from "./my-calendars";
 import type { RequestContact } from "./meeting-requests";
 import type { RateLimiter } from "./rate-limit";
 import { createMeetingsMcpServer, type CalendarLookup } from "./meetings-mcp";
@@ -21,6 +22,8 @@ export interface McpEndpointDeps {
   resourceMetadataUrl: string;
   service: MeetingService;
   passes: BookingPassService;
+  /** The caller's own calendars: listing and creating them (creating happens only here). */
+  calendars: MyCalendarsService;
   calendarOf: CalendarLookup;
   /** The caller's name and email for a request, from the identity provider, with the caller's own token. */
   contactFor: (token: string, principal: VerifiedPrincipal) => Promise<RequestContact | null>;
@@ -63,7 +66,8 @@ export async function handleMcpRequest(req: Request, deps: McpEndpointDeps): Pro
     deps.service,
     { principalId: principal.principalId, contact: () => deps.contactFor(token, principal) },
     deps.calendarOf,
-    deps.passes
+    deps.passes,
+    deps.calendars
   );
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);

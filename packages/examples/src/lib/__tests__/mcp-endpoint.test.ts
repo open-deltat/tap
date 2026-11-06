@@ -7,6 +7,8 @@ import { createRateLimiter } from "../rate-limit";
 import { ANNA, OWNER, T, annaContact } from "./meeting-fixtures";
 import { STRANGER, setupPasses } from "./pass-fixtures";
 import { PASS_NOT_VALID } from "../booking-pass-service";
+import { calendarGuide } from "../calendar-guide";
+import { ALL_EXAMPLE_IDS } from "../../examples/config";
 
 // The hosted endpoint as Claude meets it: the MCP SDK's own HTTP client against the handler served
 // over real HTTP. Token verification is faked (the OidcAdapter has its own tests); everything past
@@ -27,6 +29,7 @@ function endpoint(overrides: Partial<McpEndpointDeps> = {}) {
     resourceMetadataUrl: METADATA_URL,
     service: meetings.service,
     passes: meetings.passes,
+    calendars: meetings.calendars,
     calendarOf: (id) => meetings.registry.get(id),
     contactFor: async (_token, principal) => (principal.sub === "anna" ? annaContact : null),
     limiter: createRateLimiter({ limit: 1_000, windowMs: 60_000 }),
@@ -119,10 +122,12 @@ describe("asking for and answering a meeting through MCP", () => {
       "approve_meeting_request",
       "book_with_pass",
       "create_booking_pass",
+      "create_calendar",
       "decline_meeting_request",
       "find_meeting_times",
       "find_times_with_pass",
       "hold_with_pass",
+      "how_to_model_calendars",
       "list_booking_passes",
       "list_meeting_requests",
       "list_my_calendars",
@@ -282,8 +287,91 @@ describe("booking directly with a pass through MCP", () => {
     const owner = await connect(deps, "owner");
     const stranger = await connect(deps, "stranger");
     expect((await call(owner, "list_my_calendars", {})).body).toEqual({
-      calendars: [{ calendar_id: "cal1", name: "Simon's week", timezone: "Europe/Berlin", slot_minutes: 30, takes_meeting_requests: true }],
+      calendars: [
+        {
+          calendar_id: "cal1",
+          name: "Simon's week",
+          timezone: "Europe/Berlin",
+          slot_minutes: 30,
+          takes_meeting_requests: true,
+          capacity: 1,
+          buffer_minutes: 0,
+          booking_link: "https://delt.at/b/cal1",
+        },
+      ],
     });
     expect((await call(stranger, "list_my_calendars", {})).body).toEqual({ calendars: [] });
   });
 });
+
+describe("creating calendars through MCP", () => {
+  test("create_calendar makes a calendar the caller owns; another account cannot see it or use it as theirs", async () => {
+    const { deps } = endpoint();
+    const owner = await connect(deps, "owner");
+    const stranger = await connect(deps, "stranger");
+    const made = await call(owner, "create_calendar", {
+      name: "Consultations",
+      timezone: "Europe/Berlin",
+      slot_minutes: 30,
+      weekly_hours: { monday: [{ from: "09:00", to: "17:00" }], friday: [{ from: "09:00", to: "12:00" }] },
+    });
+    expect(made.isError).toBe(false);
+    expect(made.body).toMatchObject({ name: "Consultations", timezone: "Europe/Berlin", slot_minutes: 30, takes_meeting_requests: false, capacity: 1 });
+    const id = String(made.body.calendar_id);
+    expect(made.body.booking_link).toBe(`https://delt.at/b/${id}`);
+
+    const ownerList = (await call(owner, "list_my_calendars", {})).body.calendars as { calendar_id: string }[];
+    expect(ownerList.map((c) => c.calendar_id)).toContain(id);
+    expect((await call(stranger, "list_my_calendars", {})).body).toEqual({ calendars: [] });
+    // Ownership is the account, not knowledge of the id: the stranger cannot mint passes on it.
+    expect((await call(stranger, "create_booking_pass", { calendar_id: id, from: new Date(T).toISOString(), to: new Date(T + 3_600_000).toISOString() })).isError).toBe(true);
+    expect((await call(owner, "create_booking_pass", { calendar_id: id, from: new Date(T).toISOString(), to: new Date(T + 3_600_000).toISOString() })).isError).toBe(false);
+  });
+
+  test("an unknown time zone is refused and nothing is created", async () => {
+    const { deps } = endpoint();
+    const owner = await connect(deps, "owner");
+    const refused = await call(owner, "create_calendar", { name: "Somewhere", timezone: "Berlin" });
+    expect(refused.isError).toBe(true);
+    expect(((await call(owner, "list_my_calendars", {})).body.calendars as unknown[]).length).toBe(1);
+  });
+
+  test("how_to_model_calendars has an entry for every example on the site, and only 'no' entries offer no steps", async () => {
+    const { deps } = endpoint();
+    const owner = await connect(deps, "owner");
+    const guide = (await call(owner, "how_to_model_calendars", {})).body as GuideBody;
+    expect(guide.examples.map((e) => e.example).sort()).toEqual([...ALL_EXAMPLE_IDS].sort());
+    for (const e of guide.examples) {
+      expect(e.organised.length).toBeGreaterThan(0);
+      expect(e.steps.length === 0).toBe(e.mcp_can_build === "no");
+      if (e.mcp_can_build !== "yes") expect(e.cannot_yet).toBeTruthy();
+    }
+  });
+
+  test("every step the guide offers runs as written, and the calendars come out as the steps say", async () => {
+    const guide = calendarGuide();
+    for (const example of guide.examples.filter((e) => e.steps.length > 0)) {
+      // A fresh account per example, so one example's calendars never count against another's cap.
+      const { deps } = endpoint();
+      const owner = await connect(deps, "stranger");
+      for (const step of example.steps) {
+        const result = await call(owner, step.tool, step.arguments);
+        expect({ example: example.example, step: step.arguments.name, error: result.isError ? result.body.message : null }).toEqual({
+          example: example.example,
+          step: step.arguments.name,
+          error: null,
+        });
+      }
+      const listed = (await call(owner, "list_my_calendars", {})).body.calendars as { name: string; capacity: number; slot_minutes: number }[];
+      expect(listed.map((c) => ({ name: c.name, capacity: c.capacity })).sort((a, b) => a.name.localeCompare(b.name))).toEqual(
+        example.steps
+          .map((s) => ({ name: String(s.arguments.name), capacity: Number(s.arguments.capacity ?? 1) }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      );
+    }
+  });
+});
+
+interface GuideBody {
+  examples: { example: string; organised: string[]; mcp_can_build: string; cannot_yet: string | null; steps: { tool: string; arguments: Record<string, unknown> }[] }[];
+}
