@@ -264,41 +264,128 @@ export default function HotelPage() {
       </div>
     ) : undefined;
 
+  // The guest's half: room type, the two finders, and the range calendar, flat on the surface.
+  const bookStay = (
+    <>
+      <div className="mb-4 flex">
+        <Segmented
+          className="justify-start"
+          items={types.map((rt) => ({
+            value: rt.id,
+            label: (
+              <>
+                {rt.name}
+                <span className="ml-1.5 text-[11px] tabular-nums opacity-60">×{rt.capacity}</span>
+              </>
+            ),
+          }))}
+          value={selType?.id ?? null}
+          onChange={(id) => setSelTypeId(id)}
+          ariaLabel="Room type"
+        />
+      </div>
+
+      {/* Instant finders: the SYNC-01 capability surfaced as one-tap helpers */}
+      <div className="mb-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => applyOpening("soonest")}
+          className={`inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[background-color,transform] duration-150 active:scale-[0.97] sm:h-9 ${ACCENT_GHOST}`}
+        >
+          <CalendarRange className="h-3.5 w-3.5 text-dt-accent" /> Soonest opening
+        </button>
+        <button
+          type="button"
+          onClick={() => applyOpening("longest")}
+          className={`inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[background-color,transform] duration-150 active:scale-[0.97] sm:h-9 ${ACCENT_GHOST}`}
+        >
+          <Wand2 className="h-3.5 w-3.5 text-dt-accent" /> Longest stay available
+        </button>
+      </div>
+
+      {/* Range picker: two months; booked nights struck through, the check-out boundary amber */}
+      <div className="flex justify-center overflow-x-auto border-y border-dt-line py-3">
+        <Calendar
+          mode="range"
+          numberOfMonths={2}
+          showOutsideDays={false}
+          selected={range}
+          onSelect={onSelectRange}
+          defaultMonth={new Date(todayMs)}
+          startMonth={new Date(todayMs)}
+          disabled={{ before: new Date(todayMs), after: addDays(todayMs, HORIZON) }}
+          modifiers={{
+            booked: fullNights.filter((d) => checkoutMs == null || midnight(d) !== checkoutMs),
+            checkout: checkoutMs != null ? [new Date(checkoutMs)] : [],
+          }}
+          modifiersClassNames={{
+            booked: "text-dt-ink-3/60 line-through",
+            checkout: "rounded-md text-dt-held-ink ring-1 ring-dt-held/40",
+          }}
+          className="bg-transparent text-dt-ink"
+        />
+      </div>
+      {/* A legend, like the seat maps', not a paragraph explaining the picture. */}
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-[12px] text-dt-ink-3">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="text-dt-ink-3/60 line-through">12</span>
+          booked
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="rounded px-1 text-dt-held-ink ring-1 ring-dt-held/40">12</span>
+          check-out only
+        </span>
+      </div>
+    </>
+  );
+
   return (
     <>
       <Stage
         primitive={{ label: "Find open nights to book", specId: "AVAIL-04" }}
         title="Grand Hotel"
-        contentMax="max-w-6xl"
         tray={tray}
       >
-        <div className="grid grid-cols-1 gap-7 lg:grid-cols-2">
+        {/* One column, the guest's task first: pick a room and nights. The front desk's view of the
+            same nights follows, parted by a hairline, so nothing sits in a box inside the card. */}
+        <div className="flex flex-col gap-10">
+          {/* Book a stay: pick a room, pick your dates, we validate against availability */}
+          <section className="order-1">
+            <header className="mb-4">
+              <h2 className="text-[15px] font-semibold tracking-tight text-dt-ink">Book a stay</h2>
+              <p className="mt-1 text-[12.5px] tabular-nums text-dt-ink-3">
+                Check-in {hourLabel(CHECK_IN_HOUR)} · check-out {hourLabel(CHECK_OUT_HOUR)}
+              </p>
+            </header>
+            {bookStay}
+          </section>
+
           {/* Front desk: read-only occupancy overview + manage reservations */}
-          <section>
+          <section className="order-2 border-t border-dt-line pt-8">
             <header className="mb-4">
               <h2 className="text-[15px] font-semibold tracking-tight text-dt-ink">Front desk</h2>
               <p className="mt-1 text-[12.5px] text-dt-ink-3">
                 Rooms taken per night, next 30 nights. <Legend />
               </p>
             </header>
-            <div className="space-y-5">
+            <div className="divide-y divide-dt-line">
             {types.map((rt) => {
               const all = bookingsByType[rt.id] ?? [];
               const sorted = [...all].sort((a, b) => a.start - b.start);
               return (
-                <div key={rt.id} className="rounded-2xl bg-dt-sunken p-4">
+                <div key={rt.id} className="py-5 first:pt-0">
                   <RoomHeader rt={rt} />
                   <div className="mt-3">
                     <AvailabilityStrip capacity={rt.capacity} bookings={all} fromMs={todayMs} />
                   </div>
-                  {/* Reserved baseline so booking/cancelling a room does not shove the next card. */}
+                  {/* Reserved baseline so booking/cancelling a room does not shove the next block. */}
                   <div className="mt-3 min-h-[3.5rem]">
                     {sorted.length > 0 && (
-                    <ul className="space-y-1">
+                    <ul className="divide-y divide-dt-line border-y border-dt-line">
                       {sorted.slice(0, 6).map((b) => (
                         <li
                           key={b.id}
-                          className="flex items-center justify-between gap-2 rounded-xl bg-dt-surface px-3 py-1.5 text-xs text-dt-ink-2"
+                          className="flex items-center justify-between gap-2 py-2 text-xs text-dt-ink-2"
                         >
                           <span className="truncate">
                             <span className="text-dt-ink">{b.label || "Reservation"}</span>
@@ -325,79 +412,6 @@ export default function HotelPage() {
             })}
           </div>
         </section>
-
-          {/* Book a stay: pick a room, pick your dates, we validate against availability */}
-          <section>
-            <header className="mb-4">
-              <h2 className="text-[15px] font-semibold tracking-tight text-dt-ink">Book a stay</h2>
-              <p className="mt-1 text-[12.5px] tabular-nums text-dt-ink-3">
-                Check-in {hourLabel(CHECK_IN_HOUR)} · check-out {hourLabel(CHECK_OUT_HOUR)}.
-              </p>
-            </header>
-
-            {/* Room type */}
-            <div className="mb-4 flex">
-              <Segmented
-                items={types.map((rt) => ({
-                  value: rt.id,
-                  label: (
-                    <>
-                      {rt.name}
-                      <span className="ml-1.5 text-[11px] tabular-nums opacity-60">×{rt.capacity}</span>
-                    </>
-                  ),
-                }))}
-                value={selType?.id ?? null}
-                onChange={(id) => setSelTypeId(id)}
-                ariaLabel="Room type"
-              />
-            </div>
-
-          {/* Instant finders: the SYNC-01 capability surfaced as one-tap helpers */}
-          <div className="mb-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => applyOpening("soonest")}
-              className={`inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[background-color,transform] duration-150 active:scale-[0.97] sm:h-9 ${ACCENT_GHOST}`}
-            >
-              <CalendarRange className="h-3.5 w-3.5 text-dt-accent" /> Soonest opening
-            </button>
-            <button
-              type="button"
-              onClick={() => applyOpening("longest")}
-              className={`inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-[background-color,transform] duration-150 active:scale-[0.97] sm:h-9 ${ACCENT_GHOST}`}
-            >
-              <Wand2 className="h-3.5 w-3.5 text-dt-accent" /> Longest stay available
-            </button>
-          </div>
-
-          {/* Range picker: two months; booked nights struck through, the check-out boundary amber */}
-          <div className="flex justify-center overflow-x-auto rounded-2xl bg-dt-sunken p-2">
-            <Calendar
-              mode="range"
-              numberOfMonths={2}
-              showOutsideDays={false}
-              selected={range}
-              onSelect={onSelectRange}
-              defaultMonth={new Date(todayMs)}
-              startMonth={new Date(todayMs)}
-              disabled={{ before: new Date(todayMs), after: addDays(todayMs, HORIZON) }}
-              modifiers={{
-                booked: fullNights.filter((d) => checkoutMs == null || midnight(d) !== checkoutMs),
-                checkout: checkoutMs != null ? [new Date(checkoutMs)] : [],
-              }}
-              modifiersClassNames={{
-                booked: "text-dt-ink-3/60 line-through",
-                checkout: "rounded-md text-dt-held-ink ring-1 ring-dt-held/40",
-              }}
-              className="bg-transparent text-dt-ink"
-            />
-          </div>
-            <p className="mt-2.5 text-[12px] leading-relaxed text-dt-ink-3">
-              Struck-through nights are booked. The <span className="text-dt-held-ink">amber</span> night is
-              bookable only as your check-out. You sleep the night before and leave that morning.
-            </p>
-          </section>
         </div>
       </Stage>
 

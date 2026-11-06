@@ -30,8 +30,6 @@ function colorFor(c: PublicClass): string {
   return OPEN;
 }
 
-const CAPTION = "A schedule anyone can embed and book from. Capacity and the roster stay on the server; the widget shows only spots left.";
-
 export default function GymExample() {
   const [range, setRange] = useState<{ start: number; end: number } | null>(null);
   const [failed, setFailed] = useState(false);
@@ -45,17 +43,8 @@ export default function GymExample() {
       });
   }, []);
 
-  const ribbon = (
-    <p className="mx-auto max-w-md text-pretty text-center text-[13px] leading-relaxed text-dt-ink-3">{CAPTION}</p>
-  );
-
   return (
-    <Stage
-      primitive={{ label: "Weekly classes, embeddable and bookable", specId: "EDGE-03" }}
-      title="FitFlow Studio"
-      ribbon={ribbon}
-      contentMax="max-w-3xl"
-    >
+    <Stage primitive={{ label: "Weekly classes, embeddable and bookable", specId: "EDGE-03" }} title="FitFlow Studio">
       <CalendarProvider startDay={1} className="w-full">
         <GymCalendar range={range} failed={failed} />
       </CalendarProvider>

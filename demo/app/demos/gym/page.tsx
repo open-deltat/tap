@@ -24,7 +24,8 @@ export default function Page() {
   if (!isExampleEnabled("gym")) notFound();
 
   return (
-    <div className="dt-canvas h-full overflow-auto text-dt-ink">
+    // Flat canvas: the iframe below is flat too, so the light from above would end in a seam.
+    <div className="h-full overflow-auto bg-dt-canvas text-dt-ink">
       <JsonLd
         graph={[
           webPageLd(SEO),
@@ -34,30 +35,21 @@ export default function Page() {
           ]),
         ]}
       />
-      <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-14">
-        <header className="mb-6 text-center">
-          <h1 className="text-balance text-[1.6rem] font-semibold tracking-[-0.02em] text-dt-ink sm:text-[2rem]">Embedded schedule</h1>
-          <p className="mx-auto mt-2 max-w-xl text-[14px] leading-relaxed text-dt-ink-3">
-            The schedule below is the real{" "}
-            <code className="rounded-md bg-dt-sunken px-1.5 py-0.5 font-mono text-[12px] text-dt-ink">/embed/gym</code>{" "}
-            widget loaded in an actual iframe, the read-only public schedule that visitors see.
-            Copy the snippet underneath to drop it on any site.
-          </p>
-        </header>
+      {/* The same header every example has, so this page reads as one of them. */}
+      <header className="w-full px-5 pb-1 pt-8 text-center sm:pt-12">
+        <h1 className="text-balance text-[1.6rem] font-semibold leading-tight tracking-[-0.02em] text-dt-ink sm:text-[2rem]">FitFlow Studio</h1>
+        <p className="mx-auto mt-2 flex max-w-md flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13px] text-dt-ink-3">
+          <span className="text-balance">A schedule you can put on any website</span>
+          <span className="rounded-full border border-dt-line px-2 py-px font-mono text-[10.5px] text-dt-ink-3">EDGE-03</span>
+        </p>
+      </header>
 
-        <div className="overflow-hidden rounded-[28px] border border-dt-line bg-dt-surface shadow-dt-surface">
-          <iframe
-            src="/embed/gym"
-            width="100%"
-            height={EMBED_HEIGHT}
-            style={{ border: 0, borderRadius: 12 }}
-            loading="lazy"
-            title="Class schedule"
-            className="block"
-          />
-        </div>
+      {/* The real widget in a real iframe. No frame of its own: the widget already brings its card,
+          so it sits on the page exactly like every other example. */}
+      <iframe src="/embed/gym" width="100%" height={EMBED_HEIGHT} style={{ border: 0 }} loading="lazy" title="Class schedule" className="block" />
 
-        <EmbedSnippet className="mt-6" example="gym" height={EMBED_HEIGHT} />
+      <div className="mx-auto max-w-3xl px-4 pb-14 sm:px-6">
+        <EmbedSnippet example="gym" height={EMBED_HEIGHT} />
       </div>
     </div>
   );

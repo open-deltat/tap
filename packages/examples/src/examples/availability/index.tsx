@@ -200,7 +200,7 @@ export default function AvailabilityExample() {
 
   return (
     <>
-      <Stage primitive={{ label: "Free time is open hours minus what is booked, computed on every read.", specId: "AVAIL-01" }} title={NAME} contentMax="max-w-3xl" tray={tray}>
+      <Stage primitive={{ label: "Free time is open hours minus what is booked, computed on every read.", specId: "AVAIL-01" }} title={NAME} tray={tray}>
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-[auto_1fr]">
           {/* Date picker: greyed days have nothing open */}
           <div className="flex justify-center sm:border-r sm:border-dt-line sm:pr-6">

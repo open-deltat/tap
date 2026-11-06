@@ -225,19 +225,16 @@ export default function BuilderExample() {
         title="Build a weekly schedule"
         tray={tray}
       >
-        <div className="grid gap-7 lg:grid-cols-2">
+        {/* One column: what Δt stores on top (the picture), the weekly hours that make it below. */}
+        <div className="flex flex-col gap-8">
           <div>
-            <div className="mb-3 text-[13px] font-medium text-dt-ink-2">Weekly hours</div>
-            <WeekHoursEditor week={week} onChange={setWeek} />
+            <div className="mb-3 text-[13px] font-medium text-dt-ink-2">The next days, as Δt stores them</div>
+            <LabeledTimeline axisStart={lo} axisEnd={hi} labelWidth={40} rows={stripRows} ticks={ticks} />
           </div>
 
           <div>
-            <div className="mb-3 text-[13px] font-medium text-dt-ink-2">What Δt stores</div>
-            <LabeledTimeline axisStart={lo} axisEnd={hi} labelWidth={40} rows={stripRows} ticks={ticks} />
-            <p className="mt-3 text-pretty text-[12.5px] leading-relaxed text-dt-ink-3">
-              Your weekly hours turn into real blocks of time, one per day. Nothing stores &quot;every
-              Monday&quot;, just the actual days. Edit and save to watch it redraw. Grey is already booked.
-            </p>
+            <div className="mb-3 text-[13px] font-medium text-dt-ink-2">Weekly hours</div>
+            <WeekHoursEditor week={week} onChange={setWeek} />
           </div>
         </div>
       </Stage>

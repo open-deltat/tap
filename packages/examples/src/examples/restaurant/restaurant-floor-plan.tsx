@@ -127,9 +127,6 @@ export function RestaurantFloorPlan({
                 />
               ))}
             </div>
-            <div className="mt-2.5 text-[11px] text-dt-ink-3">
-              Walk-up seats · book a party in one atomic batch
-            </div>
           </button>
         </div>
       )}
