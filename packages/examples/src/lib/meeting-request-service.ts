@@ -64,6 +64,17 @@ function optionalText(raw: string | null | undefined, field: string, maxLength: 
  * "Thu, 2 Oct" there), and this text goes to the owner and to agents, so it must not vary by machine.
  */
 export function describeSpan(start: number, end: number, timeZone: string): string {
+  const from = dayAndTime(start, timeZone);
+  return `${from.day}, ${from.time} to ${dayAndTime(end, timeZone).time} (${timeZone})`;
+}
+
+/** "Thu 2 Oct, 10:00 (Europe/Berlin)": one instant, for an expiry or a window edge days apart. */
+export function describeInstant(ms: number, timeZone: string): string {
+  const at = dayAndTime(ms, timeZone);
+  return `${at.day}, ${at.time} (${timeZone})`;
+}
+
+function dayAndTime(ms: number, timeZone: string): { day: string; time: string } {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     weekday: "short",
@@ -72,13 +83,9 @@ export function describeSpan(start: number, end: number, timeZone: string): stri
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
-  });
-  const at = (ms: number) => {
-    const part = (type: Intl.DateTimeFormatPartTypes) => parts.formatToParts(ms).find((p) => p.type === type)?.value ?? "";
-    return { day: `${part("weekday")} ${part("day")} ${part("month")}`, time: `${part("hour")}:${part("minute")}` };
-  };
-  const from = at(start);
-  return `${from.day}, ${from.time} to ${at(end).time} (${timeZone})`;
+  }).formatToParts(ms);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return { day: `${part("weekday")} ${part("day")} ${part("month")}`, time: `${part("hour")}:${part("minute")}` };
 }
 
 function validateSpan(record: BookableRecord, start: number, end: number, now: number): Outcome<null> {

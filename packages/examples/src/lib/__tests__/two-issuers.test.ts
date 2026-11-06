@@ -6,7 +6,8 @@ import { OidcAdapter } from "@open-deltat/mcp";
 import { canonicalVerifier, type AuthConfig } from "../auth-config";
 import { handleMcpRequest } from "../mcp-endpoint";
 import { createRateLimiter } from "../rate-limit";
-import { T, annaContact, setupMeetings } from "./meeting-fixtures";
+import { T, annaContact } from "./meeting-fixtures";
+import { setupPasses } from "./pass-fixtures";
 
 // Production's shape, not a stand-in for it: real RS256 tokens, a real JWKS served over HTTP, the real
 // OidcAdapter, and the verifier the site's session and /mcp both use. The earlier endpoint tests
@@ -70,7 +71,7 @@ describe("one person, two issuers", () => {
   });
 
   test("a calendar made through the site is answered by its owner through MCP", async () => {
-    const meetings = setupMeetings();
+    const meetings = setupPasses();
     const site = await verify(tokens.simonSite ?? "");
     if (!site) throw new Error("the site token did not verify");
     // Created through the site: the owner is whatever the site's session verified to.
@@ -84,6 +85,7 @@ describe("one person, two issuers", () => {
           verify,
           resourceMetadataUrl: "https://delt.at/.well-known/oauth-protected-resource/mcp",
           service: meetings.service,
+          passes: meetings.passes,
           calendarOf: (id) => meetings.registry.get(id),
           contactFor: async () => annaContact,
           limiter: createRateLimiter({ limit: 1_000, windowMs: 60_000 }),

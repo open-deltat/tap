@@ -37,6 +37,7 @@ export function fakeDeltaT() {
     commitFails: false,
     latencyMs: 0,
     holds: [] as string[],
+    placed: [] as { id: string; start: number; end: number; expiresAt: number }[],
     released: [] as string[],
     bookings: [] as { id: string; label: string | undefined }[],
     cancelled: [] as string[],
@@ -50,11 +51,12 @@ export function fakeDeltaT() {
           .map((s) => ({ start: Math.max(s.start, start), end: Math.min(s.end, end) })),
     },
     holds: {
-      place: async (h: { expiresAt: number }) => {
+      place: async (h: { start: number; end: number; expiresAt: number }) => {
         await pause();
         if (state.holdFails) throw Object.assign(new Error("span is already allocated"), { code: "40001" });
         const id = `hold${state.holds.length + 1}`;
         state.holds.push(id);
+        state.placed.push({ id, start: h.start, end: h.end, expiresAt: h.expiresAt });
         return { id, expiresAt: h.expiresAt };
       },
       commit: async (holdId: string, opts?: { label?: string }) => {
