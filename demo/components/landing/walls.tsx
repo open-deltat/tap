@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Check, RefreshCw } from "lucide-react";
 import { FRIEND_NAMES } from "@open-deltat/examples/lib/friends";
+import { DeltatMark } from "@/components/deltat-mark";
+import { OLD_WORLD } from "./brand-icons";
 
 // The five things an agent runs into on a normal calendar, each shown twice in the hero's own
 // picture language: "Today" on the left with one amber thing wrong, "Δt" on the right ending in
@@ -127,8 +129,8 @@ export function Walls() {
 function BeforeAfter({ today, deltat, className = "" }: { today: ReactNode; deltat: ReactNode; className?: string }) {
   return (
     <div className={`relative grid overflow-hidden rounded-3xl border border-dt-line bg-dt-surface shadow-dt-surface sm:grid-cols-2 ${className}`}>
-      <Half label="Today">{today}</Half>
-      <Half label="Δt" good>
+      <Half label={<OldWorldMarks />}>{today}</Half>
+      <Half label={<DeltatMark size="sm" className="!h-5 !w-5 !rounded-[6px] !text-[9px]" />} good>
         {deltat}
       </Half>
       <span
@@ -141,7 +143,18 @@ function BeforeAfter({ today, deltat, className = "" }: { today: ReactNode; delt
   );
 }
 
-function Half({ label, good, children }: { label: string; good?: boolean; children: ReactNode }) {
+// The old side is named by the logos people already know, no words: Google Calendar, Apple, Outlook.
+function OldWorldMarks() {
+  return (
+    <span className="flex h-5 items-center gap-2 text-dt-ink-3">
+      {OLD_WORLD.map(({ name, Mark }) => (
+        <Mark key={name} className="h-4 w-4" />
+      ))}
+    </span>
+  );
+}
+
+function Half({ label, good, children }: { label: ReactNode; good?: boolean; children: ReactNode }) {
   return (
     <div
       className={`flex min-h-[170px] flex-col p-5 ${
@@ -150,7 +163,7 @@ function Half({ label, good, children }: { label: string; good?: boolean; childr
           : ""
       }`}
     >
-      <div className={`text-[12px] font-medium ${good ? "text-dt-accent-ink" : "text-dt-ink-3"}`}>{label}</div>
+      <div className="flex h-5 items-center">{label}</div>
       <div className="mt-3 flex flex-1 flex-col justify-center">{children}</div>
     </div>
   );

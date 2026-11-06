@@ -27,7 +27,7 @@ export default function WhatIsDeltatPage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Δt · the database" title="What is Δt" />
+      <DocHeader title="What is Δt" />
       <Markdown>{before}</Markdown>
       <div className="my-2">
         <CollisionToy />

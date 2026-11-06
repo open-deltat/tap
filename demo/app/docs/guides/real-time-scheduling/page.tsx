@@ -26,7 +26,7 @@ export default function RealTimeSchedulingPage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Agents · in real time" title="Real-time scheduling" />
+      <DocHeader title="Live updates" />
       <Markdown>{docContent("guides/real-time-scheduling")}</Markdown>
     </article>
   );

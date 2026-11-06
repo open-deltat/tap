@@ -28,7 +28,7 @@ export default function HoldsAndAvailabilityPage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Δt · the database" title="Holds and availability" />
+      <DocHeader title="Find, hold, book, listen" />
       <Markdown>{intro}</Markdown>
       <div className="mt-6">
         <HoldsStatic />

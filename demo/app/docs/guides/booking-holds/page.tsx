@@ -26,7 +26,7 @@ export default function BookingHoldsPage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Guides · in practice" title="Booking holds" />
+      <DocHeader title="Booking holds" />
       <Markdown>{docContent("guides/booking-holds")}</Markdown>
     </article>
   );

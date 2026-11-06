@@ -21,12 +21,12 @@ export default function ReferencePage() {
           techArticleLd(SEO),
           breadcrumbLd([
             { name: "Home", path: "/" },
-            { name: "What is TAP", path: "/docs/sdk" },
+            { name: "What is Δt", path: "/docs" },
             { name: "SDK reference", path: "/docs/sdk/reference" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="TAP · the protocol" title="SDK reference" />
+      <DocHeader title="SDK reference" />
       <Markdown>{docContent("sdk-reference")}</Markdown>
     </article>
   );

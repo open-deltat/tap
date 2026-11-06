@@ -21,12 +21,12 @@ export default function QuickstartPage() {
           techArticleLd(SEO),
           breadcrumbLd([
             { name: "Home", path: "/" },
-            { name: "What is TAP", path: "/docs/sdk" },
-            { name: "Quickstart", path: "/docs/sdk/quickstart" },
+            { name: "What is Δt", path: "/docs" },
+            { name: "TypeScript quickstart", path: "/docs/sdk/quickstart" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="TAP · the protocol" title="Quickstart" />
+      <DocHeader title="TypeScript quickstart" />
       <Markdown>{docContent("sdk-quickstart")}</Markdown>
     </article>
   );

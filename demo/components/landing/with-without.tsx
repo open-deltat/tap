@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { ArrowDown, ArrowRight, Check, RefreshCw } from "lucide-react";
-import { AppleMark, GoogleCalendarMark, OutlookMark } from "./brand-icons";
+import { ArrowRight, Check, RefreshCw } from "lucide-react";
+import { OLD_WORLD } from "./brand-icons";
 import { DeltatMark } from "@/components/deltat-mark";
 
 // The same Tuesday afternoon on two calendars, shown finished. Three agents booked at the same
@@ -10,56 +10,33 @@ import { DeltatMark } from "@/components/deltat-mark";
 // live, the second booking refused and moved to a time that still worked, the third held while its
 // agent asks. The Δt card wears the logo's own material (dark tile, emerald ring, glow) so old and
 // new are told apart before a word is read. Static on purpose, and nothing under it explains it.
-const OLD_WORLD = [
-  { name: "Google Calendar", Mark: GoogleCalendarMark },
-  { name: "Apple Calendar", Mark: AppleMark },
-  { name: "Outlook", Mark: OutlookMark },
-] as const;
-
+// One card, two halves, the arrow on the seam: the same shape as each of the five walls below.
 export function WithWithout() {
   return (
-    <div className="relative mx-auto mt-14 max-w-4xl sm:mt-20">
-      <div className="grid gap-y-4 md:grid-cols-2 md:gap-x-10">
-        <div>
-          <div className="mb-3 flex h-8 flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[12.5px] text-dt-ink-2">
-            {OLD_WORLD.map(({ name, Mark }) => (
-              <span key={name} className="inline-flex items-center gap-1.5">
-                <Mark className="h-3.5 w-3.5" />
-                {name}
-              </span>
-            ))}
-          </div>
-          <OldCalendar />
-        </div>
-
-        {/* From this to this: an arrow down between the stacked cards on a phone. */}
-        <div className="flex justify-center md:hidden" aria-hidden>
-          <span className="grid h-9 w-9 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface">
-            <ArrowDown className="h-4 w-4" />
-          </span>
-        </div>
-
-        <div>
-          <div className="mb-3 flex h-8 items-center px-1">
-            <DeltatMark />
-          </div>
-          <NewCalendar />
-        </div>
-      </div>
-
-      {/* The same arrow, between the cards, when they sit side by side. */}
-      <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 md:block" aria-hidden>
-        <span className="grid h-9 w-9 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface">
-          <ArrowRight className="h-4 w-4" />
-        </span>
-      </div>
+    <div className="relative mx-auto mt-14 grid max-w-4xl overflow-hidden rounded-[28px] border border-dt-line bg-dt-surface shadow-dt-float sm:mt-20 md:grid-cols-2">
+      <OldCalendar />
+      <NewCalendar />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 z-10 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 rotate-90 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface md:rotate-0"
+      >
+        <ArrowRight className="h-4 w-4" />
+      </span>
     </div>
   );
 }
 
 function OldCalendar() {
   return (
-    <div className="rounded-3xl border border-dt-line bg-dt-surface p-5 shadow-dt-float sm:p-6">
+    <div className="p-5 sm:p-6">
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-dt-ink-2">
+        {OLD_WORLD.map(({ name, Mark }) => (
+          <span key={name} className="inline-flex items-center gap-1.5">
+            <Mark className="h-3.5 w-3.5" />
+            {name}
+          </span>
+        ))}
+      </div>
       <Head
         day="Tuesday"
         status={
@@ -85,9 +62,13 @@ function OldCalendar() {
 
 function NewCalendar() {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-[#34d399]/60 bg-[#0a0f0d] p-5 text-white shadow-dt-float sm:p-6">
+    <div className="relative overflow-hidden bg-[#0a0f0d] p-5 text-white sm:p-6">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_112%,rgba(52,211,153,0.38),transparent)]" />
       <div className="relative">
+        <div className="mb-4 flex h-[18px] items-center gap-2 text-[12.5px] font-medium text-white/80">
+          <DeltatMark size="sm" className="!h-[18px] !w-[18px] !rounded-[5px] !text-[8px]" />
+          Δt
+        </div>
         <Head
           day="Tuesday"
           status={

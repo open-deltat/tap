@@ -26,7 +26,7 @@ export default function UnderTheHoodPage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Δt · the database" title="Under the hood" />
+      <DocHeader title="Under the hood" />
       <Markdown>{docContent("protocol-and-engine")}</Markdown>
     </article>
   );

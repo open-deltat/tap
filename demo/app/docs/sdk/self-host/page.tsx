@@ -21,12 +21,12 @@ export default function SelfHostPage() {
           techArticleLd(SEO),
           breadcrumbLd([
             { name: "Home", path: "/" },
-            { name: "What is TAP", path: "/docs/sdk" },
+            { name: "What is Δt", path: "/docs" },
             { name: "Self-host", path: "/docs/sdk/self-host" },
           ]),
         ]}
       />
-      <DocHeader eyebrow="TAP · the protocol" title="Self-host" />
+      <DocHeader title="Self-host" />
       <Markdown>{docContent("sdk-self-host")}</Markdown>
     </article>
   );

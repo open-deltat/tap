@@ -26,7 +26,7 @@ export default function AiAgentSchedulingPage() {
           ]),
         ]}
       />
-      <DocHeader eyebrow="Agents · in real time" title="Scheduling for AI agents" />
+      <DocHeader title="Scheduling for AI agents" />
       <Markdown>{docContent("guides/ai-agent-scheduling")}</Markdown>
     </article>
   );
