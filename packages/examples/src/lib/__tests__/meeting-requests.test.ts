@@ -47,6 +47,7 @@ describe("asking for a meeting", () => {
     expect(result.value.decision.status).toBe("pending");
     expect(state.holds).toEqual([]); // asking is information, never a hold
     expect(notices).toHaveLength(1);
+    expect(notices[0]).toMatchObject({ kind: "meeting_request", calendarId: "cal1", requestId: result.value.id });
     expect(notices[0]?.text).toContain("Anna Example <anna@example.com>");
     expect(notices[0]?.text).toContain("Sun 6 Jan, 11:00 to 11:30 (Europe/Berlin)");
     expect(notices[0]?.text).toContain("Note: Coffee about deltat?");

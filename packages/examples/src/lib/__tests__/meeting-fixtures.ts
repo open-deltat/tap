@@ -34,14 +34,49 @@ export function fakeDeltaT() {
   const state = {
     free: [{ start: NOW, end: NOW + 7 * 24 * 60 * MIN }] as AvailabilitySlot[],
     holdFails: false,
+    /** The kernel refuses the commit: the hold is unknown or expired (SQLSTATE 42704). */
     commitFails: false,
+    /** The kernel applies the commit, then the reply is lost on the way back. */
+    commitReplyLost: false,
+    /** The connection drops before the commit reaches the kernel: nothing is applied. */
+    commitNotSent: false,
+    /** The client sees the connection drop, but the kernel applies the commit later, before the next statement. */
+    commitLandsLate: false,
+    /** A release fails: the connection drops ("reset"), or the kernel says the hold is gone ("gone", 42704). */
+    releaseFails: null as "reset" | "gone" | null,
+    /** Every read of bookings fails, as during an outage. */
+    readsFail: false,
     latencyMs: 0,
     holds: [] as string[],
+    placed: [] as { id: string; start: number; end: number; expiresAt: number }[],
     released: [] as string[],
     bookings: [] as { id: string; label: string | undefined }[],
     cancelled: [] as string[],
   };
+  /** holdId -> bookingId for every commit the kernel applied: the hold is consumed, the booking takes its span. */
+  const committed = new Map<string, string>();
+  /**
+   * A commit the kernel has received but not yet applied (commitLandsLate). It lands just before the
+   * next release on the connection; a read alone does not wait for it, which is exactly the trap.
+   */
+  const late: { apply: (() => void) | null } = { apply: null };
+  const applyCommit = (holdId: string, label: string | undefined) => {
+    const booking = { id: `booking${state.bookings.length + 1}`, label };
+    state.bookings.push(booking);
+    committed.set(holdId, booking.id);
+    return booking;
+  };
+  const landLateCommit = () => {
+    late.apply?.();
+    late.apply = null;
+  };
   const pause = () => (state.latencyMs ? Bun.sleep(state.latencyMs) : Promise.resolve());
+  const overlaps = (s: { start: number; end: number }, f?: { start?: number; end?: number }) =>
+    (f?.end === undefined || s.start < f.end) && (f?.start === undefined || s.end > f.start);
+  const connectionReset = () => Object.assign(new Error("read ECONNRESET"), { errno: -54 });
+  const readOrFail = () => {
+    if (state.readsFail) throw connectionReset();
+  };
   const dt = {
     availability: {
       get: async ({ start, end }: { start: number; end: number }) =>
@@ -50,27 +85,46 @@ export function fakeDeltaT() {
           .map((s) => ({ start: Math.max(s.start, start), end: Math.min(s.end, end) })),
     },
     holds: {
-      place: async (h: { expiresAt: number }) => {
+      place: async (h: { start: number; end: number; expiresAt: number }) => {
         await pause();
         if (state.holdFails) throw Object.assign(new Error("span is already allocated"), { code: "40001" });
         const id = `hold${state.holds.length + 1}`;
         state.holds.push(id);
+        state.placed.push({ id, start: h.start, end: h.end, expiresAt: h.expiresAt });
         return { id, expiresAt: h.expiresAt };
       },
       commit: async (holdId: string, opts?: { label?: string }) => {
         await pause();
-        if (state.commitFails) throw new Error("hold expired");
-        const booking = { id: `booking${state.bookings.length + 1}`, label: opts?.label };
-        state.bookings.push(booking);
+        if (state.commitFails) throw Object.assign(new Error("unknown hold (expired?)"), { code: "42704" });
+        if (state.commitNotSent) throw connectionReset();
+        if (state.commitLandsLate) {
+          late.apply = () => applyCommit(holdId, opts?.label);
+          throw connectionReset();
+        }
+        const booking = applyCommit(holdId, opts?.label);
+        if (state.commitReplyLost) throw connectionReset();
         return { bookingId: booking.id, holdId };
       },
       release: async (holdId: string) => {
+        landLateCommit();
+        if (state.releaseFails === "reset") throw connectionReset();
+        if (state.releaseFails === "gone") throw Object.assign(new Error("unknown hold"), { code: "42704" });
         state.released.push(holdId);
       },
     },
     bookings: {
       cancel: async (id: string) => {
         state.cancelled.push(id);
+      },
+      get: async (resourceId: string, filter?: { start?: number; end?: number }) => {
+        readOrFail();
+        return [...committed].flatMap(([holdId, bookingId]) => {
+          const span = state.placed.find((h) => h.id === holdId);
+          const booking = state.bookings.find((b) => b.id === bookingId);
+          return span && booking && !state.cancelled.includes(bookingId) && overlaps(span, filter)
+            ? [{ id: bookingId, resourceId, start: span.start, end: span.end, label: booking.label ?? null }]
+            : [];
+        });
       },
     },
   };

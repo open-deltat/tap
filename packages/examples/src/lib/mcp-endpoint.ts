@@ -1,6 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { VerifiedPrincipal } from "@open-deltat/mcp";
 import type { MeetingService } from "./meeting-request-service";
+import type { BookingPassService } from "./booking-pass-service";
 import type { RequestContact } from "./meeting-requests";
 import type { RateLimiter } from "./rate-limit";
 import { createMeetingsMcpServer, type CalendarLookup } from "./meetings-mcp";
@@ -19,6 +20,7 @@ export interface McpEndpointDeps {
   /** Absolute URL of this resource's metadata, e.g. https://delt.at/.well-known/oauth-protected-resource/mcp. */
   resourceMetadataUrl: string;
   service: MeetingService;
+  passes: BookingPassService;
   calendarOf: CalendarLookup;
   /** The caller's name and email for a request, from the identity provider, with the caller's own token. */
   contactFor: (token: string, principal: VerifiedPrincipal) => Promise<RequestContact | null>;
@@ -60,7 +62,8 @@ export async function handleMcpRequest(req: Request, deps: McpEndpointDeps): Pro
   const server = createMeetingsMcpServer(
     deps.service,
     { principalId: principal.principalId, contact: () => deps.contactFor(token, principal) },
-    deps.calendarOf
+    deps.calendarOf,
+    deps.passes
   );
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);

@@ -1,15 +1,27 @@
-// Telling the owner that someone asked for a meeting. Optional and best effort: the request is
-// already stored and shows on the owner's dashboard, so a webhook that is down must never fail the
-// request or slow it past a few seconds.
+// Telling the owner that someone asked for a meeting, or booked with a pass they handed out.
+// Optional and best effort: the request or booking is already stored and shows on the owner's
+// dashboard or pass list, so a webhook that is down must never fail it or slow it past a few seconds.
 //
 // Configured by NOTIFY_WEBHOOK_URL. The body carries the message as both `text` (Slack) and
 // `content` (Discord), so either incoming-webhook URL works as is.
 
-export interface OwnerNotice {
-  /** One line for a human: who asked, for which calendar, when. */
+interface NoticeBase {
+  /** One line for a human: who, for which calendar, when. */
   readonly text: string;
   readonly calendarId: string;
-  readonly requestId: string;
+}
+
+export type OwnerNotice =
+  | (NoticeBase & { readonly kind: "meeting_request"; readonly requestId: string })
+  | (NoticeBase & { readonly kind: "pass_booking"; readonly passId: string });
+
+/**
+ * The webhook body. A meeting request sends the fields it has always sent, plus `kind`, so a
+ * receiver written before passes existed keeps working.
+ */
+function webhookBody(notice: OwnerNotice) {
+  const shared = { kind: notice.kind, text: notice.text, content: notice.text, calendar_id: notice.calendarId };
+  return notice.kind === "meeting_request" ? { ...shared, request_id: notice.requestId } : { ...shared, pass_id: notice.passId };
 }
 
 export type Notifier = (notice: OwnerNotice) => Promise<void>;
@@ -41,13 +53,13 @@ export function webhookNotifier(url: URL | null, fetchImpl: typeof fetch = fetch
     const outcome = await fetchImpl(url, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text: notice.text, content: notice.text, calendar_id: notice.calendarId, request_id: notice.requestId }),
+      body: JSON.stringify(webhookBody(notice)),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     }).then(
       (res) => (res.ok ? null : `answered HTTP ${res.status}`),
       (err: unknown) => (err instanceof Error ? err.message : "failed")
     );
     // The destination is not logged: it is a credential.
-    if (outcome) console.warn(`Owner notification webhook ${outcome}; the request is stored regardless.`);
+    if (outcome) console.warn(`Owner notification webhook ${outcome}; the ${notice.kind === "pass_booking" ? "booking" : "request"} is stored regardless.`);
   };
 }

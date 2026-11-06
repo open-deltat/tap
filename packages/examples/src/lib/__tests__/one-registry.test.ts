@@ -8,6 +8,7 @@ import { tmpPath } from "./meeting-fixtures";
 
 process.env.PUBLIC_BOOKABLES_PATH = tmpPath(`one-registry-${crypto.randomUUID()}`);
 process.env.MEETING_REQUESTS_PATH = tmpPath(`one-meetings-${crypto.randomUUID()}`);
+process.env.BOOKING_PASSES_PATH = tmpPath(`one-passes-${crypto.randomUUID()}`);
 
 test("a second evaluation of the registry module shares the one registry, so it sees what the first wrote", async () => {
   const first = await import("../public-registry");
@@ -22,4 +23,10 @@ test("the meeting service is one per process too, so two graphs never overwrite 
   const first = await import("../meetings");
   const second = await import("../meetings.ts?second-module-graph");
   expect(second.meetings).toBe(first.meetings);
+});
+
+test("the booking-pass service is one per process too, so a second graph cannot spend a pass again", async () => {
+  const first = await import("../booking-passes-live");
+  const second = await import("../booking-passes-live.ts?second-module-graph");
+  expect(second.bookingPasses).toBe(first.bookingPasses);
 });
