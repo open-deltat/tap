@@ -58,6 +58,10 @@ export function fakeDeltaT() {
     openHours: new Map<string, { start: number; end: number }[]>(),
     /** The next `rules.replaceOpenHours` throws, as a kernel refusal would. */
     rulesFail: false,
+    /** `resources.delete` throws, as during an outage. */
+    deleteFails: false,
+    /** Bookings seeded straight onto one calendar (by resource id), beside the ones holds became. */
+    seededBookings: [] as { id: string; resourceId: string; start: number; end: number }[],
   };
   /** holdId -> bookingId for every commit the kernel applied: the hold is consumed, the booking takes its span. */
   const committed = new Map<string, string>();
@@ -92,7 +96,18 @@ export function fakeDeltaT() {
         return resource;
       },
       find: async (id: string) => state.resources.get(id) ?? null,
+      update: async (id: string, opts: { name?: string; capacity?: number; bufferAfter?: number | null }) => {
+        const current = state.resources.get(id);
+        if (!current) throw Object.assign(new Error("unknown resource"), { code: "42704" });
+        state.resources.set(id, {
+          ...current,
+          ...(opts.name !== undefined && { name: opts.name }),
+          ...(opts.capacity !== undefined && { capacity: opts.capacity }),
+          ...(opts.bufferAfter !== undefined && { bufferAfter: opts.bufferAfter }),
+        });
+      },
       delete: async (id: string) => {
+        if (state.deleteFails) throw connectionReset();
         state.resources.delete(id);
         state.openHours.delete(id);
       },
@@ -143,13 +158,17 @@ export function fakeDeltaT() {
       },
       get: async (resourceId: string, filter?: { start?: number; end?: number }) => {
         readOrFail();
-        return [...committed].flatMap(([holdId, bookingId]) => {
+        const fromHolds = [...committed].flatMap(([holdId, bookingId]) => {
           const span = state.placed.find((h) => h.id === holdId);
           const booking = state.bookings.find((b) => b.id === bookingId);
           return span && booking && !state.cancelled.includes(bookingId) && overlaps(span, filter)
             ? [{ id: bookingId, resourceId, start: span.start, end: span.end, label: booking.label ?? null }]
             : [];
         });
+        const seeded = state.seededBookings
+          .filter((b) => b.resourceId === resourceId && !state.cancelled.includes(b.id) && overlaps(b, filter))
+          .map((b) => ({ ...b, label: "Seeded" }));
+        return [...fromHolds, ...seeded];
       },
     },
   };

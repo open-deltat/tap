@@ -328,6 +328,8 @@ export function calendarGuide() {
         "A team in one account: one calendar per person (Anna, Ben, Chris) and one per shared room (Meeting room, Studio). They are separate calendars side by side; the MCP cannot put them under one company calendar yet.",
       reaching_each:
         "Each calendar has its own booking link, its own meeting requests and its own booking passes. Hand a client Anna's link to ask Anna, or mint a pass on the Meeting room to let one agent book the room. A person and a room cannot be booked together in one step yet.",
+      requests_or_direct:
+        "Give a person's calendar takes_meeting_requests true when that person wants to approve each meeting. Leave it false when anyone with the booking link, or with a booking pass, may book a free time directly, as for a shared room.",
       who_manages:
         "All of them belong to the account that created them; teammates do not manage their own calendar from their own account yet.",
     },
@@ -336,7 +338,9 @@ export function calendarGuide() {
       available: DISPLAY_NAMES.map((d) => ({ display: d, example: DISPLAYS[d].example, when_to_pick: DISPLAYS[d].pick })),
       not_yet: NOT_YET,
     },
-    limits: `One account can own up to ${MAX_CALENDARS_PER_OWNER} calendars.`,
+    changing_and_undoing:
+      "update_calendar changes a calendar's name, hours, slot length, places, turnover or whether it takes requests; bookings already made stay. delete_calendar removes a calendar made by mistake; it is refused while the calendar has future bookings.",
+    limits: `One account can own up to ${MAX_CALENDARS_PER_OWNER} calendars; delete_calendar frees a place.`,
     examples: (Object.keys(GUIDES) as ExampleId[]).map((id) => GUIDES[id]()),
   };
 }

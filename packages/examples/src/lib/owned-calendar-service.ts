@@ -183,6 +183,25 @@ export async function renameOwnedCalendar(
   return { ok: true, value: updated };
 }
 
+/**
+ * Change how many bookings may overlap and the turnover after each, both kept only in the kernel.
+ * The caller checks the ranges, and refuses changes existing bookings might no longer fit (fewer
+ * places, more turnover): the kernel takes the new values without looking at what is booked.
+ */
+export async function setOwnedCalendarShape(
+  deps: OwnedDeps,
+  input: { id: string; owner: string; capacity: number; bufferMinutes: number }
+): Promise<Outcome<null>> {
+  if (!deps.registry.authorizeOwner(input.id, input.owner)) {
+    return { ok: false, error: "You do not own this calendar." };
+  }
+  await deps.dt.resources.update(input.id, {
+    capacity: input.capacity,
+    bufferAfter: input.bufferMinutes ? input.bufferMinutes * 60_000 : null,
+  });
+  return { ok: true, value: null };
+}
+
 /** Cancel one booking on a calendar the caller owns. */
 export async function cancelOwnedBooking(
   deps: OwnedDeps,

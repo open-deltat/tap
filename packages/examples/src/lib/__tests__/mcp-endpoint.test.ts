@@ -124,6 +124,7 @@ describe("asking for and answering a meeting through MCP", () => {
       "create_booking_pass",
       "create_calendar",
       "decline_meeting_request",
+      "delete_calendar",
       "find_meeting_times",
       "find_times_with_pass",
       "hold_with_pass",
@@ -136,6 +137,7 @@ describe("asking for and answering a meeting through MCP", () => {
       "request_meeting",
       "revoke_booking_pass",
       "set_calendar_display",
+      "update_calendar",
       "withdraw_meeting_request",
     ]);
     for (const tool of tools) {
@@ -299,6 +301,8 @@ describe("booking directly with a pass through MCP", () => {
           buffer_minutes: 0,
           display: "appointments",
           booking_link: "https://delt.at/b/cal1",
+          weekly_hours: {},
+          created_at: expect.any(String),
         },
       ],
     });
@@ -341,6 +345,31 @@ describe("creating calendars through MCP", () => {
     // Ownership is the account, not knowledge of the id: the stranger cannot mint passes on it.
     expect((await call(stranger, "create_booking_pass", { calendar_id: id, from: new Date(T).toISOString(), to: new Date(T + 3_600_000).toISOString() })).isError).toBe(true);
     expect((await call(owner, "create_booking_pass", { calendar_id: id, from: new Date(T).toISOString(), to: new Date(T + 3_600_000).toISOString() })).isError).toBe(false);
+  });
+
+  test("update_calendar and delete_calendar: the owner can, another account cannot, and the list reads back what was set", async () => {
+    const { deps } = endpoint();
+    const owner = await connect(deps, "owner");
+    const stranger = await connect(deps, "stranger");
+    const made = await call(owner, "create_calendar", { name: "Consultations", timezone: "Europe/Berlin" });
+    const id = String(made.body.calendar_id);
+
+    expect((await call(stranger, "update_calendar", { calendar_id: id, name: "Mine" })).body).toEqual({ error: "REFUSED", message: "You do not own this calendar." });
+    expect((await call(stranger, "delete_calendar", { calendar_id: id })).body).toEqual({ error: "REFUSED", message: "You do not own this calendar." });
+
+    const updated = await call(owner, "update_calendar", {
+      calendar_id: id,
+      name: "Advice",
+      weekly_hours: { wednesday: [{ from: "10:00", to: "14:00" }] },
+      capacity: 2,
+    });
+    expect(updated.body).toMatchObject({ name: "Advice", capacity: 2, weekly_hours: { wednesday: [{ from: "10:00", to: "14:00" }] } });
+    const listed = (await call(owner, "list_my_calendars", {})).body.calendars as { calendar_id: string; created_at: string }[];
+    expect(listed.find((c) => c.calendar_id === id)).toMatchObject({ name: "Advice", capacity: 2, weekly_hours: { wednesday: [{ from: "10:00", to: "14:00" }] } });
+
+    expect((await call(owner, "delete_calendar", { calendar_id: id })).isError).toBe(false);
+    const after = (await call(owner, "list_my_calendars", {})).body.calendars as { calendar_id: string }[];
+    expect(after.map((c) => c.calendar_id)).not.toContain(id);
   });
 
   test("an unknown time zone is refused and nothing is created", async () => {

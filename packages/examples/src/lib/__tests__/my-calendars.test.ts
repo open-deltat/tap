@@ -25,6 +25,8 @@ describe("creating a calendar", () => {
       bufferMinutes: 0,
       display: "appointments",
       bookingLink: `${BOOKING_BASE}/b/${made.id}`,
+      week: DEFAULT_WEEK,
+      createdAt: made.createdAt,
     });
     expect(registry.authorizeOwner(made.id, OWNER)?.week).toEqual(DEFAULT_WEEK);
     expect(registry.authorizeOwner(made.id, BEN)).toBeUndefined();
@@ -143,6 +145,8 @@ describe("listing calendars", () => {
         bufferMinutes: 0,
         display: "appointments",
         bookingLink: `${BOOKING_BASE}/b/cal1`,
+        week: {},
+        createdAt: expect.any(Number),
       },
     ]);
     expect(must(await calendars.list(BEN)).map((c) => c.id)).toEqual(["cal2"]);

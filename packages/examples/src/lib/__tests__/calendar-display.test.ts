@@ -35,7 +35,7 @@ describe("a calendar's public view", () => {
     expect(must(await calendars.setDisplay(OWNER, made.id, "appointments")).display).toBe("appointments");
     const stranger = await calendars.setDisplay(STRANGER, made.id, "appointments");
     const missing = await calendars.setDisplay(OWNER, "nope", "appointments");
-    expect(stranger).toEqual({ ok: false, error: "No such calendar of yours." });
+    expect(stranger).toEqual({ ok: false, error: "You do not own this calendar." });
     expect(missing).toEqual(stranger);
     expect(registry.get(made.id)?.display).toBe("appointments");
   });

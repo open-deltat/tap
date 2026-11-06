@@ -78,8 +78,8 @@ const WEEKDAYS_9_TO_5: WeekHours = {
 
 const OWNER = "https://issuer.test#owner";
 
-/** The one create path: what the hosted MCP's create_calendar runs. */
-const calendars = () => createMyCalendars({ ...d(), bookingBase: null });
+/** The one create path: what the hosted MCP's create_calendar runs. No passes exist in this suite. */
+const calendars = () => createMyCalendars({ ...d(), bookingBase: null, revokePasses: async () => ({ ok: true, value: 0 }) });
 
 async function makeBookable(name = "Dentist chair", slotMinutes = 30) {
   const created = await calendars().create(OWNER, { name, slotMinutes, timezone: "Europe/Berlin", week: WEEKDAYS_9_TO_5 });

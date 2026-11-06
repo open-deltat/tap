@@ -121,7 +121,9 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
           .min(1)
           .max(MAX_PASS_MINUTES)
           .optional()
-          .describe(`Minutes until the pass stops working. Defaults to ${DEFAULT_PASS_MINUTES}; short is normal for a one-off`),
+          .describe(
+            `Minutes until the pass stops working. Defaults to ${DEFAULT_PASS_MINUTES}; short is normal for a one-off. If the person will book later, set expires_in_minutes to cover until then`
+          ),
         label: z.string().max(60).optional().describe("A note for you about who it is for, e.g. \"for Acme's agent\". The holder never sees it"),
       },
     },

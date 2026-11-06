@@ -1,6 +1,7 @@
 import { dtPublic } from "./deltat";
 import { publicRegistry } from "./public-registry";
 import { publicBaseUrl } from "./public-base-url";
+import { bookingPasses } from "./booking-passes-live";
 import { createMyCalendars, type MyCalendarsService } from "./my-calendars";
 
 // The one process-wide calendar service for the hosted MCP, beside the registry it writes. Kept on
@@ -12,4 +13,5 @@ export const myCalendars: MyCalendarsService = (shared.__deltatMyCalendars ??= c
   dt: dtPublic,
   registry: publicRegistry,
   bookingBase: publicBaseUrl,
+  revokePasses: (owner, calendarId) => bookingPasses.revokeAllOn(owner, calendarId),
 }));
