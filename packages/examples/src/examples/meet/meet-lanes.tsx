@@ -1,15 +1,13 @@
 "use client";
 
-import type { MouseEvent } from "react";
 import { cn } from "@open-deltat/shared/utils";
-import { formatTime } from "@open-deltat/shared/time";
 import type { AvailabilitySlot } from "../../lib/schemas";
 
 export interface MeetLane {
   label: string;
   slots: AvailabilitySlot[];
-  /** emerald intersection lane: shows discrete bookable slots you can click. */
-  intersection?: boolean;
+  /** The "everyone" lane: the only one drawn in colour, because it is the answer. */
+  everyone?: boolean;
 }
 
 interface MeetLanesProps {
@@ -17,154 +15,68 @@ interface MeetLanesProps {
   /** Shared axis bounds (Unix ms). All lanes are positioned against these. */
   axisStart: number;
   axisEnd: number;
-  tickHours?: number;
-  /** Discrete bookable slots in the intersection lane (already duration-length). */
-  intersectionSlots?: AvailabilitySlot[];
-  /** Selected slot starts (Unix ms). */
-  selectedStarts?: Set<number>;
-  /** Click the lane → nearest slot. additive = shift/cmd-click (toggle multi-select). */
-  onPickSlot?: (slot: AvailabilitySlot, additive: boolean) => void;
+  /** The chosen time, drawn across every lane so the eye sees it fits each calendar. */
+  selected?: AvailabilitySlot;
 }
 
+const TICK_MS = 2 * 3_600_000;
+// Hour only ("7 PM", "19"): the ruler is a guide, the exact time is on the buttons below it.
+const hourLabel = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: "numeric" });
+
 /**
- * Free-time lanes on ONE shared time ruler. The emerald intersection lane is the clickable graph:
- * click it to snap to the nearest bookable start, shift/cmd-click to select several. Selected slots
- * light up; faint ticks mark every bookable start.
+ * Each person's free time on one shared ruler, with the time everyone shares underneath. Read-only:
+ * times are picked with buttons below it, because a tap on a thin bar is a guess on a phone.
  */
-export function MeetLanes({
-  lanes,
-  axisStart,
-  axisEnd,
-  tickHours = 1,
-  intersectionSlots = [],
-  selectedStarts,
-  onPickSlot,
-}: MeetLanesProps) {
+export function MeetLanes({ lanes, axisStart, axisEnd, selected }: MeetLanesProps) {
   const range = axisEnd - axisStart;
-  const pct = (ms: number) => ((ms - axisStart) / range) * 100;
-  const clampPct = (v: number) => Math.max(0, Math.min(100, v));
-
-  const ticks: number[] = [];
-  for (let t = axisStart; t <= axisEnd; t += tickHours * 3_600_000) ticks.push(t);
-
-  // One gridline every tick interval, drawn as a single repeating gradient so every line is exactly
-  // evenly spaced, per-element 1px dividers drift visibly from sub-pixel rounding.
-  const tickPct = ((tickHours * 3_600_000) / range) * 100;
-  const gridBg = `repeating-linear-gradient(to right, var(--dt-line) 0, var(--dt-line) 1px, transparent 1px, transparent ${tickPct}%)`;
-
-  const intersectionLabel = lanes.find((l) => l.intersection)?.label ?? "shared";
-
-  function handleLaneClick(e: MouseEvent<HTMLDivElement>) {
-    if (!onPickSlot || intersectionSlots.length === 0) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const t = axisStart + ((e.clientX - rect.left) / rect.width) * range;
-    // Snap to the nearest bookable start. Slots are drawn start→end and overlap (30-min steps), so
-    // matching by nearest start (not "first span containing t") picks the slot the click is closest
-    // to, and any click on the lane selects something (no dead zones near the edges).
-    let best = intersectionSlots[0];
-    let bestD = Math.abs(best.start - t);
-    for (const s of intersectionSlots) {
-      const d = Math.abs(s.start - t);
-      if (d < bestD) {
-        bestD = d;
-        best = s;
-      }
-    }
-    onPickSlot(best, e.shiftKey || e.metaKey);
-  }
+  const pct = (ms: number) => Math.max(0, Math.min(100, ((ms - axisStart) / range) * 100));
+  const ticks = Array.from({ length: Math.floor(range / TICK_MS) + 1 }, (_, i) => axisStart + i * TICK_MS);
+  const band = (s: AvailabilitySlot) => ({ left: `${pct(s.start)}%`, width: `${pct(s.end) - pct(s.start)}%` });
 
   return (
-    <div className="select-none">
-      {/* shared hour ruler */}
-      <div className="relative ml-14 h-5 sm:ml-20">
-        {ticks.map((t) => (
-          <div
+    <div className="select-none" aria-hidden>
+      <div className="relative ml-[4.5rem] h-4">
+        {ticks.map((t, i) => (
+          <span
             key={t}
-            className="absolute -translate-x-1/2 text-[10px] tabular-nums text-dt-ink-3"
-            style={{ left: `${clampPct(pct(t))}%` }}
+            className={cn(
+              "absolute whitespace-nowrap text-[10px] tabular-nums text-dt-ink-3",
+              i === 0 ? "translate-x-0" : i === ticks.length - 1 ? "-translate-x-full" : "-translate-x-1/2"
+            )}
+            style={{ left: `${pct(t)}%` }}
           >
-            {formatTime(t)}
-          </div>
+            {hourLabel(t)}
+          </span>
         ))}
       </div>
 
-      <div className="space-y-2.5">
-        {lanes.map((lane) => {
-          const clickable = !!lane.intersection && !!onPickSlot && intersectionSlots.length > 0;
-          return (
-            <div key={lane.label} className="flex items-stretch gap-3">
-              <div
-                className={cn(
-                  "w-12 shrink-0 self-center text-right text-xs font-medium sm:w-[68px]",
-                  lane.intersection ? "font-semibold text-dt-accent-ink" : "text-dt-ink-2"
-                )}
-              >
-                {lane.label}
-              </div>
-
-              <div
-                className={cn(
-                  "relative flex-1 overflow-hidden rounded-lg bg-dt-surface ring-1 ring-dt-line",
-                  lane.intersection ? "h-11 sm:h-9" : "h-8",
-                  clickable && "cursor-pointer"
-                )}
-                style={{ backgroundImage: gridBg }}
-                onClick={lane.intersection ? handleLaneClick : undefined}
-              >
-                {/* free windows (faint context) */}
-                {lane.slots.map((slot, i) => {
-                  const left = clampPct(pct(slot.start));
-                  const width = clampPct(pct(slot.end)) - left;
-                  if (width <= 0) return null;
-                  return (
-                    <div
-                      key={i}
-                      aria-hidden
-                      className={cn(
-                        "pointer-events-none absolute inset-y-1 rounded",
-                        lane.intersection ? "bg-dt-accent-soft ring-1 ring-dt-accent/30" : "bg-dt-ink-3/20 ring-1 ring-dt-line"
-                      )}
-                      style={{ left: `${left}%`, width: `${width}%` }}
-                    />
-                  );
-                })}
-
-                {/* intersection: bookable-slot ticks + selected highlights */}
-                {lane.intersection &&
-                  intersectionSlots.map((s) => {
-                    const left = clampPct(pct(s.start));
-                    const width = clampPct(pct(s.end)) - left;
-                    const sel = selectedStarts?.has(s.start);
-                    if (sel) {
-                      return (
-                        <div
-                          key={s.start}
-                          aria-hidden
-                          className="pointer-events-none absolute inset-y-0.5 rounded-md bg-dt-ink shadow-[0_0_0_3px_var(--dt-accent-soft)]"
-                          style={{ left: `${left}%`, width: `${Math.max(width, 1)}%` }}
-                        />
-                      );
-                    }
-                    return (
-                      <div
-                        key={s.start}
-                        aria-hidden
-                        className="pointer-events-none absolute inset-y-[38%] w-px bg-dt-accent/50"
-                        style={{ left: `${left}%` }}
-                      />
-                    );
-                  })}
-              </div>
+      <div className="relative mt-1.5 space-y-1.5">
+        {lanes.map((lane) => (
+          <div key={lane.label} className={cn("flex items-center gap-2", lane.everyone && "mt-3 border-t border-dt-line pt-3")}>
+            <span className={cn("w-16 shrink-0 truncate text-right text-[12px]", lane.everyone ? "font-semibold text-dt-ink" : "text-dt-ink-2")}>
+              {lane.label}
+            </span>
+            <div className={cn("relative flex-1 rounded-full bg-dt-line/50", lane.everyone ? "h-3" : "h-2")}>
+              {lane.slots.map((s) => (
+                <div
+                  key={s.start}
+                  className={cn("absolute inset-y-0 rounded-full", lane.everyone ? "bg-dt-accent" : "bg-dt-ink-3/45")}
+                  style={band(s)}
+                />
+              ))}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        ))}
 
-      {onPickSlot && (
-        <p className="mt-2.5 text-center text-[12px] text-dt-ink-3">
-          Tap the <span className="font-medium text-dt-accent-ink">{intersectionLabel}</span> lane to pick a time
-        </p>
-      )}
+        {selected && (
+          <div className="pointer-events-none absolute inset-y-[-4px] left-[4.5rem] right-0">
+            <div
+              className="absolute inset-y-0 rounded-md bg-dt-ink/[0.07] ring-1 ring-dt-ink/25 transition-[left,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]"
+              style={band(selected)}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

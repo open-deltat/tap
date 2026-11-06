@@ -36,7 +36,7 @@ const ENTERPRISE_MAILTO = mailto("Δt enterprise", "Company:\nWhat you want to r
 const SPECS = [
   { k: "Double bookings", v: "Impossible", note: "Enforced by the storage engine" },
   { k: "Holds", v: "Built in", note: "Expire on their own" },
-  { k: "Protocol", v: "Postgres wire", note: "Connect with a Postgres driver" },
+  { k: "Protocol", v: "TAP", note: "Time Allocation Protocol, over Postgres wire" },
   { k: "Agents", v: "MCP server", note: "On the official registry" },
 ] as const;
 
@@ -122,15 +122,8 @@ type Plan = {
   footnote?: string;
 };
 
+// Self-hosting stays free and is named under the cards; the cards are what we sell.
 const PLANS: readonly Plan[] = [
-  {
-    id: "open-source",
-    name: "Open source",
-    price: "€0",
-    blurb: "The whole database, on your own servers.",
-    features: ["Every feature, no limits", "Single Rust binary or Docker", "MCP server and TypeScript client", "AGPL-3.0"],
-    cta: { label: "Self-host it", href: "/docs/sdk/self-host" },
-  },
   {
     id: "pilot",
     name: "Founding pilot",
@@ -250,8 +243,8 @@ export default function Home() {
           </div>
           <p className="mt-8 max-w-3xl text-[15px] leading-relaxed text-dt-ink-2">
             Underneath is Δt, a database whose one rule is that two bookings never occupy the same time. The refusal
-            comes from the storage engine, not from code that checked first and hoped. It speaks the Postgres wire
-            protocol, so you talk to it with the Postgres driver you already use.
+            comes from the storage engine, not from code that checked first and hoped. It speaks TAP, the Time
+            Allocation Protocol, over the Postgres wire, so the Postgres driver you already use connects to it.
           </p>
         </Section>
 
@@ -275,8 +268,8 @@ export default function Home() {
         </Section>
 
         {/* Pricing */}
-        <Section id="pricing" eyebrow="Pricing" title="Free to run. Paid to have it run for you.">
-          <div className="grid gap-4 lg:grid-cols-3 lg:items-stretch">
+        <Section id="pricing" eyebrow="Pricing" title="We run it. You ship the agent.">
+          <div className="mx-auto grid max-w-4xl gap-4 md:grid-cols-2 md:items-stretch">
             {PLANS.map((p) => (
               <div
                 key={p.id}
@@ -321,8 +314,12 @@ export default function Home() {
               </div>
             ))}
           </div>
-          <p className="mt-5 text-center text-[13px] text-dt-ink-3">
-            Connectors to outside calendars and booking channels are scoped per customer, not shipped as a catalogue.
+          <p className="mx-auto mt-6 max-w-2xl text-pretty text-center text-[13.5px] leading-relaxed text-dt-ink-3">
+            Running it yourself is free: the whole database is open source under AGPL-3.0, every feature included.{" "}
+            <a href="/docs/sdk/self-host" className="whitespace-nowrap font-medium text-dt-ink underline decoration-dt-line-strong underline-offset-4 hover:decoration-dt-ink">
+              Self-host it
+            </a>
+            . Connectors to outside calendars and booking channels are scoped per customer.
           </p>
         </Section>
 
