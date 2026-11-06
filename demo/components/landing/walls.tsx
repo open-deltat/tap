@@ -159,7 +159,7 @@ function Half({ label, good, children }: { label: ReactNode; good?: boolean; chi
     <div
       className={`flex min-h-[170px] flex-col p-5 ${
         good
-          ? "border-t border-dt-line bg-[radial-gradient(90%_70%_at_50%_120%,color-mix(in_oklab,var(--dt-accent)_10%,transparent),transparent)] sm:border-l sm:border-t-0"
+          ? "dt-glow border-t border-dt-line sm:border-l sm:border-t-0"
           : ""
       }`}
     >

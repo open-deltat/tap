@@ -18,16 +18,26 @@ export function VerbChip({ verb }: { verb: (typeof VERBS)[number] }) {
   );
 }
 
+// Hairlines between the cells for each layout: one column on a phone, two on a tablet, and four in
+// a row on a wide screen (or two, where the page is narrow, as in the docs).
+const CELL_LINES: Record<2 | 4, readonly string[]> = {
+  4: ["", "border-t sm:border-t-0 sm:border-l", "border-t lg:border-t-0 lg:border-l", "border-t sm:border-l lg:border-t-0"],
+  2: ["", "border-t sm:border-t-0 sm:border-l", "border-t", "border-t sm:border-l"],
+};
+
+// One card, like the before/after cards: the four commands side by side under the Δt glow.
 export function Verbs({ columns = 4 }: { columns?: 2 | 4 }) {
   return (
-    <dl className={`grid gap-x-8 gap-y-8 sm:grid-cols-2 ${columns === 4 ? "lg:grid-cols-4" : ""}`}>
+    <dl
+      className={`dt-glow grid overflow-hidden rounded-3xl border border-dt-line bg-dt-surface shadow-dt-surface sm:grid-cols-2 ${columns === 4 ? "lg:grid-cols-4" : ""}`}
+    >
       {VERBS.map((v, i) => (
-        <div key={v.title} className="border-t border-dt-line pt-4">
+        <div key={v.title} className={`border-dt-line p-6 ${CELL_LINES[columns][i]}`}>
           <dt>
             <div className="text-[12.5px] text-dt-ink-3">
               <span className="font-mono">0{i + 1}</span> · {v.title}
             </div>
-            <div className="mt-2">
+            <div className="mt-3">
               <VerbChip verb={v} />
             </div>
           </dt>

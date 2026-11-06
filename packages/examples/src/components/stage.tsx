@@ -70,7 +70,8 @@ export function Stage({
         )}
 
         <div className={cn("w-full", inline ? "max-w-none px-0" : `px-0 sm:px-6 ${contentMax}`)}>
-          <div className="w-full bg-transparent px-4 py-2 sm:rounded-[28px] sm:border sm:border-dt-line sm:bg-dt-surface sm:p-7 sm:shadow-dt-surface">
+          {/* The example's one surface wears the Δt glow, like the Δt side of every card on the site. */}
+          <div className="dt-glow w-full bg-transparent px-4 py-2 sm:rounded-[28px] sm:border sm:border-dt-line sm:bg-dt-surface sm:p-7 sm:shadow-dt-surface">
             {ribbon && <div className="mb-6 border-b border-dt-line pb-5">{ribbon}</div>}
             {children}
           </div>

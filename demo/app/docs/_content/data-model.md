@@ -4,7 +4,7 @@ This page covers how your data is shaped: the tenant boundary, the resource tree
 
 ## A tenant is your private database
 
-The `database` name on your connection picks the tenant. Each tenant is fully separate: its own state, its own durable log on disk, no shared rows with anyone else. Acme Tickets gets `database: "acme"` and never sees another tenant's data, because there is nothing shared to leak.
+The `database` name on your connection picks the tenant. Each tenant is fully separate: its own state, its own durable log on disk, no shared rows with anyone else. Acme Tickets gets `database: "acme"` and never sees another tenant's data, because there is nothing shared to leak. (The MCP server calls this `DELTAT_DATABASE`, and a "calendar" there is a resource here.)
 
 In practice you make one client per tenant and reuse it:
 
@@ -15,7 +15,7 @@ const db = new DeltaT({
   host: "localhost",
   port: 5433,
   database: "acme",
-  password: "deltat",
+  password: process.env.DELTAT_PASSWORD,
 });
 ```
 
@@ -121,8 +121,8 @@ const cleanedSeat = await db.resources.create({
 - **Intervals are half-open, `[start, end)`.** The end instant is excluded, so a booking ending at 9:00 and one starting at 9:00 do not overlap. No off-by-one wars over the boundary.
 - **Calendars live in your code.** Δt has no notion of timezones, weekdays, or recurrence. You expand "every Tuesday 7pm to 11pm" into concrete instants on your side, then feed it the plain numbers. The data model stays a flat number line, which is what keeps it simple.
 
-## What is not here yet
+## A resource with no open hours
 
-There is no atomic "commit this hold into a booking" verb. Turning a hold into a booking today is two steps: release the hold, then create the booking. That leaves a brief window where the slot is open to someone else. If you need the slot guaranteed, keep the hold alive until the booking succeeds rather than releasing first.
+If neither a resource nor anything above it has open hours, Δt does not restrict when it can be booked: any booking that does not collide is accepted. Availability for it reads as empty, though, because there are no open hours to subtract from. Give a resource open hours as soon as anyone needs to ask what is free.
 
-For the durability, transport, and self-host details under all of this, see the [Under the hood](/docs/protocol-and-engine) page.
+How holds turn into bookings, and how to hear about changes, is on [find, hold, book, listen](/docs/holds-and-availability). The durability, transport and self-host details are on [under the hood](/docs/protocol-and-engine).

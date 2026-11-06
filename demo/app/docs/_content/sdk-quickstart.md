@@ -1,4 +1,4 @@
-This page takes you from nothing to a confirmed booking with as little ceremony as possible, using `@open-deltat/client`, TAP's TypeScript SDK, against a running Δt node. You create resources and time rules, ask what is free, hold a slot for a moment, then confirm the booking.
+This page takes you from nothing to a confirmed booking in code, using `@open-deltat/client`, the TypeScript SDK, against a running Δt ([self-host](/docs/sdk/self-host) shows how to start one). You create resources and open hours, ask what is free, hold a slot, then book it. If you only want an agent to book, the [agent quickstart](/docs/quickstart) needs no code at all.
 
 We will use one running example: Acme Tickets sells seats in a stadium. The tree is Stadium, then Section A, then Seat 12. We will open Seat 12 for sale, find out when it is free, hold it, and book it.
 
@@ -20,12 +20,12 @@ One `DeltaT` instance is one connection to one tenant. The `database` you pass i
 const db = new DeltaT({
   host: "localhost",
   port: 5433,
-  database: "default",
-  password: "deltat",
+  database: "acme",
+  password: process.env.DELTAT_PASSWORD,
 });
 ```
 
-Those four values are the defaults, so locally you can write `new DeltaT()` and get exactly the same thing.
+Host and port default to `localhost` and `5433`. Always pass the password you started Δt with: a server started without one makes up a random password at each start and prints it once.
 
 A note on how this connects: Δt speaks the PostgreSQL wire protocol, so under the hood TAP rides a normal Postgres driver. That is purely how the bytes get there. You never write SQL. You call typed verbs like `resources.create` and `availability.get`, and TAP turns them into the right calls for you. (There is a raw `db.sql` escape hatch if you ever need it, but reach for it only when no verb covers what you want.)
 
@@ -89,25 +89,17 @@ const hold = await db.holds.place({
 });
 ```
 
-`expiresAt` is an absolute Unix-ms timestamp, not a duration. You decide it; Δt stores it as given and stops counting the hold the moment that time passes.
+`expiresAt` is an absolute Unix-ms timestamp, not a duration. The server keeps it no later than its own clock plus a cap (one hour by default), so read the hold back with `holds.get` if you show a countdown. The hold stops counting the moment it expires.
 
 ## Confirm the booking
 
-A booking is the permanent allocation. It stays on the timeline until you cancel it.
+When the buyer says yes, turn the hold into a booking. It is one step on the server, so the seat is never free in between:
 
 ```ts
-await db.holds.release(hold.id);
-const [booking] = await db.bookings.create([
-  {
-    resourceId: seat.id,
-    start: hold.start,
-    end: hold.end,
-    label: "Acme Tickets order #4012",
-  },
-]);
+const { bookingId } = await db.holds.commit(hold.id, { label: "Acme Tickets order #4012" });
 ```
 
-One honest caveat: turning a hold into a booking today is two steps, `holds.release` then `bookings.create`. There is no single commit verb yet, so there is a brief window between the two where the slot is open again. Worth knowing if you have heavy contention on the same seat.
+The booking stays on the timeline until you cancel it. If the hold already expired, the commit is refused: read availability again and offer the next seat.
 
 ## Close
 
@@ -124,7 +116,7 @@ Here it is end to end: open the seat, find a slot, hold it, book it, close.
 ```ts
 import { DeltaT } from "@open-deltat/client";
 
-const db = new DeltaT(); // localhost:5433, database "default"
+const db = new DeltaT({ database: "acme", password: process.env.DELTAT_PASSWORD }); // localhost:5433
 
 const stadium = await db.resources.create({ name: "Stadium" });
 const section = await db.resources.create({ parentId: stadium.id, name: "Section A" });
@@ -147,10 +139,7 @@ const hold = await db.holds.place({
   expiresAt: Date.now() + 5 * 60 * 1000,
 });
 
-await db.holds.release(hold.id);
-const [booking] = await db.bookings.create([
-  { resourceId: seat.id, start: hold.start, end: hold.end, label: "order #4012" },
-]);
+const { bookingId } = await db.holds.commit(hold.id, { label: "order #4012" });
 
 await db.close();
 ```

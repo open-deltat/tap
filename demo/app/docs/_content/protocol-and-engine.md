@@ -1,47 +1,45 @@
-The rest of these docs treat Δt as a clean idea: time is one line, a booking is a stretch on it, and two stretches collide when they cover the same moment. This page is the short tour of what is actually running underneath that idea. You do not need any of it to use Δt, but it helps to know what you are talking to.
+The rest of these docs treat Δt as a clean idea: time is one line, a booking is a stretch on it, and two stretches collide when they cover the same moment. This page is the short tour of what actually runs underneath. You do not need any of it to use Δt, but it helps to know what you are talking to.
 
-The short version: Δt is one program. There is no separate database to install, no Postgres hiding behind it, no Redis, no sidecar. You run a single binary and that is the whole thing.
+## One binary, no other database
 
-## One binary, no database
+Δt is a single Rust binary, open source under AGPL-3.0. There is no Postgres, Redis or sidecar behind it. While it runs, all live data sits in memory, which is why "what is free?" is fast: it is a little arithmetic over a sorted list, done in RAM.
 
-Δt is a single Rust binary, and all of your live data sits in memory while it runs. That is what makes it quick to answer "what is free?". Reading from memory is fast.
+Every change is written to an append-only log on disk before it touches memory. The log is the source of truth; memory is a fast copy of it. On restart Δt replays the log and is back where it was. If the machine died mid-write, only the unfinished last entry is dropped. So there is one thing to back up: the data directory.
 
-Memory alone would be a problem the moment the process restarts, so every change is also written to an append-only log on disk before it touches memory. The log is the real source of truth; the in-memory copy is just a fast projection of it. When Δt starts back up, it replays the log and rebuilds its state, so a restart does not lose your Acme Tickets seats. If the machine crashed mid-write, only the unfinished tail of the log is dropped on the way back up. Everything that was fully written is still there.
+## TAP: the language it speaks
 
-In practice that means there is exactly one thing to back up: the data directory holding those logs. Copy it and the instance survives a move. Delete it and you get a clean slate.
+TAP, the Time Allocation Protocol, is the small model every Δt surface shares: resources that hold time, rules that open and close it, holds and bookings that claim it, and availability as whatever is left. Every time is a whole number of milliseconds since 1970, and every stretch is half-open, `[start, end)`.
 
-## It speaks Postgres, for now
+TAP keeps people's things at the edge. It has no time zones, no weekdays and no "every Tuesday". Your code (or the MCP server, for an agent) turns those into plain stretches before they reach Δt, and formats them on the way out. That is what keeps the core small and fast.
 
-Today Δt talks to clients over the PostgreSQL wire protocol. That is the one detail that explains the SDK: there is no Postgres underneath, but Δt answers the same handshake a Postgres server would, so a normal Postgres client can connect to it. The TAP client wraps exactly such a connection, which is why opening a database looks like this:
+## Three ways in
 
-```ts
-const db = new DeltaT({ host: "localhost", port: 5433, database: "acme", password: "deltat" });
-```
+All three reach the same engine and the same rules.
 
-Same idea for live updates. You can subscribe to a resource and Δt pushes changes to you as they happen, and a change on a child seat bubbles up to anyone watching the section or the stadium above it:
+- **The MCP server** (`@open-deltat/mcp`) gives an agent find, hold and book as tools. It takes times with their zone (RFC 3339), turns weekly hours into concrete rules, and refuses one-step bookings on purpose. See the [agent quickstart](/docs/quickstart).
+- **The TypeScript client** (`@open-deltat/client`) is a typed SDK: `resources`, `rules`, `availability`, `holds`, `bookings`, `events`. See the [SDK reference](/docs/sdk/reference).
+- **The PostgreSQL wire protocol** is what both of those ride on. Δt answers the same handshake a Postgres server does, so any Postgres driver in any language can connect and send its small set of SQL statements. See [any Postgres client](/docs/guides/postgres-wire).
 
-```ts
-const stop = await db.events.listen(seat.id, (e) => console.log(e));
-await stop();
-```
+The Postgres wire is the current transport, not the final one. An HTTP/JSON way in is planned and not built; when it lands, the client and the MCP server keep working the same way.
 
-This Postgres-shaped transport is honestly a transitional choice, not the long-term plan. There is a cleaner, framed protocol in the works to replace it, built around a transport-neutral command type that the SQL layer already feeds into. When that lands, the wire and SQL layers go away and the SDK keeps working the same way.
+## Live changes
 
-## What is not built yet
+Every hold, booking, release and cancel is sent to anyone listening on that resource, and to anyone listening on a resource above it, so watching a section hears every seat in it. Over the wire this is Postgres `LISTEN`; in the client it is `events.listen` and `events.watch`.
 
-Two further front doors are planned on top of that framed protocol, and it is worth being clear that neither exists today:
+A listener that falls too far behind is told how many changes it missed. The right way to use a change is as a reason to read again, never as the full picture: a fresh read is always correct, however many changes were missed. Booking labels are never included in a change.
 
-- An HTTP/JSON adapter, so any HTTP client could talk to Δt without a Postgres driver.
-- An MCP tool surface, so an AI agent could search, check availability, and book.
+## Many tenants, one instance
 
-Both are on the roadmap. Neither ships at the moment, so for now the way in is the Postgres-wire connection above.
+One Δt holds many separate worlds, picked by the database name on the connection. Each tenant gets its own engine and its own log file, created the first time it is used. There is no shared table filtered by tenant; the separation is in the storage itself. The name is cleaned down to letters, digits, `_` and `-` before it becomes a file name, so it can never point outside the data directory.
 
-## One Δt, many tenants
+## Who can connect
 
-A single Δt instance can hold many independent worlds, and they are kept apart by the database name on the connection. The `database: "acme"` in the example above is the whole isolation story: Acme Tickets gets its own engine and its own log, created the first time it is used, completely separate from any other tenant on the same instance. There is no shared table that everyone reads from with a filter; the separation is real, at the storage level.
+Today there is one shared password for the whole instance (`DELTAT_PASSWORD`); the username is ignored. Per-tenant passwords exist (`DELTAT_TENANT_PASSWORDS`), but a tenant without its own entry falls back to the shared one, so treat them as a convenience, not a security boundary. TLS is supported. Per-connection identity and permissions are planned and not built, so run Δt behind your own application or on a private network.
+
+Holding a hold's id is what lets you commit or release it, which is why the MCP server hands hold ids back to the agent that made them.
 
 ## A word on speed
 
-Δt answers availability quickly because the answer is computed from data already sitting in memory, with nothing to fetch from a separate database. That is the entire speed claim, and it is worth being precise about what it is not. It is not a promise about how fast a single write becomes durable on disk, and it is not a promise about talking to Δt from another region across the network. It is just: reading from RAM is fast, and availability is a read.
+Δt answers availability quickly because the data is already in memory and there is no other database to ask. That is the whole speed claim. It is not a promise about how fast a write becomes durable on disk, or about talking to Δt from across the world.
 
-Most of the time you will never touch any of this. To get back to the model it sits beneath, see the [Data model](/docs/data-model).
+To get back to the model this sits under, see the [data model](/docs/data-model). To run it, see [self-host](/docs/sdk/self-host).

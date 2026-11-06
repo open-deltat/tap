@@ -231,6 +231,13 @@
 .dt-draw-ring { stroke-dasharray: 152; stroke-dashoffset: 152; animation: dt-draw 520ms var(--ease-dt) forwards; }
 .dt-draw-tick { stroke-dasharray: 32; stroke-dashoffset: 32; animation: dt-draw 320ms var(--ease-dt) 380ms forwards; }
 
+/* The Δt glow: the faint emerald light rising from the foot of the logo, laid on any surface that is
+   "the Δt side" (the walls' right halves, the live example, the four commands). One recipe, so
+   every place it appears is the same light. */
+.dt-glow {
+  background-image: radial-gradient(90% 75% at 50% 120%, color-mix(in oklab, var(--dt-accent) 15%, transparent), transparent);
+}
+
 /* A live indicator: a slow breath, not a blink. */
 @keyframes dt-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 .dt-breathe { animation: dt-breathe 2.4s ease-in-out infinite; }
