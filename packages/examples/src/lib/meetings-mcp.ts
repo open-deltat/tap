@@ -160,7 +160,7 @@ export function createMeetingsMcpServer(
     {
       title: "My meeting requests",
       description:
-        "Use this to see what happened to the meetings you asked for: each request with its status (pending, approved, declined, unavailable when the time was taken before the owner approved, withdrawn, or expired when the time came first). Approved means booked.",
+        "Use this to see what happened to the meetings you asked for: each request with its status (pending, approved, declined, unavailable when the time was taken before the owner approved, withdrawn, expired when the time came first, or unconfirmed when the owner approved but the booking could not be confirmed; ask the owner). Approved means booked.",
       annotations: { readOnlyHint: true, idempotentHint: true },
       inputSchema: { calendar_id: z.string().max(64).optional() },
     },
@@ -209,7 +209,7 @@ export function createMeetingsMcpServer(
     {
       title: "Approve a meeting request",
       description:
-        "Use this when you are the calendar's owner and have decided to meet: it books the requested time under the requester's name. If someone else took that time since the request came in, nothing is booked and the request is marked unavailable; say so rather than offering another time on the owner's behalf.",
+        "Use this when you are the calendar's owner and have decided to meet: it books the requested time under the requester's name. If someone else took that time since the request came in, nothing is booked and the request is marked unavailable; say so rather than offering another time on the owner's behalf. If the booking cannot be confirmed (a lost connection), the request is marked unconfirmed and cannot be approved again: tell the owner to check their calendar.",
       inputSchema: { request_id: z.string().max(64) },
     },
     async ({ request_id }) => {

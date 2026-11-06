@@ -31,6 +31,14 @@ describe("the request store", () => {
     expect(openMeetingRequestStore(path).count()).toBe(1);
   });
 
+  test("an unconfirmed decision is kept across a reopen, so it cannot quietly become approvable again", () => {
+    const path = tmpPath("unconfirmed");
+    const store = openMeetingRequestStore(path);
+    const request = store.create({ calendarId: "c", requester: ANNA, contact: annaContact, start: 10, end: 20, note: null });
+    expect(store.decide(request.id, { status: "unconfirmed", decidedAt: 5 })?.decision.status).toBe("unconfirmed");
+    expect(openMeetingRequestStore(path).get(request.id)?.decision).toEqual({ status: "unconfirmed", decidedAt: 5 });
+  });
+
   test("refuses past its ceiling rather than filling the disk", () => {
     const store = openMeetingRequestStore(tmpPath("full"), { maxEntries: 1 });
     store.create({ calendarId: "c", requester: ANNA, contact: annaContact, start: 1, end: 2, note: null });
@@ -144,15 +152,97 @@ describe("the owner's answer", () => {
     expect(state.bookings).toEqual([]);
   });
 
-  test("a failed commit gives the hold back and leaves the request pending to try again", async () => {
+  test("a commit the kernel refuses (the hold is gone) books nothing and leaves the request pending to try again", async () => {
     const { ask, service, state, store } = setup();
     const asked = await ask();
     if (!asked.ok) throw new Error(asked.error);
     state.commitFails = true;
     expect((await service.approve({ requestId: asked.value.id, owner: OWNER })).ok).toBe(false);
+    expect(state.bookings).toEqual([]);
+    expect(store.get(asked.value.id)?.decision.status).toBe("pending");
+  });
+
+  test("an approval whose commit landed but whose reply was lost is recorded as approved, so approving again books nothing", async () => {
+    const { ask, service, state, store } = setup();
+    const asked = await ask();
+    if (!asked.ok) throw new Error(asked.error);
+    state.commitReplyLost = true;
+    expect(await service.approve({ requestId: asked.value.id, owner: OWNER })).toMatchObject({ ok: true, value: { decision: { status: "approved", bookingId: "booking1" } } });
+    state.commitReplyLost = false;
+    expect((await service.approve({ requestId: asked.value.id, owner: OWNER })).ok).toBe(false);
+    expect(state.bookings).toHaveLength(1);
+    expect(store.get(asked.value.id)?.decision.status).toBe("approved");
+  });
+
+  test("a commit that lands late, after the error reached us, is found because the hold is released before reading", async () => {
+    const { ask, service, state } = setup();
+    const asked = await ask();
+    if (!asked.ok) throw new Error(asked.error);
+    state.commitLandsLate = true;
+    expect(await service.approve({ requestId: asked.value.id, owner: OWNER })).toMatchObject({ ok: true, value: { decision: { status: "approved" } } });
+    state.commitLandsLate = false;
+    expect((await service.approve({ requestId: asked.value.id, owner: OWNER })).ok).toBe(false);
+    expect(state.bookings).toHaveLength(1);
+  });
+
+  test("a commit that never reached the kernel gives the hold back once and leaves the request pending", async () => {
+    const { ask, service, state, store } = setup();
+    const asked = await ask();
+    if (!asked.ok) throw new Error(asked.error);
+    state.commitNotSent = true;
+    expect(await service.approve({ requestId: asked.value.id, owner: OWNER })).toEqual({ ok: false, error: "Booking it failed. The request is still pending; try again." });
     expect(state.released).toEqual(["hold1"]);
     expect(store.get(asked.value.id)?.decision.status).toBe("pending");
   });
+
+  test("after an unclear commit, a release that finds the hold already gone lets the bookings decide", async () => {
+    const { ask, service, state } = setup();
+    const asked = await ask();
+    if (!asked.ok) throw new Error(asked.error);
+    state.commitReplyLost = true;
+    state.releaseFails = "gone";
+    expect(await service.approve({ requestId: asked.value.id, owner: OWNER })).toMatchObject({ ok: true, value: { decision: { status: "approved" } } });
+  });
+
+  test("a connection error whose text says 'expired' is not taken for the kernel's refusal", async () => {
+    const { ask, service, state, dt } = setup();
+    const asked = await ask();
+    if (!asked.ok) throw new Error(asked.error);
+    const holds = dt.holds as unknown as { commit: (id: string, o?: { label?: string }) => Promise<{ bookingId: string }> };
+    const real = holds.commit.bind(holds);
+    holds.commit = async (id, o) => {
+      await real(id, o); // the kernel applied it
+      throw Object.assign(new Error("socket expired while reading the reply"), { code: "ECONNRESET" });
+    };
+    expect(await service.approve({ requestId: asked.value.id, owner: OWNER })).toMatchObject({ ok: true, value: { decision: { status: "approved" } } });
+    expect(state.bookings).toHaveLength(1);
+  });
+
+  for (const [what, fail] of [
+    ["the release", (s: ReturnType<typeof setup>["state"]) => (s.releaseFails = "reset")],
+    ["the read", (s: ReturnType<typeof setup>["state"]) => (s.readsFail = true)],
+  ] as const) {
+    test(`when ${what} after an unclear commit fails, the request shows as unconfirmed and cannot be approved again`, async () => {
+      const { ask, service, state, store } = setup();
+      const asked = await ask();
+      if (!asked.ok) throw new Error(asked.error);
+      state.commitReplyLost = true;
+      fail(state);
+      const approved = await service.approve({ requestId: asked.value.id, owner: OWNER });
+      expect(approved.ok).toBe(false);
+      if (approved.ok) return;
+      expect(approved.error).toContain("could not confirm");
+      state.commitReplyLost = false;
+      state.releaseFails = null;
+      state.readsFail = false;
+
+      expect(store.get(asked.value.id)?.decision.status).toBe("unconfirmed");
+      expect(await service.approve({ requestId: asked.value.id, owner: OWNER })).toEqual({ ok: false, error: "That request is already unconfirmed." });
+      expect(service.decline({ requestId: asked.value.id, owner: OWNER }).ok).toBe(false);
+      expect(service.withdraw({ requestId: asked.value.id, requester: ANNA }).ok).toBe(false);
+      expect(state.bookings).toHaveLength(1); // the one booking that may have landed, never a second
+    });
+  }
 
   test("a double-clicked approve books once and never also marks the request unavailable", async () => {
     const { ask, service, state, store } = setup();

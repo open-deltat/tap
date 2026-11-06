@@ -9,6 +9,7 @@ const LABELS: Record<RequestView["status"], { text: string; variant: "secondary"
   unavailable: { text: "Taken before approval", variant: "muted" },
   withdrawn: { text: "Withdrawn", variant: "muted" },
   expired: { text: "Expired", variant: "muted" },
+  unconfirmed: { text: "Not confirmed: check the calendar", variant: "secondary" },
 };
 
 export function RequestStatus({ status }: { status: RequestView["status"] }) {

@@ -29,7 +29,13 @@ export type RequestDecision =
   | { readonly status: "declined"; readonly decidedAt: number; readonly reason: string | null }
   /** The owner approved, but the time had been taken meanwhile; nothing was booked. */
   | { readonly status: "unavailable"; readonly decidedAt: number }
-  | { readonly status: "withdrawn"; readonly decidedAt: number };
+  | { readonly status: "withdrawn"; readonly decidedAt: number }
+  /**
+   * The owner approved, the commit's reply was lost, and nothing could confirm whether it booked.
+   * Final, like every decision: approving it again could book the same request twice, so the owner
+   * checks their calendar instead. The safe direction (INV-01): a request stuck, never two bookings.
+   */
+  | { readonly status: "unconfirmed"; readonly decidedAt: number };
 
 export type RequestStatus = RequestDecision["status"];
 
@@ -89,6 +95,7 @@ function isDecision(value: unknown): value is RequestDecision {
       return isNumber(value.decidedAt) && (value.reason === null || typeof value.reason === "string");
     case "unavailable":
     case "withdrawn":
+    case "unconfirmed":
       return isNumber(value.decidedAt);
     default:
       return false;

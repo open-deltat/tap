@@ -4,6 +4,7 @@ import type { MeetingRequest, MeetingRequestStore, RequestContact, RequestStatus
 import type { Notifier } from "./notify";
 import { requireDisplayText } from "./display-text";
 import { HORIZON_DAYS, MAX_QUERY_WINDOW_MS, type Outcome } from "./bookable-service";
+import { commitAndConfirm } from "./commit-outcome";
 
 // Asking for a meeting on a calendar whose owner approves each one, and the owner's answer. The web
 // actions and the hosted MCP endpoint are thin edges over this, so both enforce the same rules.
@@ -11,7 +12,8 @@ import { HORIZON_DAYS, MAX_QUERY_WINDOW_MS, type Outcome } from "./bookable-serv
 // The commitment ladder (PRINCIPLES.md §6) decides the shape. Asking is information: nothing is held,
 // so a request cannot squat on the owner's week while they sleep on it. Approving is the commitment:
 // the time is held and booked in one step, and if someone else took it meanwhile the approval says
-// so and books nothing, never a substitute.
+// so and books nothing, never a substitute. If the commit's reply is lost, commit-outcome.ts settles
+// what happened; when nothing can, the request becomes `unconfirmed` rather than approvable again.
 
 export interface MeetingDeps {
   dt: DeltaT;
@@ -245,15 +247,26 @@ export function createMeetingService(deps: MeetingDeps): MeetingService {
           deps.store.decide(requestId, { status: "unavailable", decidedAt: now() });
           return fail("That time was taken after the request came in, so nothing was booked. The request now shows as unavailable.");
         }
-        const booked = await deps.dt.holds.commit(hold.id, { label: request.contact.name }).catch(() => null);
-        if (!booked) {
-          await deps.dt.holds.release(hold.id).catch(() => {});
-          return fail("Booking it failed. The request is still pending; try again.");
+        const outcome = await commitAndConfirm(deps.dt, {
+          resourceId: request.calendarId,
+          holdId: hold.id,
+          start: request.start,
+          end: request.end,
+          label: request.contact.name,
+        });
+        if (outcome.kind === "unknown") {
+          // It may have booked. Pending would invite a second approval and a second booking.
+          deps.store.decide(requestId, { status: "unconfirmed", decidedAt: now() });
+          return fail(
+            "We could not confirm whether the booking went through. Check your calendar: it may be booked. The request now shows as unconfirmed and cannot be approved again."
+          );
         }
-        const approved = deps.store.decide(requestId, { status: "approved", decidedAt: now(), bookingId: booked.bookingId });
+        // Not booked: the kernel refused because the hold was gone, or the unclear path released it.
+        if (outcome.kind === "not_booked") return fail("Booking it failed. The request is still pending; try again.");
+        const approved = deps.store.decide(requestId, { status: "approved", decidedAt: now(), bookingId: outcome.bookingId });
         if (!approved) {
           // Decided meanwhile (withdrawn): the booking must not outlive the request it came from.
-          await deps.dt.bookings.cancel(booked.bookingId).catch(() => {});
+          await deps.dt.bookings.cancel(outcome.bookingId).catch(() => {});
           return fail("The request was withdrawn just now, so nothing was booked.");
         }
         return ok(approved);
