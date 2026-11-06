@@ -20,6 +20,10 @@ export interface StagePrimitive {
  * Inside another page (see StageMode "inline") the example is a block in that page's flow: the page
  * scrolls, never the example, the host supplies the title, and the island sits at the block's foot.
  * In a gallery preview ("bare") the title and caption are left out: the card is the picture.
+ *
+ * Every example is the same application: one width (max-w-3xl, wider only for side-by-side
+ * layouts), and its controls (the ribbon) live at the top of the surface above a hairline, never
+ * floating above the card.
  */
 export function Stage({
   primitive,
@@ -27,21 +31,23 @@ export function Stage({
   ribbon,
   tray,
   children,
-  contentMax = "max-w-5xl",
+  contentMax = "max-w-3xl",
 }: {
   primitive?: StagePrimitive;
   title?: string;
   ribbon?: ReactNode;
   tray?: ReactNode;
   children: ReactNode;
-  /** Tailwind max-width for the panel. Widen it for multi-column demos (e.g. the live mirrors). */
+  /** Tailwind max-width for the panel. Only side-by-side layouts widen it, to max-w-5xl. */
   contentMax?: string;
 }) {
   const mode = useStageMode();
   const inline = mode === "inline";
   const chrome = mode === "page";
   return (
-    <div className={cn("relative flex flex-col text-dt-ink", !inline && "dt-canvas h-full overflow-hidden")}>
+    // A preview ("bare") sits inside another page's frame, so it takes the flat canvas colour without
+    // the light falling from above: otherwise the light's edge shows as a seam where the frame starts.
+    <div className={cn("relative flex flex-col text-dt-ink", !inline && "h-full overflow-hidden", chrome ? "dt-canvas" : !inline && "bg-dt-canvas")}>
       <div className={cn("flex min-h-0 flex-1 flex-col items-center", inline ? "pb-24 sm:pb-28" : "overflow-auto pb-32", !chrome && !inline && "pt-4 sm:pt-6")}>
         {chrome && (title || primitive) && (
           <header className="w-full shrink-0 px-5 pb-5 pt-8 text-center sm:pt-12">
@@ -63,10 +69,9 @@ export function Stage({
           </header>
         )}
 
-        {chrome && ribbon && <div className="w-full shrink-0 px-4 pb-5">{ribbon}</div>}
-
         <div className={cn("w-full", inline ? "max-w-none px-0" : `px-0 sm:px-6 ${contentMax}`)}>
           <div className="w-full bg-transparent px-4 py-2 sm:rounded-[28px] sm:border sm:border-dt-line sm:bg-dt-surface sm:p-7 sm:shadow-dt-surface">
+            {ribbon && <div className="mb-6 border-b border-dt-line pb-5">{ribbon}</div>}
             {children}
           </div>
         </div>

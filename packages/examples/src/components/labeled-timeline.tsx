@@ -70,7 +70,8 @@ export function LabeledTimeline({
   const hasOps = rows.some((r) => r.op);
 
   return (
-    <div className="rounded-2xl border border-dt-line bg-dt-sunken p-3.5">
+    // Drawn straight on the surface between hairlines; the examples never put a box inside the card.
+    <div className="border-y border-dt-line py-3.5">
       {ticks && ticks.length > 0 && (
         <div className="mb-1.5 flex items-end gap-2">
           {hasOps && <span className="w-3 shrink-0" />}

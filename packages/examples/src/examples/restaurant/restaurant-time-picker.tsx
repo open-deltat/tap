@@ -1,6 +1,8 @@
 "use client";
 
 import { formatTime } from "@open-deltat/shared/time";
+import { cn } from "@open-deltat/shared/utils";
+import { PILL_ACTIVE, PILL_BASE, PILL_IDLE } from "../../lib/accent";
 import type { AvailabilitySlot } from "../../lib/schemas";
 
 const SLOT_DURATION = 90 * 60_000;
@@ -24,30 +26,30 @@ interface TimePickerProps {
   onSelect: (start: number, end: number) => void;
 }
 
+// The seating start times as the same pills every example uses, in one row that scrolls sideways
+// (one direction per section) instead of a native dropdown that looks like no other control here.
 export function RestaurantTimePicker({ slots, selectedStart, onSelect }: TimePickerProps) {
   if (slots.length === 0) {
     return <div className="text-[13px] text-dt-ink-3">No available times today</div>;
   }
 
-  // One dropdown rather than a wall of pills: a 90-min seating starting at the chosen time.
   return (
-    <label className="flex items-center gap-2 text-[13px] text-dt-ink-3">
-      Seating
-      <select
-        value={selectedStart ?? ""}
-        onChange={(e) => {
-          const start = Number(e.target.value);
-          const slot = slots.find((s) => s.start === start);
-          if (slot) onSelect(slot.start, slot.end);
-        }}
-        className="h-11 rounded-full border border-dt-line-strong bg-dt-surface px-4 text-base tabular-nums text-dt-ink transition-colors focus:border-dt-ink focus:outline-none sm:h-9 sm:text-[13px]"
-      >
-        {slots.map((slot) => (
-          <option key={slot.start} value={slot.start} className="bg-dt-surface text-dt-ink">
-            {formatTime(slot.start)} to {formatTime(slot.end)}
-          </option>
-        ))}
-      </select>
-    </label>
+    <div role="group" aria-label="Seating time" className="flex w-full max-w-full gap-1.5 overflow-x-auto pb-1">
+
+      {slots.map((slot) => {
+        const active = slot.start === selectedStart;
+        return (
+          <button
+            key={slot.start}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onSelect(slot.start, slot.end)}
+            className={cn(PILL_BASE, "shrink-0 tabular-nums", active ? PILL_ACTIVE : PILL_IDLE)}
+          >
+            {formatTime(slot.start)}
+          </button>
+        );
+      })}
+    </div>
   );
 }

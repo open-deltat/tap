@@ -38,15 +38,13 @@ export function WeekHoursEditor({
     );
 
   return (
-    <div className="space-y-1.5">
+    // One row per day on the surface itself, parted by hairlines: no box per day.
+    <div className="divide-y divide-dt-line border-y border-dt-line">
       {DOW_ORDER.map((dow) => {
         const ranges = week[dow] ?? [];
         const on = ranges.length > 0;
         return (
-          <div
-            key={dow}
-            className="flex min-h-[4.5rem] items-start gap-3 rounded-2xl border border-dt-line bg-dt-sunken px-3.5 py-3"
-          >
+          <div key={dow} className="flex min-h-[4.5rem] items-start gap-3 py-3">
             <div className="flex w-14 shrink-0 flex-col items-start gap-1.5">
               <span className="text-[13px] font-medium text-dt-ink">{DOW_LABEL[dow]}</span>
               <Toggle
