@@ -2,7 +2,7 @@
 
 import { cn } from "@open-deltat/shared/utils";
 import type { AvailabilitySlot } from "../../lib/schemas";
-import { FriendAvatar } from "./friends";
+import { FriendAvatar } from "../../components/friend-avatar";
 
 export interface MeetLane {
   label: string;

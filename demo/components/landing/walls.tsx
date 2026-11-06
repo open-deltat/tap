@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowRight, Check, RefreshCw } from "lucide-react";
+import { FriendAvatar } from "@open-deltat/examples/components/friend-avatar";
 
 // The five things an agent runs into on a normal calendar, each shown twice in the hero's own
 // picture language: "Today" on the left with one amber thing wrong, "Δt" on the right ending in
@@ -182,12 +183,14 @@ function Live() {
   return (
     <span className="inline-flex items-center gap-1.5 text-[11.5px] text-dt-accent-ink">
       <span className="dt-breathe h-1.5 w-1.5 rounded-full bg-dt-accent" />
-      live
+      listening
     </span>
   );
 }
 
-// Five people's free evenings as bars; with the answer, the overlap is drawn underneath in green.
+// The live example's lanes, small: five people's free evenings as bars, each behind its avatar, and
+// the Everyone lane underneath. With the answer the overlap is drawn in green; without it the lane
+// is empty and the work is yours.
 const FREE = [
   [10, 90],
   [0, 62],
@@ -200,22 +203,25 @@ function Lanes({ answer }: { answer: boolean }) {
   return (
     <div className="space-y-1.5">
       {FREE.map(([a, b], i) => (
-        <div key={i} className="relative h-2 rounded-full bg-dt-line/50">
-          <div className="absolute inset-y-0 rounded-full bg-dt-ink-3/45" style={{ left: `${a}%`, width: `${b - a}%` }} />
+        <div key={i} className="flex items-center gap-2">
+          <span className="flex w-12 shrink-0 justify-end">
+            <FriendAvatar i={i} size={16} />
+          </span>
+          <div className="relative h-2 flex-1 rounded-full bg-dt-line/50">
+            <div className="absolute inset-y-0 rounded-full bg-dt-ink-3/45" style={{ left: `${a}%`, width: `${b - a}%` }} />
+          </div>
         </div>
       ))}
-      <div className="flex items-center gap-2 pt-2">
+      <div className="flex items-center gap-2 border-t border-dt-line pt-2">
+        <span className="w-12 shrink-0 text-right text-[11px] font-semibold text-dt-ink">Everyone</span>
         {answer ? (
-          <>
-            <div className="relative h-3 flex-1 rounded-full bg-dt-line/50">
-              <div className="absolute inset-y-0 rounded-full bg-dt-accent" style={{ left: "22%", width: "40%" }} />
-            </div>
-            <span className="shrink-0 text-[11.5px] font-medium text-dt-accent-ink">everyone</span>
-          </>
+          <div className="relative h-3 flex-1 rounded-full bg-dt-line/50">
+            <div className="absolute inset-y-0 rounded-full bg-dt-accent" style={{ left: "22%", width: "40%" }} />
+          </div>
         ) : (
           <>
             <div className="h-3 flex-1 rounded-full border border-dashed border-dt-line-strong" />
-            <span className="shrink-0 text-[11.5px] font-medium text-dt-held-ink">you work it out</span>
+            <span className="shrink-0 text-[11px] font-medium text-dt-held-ink">you work it out</span>
           </>
         )}
       </div>

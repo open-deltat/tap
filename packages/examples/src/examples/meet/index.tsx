@@ -9,7 +9,7 @@ import { Stage } from "../../components/stage";
 import { Segmented } from "../../components/ui/segmented";
 import { BookButton } from "../../components/book-button";
 import { MeetLanes } from "./meet-lanes";
-import { FRIENDS } from "./friends";
+import { FRIENDS } from "../../components/friend-avatar";
 import { BookingConfirmedModal, type BookingResult } from "../../components/booking-confirmed-modal";
 import type { AvailabilitySlot, Resource } from "../../lib/schemas";
 
