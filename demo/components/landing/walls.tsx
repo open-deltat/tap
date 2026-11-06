@@ -35,7 +35,7 @@ const WALLS: readonly Wall[] = [
     ),
   },
   {
-    title: "Every app sees an outdated calendar.",
+    title: "It can’t keep every app up to date.",
     link: { label: "How live updates work", href: "/docs/guides/real-time-scheduling" },
     today: (
       <Rows>
