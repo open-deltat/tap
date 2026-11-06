@@ -35,6 +35,7 @@ function body(): string {
     "claims with a server-enforced TTL that convert to bookings in one atomic statement, which is the",
     "primitive an AI agent needs when its decision takes seconds. Δt speaks the PostgreSQL wire",
     "protocol, so any Postgres client can talk to it; TAP is the typed TypeScript SDK on top.",
+    "Agents connect through the MCP server (npx @open-deltat/mcp): find_slots, hold_slot, commit_hold.",
     "",
     ...DOCS_SECTIONS.map((s) => `${section(s.title, s.links)}\n`),
     section("Try it", [
