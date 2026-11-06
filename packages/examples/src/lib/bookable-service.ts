@@ -1,17 +1,13 @@
-import { expandRecurrence, type AvailabilitySlot, type Booking, type DeltaT } from "@open-deltat/client";
-import {
-  MAX_PUBLIC_BOOKABLES,
-  normalizeBookableName,
-  type BookableRecord,
-  type BookableRegistry,
-} from "./public-bookables";
+import type { AvailabilitySlot, Booking, DeltaT } from "@open-deltat/client";
+import { normalizeBookableName, type BookableRecord, type BookableRegistry } from "./public-bookables";
 import { requireDisplayText } from "./display-text";
-import { dateRangeFromToday, weekToRanges, type WeekHours } from "../examples/builder/schedule";
+import { weekToRanges, type WeekHours } from "../examples/builder/schedule";
 
-// Everything the public bookable feature actually does, with its two dependencies passed in. The
-// server actions are a thin edge on top of this that supplies the live deltat and registry and
-// applies rate limiting; the logic lives here so it can be driven against a real deltat in the
-// integration suite instead of being re-implemented by a test that then drifts from it.
+// Everything the public bookable feature does once a bookable exists, with its two dependencies
+// passed in: list slots, hold, book, release, and the manage-link writes (rename, delete, bookings).
+// The server actions are a thin edge on top that supplies the live deltat and registry and applies
+// rate limiting. Creating a bookable is not here: calendars are created only through the hosted MCP
+// (my-calendars.ts).
 
 export interface BookableDeps {
   dt: DeltaT;
@@ -19,12 +15,6 @@ export interface BookableDeps {
 }
 
 export type Outcome<T> = { ok: true; value: T } | { ok: false; error: string };
-
-export interface CreatedBookable {
-  id: string;
-  name: string;
-  manageKey: string;
-}
 
 /** How far ahead a new bookable's open hours are written as concrete rules. */
 export const HORIZON_DAYS = 60;
@@ -43,20 +33,6 @@ const MAX_WEEK_RANGES = 14;
 const MAX_BOOKER_NAME_LENGTH = 60;
 
 const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-export interface CreateBookableInput {
-  name: string;
-  slotMinutes: number;
-  timezone: string;
-  week: WeekHours;
-}
-
-interface ValidCreateInput {
-  name: string;
-  slotMinutes: number;
-  timezone: string;
-  ranges: { dow: number; startTime: string; endTime: string }[];
-}
 
 export function isKnownTimeZone(timezone: string): boolean {
   try {
@@ -95,78 +71,6 @@ function validateName(raw: string): Outcome<string> {
     return { ok: true, value: normalizeBookableName(raw) };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "That name will not work." };
-  }
-}
-
-function validateCreateInput(input: CreateBookableInput): Outcome<ValidCreateInput> {
-  const name = validateName(input.name);
-  if (!name.ok) return name;
-
-  if (!ALLOWED_SLOT_MINUTES.includes(input.slotMinutes)) {
-    return { ok: false, error: `Pick a slot length of ${ALLOWED_SLOT_MINUTES.join(", ")} minutes.` };
-  }
-  if (!isKnownTimeZone(input.timezone)) {
-    return { ok: false, error: "That time zone is not one this server recognises." };
-  }
-
-  const ranges = validateWeek(input.week);
-  if (!ranges.ok) return ranges;
-
-  return {
-    ok: true,
-    value: { name: name.value, slotMinutes: input.slotMinutes, timezone: input.timezone, ranges: ranges.value },
-  };
-}
-
-export async function createBookable(
-  deps: BookableDeps,
-  input: CreateBookableInput,
-  opts?: { owner?: string }
-): Promise<Outcome<CreatedBookable>> {
-  if (deps.registry.count() >= MAX_PUBLIC_BOOKABLES) {
-    return { ok: false, error: "The public registry is full. Nothing new can be created right now." };
-  }
-
-  const validated = validateCreateInput(input);
-  if (!validated.ok) return validated;
-  const { name, slotMinutes, timezone, ranges } = validated.value;
-
-  const { fromDate, toDate } = dateRangeFromToday(HORIZON_DAYS);
-  const segments = ranges.flatMap((range) =>
-    expandRecurrence({
-      daysOfWeek: [range.dow],
-      startTime: range.startTime,
-      endTime: range.endTime,
-      fromDate,
-      toDate,
-      timeZone: timezone,
-      blocking: false,
-    })
-  );
-  if (segments.length === 0) {
-    return { ok: false, error: `Those hours do not land on any day in the next ${HORIZON_DAYS} days.` };
-  }
-
-  const resource = await deps.dt.resources.create({ name });
-  try {
-    await deps.dt.rules.create(
-      segments.map((s) => ({ resourceId: resource.id, start: s.start, end: s.end, blocking: false }))
-    );
-    const { manageKey } = deps.registry.register({
-      id: resource.id,
-      name,
-      slotMinutes,
-      timezone,
-      owner: opts?.owner,
-    });
-    return { ok: true, value: { id: resource.id, name, manageKey } };
-  } catch (err) {
-    // Compensate. A resource the registry never learned about is unownable: nobody can rename it,
-    // nobody can delete it, and it would sit in the tenant forever. Rolling it back leaves the
-    // caller with an error instead of a ghost.
-    await deps.dt.resources.delete(resource.id).catch(() => {});
-    console.error("createBookable failed after the resource was created:", err);
-    return { ok: false, error: "Something broke while setting that up. Nothing was created." };
   }
 }
 

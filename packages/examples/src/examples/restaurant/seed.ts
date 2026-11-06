@@ -2,54 +2,13 @@
 
 import { dt } from "../../lib/deltat";
 import * as store from "../../lib/store";
-import { ensureSchedule, daily, findRootByName, baseMs } from "../../actions/seed-helpers";
+import { ensureSchedule, findRootByName, baseMs } from "../../actions/seed-helpers";
+import { BAR, BLOCKED_TABLE, NAME, SEATING_MINUTES, SECTIONS, SERVICE_HOURS, TURNOVER_MINUTES } from "./structure";
 
-const NAME = "Bella Cucina";
+// The shape (sections, tables, bar, hours) is in ./structure, which the hosted MCP's modelling
+// guide reads too; this file only builds it.
 
-// Open 11:00–22:00 daily, expanded into rules at the edge (no kernel Schedule primitive).
-const SERVICE_HOURS = daily([{ h: 11, m: 0, dur: 660 }]);
-
-// The dining table closed for tonight's service, to demo "block a table tonight".
-const BLOCKED_TABLE = "D1";
-const BAR_SECTION = "Bar";
-const BAR_NAME = "Bar";
-const BAR_CAPACITY = 10;
-const BAR_PRICE = 0;
-
-interface TableDef {
-  name: string;
-  maxGuests: number;
-}
-
-const SECTIONS: { name: string; tables: TableDef[] }[] = [
-  {
-    name: "Patio",
-    tables: [
-      { name: "P1", maxGuests: 2 },
-      { name: "P2", maxGuests: 2 },
-      { name: "P3", maxGuests: 4 },
-      { name: "P4", maxGuests: 4 },
-    ],
-  },
-  {
-    name: "Dining Room",
-    tables: [
-      { name: "D1", maxGuests: 2 },
-      { name: "D2", maxGuests: 4 },
-      { name: "D3", maxGuests: 4 },
-      { name: "D4", maxGuests: 6 },
-      { name: "D5", maxGuests: 6 },
-      { name: "D6", maxGuests: 8 },
-    ],
-  },
-  {
-    name: "Private Room",
-    tables: [
-      { name: "VIP1", maxGuests: 8 },
-      { name: "VIP2", maxGuests: 12 },
-    ],
-  },
-];
+const TURNOVER_MS = TURNOVER_MINUTES * 60_000;
 
 export async function seedRestaurant(): Promise<string> {
   const existing = await findRootByName(NAME);
@@ -58,8 +17,8 @@ export async function seedRestaurant(): Promise<string> {
     return existing;
   }
 
-  const restaurant = await dt.resources.create({ name: NAME, bufferAfter: 30 * 60_000 });
-  store.set(restaurant.id, { slotMinutes: 90, price: null });
+  const restaurant = await dt.resources.create({ name: NAME, bufferAfter: TURNOVER_MS });
+  store.set(restaurant.id, { slotMinutes: SEATING_MINUTES, price: null });
 
   await ensureSchedule(restaurant.id, SERVICE_HOURS);
 
@@ -67,30 +26,30 @@ export async function seedRestaurant(): Promise<string> {
 
   for (const section of SECTIONS) {
     const sec = await dt.resources.create({ parentId: restaurant.id, name: section.name });
-    store.set(sec.id, { slotMinutes: 90, price: null });
+    store.set(sec.id, { slotMinutes: SEATING_MINUTES, price: null });
 
     for (const table of section.tables) {
       const t = await dt.resources.create({
         parentId: sec.id,
         name: table.name,
-        bufferAfter: 30 * 60_000,
+        bufferAfter: TURNOVER_MS,
       });
-      store.set(t.id, { slotMinutes: 90, price: null, maxGuests: table.maxGuests });
+      store.set(t.id, { slotMinutes: SEATING_MINUTES, price: null, maxGuests: table.maxGuests });
       if (table.name === BLOCKED_TABLE) blockedTableId = t.id;
     }
   }
 
   // The Bar: ONE capacity-N resource. A party books K of N walk-up seats in one atomic batch;
   // the engine allows up to N and rejects the (N+1)th seat.
-  const barSection = await dt.resources.create({ parentId: restaurant.id, name: BAR_SECTION });
-  store.set(barSection.id, { slotMinutes: 90, price: null });
+  const barSection = await dt.resources.create({ parentId: restaurant.id, name: BAR.section });
+  store.set(barSection.id, { slotMinutes: SEATING_MINUTES, price: null });
   const bar = await dt.resources.create({
     parentId: barSection.id,
-    name: BAR_NAME,
-    capacity: BAR_CAPACITY,
-    bufferAfter: 30 * 60_000,
+    name: BAR.name,
+    capacity: BAR.capacity,
+    bufferAfter: TURNOVER_MS,
   });
-  store.set(bar.id, { slotMinutes: 90, price: BAR_PRICE });
+  store.set(bar.id, { slotMinutes: SEATING_MINUTES, price: BAR.price });
 
   // Block one dining table for tonight's dinner service (19:00–22:00 today).
   if (blockedTableId) {

@@ -9,12 +9,14 @@ import type { Outcome } from "../lib/bookable-service";
 import { createRateLimiter } from "../lib/rate-limit";
 import { getSessionPrincipal } from "../lib/auth-session";
 
-// The signed-in calendar surface: the full round-trip (create, read, set availability, rename,
-// cancel a booking, delete) for calendars a verified principal owns. Same public tenant as the
-// anonymous secret-link flow, but authorized by the principal, so the dashboard lists your
-// calendars and nothing depends on keeping a link.
+// The signed-in calendar surface for calendars a verified principal owns: read, set availability,
+// rename, cancel a booking, delete. Same public tenant as the old secret-link flow, but authorized by
+// the principal, so the dashboard lists your calendars and nothing depends on keeping a link.
+//
+// There is deliberately no create here. Calendars are created only through the hosted MCP
+// (lib/my-calendars.ts, create_calendar); the website shows them. An action is callable by anyone
+// who can post to the site, so leaving one here would keep a create path open whatever the UI shows.
 
-const perPrincipalCreates = createRateLimiter({ limit: 20, windowMs: 3_600_000 });
 // Saving availability expands a week into rules; cap it so a script cannot hammer replaceOpenHours.
 const perPrincipalSaves = createRateLimiter({ limit: 120, windowMs: 3_600_000 });
 
@@ -22,27 +24,6 @@ const deps = { dt: dtPublic, registry: publicRegistry };
 
 async function owner(): Promise<string | null> {
   return (await getSessionPrincipal())?.principalId ?? null;
-}
-
-export type CreateCalendarResult = { ok: true; id: string } | { ok: false; error: string };
-
-/** Create an empty calendar; the caller then sets its availability. */
-export async function createCalendar(input: {
-  name: string;
-  timezone: string;
-}): Promise<CreateCalendarResult> {
-  const o = await owner();
-  if (!o) return { ok: false, error: "Sign in to create a calendar." };
-
-  const gate = perPrincipalCreates.check(o);
-  if (!gate.allowed) {
-    const minutes = Math.max(1, Math.ceil(gate.retryAfterMs / 60_000));
-    return { ok: false, error: `That is twenty new calendars in an hour. Try again in ${minutes} minutes.` };
-  }
-
-  const created = await owned.createOwnedCalendar(deps, { name: input.name, timezone: input.timezone, owner: o });
-  if (!created.ok) return created;
-  return { ok: true, id: created.value.id };
 }
 
 export async function getCalendar(id: string): Promise<Outcome<CalendarView>> {

@@ -11,6 +11,11 @@
 /** Slots per day of week (0 = Sunday), each an offset from local midnight plus a duration. */
 export type DaySchedule = Record<number, { h: number; m: number; dur: number }[]>;
 
+/** The same slots on every day of the week. */
+export function daily(shows: { h: number; m: number; dur: number }[]): DaySchedule {
+  return Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, shows]));
+}
+
 /** How far ahead open hours are kept. Under deltat's 90-day MAX_QUERY_WINDOW, so a single
  *  availability query can see the whole window. */
 export const HORIZON_DAYS = 60;

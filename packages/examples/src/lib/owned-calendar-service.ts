@@ -1,5 +1,6 @@
 import { expandRecurrence, type Booking, type DeltaT } from "@open-deltat/client";
-import type { BookableRecord, BookableRegistry } from "./public-bookables";
+import type { BookableRecord, BookableRegistry, BookingMode } from "./public-bookables";
+import type { Display } from "./calendar-displays";
 import { MAX_PUBLIC_BOOKABLES, normalizeBookableName } from "./public-bookables";
 import { dateRangeFromToday, type WeekHours } from "../examples/builder/schedule";
 import {
@@ -40,10 +41,24 @@ function validateName(raw: string): Outcome<string> {
   }
 }
 
-/** Create an empty calendar (a deltat resource with no open hours yet), owned by the principal. */
+/**
+ * Create an empty calendar (a deltat resource with no open hours yet), owned by the principal.
+ * `capacity` (bookings at the same time) and `bufferMinutes` (turnover after each booking) live in
+ * the kernel, the only place they are kept; callers validate their ranges. `bookingMode` and
+ * `display` are written with the record, so it is right from its first write: a calendar meant to
+ * take requests never reads as instant while its hours are still being written.
+ */
 export async function createOwnedCalendar(
   deps: OwnedDeps,
-  input: { name: string; timezone: string; owner: string }
+  input: {
+    name: string;
+    timezone: string;
+    owner: string;
+    capacity?: number;
+    bufferMinutes?: number;
+    bookingMode?: BookingMode;
+    display?: Display;
+  }
 ): Promise<Outcome<{ id: string }>> {
   const name = validateName(input.name);
   if (!name.ok) return name;
@@ -51,7 +66,11 @@ export async function createOwnedCalendar(
     return { ok: false, error: "That time zone is not one this server recognises." };
   }
 
-  const resource = await deps.dt.resources.create({ name: name.value });
+  const resource = await deps.dt.resources.create({
+    name: name.value,
+    capacity: input.capacity ?? 1,
+    bufferAfter: input.bufferMinutes ? input.bufferMinutes * 60_000 : null,
+  });
   try {
     deps.registry.register({
       id: resource.id,
@@ -61,6 +80,8 @@ export async function createOwnedCalendar(
       owner: input.owner,
       priceCents: null,
       week: {},
+      bookingMode: input.bookingMode,
+      display: input.display,
     });
     return { ok: true, value: { id: resource.id } };
   } catch (err) {
@@ -160,6 +181,25 @@ export async function renameOwnedCalendar(
   if (!updated) return { ok: false, error: "You do not own this calendar." };
   await deps.dt.resources.update(input.id, { name: updated.name });
   return { ok: true, value: updated };
+}
+
+/**
+ * Change how many bookings may overlap and the turnover after each, both kept only in the kernel.
+ * The caller checks the ranges, and refuses changes existing bookings might no longer fit (fewer
+ * places, more turnover): the kernel takes the new values without looking at what is booked.
+ */
+export async function setOwnedCalendarShape(
+  deps: OwnedDeps,
+  input: { id: string; owner: string; capacity: number; bufferMinutes: number }
+): Promise<Outcome<null>> {
+  if (!deps.registry.authorizeOwner(input.id, input.owner)) {
+    return { ok: false, error: "You do not own this calendar." };
+  }
+  await deps.dt.resources.update(input.id, {
+    capacity: input.capacity,
+    bufferAfter: input.bufferMinutes ? input.bufferMinutes * 60_000 : null,
+  });
+  return { ok: true, value: null };
 }
 
 /** Cancel one booking on a calendar the caller owns. */

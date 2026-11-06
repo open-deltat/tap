@@ -1,24 +1,24 @@
 import type { Metadata } from "next";
-import { PublicBookableCreate } from "@open-deltat/examples/components/public-bookable-create";
 import { JsonLd } from "@/components/json-ld";
+import { ConnectAgent } from "@/components/connect-agent";
 import { pageMetadata, webPageLd } from "@/lib/seo";
 
+// Kept at /new because search engines know it. Calendars are no longer made on the website: this page
+// says how to have your agent make one, through the hosted MCP at delt.at/mcp.
 const SEO = {
-  title: "Make something bookable",
+  title: "Create a calendar with your agent",
   description:
-    "Publish a real bookable timeline on Δt in one form. No account, no password: you get a link to share and a link to keep.",
+    "Ask your AI agent for the calendar you need. Connect it to delt.at/mcp once, sign in, describe the calendar, and it is created in your account.",
   path: "/new",
 };
 
 export const metadata: Metadata = pageMetadata(SEO);
 
-export default function NewBookablePage() {
+export default function NewCalendarPage() {
   return (
-    <>
+    <main className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6 sm:py-16">
       <JsonLd graph={[webPageLd(SEO)]} />
-      {/* The page's one h1, in the server HTML; the form's visible title is an h2 inside it. */}
-      <h1 className="sr-only">{SEO.title}</h1>
-      <PublicBookableCreate />
-    </>
+      <ConnectAgent as="h1" />
+    </main>
   );
 }

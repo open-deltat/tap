@@ -3,13 +3,14 @@ import { DocHeader } from "@/components/doc-header";
 import { DocBody } from "@/components/doc-body";
 import { JsonLd } from "@/components/json-ld";
 import { VERBS, VerbChip } from "@/components/landing/verbs";
+import { ConnectAgent } from "@/components/connect-agent";
 import { docContent } from "@/lib/docs-content";
 import { pageMetadata, techArticleLd, breadcrumbLd } from "@/lib/seo";
 
 const SEO = {
   title: "Agent quickstart: give your agent a calendar",
   description:
-    "Run Δt, add the MCP server to Claude or any MCP client, and your agent can find, hold and book times on a real calendar without double bookings.",
+    "Connect Claude or any MCP client to delt.at/mcp, or run your own Δt, and your agent can create calendars and find, hold and book times without double bookings.",
   path: "/docs/quickstart",
 };
 
@@ -44,7 +45,7 @@ export default function AgentQuickstartPage() {
         ]}
       />
       <DocHeader title="Agent quickstart" path={SEO.path} />
-      <DocBody source={docContent("quickstart")} slots={{ AGENT_TOOLS: <AgentTools /> }} />
+      <DocBody source={docContent("quickstart")} slots={{ AGENT_TOOLS: <AgentTools />, CONNECT_AGENT: <ConnectAgent /> }} />
     </article>
   );
 }

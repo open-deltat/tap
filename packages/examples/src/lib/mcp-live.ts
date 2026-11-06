@@ -2,6 +2,7 @@ import { OidcAdapter } from "@open-deltat/mcp";
 import { authConfig, canonicalVerifier } from "./auth-config";
 import { meetings } from "./meetings";
 import { bookingPasses } from "./booking-passes-live";
+import { myCalendars } from "./my-calendars-live";
 import { publicRegistry } from "./public-registry";
 import { publicBaseUrl } from "./public-base-url";
 import { fetchVerifiedContact } from "./userinfo";
@@ -35,6 +36,7 @@ function buildDeps(): McpEndpointDeps | null {
     resourceMetadataUrl: `${publicBaseUrl}${METADATA_PATH}`,
     service: meetings,
     passes: bookingPasses,
+    calendars: myCalendars,
     calendarOf: (id) => publicRegistry.get(id),
     contactFor: (token, principal) =>
       principal.sub
@@ -56,6 +58,7 @@ export function liveMcpDeps(): McpEndpointDeps {
       resourceMetadataUrl: "",
       service: meetings,
       passes: bookingPasses,
+      calendars: myCalendars,
       calendarOf: () => undefined,
       contactFor: async () => null,
       limiter: createRateLimiter({ limit: 0, windowMs: 1 }),

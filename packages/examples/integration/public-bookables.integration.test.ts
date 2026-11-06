@@ -1,5 +1,7 @@
 /**
- * Live-server suite for the public bookable feature: `lib/bookable-service` against a real deltat.
+ * Live-server suite for public calendars against a real deltat: creating one through the one create
+ * path (`lib/my-calendars`, what the hosted MCP's create_calendar runs), then booking it through
+ * `lib/bookable-service`, and the manage links of bookables the retired anonymous form made.
  *
  * The unit tests cover the pure layers (keys, registry, sanitizing, rate limits). Everything those
  * cannot reach is here: that a weekly schedule becomes real rules, that availability slices into
@@ -25,7 +27,6 @@ import { DeltaT } from "@open-deltat/client";
 import { openBookableRegistry } from "../src/lib/public-bookables";
 import {
   commitHold,
-  createBookable,
   deleteBookable,
   holdSlot,
   listBookings,
@@ -34,6 +35,7 @@ import {
   renameBookable,
   type BookableDeps,
 } from "../src/lib/bookable-service";
+import { createMyCalendars } from "../src/lib/my-calendars";
 import type { WeekHours } from "../src/examples/builder/schedule";
 
 const PORT_ENV = process.env.DELTAT_INTEGRATION_PORT;
@@ -74,15 +76,25 @@ const WEEKDAYS_9_TO_5: WeekHours = {
   6: [],
 };
 
+const OWNER = "https://issuer.test#owner";
+
+/** The one create path: what the hosted MCP's create_calendar runs. No passes exist in this suite. */
+const calendars = () => createMyCalendars({ ...d(), bookingBase: null, revokePasses: async () => ({ ok: true, value: 0 }) });
+
 async function makeBookable(name = "Dentist chair", slotMinutes = 30) {
-  const created = await createBookable(d(), {
-    name,
-    slotMinutes,
-    timezone: "Europe/Berlin",
-    week: WEEKDAYS_9_TO_5,
-  });
-  if (!created.ok) throw new Error(`setup failed to create a bookable: ${created.error}`);
+  const created = await calendars().create(OWNER, { name, slotMinutes, timezone: "Europe/Berlin", week: WEEKDAYS_9_TO_5 });
+  if (!created.ok) throw new Error(`setup failed to create a calendar: ${created.error}`);
   return created.value;
+}
+
+/**
+ * A bookable as the retired anonymous form made it: a resource registered with a manage key and no
+ * owner. Records like this still exist on the live site, and their manage links must keep working.
+ */
+async function legacyBookable(name: string) {
+  const resource = await d().dt.resources.create({ name });
+  const { manageKey } = d().registry.register({ id: resource.id, name, slotMinutes: 30, timezone: "Europe/Berlin" });
+  return { id: resource.id, manageKey };
 }
 
 /**
@@ -143,26 +155,28 @@ describe.skipIf(!enabled)("creating a bookable", () => {
 
   test("a rejected input creates nothing", async () => {
     const before = (await d().dt.resources.get()).length;
-    const result = await createBookable(d(), {
-      name: "   ",
-      slotMinutes: 30,
-      timezone: "Europe/Berlin",
-      week: WEEKDAYS_9_TO_5,
-    });
+    const result = await calendars().create(OWNER, { name: "   ", slotMinutes: 30, timezone: "Europe/Berlin", week: WEEKDAYS_9_TO_5 });
     expect(result.ok).toBe(false);
     expect((await d().dt.resources.get()).length).toBe(before);
   });
 
   test("an unknown time zone is refused before anything is written", async () => {
     const before = (await d().dt.resources.get()).length;
-    const result = await createBookable(d(), {
-      name: "Bad zone",
-      slotMinutes: 30,
-      timezone: "Mars/Olympus_Mons",
-      week: WEEKDAYS_9_TO_5,
-    });
+    const result = await calendars().create(OWNER, { name: "Bad zone", slotMinutes: 30, timezone: "Mars/Olympus_Mons", week: WEEKDAYS_9_TO_5 });
     expect(result.ok).toBe(false);
     expect((await d().dt.resources.get()).length).toBe(before);
+  });
+
+  test("capacity and turnover reach deltat, and two places at the same time can both be booked", async () => {
+    const created = await calendars().create(OWNER, { name: "Two chairs", slotMinutes: 30, timezone: "Europe/Berlin", week: WEEKDAYS_9_TO_5, capacity: 2, bufferMinutes: 15 });
+    if (!created.ok) throw new Error(created.error);
+    const { id } = created.value;
+    expect(await d().dt.resources.find(id)).toMatchObject({ capacity: 2, bufferAfter: 15 * 60_000 });
+
+    const slot = await firstFutureSlot(id, 30);
+    expect((await holdSlot(d(), id, slot.start, slot.end)).ok).toBe(true);
+    expect((await holdSlot(d(), id, slot.start, slot.end)).ok).toBe(true);
+    expect((await holdSlot(d(), id, slot.start, slot.end)).ok).toBe(false); // the third place does not exist
   });
 });
 
@@ -192,7 +206,7 @@ describe.skipIf(!enabled)("holding and booking", () => {
   });
 
   test("committing a hold books the slot and takes it out of availability", async () => {
-    const { id, manageKey } = await makeBookable("Commit path");
+    const { id } = await makeBookable("Commit path");
     const slot = await firstFutureSlot(id, 30);
 
     const held = await holdSlot(d(), id, slot.start, slot.end);
@@ -204,31 +218,23 @@ describe.skipIf(!enabled)("holding and booking", () => {
     const after = await listSlots(d(), id, slot.dayStart, slot.dayStart + DAY_MS);
     expect(after.some((s) => s.start <= slot.start && s.end >= slot.end)).toBe(false);
 
-    const booked = await listBookings(d(), id, manageKey, {
-      start: slot.dayStart,
-      end: slot.dayStart + DAY_MS,
-    });
-    if (!booked.ok) throw new Error(booked.error);
-    expect(booked.value).toHaveLength(1);
-    expect(booked.value[0].label).toBe("Simon");
+    const booked = await d().dt.bookings.get(id, { start: slot.dayStart, end: slot.dayStart + DAY_MS });
+    expect(booked).toHaveLength(1);
+    expect(booked[0].label).toBe("Simon");
   });
 
   test("the booker's name is sanitized on its way into the WAL", async () => {
     // GAP-02: label is free text in the kernel, so this is the one stranger-supplied string that
     // reaches the log. A newline in it must not survive as a newline.
-    const { id, manageKey } = await makeBookable("Sanitized label");
+    const { id } = await makeBookable("Sanitized label");
     const slot = await firstFutureSlot(id, 30);
 
     const held = await holdSlot(d(), id, slot.start, slot.end);
     if (!held.ok) throw new Error(held.error);
     expect((await commitHold(d(), id, held.value.holdId, "Line\nBreak")).ok).toBe(true);
 
-    const booked = await listBookings(d(), id, manageKey, {
-      start: slot.dayStart,
-      end: slot.dayStart + DAY_MS,
-    });
-    if (!booked.ok) throw new Error(booked.error);
-    expect(booked.value[0].label).toBe("Line Break");
+    const booked = await d().dt.bookings.get(id, { start: slot.dayStart, end: slot.dayStart + DAY_MS });
+    expect(booked[0].label).toBe("Line Break");
   });
 
   test("an empty booker name is refused and the hold survives for a retry", async () => {
@@ -243,9 +249,16 @@ describe.skipIf(!enabled)("holding and booking", () => {
   });
 });
 
-describe.skipIf(!enabled)("ownership over the wire", () => {
+describe.skipIf(!enabled)("ownership over the wire, for bookables the old anonymous form made", () => {
+  test("their manage link still reads their bookings", async () => {
+    const { id, manageKey } = await legacyBookable("Old form");
+    const window = { start: Date.now(), end: Date.now() + DAY_MS };
+    expect(await listBookings(d(), id, manageKey, window)).toEqual({ ok: true, value: [] });
+    expect((await listBookings(d(), id, "not-the-key", window)).ok).toBe(false);
+  });
+
   test("renaming with the key updates both the registry and deltat", async () => {
-    const { id, manageKey } = await makeBookable("Before");
+    const { id, manageKey } = await legacyBookable("Before");
     const renamed = await renameBookable(d(), id, manageKey, "After");
     expect(renamed.ok).toBe(true);
 
@@ -254,7 +267,7 @@ describe.skipIf(!enabled)("ownership over the wire", () => {
   });
 
   test("a wrong key changes nothing, in the registry or in deltat", async () => {
-    const { id } = await makeBookable("Untouchable");
+    const { id } = await legacyBookable("Untouchable");
 
     expect((await renameBookable(d(), id, "not-the-key", "Hijacked")).ok).toBe(false);
     expect((await deleteBookable(d(), id, "not-the-key")).ok).toBe(false);
@@ -264,15 +277,15 @@ describe.skipIf(!enabled)("ownership over the wire", () => {
   });
 
   test("one bookable's key does not open another over the wire", async () => {
-    const mine = await makeBookable("Mine");
-    const theirs = await makeBookable("Theirs");
+    const mine = await legacyBookable("Mine");
+    const theirs = await legacyBookable("Theirs");
 
     expect((await deleteBookable(d(), theirs.id, mine.manageKey)).ok).toBe(false);
     expect((await d().dt.resources.get()).some((r) => r.id === theirs.id)).toBe(true);
   });
 
   test("deleting removes the resource from deltat and the entry from the registry", async () => {
-    const { id, manageKey } = await makeBookable("Doomed");
+    const { id, manageKey } = await legacyBookable("Doomed");
     expect((await deleteBookable(d(), id, manageKey)).ok).toBe(true);
 
     expect((await d().dt.resources.get()).some((r) => r.id === id)).toBe(false);

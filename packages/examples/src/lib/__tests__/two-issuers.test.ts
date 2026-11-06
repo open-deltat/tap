@@ -86,6 +86,7 @@ describe("one person, two issuers", () => {
           resourceMetadataUrl: "https://delt.at/.well-known/oauth-protected-resource/mcp",
           service: meetings.service,
           passes: meetings.passes,
+          calendars: meetings.calendars,
           calendarOf: (id) => meetings.registry.get(id),
           contactFor: async () => annaContact,
           limiter: createRateLimiter({ limit: 1_000, windowMs: 60_000 }),

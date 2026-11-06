@@ -99,27 +99,6 @@ export const BOOKING_PASS_INSTRUCTIONS =
 
 export function registerBookingPassTools(server: McpServer, passes: BookingPassService, caller: MeetingsCaller): void {
   server.registerTool(
-    "list_my_calendars",
-    {
-      title: "My calendars",
-      description:
-        "Use this when you own calendars and need a calendar_id, for create_booking_pass, list_booking_passes or list_meeting_requests: it lists the calendars you own, each with its name, time zone, slot length (slot_minutes) and whether it takes meeting requests. Only your own calendars are listed; anyone else gets an empty list.",
-      annotations: { readOnlyHint: true, idempotentHint: true },
-      inputSchema: {},
-    },
-    async () =>
-      ok({
-        calendars: passes.ownedCalendars(caller.principalId).map((c) => ({
-          calendar_id: c.id,
-          name: c.name,
-          timezone: c.timezone,
-          slot_minutes: c.slotMinutes,
-          takes_meeting_requests: c.takesMeetingRequests,
-        })),
-      })
-  );
-
-  server.registerTool(
     "create_booking_pass",
     {
       title: "Create a booking pass",
@@ -142,7 +121,9 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
           .min(1)
           .max(MAX_PASS_MINUTES)
           .optional()
-          .describe(`Minutes until the pass stops working. Defaults to ${DEFAULT_PASS_MINUTES}; short is normal for a one-off`),
+          .describe(
+            `Minutes until the pass stops working. Defaults to ${DEFAULT_PASS_MINUTES}; short is normal for a one-off. If the person will book later, set expires_in_minutes to cover until then`
+          ),
         label: z.string().max(60).optional().describe("A note for you about who it is for, e.g. \"for Acme's agent\". The holder never sees it"),
       },
     },

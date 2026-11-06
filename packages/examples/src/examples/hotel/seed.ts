@@ -4,18 +4,10 @@ import { dt } from "../../lib/deltat";
 import { findRootByName, baseMs, ensureOpenWindow } from "../../actions/seed-helpers";
 
 import { CHECK_IN_HOUR, CHECK_OUT_HOUR } from "./policy";
+import { NAME, ROOM_TYPES } from "./structure";
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
-const NAME = "Grand Hotel";
-
-// Room TYPES, not individual rooms: capacity = how many rooms of that type exist.
-// Booking a stay consumes one unit; the capacity sweep prevents overbooking past N.
-const TYPES = [
-  { name: "Standard Room", capacity: 5 },
-  { name: "Deluxe Room", capacity: 3 },
-  { name: "Suite", capacity: 1 },
-];
 
 export type HotelRoomType = { id: string; name: string; capacity: number };
 
@@ -29,7 +21,7 @@ export async function ensureHotel(): Promise<{ rootId: string; rooms: HotelRoomT
     await ensureOpenWindow(hotelId);
 
     const created: HotelRoomType[] = [];
-    for (const t of TYPES) {
+    for (const t of ROOM_TYPES) {
       const r = await dt.resources.create({ parentId: hotelId, name: t.name, capacity: t.capacity });
       created.push({ id: r.id, name: t.name, capacity: t.capacity });
     }

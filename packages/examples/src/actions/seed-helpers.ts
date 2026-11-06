@@ -5,13 +5,14 @@ import type { Rule } from "@open-deltat/client";
 import {
   addLocalDays,
   coveredThrough,
+  daily,
   HORIZON_DAYS,
   scheduleOccurrences,
   startOfLocalDay,
   type DaySchedule,
 } from "./schedule-window";
 
-export { addLocalDays, coveredThrough, startOfLocalDay, type DaySchedule };
+export { addLocalDays, coveredThrough, daily, startOfLocalDay, type DaySchedule };
 
 function toMeta(opts: { slotMinutes: number; price: number | null }): ResourceMeta {
   return { slotMinutes: opts.slotMinutes, price: opts.price };
@@ -144,9 +145,6 @@ export async function ensureOpenWindow(
   return { start, end: Math.max(widest.end, until) };
 }
 
-export function daily(shows: { h: number; m: number; dur: number }[]): DaySchedule {
-  return Object.fromEntries([0, 1, 2, 3, 4, 5, 6].map((d) => [d, shows]));
-}
 
 export async function findRootByName(name: string): Promise<string | null> {
   const roots = await dt.resources.get({ roots: true });
