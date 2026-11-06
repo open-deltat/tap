@@ -15,6 +15,10 @@ import {
 } from "lucide-react";
 import { enabledExamples, type ExampleMeta } from "@open-deltat/examples/manifest";
 import { pageMetadata, SITE } from "@/lib/seo";
+import { RaceModule } from "@/components/landing/race-module";
+import { DifferenceModule } from "@/components/landing/difference-module";
+import { VerbsBento } from "@/components/landing/verbs-bento";
+import { Faq } from "@/components/landing/faq";
 
 export const metadata = pageMetadata({
   title: SITE.defaultTitle,
@@ -38,28 +42,6 @@ const SPECS = [
   { k: "Holds", v: "Built in", note: "Expire on their own" },
   { k: "Protocol", v: "TAP", note: "Time Allocation Protocol, over Postgres wire" },
   { k: "Agents", v: "MCP server", note: "On the official registry" },
-] as const;
-
-const PROBLEMS = [
-  {
-    title: "Agents read, think, then write",
-    body: "An agent sees 14:30 free, spends seconds deciding and asking a human, then tries to book. By then someone else has it. Checking and booking are two moments, and the gap between them is a race.",
-  },
-  {
-    title: "Nothing can be held",
-    body: "Calendars have no way to say “keep this for me while I ask”. So agents book too early and cancel, or offer a time they cannot keep.",
-  },
-  {
-    title: "Whoever polls fastest wins",
-    body: "Every frontend copies the calendar on a timer. The site with the tightest loop beats the agent on a phone call, and every copy is a little out of date.",
-  },
-] as const;
-
-const STEPS = [
-  { tool: "find_slots", title: "Find", body: "What is free right now, across every calendar you name." },
-  { tool: "hold_slot", title: "Hold", body: "The time is reserved for minutes while the agent asks. It expires on its own." },
-  { tool: "commit_hold", title: "Commit", body: "The hold becomes a booking in one step. If it is gone, the refusal lists times that still work." },
-  { tool: "LISTEN", title: "Listen", body: "Every screen and agent hears the moment anything changes, and re-reads." },
 ] as const;
 
 type UseCase = { icon: LucideIcon; title: string; body: string; demo?: { href: string; label: string } };
@@ -153,7 +135,9 @@ const PLANS: readonly Plan[] = [
 
 export default function Home() {
   const all = enabledExamples();
-  const featured = all.filter((e) => e.group === "featured");
+  // Group bookings has its own section above the gallery, so the gallery does not repeat it.
+  const meet = all.find((e) => e.id === "meet");
+  const featured = all.filter((e) => e.group === "featured" && e.id !== "meet");
   const rest = all.filter((e) => e.group === "seats" || e.group === "spaces");
 
   return (
@@ -176,8 +160,9 @@ export default function Home() {
               Real-Time Calendars for Agents
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-pretty text-[17px] leading-relaxed text-dt-ink-2 sm:text-lg">
-              One calendar is the source of truth. Every agent and every frontend reads it live, holds a slot while
-              it decides, and books it in one step. Nobody polls. Nothing is ever booked twice.
+              A calendar is a list that gets copied around. Δt is a database of time. Agents query it, hold a slot
+              while they decide, and commit in one step. Every screen hears it the moment it is written. Nothing is
+              ever booked twice.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a href="#pricing" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-dt-ink px-7 text-[15px] font-semibold text-dt-on-ink transition-[background-color,transform] duration-150 hover:bg-dt-ink/85 active:scale-[0.98] sm:w-auto">
@@ -193,7 +178,7 @@ export default function Home() {
             </div>
           </div>
 
-          <RaceVisual />
+          <RaceModule />
         </section>
 
         {/* Spec strip */}
@@ -209,43 +194,42 @@ export default function Home() {
           </dl>
         </section>
 
-        {/* Problem */}
-        <Section eyebrow="The problem" title="Calendars were built for people clicking. Agents race.">
-          <div className="grid gap-4 md:grid-cols-3">
-            {PROBLEMS.map((p, i) => (
-              <div key={p.title} className="rounded-3xl border border-dt-line bg-dt-surface p-6 shadow-dt-surface">
-                <div className="font-mono text-[12px] text-dt-ink-3">0{i + 1}</div>
-                <h3 className="mt-3 text-[17px] font-semibold tracking-tight">{p.title}</h3>
-                <p className="mt-2 text-[14.5px] leading-relaxed text-dt-ink-2">{p.body}</p>
-              </div>
-            ))}
-          </div>
+        {/* The difference: why "my calendar already does that" is not true */}
+        <Section
+          eyebrow="Why not my calendar?"
+          title="A calendar is a list. Δt is a database of time."
+          lead="Google Calendar, Outlook and every .ics feed hand you a list of events and leave the rest to you. An agent needs an answer, a hold, and a write that fails when it should. Ask both the same four things."
+        >
+          <DifferenceModule />
         </Section>
 
         {/* How it works */}
         <Section eyebrow="How it works" title="Four verbs. No race left to lose.">
-          <div className="grid gap-6 lg:grid-cols-[1fr_1.05fr] lg:items-start">
-            <ol className="grid gap-3">
-              {STEPS.map((s, i) => (
-                <li key={s.tool} className="flex gap-4 rounded-3xl border border-dt-line bg-dt-surface p-5 shadow-dt-surface">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-dt-ink font-mono text-[13px] font-semibold text-dt-on-ink">{i + 1}</span>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                      <h3 className="text-[16px] font-semibold tracking-tight">{s.title}</h3>
-                      <code className="font-mono text-[12px] text-dt-accent-ink">{s.tool}</code>
-                    </div>
-                    <p className="mt-1 text-[14.5px] leading-relaxed text-dt-ink-2">{s.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-            <CodeCard />
-          </div>
+          <VerbsBento />
           <p className="mt-8 max-w-3xl text-[15px] leading-relaxed text-dt-ink-2">
             Underneath is Δt, a database whose one rule is that two bookings never occupy the same time. The refusal
             comes from the storage engine, not from code that checked first and hoped. It speaks TAP, the Time
             Allocation Protocol, over the Postgres wire, so the Postgres driver you already use connects to it.
           </p>
+        </Section>
+
+        {/* The question a calendar cannot answer, asked of the live example */}
+        <Section
+          eyebrow="Ask time a question"
+          title="When are five people free for an hour? One query."
+          lead="A calendar can list what is in it. It cannot answer this. Δt computes the gaps across every calendar you name on each read, and holds the answer while you confirm. This is the live example, running on Δt now: pick a length."
+        >
+          <div className="overflow-hidden rounded-[28px] border border-dt-line bg-dt-canvas shadow-dt-float">
+            <iframe src="/embed/meet" title="Group bookings, live" loading="lazy" className="block h-[820px] w-full border-0 sm:h-[860px]" />
+          </div>
+          {meet && (
+            <div className="mt-4 text-center">
+              <a href={meet.href} className="inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-dt-ink hover:text-dt-accent-ink">
+                Open the full example
+                <ArrowRight className="h-4 w-4" />
+              </a>
+            </div>
+          )}
         </Section>
 
         {/* Use cases */}
@@ -325,7 +309,7 @@ export default function Home() {
 
         {/* Live examples */}
         <Section id="examples" eyebrow="See it live" title="Every example runs on Δt, right now.">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             {featured.map((e) => (
               <FeaturedCard key={e.id} e={e} />
             ))}
@@ -335,6 +319,11 @@ export default function Home() {
               <RowCard key={e.id} e={e} />
             ))}
           </div>
+        </Section>
+
+        {/* FAQ */}
+        <Section eyebrow="Questions" title="The ones people ask with their calendar open in the next tab.">
+          <Faq />
         </Section>
 
         {/* Closing CTA */}
@@ -379,101 +368,16 @@ export default function Home() {
   );
 }
 
-function Section({ id, eyebrow, title, children }: { id?: string; eyebrow: string; title: string; children: ReactNode }) {
+function Section({ id, eyebrow, title, lead, children }: { id?: string; eyebrow: string; title: string; lead?: string; children: ReactNode }) {
   return (
     <section id={id} className="mx-auto max-w-6xl scroll-mt-16 px-5 py-16 sm:px-6 sm:py-24">
       <div className="mb-10 max-w-2xl sm:mb-12">
         <div className="text-[13px] font-medium text-dt-accent-ink">{eyebrow}</div>
         <h2 className="mt-2 text-balance text-[1.9rem] font-semibold leading-[1.08] tracking-[-0.03em] sm:text-[2.6rem]">{title}</h2>
+        {lead && <p className="mt-4 text-pretty text-[16px] leading-relaxed text-dt-ink-2">{lead}</p>}
       </div>
       {children}
     </section>
-  );
-}
-
-// The race every agent loses on a polled calendar, drawn as Δt answers it: the first hold wins, and
-// the second agent gets a refusal that already carries times that still work (counter-offers ship
-// in the kernel and the MCP server today).
-function RaceVisual() {
-  const slots = ["13:30", "14:00", "14:30", "15:00", "15:30", "16:00"];
-  return (
-    <div className="relative mx-auto mt-16 max-w-4xl sm:mt-20">
-      <div className="rounded-[28px] border border-dt-line bg-dt-surface p-3 shadow-dt-float sm:p-4">
-        <div className="flex items-center justify-between px-2 pb-3 pt-1 sm:px-3">
-          <div className="flex items-center gap-2 text-[13px] font-medium">
-            <span className="dt-breathe h-2 w-2 rounded-full bg-dt-accent" />
-            Dr. Chen · Tuesday
-          </div>
-          <span className="font-mono text-[11.5px] text-dt-ink-3">resource 01J9…K2 · live</span>
-        </div>
-        <div className="grid grid-cols-3 gap-1.5 rounded-2xl bg-dt-sunken p-1.5 sm:grid-cols-6">
-          {slots.map((t) => {
-            const held = t === "14:30";
-            const taken = t === "13:30";
-            return (
-              <div
-                key={t}
-                className={
-                  held
-                    ? "relative rounded-xl bg-dt-ink py-3 text-center text-[13.5px] font-semibold tabular-nums text-dt-on-ink"
-                    : taken
-                      ? "rounded-xl py-3 text-center text-[13.5px] tabular-nums text-dt-ink-3/60 line-through"
-                      : "rounded-xl bg-dt-surface py-3 text-center text-[13.5px] font-medium tabular-nums text-dt-ink-2"
-                }
-              >
-                {t}
-                {held && <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full border-2 border-dt-surface bg-dt-accent" />}
-              </div>
-            );
-          })}
-        </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <AgentCard who="Agent A" via="voice call" call="hold_slot 14:30" ok result="held · expires in 4:59" />
-          <AgentCard who="Agent B" via="web chat" call="hold_slot 14:30" result="CONFLICT · offers 15:00, 15:30" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AgentCard({ who, via, call, result, ok }: { who: string; via: string; call: string; result: string; ok?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-dt-line p-4">
-      <div className="flex items-center justify-between text-[13px]">
-        <span className="font-semibold">{who}</span>
-        <span className="text-dt-ink-3">{via}</span>
-      </div>
-      <div className="mt-3 font-mono text-[12.5px] text-dt-ink-2">→ {call}</div>
-      <div className={`mt-1 font-mono text-[12.5px] ${ok ? "text-dt-accent-ink" : "text-dt-held-ink"}`}>
-        ← {result}
-      </div>
-    </div>
-  );
-}
-
-function CodeCard() {
-  return (
-    <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#0b0b0f] shadow-dt-float">
-      <div className="flex items-center gap-1.5 border-b border-white/10 px-4 py-3">
-        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-        <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
-        <span className="ml-2 font-mono text-[11.5px] text-[#8b8b95]">commit_hold → refused</span>
-      </div>
-      <pre className="overflow-x-auto p-5 font-mono text-[12.5px] leading-relaxed text-[#e4e4e7]">
-        <code>
-          {"{\n"}
-          {"  "}<span className="text-[#7dd3fc]">&quot;error&quot;</span>: <span className="text-[#6ee7b7]">&quot;CONFLICT&quot;</span>,{"\n"}
-          {"  "}<span className="text-[#7dd3fc]">&quot;booked&quot;</span>: <span className="text-[#c4b5fd]">false</span>, <span className="text-[#7dd3fc]">&quot;reserved&quot;</span>: <span className="text-[#c4b5fd]">false</span>,{"\n"}
-          {"  "}<span className="text-[#7dd3fc]">&quot;alternatives&quot;</span>: [{"\n"}
-          {"    "}{"{ "}<span className="text-[#7dd3fc]">&quot;start_local&quot;</span>: <span className="text-[#6ee7b7]">&quot;Tue, 3:00 pm&quot;</span>{" },\n"}
-          {"    "}{"{ "}<span className="text-[#7dd3fc]">&quot;start_local&quot;</span>: <span className="text-[#6ee7b7]">&quot;Tue, 3:30 pm&quot;</span>{" }\n"}
-          {"  ],\n"}
-          {"  "}<span className="text-[#7dd3fc]">&quot;next&quot;</span>: <span className="text-[#6ee7b7]">&quot;Offer one, then hold it.&quot;</span>{"\n"}
-          {"}"}
-        </code>
-      </pre>
-    </div>
   );
 }
 

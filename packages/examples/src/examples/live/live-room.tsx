@@ -110,8 +110,9 @@ export function LiveRoom() {
         {(streamStatus === "expiring" || streamStatus === "paused") && (
           <StreamNotice status={streamStatus} onResume={() => setStreamKey((k) => k + 1)} />
         )}
-        {/* Two independent bookers: side-by-side on desktop, stacked top/bottom on mobile. */}
-        <div key={streamKey} className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Two independent bookers on the one surface, parted by a hairline: beside each other on
+            desktop, one above the other on a phone. */}
+        <div key={streamKey} className="grid grid-cols-1 divide-y divide-dt-line lg:grid-cols-2 lg:divide-x lg:divide-y-0">
           <Booker
             label="You"
             person="you"
@@ -302,15 +303,10 @@ function Booker({
 
   return (
     <>
-      {/* A well, not a card: the Stage surface is already the card, so the two screens sit in it as
-          sunken panels. A notify from the other screen lights the panel's ring once. */}
-      <div
-        className={cn(
-          "rounded-3xl bg-dt-sunken p-3 ring-1 ring-inset transition-[box-shadow] duration-300 sm:p-4",
-          live ? "ring-dt-accent/60" : "ring-transparent"
-        )}
-      >
-        <div className="flex items-center justify-between gap-3 px-1">
+      {/* No box of its own: the Stage surface is the card. A notify from the other screen lights the
+          Live pill for a moment, which is the only thing that changes. */}
+      <div className="py-5 first:pt-0 last:pb-0 lg:px-6 lg:py-0 lg:first:pl-0 lg:last:pr-0">
+        <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[15px] font-semibold tracking-tight text-dt-ink">
               <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", PERSON[person])} />
@@ -325,7 +321,7 @@ function Booker({
           <span
             className={cn(
               "flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors duration-300",
-              live ? "bg-dt-accent-soft text-dt-accent-ink" : "bg-dt-surface text-dt-ink-3"
+              live ? "bg-dt-accent-soft text-dt-accent-ink" : "bg-dt-sunken text-dt-ink-3"
             )}
           >
             <Wifi className="h-3.5 w-3.5" />
@@ -335,7 +331,7 @@ function Booker({
 
         <PerfBar perf={perf} />
 
-        <div className="mt-3 rounded-2xl bg-dt-surface p-3 text-dt-ink sm:p-5">
+        <div className="mt-4 text-dt-ink">
           {noSurface ? (
             <EmptySurface />
           ) : (
@@ -356,14 +352,14 @@ function Booker({
         {/* Always rendered, so the 0-to-1 selection never changes the card height: the Book button
             (fixed h-10) is always present, and the chips replace the hint in the same row. It only
             grows if many chips wrap, which is genuine content, not a pop-in. */}
-        <div className="mt-3 flex flex-wrap items-center gap-3 px-1">
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-dt-line pt-4">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
             {slot && selectedSeats.size > 0 ? (
               Array.from(selectedSeats)
                 .map((id) => ({ id, name: seatName(id), price: sectionOf(id)?.price }))
                 .sort((x, y) => x.name.localeCompare(y.name))
                 .map(({ id, name, price }) => (
-                  <span key={id} className="dt-rise inline-flex h-7 items-center gap-1 rounded-full bg-dt-surface px-2.5 text-[12.5px] font-medium tabular-nums text-dt-ink">
+                  <span key={id} className="dt-rise inline-flex h-7 items-center gap-1 rounded-full bg-dt-sunken px-2.5 text-[12.5px] font-medium tabular-nums text-dt-ink">
                     {name}
                     {price != null && <span className="text-dt-ink-3">${price}</span>}
                   </span>
@@ -400,9 +396,9 @@ function PerfBar({ perf }: { perf: { read?: number; book?: number; live?: number
     { label: "Book", hint: "Every held seat booked in one step", value: perf.book },
   ];
   return (
-    <div className="mt-3 grid grid-cols-3 gap-1.5">
+    <div className="mt-4 grid grid-cols-3 divide-x divide-dt-line border-y border-dt-line py-2.5">
       {stats.map((s) => (
-        <span key={s.label} className="rounded-xl bg-dt-surface/70 px-3 py-2" title={s.hint}>
+        <span key={s.label} className="px-3 first:pl-0" title={s.hint}>
           <span className="block text-[11.5px] text-dt-ink-3">{s.label}</span>
           <span className="mt-0.5 block font-mono text-[13px] font-semibold tabular-nums text-dt-ink">
             {s.value != null ? fmtMs(s.value) : <span className="font-sans font-normal text-dt-ink-3">waiting</span>}
