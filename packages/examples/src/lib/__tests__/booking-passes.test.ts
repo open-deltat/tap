@@ -244,6 +244,49 @@ describe("the first agent to hold claims the pass", () => {
     expect(must(passes.list({ owner: OWNER }))).toEqual([expect.objectContaining({ id: pass.id, claimedBy: "Gina Guest" })]);
   });
 
+  test("a first hold that fails gives the claim back, so one bad hold cannot lock the intended agent out", async () => {
+    const { mint, passes, state } = setup();
+    const { token } = mint();
+    const claimer = () => must(passes.list({ owner: OWNER }))[0]?.claimedBy;
+
+    state.free = []; // the time is not free
+    expect((await passes.hold({ token, caller: STRANGER, start: T, name: async () => "Eve" })).ok).toBe(false);
+    expect(claimer()).toBeNull();
+    state.free = [{ start: NOW, end: NOW + 7 * DAY }];
+    state.holdFails = true; // the kernel refuses the placement
+    expect((await passes.hold({ token, caller: STRANGER, start: T, name: async () => "Eve" })).ok).toBe(false);
+    expect(claimer()).toBeNull();
+
+    state.holdFails = false;
+    must(await passes.hold({ token, caller: GUEST, start: T, name: async () => "Gina Guest" }));
+    expect(claimer()).toBe("Gina Guest");
+  });
+
+  test("a claimer whose later hold fails keeps the claim", async () => {
+    const { mint, passes, state } = setup();
+    const { token } = mint();
+    must(await passes.hold({ token, caller: GUEST, start: T, name: async () => "Gina Guest" }));
+    state.holdFails = true;
+    expect((await passes.hold({ token, caller: GUEST, start: T + 60 * MIN })).ok).toBe(false);
+    expect(must(passes.list({ owner: OWNER }))[0]?.claimedBy).toBe("Gina Guest");
+    expect(await passes.findTimes({ token, caller: STRANGER })).toEqual({ ok: false, error: PASS_NOT_VALID });
+  });
+
+  test("the claim is not given back while the claimer has another hold on its way", async () => {
+    const { mint, passes, state } = setup();
+    const { token } = mint();
+    state.latencyMs = 10;
+    // Two holds by the same agent at once: the first takes the claim and fails, the second lands.
+    state.free = [{ start: T + 60 * MIN, end: T + 120 * MIN }];
+    const [failed, landed] = await Promise.all([
+      passes.hold({ token, caller: GUEST, start: T, name: async () => "Gina Guest" }),
+      passes.hold({ token, caller: GUEST, start: T + 60 * MIN, name: async () => "Gina Guest" }),
+    ]);
+    expect(failed?.ok).toBe(false);
+    expect(landed?.ok).toBe(true);
+    expect(must(passes.list({ owner: OWNER }))[0]?.claimedBy).toBe("Gina Guest");
+  });
+
   test("two agents holding at once on an unclaimed pass: one claims it, the other is refused", async () => {
     const { mint, passes, state } = setup();
     const { token } = mint();

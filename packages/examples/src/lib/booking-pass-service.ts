@@ -34,8 +34,11 @@ export interface PassDeps {
   now?: () => number;
 }
 
-/** The one answer for a pass that is wrong, expired, spent or revoked: which one is not said. */
-export const PASS_NOT_VALID = "That pass is not valid any more.";
+/**
+ * The one answer for a pass that is wrong, expired, spent, revoked or someone else's: which one is
+ * not said. Not "any more": a wrong string never worked, and the wording must not tell it apart.
+ */
+export const PASS_NOT_VALID = "That pass is not valid. Ask the person who sent it for a new one.";
 export const PASS_PREFIX = "dtp_";
 /** 256 bits; base64url of 32 bytes is 43 characters, so a pass is 47 with its prefix. */
 const PASS_BYTES = 32;
@@ -56,7 +59,7 @@ const MAX_NOTE_LENGTH = 500;
 const MIN = 60_000;
 const DAY_MS = 86_400_000;
 
-const BUSY = "Another booking with this pass is going through. Retry once; if the pass is then not valid any more, the other booking used it.";
+const BUSY = "Another booking with this pass is going through. Retry once; if the pass is then not valid, the other booking used it.";
 const NOT_THIS_PASS = "That hold was not made with this pass, or it is already booked or released.";
 
 const fail = <T>(error: string): Outcome<T> => ({ ok: false, error });
@@ -366,8 +369,17 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       // The first hold claims the pass, before anything is placed, so two agents racing for an
       // unclaimed pass cannot both get a hold: the loser finds it claimed, which reads as not valid.
       const claimerName = pass.claim || !name ? null : await name().catch(() => null);
+      const claimedBefore = deps.store.get(pass.id)?.claim ?? null;
       const current = pass.claim ? pass : deps.store.claim(pass.id, { principal: caller, name: claimerName });
       if (!current) return refuse(pass, caller, PASS_NOT_VALID);
+      // Only a hold that lands keeps a claim this call took; otherwise one deliberately bad hold by
+      // anyone holding the string would lock the intended agent out. Kept while another hold of the
+      // claimer's is still on its way: that one may land, and it is theirs.
+      const tookClaim = claimedBefore === null;
+      const refuseAndGiveBack = (message: string) => {
+        if (tookClaim && placingFor(pass.id) === 1) deps.store.unclaim(pass.id, caller);
+        return refuse<{ scope: PassScope; holdId: string; start: number; end: number; expiresAt: number }>(pass, caller, message);
+      };
       if (liveHolds(current, at).length + placingFor(pass.id) >= MAX_LIVE_HOLDS_PER_PASS) {
         return refuse(pass, caller, `This pass already holds ${MAX_LIVE_HOLDS_PER_PASS} times. Book one or release one first.`);
       }
@@ -375,12 +387,12 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       adjustPlacing(pass.id, 1);
       try {
         const free = await deps.dt.availability.get({ resourceId: pass.calendarId, start, end }).catch(() => null);
-        if (!free || !covers(free, start, end)) return refuse(pass, caller, "That time is not free. Pick another from find_times_with_pass.");
+        if (!free || !covers(free, start, end)) return refuseAndGiveBack("That time is not free. Pick another from find_times_with_pass.");
         // Ours to set, and never past the pass: a hold that outlived its pass would squat on a time
         // nobody can book with it any more.
         const expiresAt = Math.min(now() + HOLD_TTL_MS, pass.expiresAt);
         const placed = await deps.dt.holds.place({ resourceId: pass.calendarId, start, end, expiresAt }).catch(() => null);
-        if (!placed) return refuse(pass, caller, "Someone else is holding that time right now. Pick another.");
+        if (!placed) return refuseAndGiveBack("Someone else is holding that time right now. Pick another.");
         const added = deps.store.addHold(pass.id, { holdId: placed.id, start, end, expiresAt: placed.expiresAt, placedBy: caller });
         if (!added) {
           // Spent or revoked while the hold was being placed: give the time straight back.

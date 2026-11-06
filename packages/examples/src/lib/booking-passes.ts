@@ -112,6 +112,11 @@ export interface BookingPassStore {
    * someone else claimed it first or the pass is no longer active.
    */
   claim(id: string, claim: PassClaim): BookingPass | undefined;
+  /**
+   * Give a claim back after the hold that took it failed. Only this principal's claim, and only while
+   * no hold of theirs on the pass is live or booked. Undefined when nothing was given back.
+   */
+  unclaim(id: string, principal: string): BookingPass | undefined;
   /** Every pass on a calendar, newest first. */
   listForCalendar(calendarId: string): BookingPass[];
   /** Record a hold placed under an active pass. Undefined when the pass is no longer active. */
@@ -299,6 +304,13 @@ export function openBookingPassStore(
       if (!pass || pass.state.status !== "active") return undefined;
       if (pass.claim) return pass.claim.principal === claim.principal ? pass : undefined;
       return save({ ...pass, claim });
+    },
+
+    unclaim(id, principal) {
+      const pass = passes.get(id);
+      if (!pass?.claim || pass.claim.principal !== principal) return undefined;
+      if (pass.holds.some((h) => h.placedBy === principal && h.outcome.status !== "released")) return undefined;
+      return save({ ...pass, claim: null });
     },
 
     listForCalendar(calendarId) {

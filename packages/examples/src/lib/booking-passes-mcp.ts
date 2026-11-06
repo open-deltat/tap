@@ -93,7 +93,7 @@ const describeSlot = (slot: AvailabilitySlot, timeZone: string) => ({
 });
 
 export const BOOKING_PASS_INSTRUCTIONS =
-  "If someone gave you a booking pass (a code starting dtp_), book with it directly: find_times_with_pass, then hold_with_pass, then book_with_pass, which spends the pass. If you own a calendar, create_booking_pass mints one for you to send to the person you choose, list_booking_passes shows them, and revoke_booking_pass stops one.";
+  "If someone gave you a booking pass (a code starting dtp_), book with it directly: find_times_with_pass, then hold_with_pass, then book_with_pass, which spends the pass. If you own a calendar, create_booking_pass mints one for you to send to the person you choose, list_booking_passes shows them, and revoke_booking_pass stops one. A pass belongs to the first agent that holds a time with it. If a pass is refused, do not retry; ask for a new one. Quote the `when` field to people; start/end are UTC.";
 
 export function registerBookingPassTools(server: McpServer, passes: BookingPassService, caller: MeetingsCaller): void {
   server.registerTool(
@@ -101,7 +101,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
     {
       title: "Create a booking pass",
       description:
-        `Use this when you own a calendar and want someone's agent to book a time on it directly, without sending a meeting request. It returns a booking pass (a code starting dtp_) exactly once and never again: send it to that person yourself, however you like (Δt never sends it). The first agent to hold a time with it claims it; nobody else can use it after that. It allows bookings only inside the window [from, to), only for the lengths you allow, for \`uses\` bookings (default 1, at most ${MAX_PASS_USES}), and stops working after expires_in_minutes (default ${DEFAULT_PASS_MINUTES}; short is normal for a one-off, at most 7 days). Revoke it any time with revoke_booking_pass.`,
+        `Use this when you own a calendar and want someone's agent to book a time on it directly, without sending a meeting request. It returns a booking pass (a code starting dtp_) exactly once and never again: send it to that person yourself, however you like (Δt never sends it). The first agent to hold a time with it claims it; nobody else can use it after that. It allows bookings only inside the window [from, to): one continuous window; the whole meeting must fit inside it. For two separate mornings, make two passes. It allows only the lengths you allow, for \`uses\` bookings (default 1, at most ${MAX_PASS_USES}), and stops working after expires_in_minutes (default ${DEFAULT_PASS_MINUTES}; short is normal for a one-off, at most 7 days). Revoke it any time with revoke_booking_pass.`,
       inputSchema: {
         calendar_id: z.string().max(64),
         from: Instant.describe("Start of the window the booking must fall in (RFC 3339 with an offset)"),
@@ -152,7 +152,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
     {
       title: "My booking passes",
       description:
-        "Use this when you own a calendar and want to see the booking passes you created: each one's status, bookings left, expiry, who claimed it (claimed_by), and what was booked with it and by whom. Statuses: active: usable; spending: a booking is going through; spent: every booking it allowed is made; revoked: you stopped it; expired: its time ran out. The passes themselves are never shown again; use pass_id to revoke one.",
+        "Use this when you own a calendar and want to see the booking passes you created: each one's status, bookings left, expiry, who claimed it (claimed_by), and what was booked with it and by whom. Statuses: active: usable; spending: a booking is going through; spent: every booking it allowed is made; revoked: you stopped it; expired: its time ran out. claimed_by is the sign-in name of the agent that claimed the pass; booked_by is the name it gave for the meeting. They can differ. The passes themselves are never shown again; use pass_id to revoke one.",
       annotations: { readOnlyHint: true, idempotentHint: true },
       inputSchema: { calendar_id: z.string().max(64).optional().describe("Only this calendar. Defaults to every calendar you own") },
     },
@@ -182,7 +182,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
     {
       title: "Find times a pass can book",
       description:
-        `Use this first when someone gave you a booking pass (a code starting dtp_): it lists the free windows on that calendar inside what the pass allows, the meeting lengths it allows, and how many bookings it has left. Then call hold_with_pass, then book_with_pass. Free now does not mean yours until it is held. A pass that is wrong, expired, used up, revoked or claimed by another agent gets the one answer "${PASS_NOT_VALID}"; ask the person who sent it for a new one.`,
+        `Use this first when someone gave you a booking pass (a code starting dtp_): it lists the free windows on that calendar inside what the pass allows, the meeting lengths it allows, and how many bookings it has left. Then call hold_with_pass, then book_with_pass. Free now does not mean yours until it is held. A pass that is wrong, expired, used up, revoked or claimed by another agent gets the one answer "${PASS_NOT_VALID}"`,
       annotations: { readOnlyHint: true, idempotentHint: true },
       inputSchema: {
         pass: Pass,
