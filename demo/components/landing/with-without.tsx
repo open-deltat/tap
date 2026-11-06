@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { CalendarDays, Check, RefreshCw } from "lucide-react";
+import { Check, RefreshCw } from "lucide-react";
+import { AppleMark, GoogleCalendarMark, OutlookMark } from "./brand-icons";
 
 const ROWS = ["14:00", "14:30", "15:00", "15:30"] as const;
 type Row = (typeof ROWS)[number];
@@ -9,7 +10,11 @@ type Row = (typeof ROWS)[number];
 // refused with a time that still worked and took it. Static on purpose, so the whole point is there
 // in one look, and nothing under it explains it. The refusal with alternatives is what the kernel
 // and the MCP server answer today.
-const OLD_WORLD = ["Google Calendar", "Apple Calendar", "Outlook"] as const;
+const OLD_WORLD = [
+  { name: "Google Calendar", Mark: GoogleCalendarMark },
+  { name: "Apple Calendar", Mark: AppleMark },
+  { name: "Outlook", Mark: OutlookMark },
+] as const;
 
 export function WithWithout() {
   return (
@@ -17,9 +22,9 @@ export function WithWithout() {
       <div className="grid gap-x-3 gap-y-8 md:grid-cols-2">
         <div>
           <div className="mb-3 flex h-8 flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[12.5px] text-dt-ink-3">
-            {OLD_WORLD.map((name) => (
-              <span key={name} className="inline-flex items-center gap-1.5">
-                <CalendarDays className="h-3.5 w-3.5" strokeWidth={1.75} />
+            {OLD_WORLD.map(({ name, Mark }) => (
+              <span key={name} className="inline-flex items-center gap-1.5 text-dt-ink-2">
+                <Mark className="h-3.5 w-3.5" />
                 {name}
               </span>
             ))}
