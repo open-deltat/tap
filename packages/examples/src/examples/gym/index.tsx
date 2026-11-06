@@ -199,7 +199,8 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
         <CalendarDatePagination min={nav.min} max={nav.max} />
       </CalendarDate>
 
-      <div className="overflow-hidden rounded-2xl border border-dt-line bg-dt-surface">
+      {/* The grid's own lines do the separating; no box around the month. */}
+      <div className="border-y border-dt-line">
         <CalendarHeader />
         <div className="relative">
           {loading && (
@@ -242,12 +243,9 @@ function GymCalendar({ range, failed }: { range: { start: number; end: number } 
             {selectedClasses.length === 0 ? (
               <div className="text-sm text-dt-ink-3">No classes scheduled.</div>
             ) : (
-              <ul className="flex max-h-[16rem] flex-col gap-2 overflow-y-auto">
+              <ul className="max-h-[16rem] divide-y divide-dt-line overflow-y-auto border-t border-dt-line">
                 {selectedClasses.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex items-start gap-3 rounded-2xl border border-dt-line bg-dt-sunken px-4 py-3"
-                >
+                <li key={c.id} className="flex items-start gap-3 py-3">
                   <span
                     className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
                     style={{ backgroundColor: colorFor(c) }}
