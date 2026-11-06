@@ -569,4 +569,65 @@ describe("when the kernel's answer is lost or crosses another call", () => {
     expect((await passes.book({ token, caller: GUEST, holdId: "foreign", bookedBy: "Gina" })).ok).toBe(false);
     expect(state.bookings).toEqual([]);
   });
+
+  test("a commit that lands late, after the error and before anything else, is found and spends the pass", async () => {
+    const { mint, passes, state } = setup();
+    const { token } = mint();
+    const held = must(await passes.hold({ token, caller: GUEST, start: T }));
+    state.commitLandsLate = true;
+    const booked = must(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina" }));
+    state.commitLandsLate = false;
+    expect(booked).toMatchObject({ bookingId: "booking1", usesLeft: 0 });
+    expect(await passes.hold({ token, caller: GUEST, start: T + 60 * MIN })).toEqual({ ok: false, error: PASS_NOT_VALID });
+    expect(state.bookings).toHaveLength(1);
+  });
+
+  test("after an unclear commit, a release that fails leaves nothing decided: the pass stops", async () => {
+    const { mint, passes, state } = setup();
+    const { token } = mint({ uses: 2 });
+    const held = must(await passes.hold({ token, caller: GUEST, start: T }));
+    state.commitNotSent = true;
+    state.releaseFails = "reset";
+    expect(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina" })).toEqual({ ok: false, error: COULD_NOT_CONFIRM });
+    state.commitNotSent = false;
+    state.releaseFails = null;
+    expect(await passes.hold({ token, caller: GUEST, start: T + 60 * MIN })).toEqual({ ok: false, error: PASS_NOT_VALID });
+  });
+
+  test("after an unclear commit, a release that finds the hold already gone lets the bookings decide", async () => {
+    const { mint, passes, state } = setup();
+    const { token } = mint();
+    const held = must(await passes.hold({ token, caller: GUEST, start: T }));
+    state.commitReplyLost = true;
+    state.releaseFails = "gone";
+    expect(must(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina" }))).toMatchObject({ bookingId: "booking1", usesLeft: 0 });
+  });
+
+  test("a connection error whose text happens to say 'expired' is not taken for the kernel's refusal", async () => {
+    const { mint, passes, state, dt } = setup();
+    const { token } = mint();
+    const held = must(await passes.hold({ token, caller: GUEST, start: T }));
+    const holds = dt.holds as unknown as { commit: (id: string, o?: { label?: string }) => Promise<{ bookingId: string }> };
+    const real = holds.commit.bind(holds);
+    holds.commit = async (id, o) => {
+      await real(id, o); // the kernel applied it
+      throw Object.assign(new Error("socket expired while reading the reply"), { code: "ECONNRESET" });
+    };
+    expect(must(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina" }))).toMatchObject({ usesLeft: 0 });
+    expect(state.bookings).toHaveLength(1);
+  });
+
+  test("a release whose hold was booked while it was out says so instead of answering released", async () => {
+    const { mint, passes, dt, state } = setup();
+    const { token } = mint({ uses: 2 });
+    const held = must(await passes.hold({ token, caller: GUEST, start: T }));
+    const gate = { open: () => {} };
+    const holds = dt.holds as unknown as { release: (id: string) => Promise<void> };
+    holds.release = () => new Promise<void>((resolve) => (gate.open = resolve));
+    const release = passes.release({ token, caller: GUEST, holdId: held.holdId });
+    must(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina" }));
+    gate.open();
+    expect(await release).toMatchObject({ ok: false });
+    expect(state.bookings).toHaveLength(1);
+  });
 });

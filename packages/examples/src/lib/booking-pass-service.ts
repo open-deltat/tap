@@ -17,8 +17,8 @@ import { passStatus, usesLeft, type BookingPass, type BookingPassStore, type Pas
 // Booking spends the pass in the same decision: the pass moves to `spending` before the kernel
 // commit and nothing else can start a booking on it until that commit has answered. Only a definite
 // refusal (the hold is unknown or expired) puts the pass back to active with its uses intact. A lost
-// reply proves nothing, so the hold and bookings are read back to see what landed; if even that
-// fails, the pass stays `spending` and stops working (INV-01's direction: a lost pass, never an extra
+// reply proves nothing, so the hold is released first (ordering any late commit) and then the
+// bookings are read to see what landed; if either fails, the pass stays `spending` and stops working (INV-01's direction: a lost pass, never an extra
 // booking), and its owner may revoke it. The hold and commit calls are the ones
 // meeting approval makes (meeting-request-service.ts), so the kernel's refusal of an overlapping hold
 // stays the real double-booking guard.
@@ -76,7 +76,10 @@ type CommitOutcome = { readonly kind: "booked"; readonly bookingId: string } | {
  * the pass straight back; a lost connection proves nothing, because the commit may have landed.
  */
 function isDefiniteRefusal(err: unknown): boolean {
-  if (sqlstateOf(err) === null) return false;
+  // A real SQLSTATE is five digits or capitals; a socket error code ("ECONNRESET") is not, and its
+  // message must never be read as the kernel's answer.
+  const state = sqlstateOf(err);
+  if (state === null || !/^[0-9A-Z]{5}$/.test(state)) return false;
   const { code } = classifyRefusal(err);
   return code === "EXPIRED" || code === "NOT_FOUND";
 }
@@ -254,17 +257,22 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
   };
 
   /**
-   * After a commit failed without a definite refusal, find out what it did. A commit consumes its hold
-   * and leaves a booking on the same span under the same label, so: the hold still there means it did
-   * not land; a booking on exactly that span with our label means it did; neither means the hold
-   * lapsed. If the reads fail too, nobody knows, and the pass must stop rather than book again.
+   * After a commit failed without a definite refusal, settle what it did. Release the hold FIRST: a
+   * commit the kernel received may still be applied after the error reached us, so any read taken
+   * now is a snapshot it can overtake. Once the kernel has answered the release, a late commit is
+   * ordered before it (and is visible as a booking) or after it (and finds no hold, so books
+   * nothing). Then a booking on exactly that span under our label means it landed; none means it did
+   * not. A release that fails, other than "that hold is gone" (which also leaves the bookings to
+   * decide), or a read that fails, leaves it unknown: the pass must stop rather than book again.
    */
-  const confirmCommit = async (calendarId: string, hold: PassHold, label: string): Promise<CommitOutcome> => {
-    const span = { start: hold.start, end: hold.end };
-    const read = await Promise.all([deps.dt.holds.get(calendarId, span), deps.dt.bookings.get(calendarId, span)]).catch(() => null);
-    if (!read) return { kind: "unknown" };
-    const [holds, bookings] = read;
-    if (holds.some((h) => h.id === hold.holdId)) return { kind: "not_booked" };
+  const settleUnclearCommit = async (calendarId: string, hold: PassHold, label: string): Promise<CommitOutcome> => {
+    const released = await deps.dt.holds.release(hold.holdId).then(
+      () => true,
+      (err: unknown) => isDefiniteRefusal(err)
+    );
+    if (!released) return { kind: "unknown" };
+    const bookings = await deps.dt.bookings.get(calendarId, { start: hold.start, end: hold.end }).catch(() => null);
+    if (!bookings) return { kind: "unknown" };
     const made = bookings.find((b) => b.start === hold.start && b.end === hold.end && b.label === label);
     return made ? { kind: "booked", bookingId: made.id } : { kind: "not_booked" };
   };
@@ -274,7 +282,7 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       ({ bookingId }): CommitOutcome => ({ kind: "booked", bookingId }),
       (err: unknown): CommitOutcome | null => (isDefiniteRefusal(err) ? { kind: "not_booked" } : null)
     );
-    return answered ?? confirmCommit(calendarId, hold, label);
+    return answered ?? settleUnclearCommit(calendarId, hold, label);
   };
 
   /**
@@ -483,7 +491,7 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
         return refuse(pass, caller, COULD_NOT_CONFIRM);
       }
       if (outcome.kind === "not_booked") {
-        await deps.dt.holds.release(holdId).catch(() => {});
+        // No release here: the kernel refused because the hold is gone, or the unclear path released it.
         deps.store.finishSpend(pass.id, { booked: false, holdId, at: now() });
         return refuse(pass, caller, NOT_BOOKED);
       }
@@ -521,8 +529,10 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       // unconfirmed), the hold may have become a booking: marking it released would hide that.
       if (deps.store.get(pass.id)?.state.status === "spending") return refuse(pass, caller, RELEASE_CROSSED_BOOKING);
       const released = deps.store.releaseHold(pass.id, holdId, now());
+      // Undefined: the hold stopped being live while the release was out, i.e. it was booked.
+      if (!released) return refuse(pass, caller, NOT_THIS_PASS);
       audit(pass, caller, "release", holdId);
-      return ok({ scope: scopeOf(released ?? pass, record), holdId });
+      return ok({ scope: scopeOf(released, record), holdId });
     },
   };
 }
