@@ -55,7 +55,6 @@ export function pageMetadata(opts: {
   return {
     title: opts.absoluteTitle ? { absolute: opts.title } : opts.title,
     description: opts.description,
-    keywords: [...SITE.keywords],
     alternates: { canonical: opts.path },
     openGraph: {
       title: opts.title,
@@ -144,7 +143,6 @@ export function techArticleLd(opts: { title: string; description: string; path: 
     inLanguage: "en",
     image: abs(OG_IMAGE_PATH),
     ...(section ? { articleSection: section } : {}),
-    keywords: SITE.keywords.join(", "),
     isPartOf: { "@id": `${SITE.url}/#website` },
     about: { "@id": `${SITE.url}/#software` },
     author: { "@id": `${SITE.url}/#org` },

@@ -139,16 +139,26 @@ function BeforeAfter({ today, deltat, className = "" }: { today: ReactNode; delt
   return (
     <div className={`relative grid overflow-hidden rounded-3xl border border-dt-line bg-dt-surface shadow-dt-surface sm:grid-cols-2 ${className}`}>
       <Half label={<OldWorldMarks />}>{today}</Half>
+      {/* Stacked on a phone the arrow sits in the flow on the seam, whatever the halves' heights;
+          side by side it is centred on the seam. */}
+      <div aria-hidden className="relative z-10 -my-4 flex justify-center sm:hidden">
+        <SeamArrow down />
+      </div>
       <Half label={<DeltatMark size="sm" className="!h-5 !w-5 !rounded-[6px] !text-[9px]" />} good>
         {deltat}
       </Half>
-      <span
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/2 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 rotate-90 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface sm:rotate-0"
-      >
-        <ArrowRight className="h-3.5 w-3.5" />
+      <span aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 sm:block">
+        <SeamArrow />
       </span>
     </div>
+  );
+}
+
+function SeamArrow({ down }: { down?: boolean }) {
+  return (
+    <span className="grid h-8 w-8 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface">
+      <ArrowRight className={`h-3.5 w-3.5 ${down ? "rotate-90" : ""}`} />
+    </span>
   );
 }
 

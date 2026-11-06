@@ -16,14 +16,24 @@ export function WithWithout({ className = "mt-14 sm:mt-20" }: { className?: stri
   return (
     <div className={`relative mx-auto grid max-w-5xl overflow-hidden rounded-[32px] border border-dt-line bg-dt-surface shadow-dt-float md:grid-cols-2 ${className}`}>
       <OldCalendar />
+      {/* Stacked on a phone: the arrow sits in the flow, on the seam between the halves, whatever
+          their heights. Side by side: centred on the seam. */}
+      <div aria-hidden className="relative z-10 -my-[18px] flex justify-center md:hidden">
+        <SeamArrow down />
+      </div>
       <NewCalendar />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-1/2 z-10 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 rotate-90 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface md:rotate-0"
-      >
-        <ArrowRight className="h-4 w-4" />
+      <span aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 z-10 hidden -translate-x-1/2 -translate-y-1/2 md:block">
+        <SeamArrow />
       </span>
     </div>
+  );
+}
+
+function SeamArrow({ down }: { down?: boolean }) {
+  return (
+    <span className="grid h-9 w-9 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface">
+      <ArrowRight className={`h-4 w-4 ${down ? "rotate-90" : ""}`} />
+    </span>
   );
 }
 

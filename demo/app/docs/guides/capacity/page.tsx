@@ -26,7 +26,7 @@ export default function CapacityPage() {
           ]),
         ]}
       />
-      <DocHeader title="Capacity and pools" />
+      <DocHeader title="Capacity and pools" path={SEO.path} />
       <Markdown>{docContent("guides/capacity")}</Markdown>
     </article>
   );

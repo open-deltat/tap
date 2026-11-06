@@ -4,7 +4,7 @@ The rest of these docs treat Δt as a clean idea: time is one line, a booking is
 
 Δt is a single Rust binary, open source under AGPL-3.0. There is no Postgres, Redis or sidecar behind it. While it runs, all live data sits in memory, which is why "what is free?" is fast: it is a little arithmetic over a sorted list, done in RAM.
 
-Every change is written to an append-only log on disk before it touches memory. The log is the source of truth; memory is a fast copy of it. On restart Δt replays the log and is back where it was. If the machine died mid-write, only the unfinished last entry is dropped. So there is one thing to back up: the data directory.
+Every change is also written to an append-only log on disk, and the log is the source of truth: on restart Δt replays it and is back where it was. You are told a hold, booking or commit succeeded only once it is on disk, and notifications go out only after that too. Other readers can see a new hold or booking a moment earlier, while it is still on its way to disk, so reads never wait on a write. If the machine dies in that moment, that one change is lost and the slot shows as free again: Δt can briefly show less free time than it ends up keeping, never more. Removing things (releases, cancellations) and changing rules and resources are written to disk first. If writing to disk ever fails, that tenant stops taking changes and is rebuilt from its log. So there is one thing to back up: the data directory.
 
 ## TAP: the language it speaks
 

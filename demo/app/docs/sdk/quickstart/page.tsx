@@ -26,7 +26,7 @@ export default function QuickstartPage() {
           ]),
         ]}
       />
-      <DocHeader title="TypeScript quickstart" />
+      <DocHeader title="TypeScript quickstart" path={SEO.path} />
       <Markdown>{docContent("sdk-quickstart")}</Markdown>
     </article>
   );

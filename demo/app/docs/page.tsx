@@ -28,7 +28,7 @@ export default function WhatIsDeltatPage() {
           ]),
         ]}
       />
-      <DocHeader title="What is Δt" />
+      <DocHeader title="What is Δt" path={SEO.path} />
       <DocBody
         source={docContent("what-is-deltat")}
         slots={{

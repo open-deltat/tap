@@ -43,7 +43,7 @@ export default function AgentQuickstartPage() {
           ]),
         ]}
       />
-      <DocHeader title="Agent quickstart" />
+      <DocHeader title="Agent quickstart" path={SEO.path} />
       <DocBody source={docContent("quickstart")} slots={{ AGENT_TOOLS: <AgentTools /> }} />
     </article>
   );

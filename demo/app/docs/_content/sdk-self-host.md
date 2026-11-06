@@ -78,7 +78,7 @@ Everything is set through environment variables, and every one has a default.
 
 ## The data directory
 
-Each tenant gets its own append-only log file in the data directory. Every change is written there first and only then applied in memory, so the log is the source of truth. Backups are simple: copy the directory and you have copied the state. Delete it and you have a clean slate.
+Each tenant gets its own append-only log file in the data directory, and the log is the source of truth: a change is confirmed only once it is on disk, and a restart replays the log. ([Under the hood](/docs/protocol-and-engine) has the exact order.) Backups are simple: copy the directory and you have copied the state. Delete it and you have a clean slate.
 
 ## Tenants are just the database name
 

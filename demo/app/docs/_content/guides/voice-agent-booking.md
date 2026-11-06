@@ -94,4 +94,4 @@ An agent that fails loudly and offers the next slot ends the call with a real ap
 
 ## Next
 
-[Scheduling for AI agents](/docs/guides/ai-agent-scheduling) is the same pattern without the phone line, including retries and multi-item bookings. [What a booking hold is](/docs/guides/booking-holds) covers holds, expiry, and renewal on their own. [Real-time scheduling](/docs/guides/real-time-scheduling) is how a dashboard watching the same calendar stays current while the agent works.
+[Scheduling for AI agents](/docs/guides/ai-agent-scheduling) is the same pattern without the phone line, including retries and multi-item bookings. [What a booking hold is](/docs/guides/booking-holds) covers holds, expiry, and renewal on their own. [Live updates](/docs/guides/real-time-scheduling) is how a dashboard watching the same calendar stays current while the agent works.

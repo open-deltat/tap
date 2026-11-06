@@ -26,7 +26,7 @@ export default function AiAgentSchedulingPage() {
           ]),
         ]}
       />
-      <DocHeader title="Scheduling for AI agents" />
+      <DocHeader title="Scheduling for AI agents" path={SEO.path} />
       <Markdown>{docContent("guides/ai-agent-scheduling")}</Markdown>
     </article>
   );

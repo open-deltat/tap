@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@open-deltat/shared/utils";
@@ -122,22 +122,30 @@ export default function MeetExample() {
   const eveningIndex = chosen ? evenings.findIndex((e) => e.dayStart === dayOf(chosen.start)) : -1;
   const evening = eveningIndex >= 0 ? evenings[eveningIndex] : undefined;
 
-  // Until someone touches the example, it walks through the evening's free start times on its
-  // own, so the page shows the answer moving instead of sitting still. Any interaction stops it
-  // for good; reduced motion never starts it.
+  // Until someone reaches for the example, it walks through the evening's free start times on its
+  // own, so the page shows the answer moving instead of sitting still. A pointer or keyboard focus
+  // entering the example or its booking bar stops it for good, before any click can land, so the
+  // time a visitor books is always the time they read. Reduced motion never starts it. The
+  // interval reads the current starts through a ref and is keyed on stable values, so a live
+  // update from another calendar does not restart it.
   const [auto, setAuto] = useState(true);
-  const starts = evening?.starts;
+  const startsRef = useRef<number[]>([]);
+  startsRef.current = evening?.starts ?? [];
+  const startCount = evening?.starts.length ?? 0;
+  const eveningKey = evening?.dayStart;
   useEffect(() => {
-    if (!auto || !starts || starts.length < 2) return;
+    if (!auto || startCount < 2) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const id = window.setInterval(() => {
       setPickedStart((cur) => {
+        const starts = startsRef.current;
         const i = cur == null ? 0 : starts.indexOf(cur);
-        return starts[(i + 1) % starts.length];
+        return starts[(i + 1) % starts.length] ?? cur;
       });
     }, 2600);
     return () => clearInterval(id);
-  }, [auto, starts]);
+  }, [auto, startCount, eveningKey]);
+  const stopTour = () => setAuto(false);
 
   function pickStart(start: number) {
     setAuto(false);
@@ -201,7 +209,7 @@ export default function MeetExample() {
   }
 
   const tray = chosen ? (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3" onPointerEnter={stopTour} onPointerDown={stopTour} onFocusCapture={stopTour}>
       <div className="min-w-0 flex-1 leading-tight">
         <div className="text-sm font-medium tabular-nums text-dt-ink">
           <span className="hidden sm:inline">{shortDay(chosen.start)} · </span>
@@ -219,7 +227,12 @@ export default function MeetExample() {
     <>
       <Stage primitive={{ label: "The free time several calendars share", specId: "AVAIL-08" }} title="When is everyone free?" tray={tray}>
         {/* Like the appointments example: the choice on the left, the day on the right, one hairline between. */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-[10rem_1fr] sm:gap-6">
+        <div
+          className="grid grid-cols-1 gap-5 sm:grid-cols-[10rem_1fr] sm:gap-6"
+          onPointerEnter={stopTour}
+          onPointerDown={stopTour}
+          onFocusCapture={stopTour}
+        >
           <div className="sm:border-r sm:border-dt-line sm:pr-6">
             <div className="text-[12px] text-dt-ink-3">How long</div>
             <div className="mt-2 sm:hidden">

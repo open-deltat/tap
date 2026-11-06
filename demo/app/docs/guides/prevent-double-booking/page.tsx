@@ -26,7 +26,7 @@ export default function PreventDoubleBookingPage() {
           ]),
         ]}
       />
-      <DocHeader title="Preventing double bookings" />
+      <DocHeader title="Preventing double bookings" path={SEO.path} />
       <Markdown>{docContent("guides/prevent-double-booking")}</Markdown>
     </article>
   );

@@ -26,7 +26,7 @@ export default function SelfHostPage() {
           ]),
         ]}
       />
-      <DocHeader title="Self-host" />
+      <DocHeader title="Self-host" path={SEO.path} />
       <Markdown>{docContent("sdk-self-host")}</Markdown>
     </article>
   );

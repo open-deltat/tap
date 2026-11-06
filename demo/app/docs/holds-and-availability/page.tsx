@@ -16,7 +16,7 @@ const SEO = {
 export const metadata = pageMetadata({ ...SEO, ogType: "article" });
 
 // Each section opens with its command, in the same colour the landing and the examples give it.
-const chip = (i: number) => <VerbChip verb={VERBS[i]} />;
+const chip = (i: number) => ({ node: <VerbChip verb={VERBS[i]} />, tight: true });
 
 export default function HoldsAndAvailabilityPage() {
   return (
@@ -31,7 +31,7 @@ export default function HoldsAndAvailabilityPage() {
           ]),
         ]}
       />
-      <DocHeader title="Find, hold, book, listen" />
+      <DocHeader title="Find, hold, book, listen" path={SEO.path} />
       <DocBody
         source={docContent("holds-and-availability")}
         slots={{ HOLDS_WIDGET: <HoldsStatic />, FIND: chip(0), HOLD: chip(1), BOOK: chip(2), LISTEN: chip(3) }}

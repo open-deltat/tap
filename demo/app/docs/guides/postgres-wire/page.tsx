@@ -26,7 +26,7 @@ export default function PostgresWirePage() {
           ]),
         ]}
       />
-      <DocHeader title="Any Postgres client" />
+      <DocHeader title="Any Postgres client" path={SEO.path} />
       <Markdown>{docContent("guides/postgres-wire")}</Markdown>
     </article>
   );

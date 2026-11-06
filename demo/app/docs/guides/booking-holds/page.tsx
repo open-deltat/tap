@@ -26,7 +26,7 @@ export default function BookingHoldsPage() {
           ]),
         ]}
       />
-      <DocHeader title="Booking holds" />
+      <DocHeader title="Booking holds" path={SEO.path} />
       <Markdown>{docContent("guides/booking-holds")}</Markdown>
     </article>
   );

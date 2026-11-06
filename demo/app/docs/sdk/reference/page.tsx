@@ -26,7 +26,7 @@ export default function ReferencePage() {
           ]),
         ]}
       />
-      <DocHeader title="SDK reference" />
+      <DocHeader title="SDK reference" path={SEO.path} />
       <Markdown>{docContent("sdk-reference")}</Markdown>
     </article>
   );
