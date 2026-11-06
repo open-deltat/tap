@@ -2,7 +2,7 @@ import { dtPublic } from "./deltat";
 import { publicRegistry } from "./public-registry";
 import { openMeetingRequestStore } from "./meeting-requests";
 import { createMeetingService, type MeetingService } from "./meeting-request-service";
-import { webhookNotifier, webhookUrlFrom } from "./notify";
+import { ownerNotifier } from "./owner-notifier";
 import { publicBaseUrl } from "./public-base-url";
 import { canonicalPrincipalId } from "./auth-config";
 
@@ -18,6 +18,6 @@ export const meetings: MeetingService = (shared.__deltatMeetings ??= createMeeti
   store: openMeetingRequestStore(process.env.MEETING_REQUESTS_PATH ?? "./data/meeting-requests.json", {
     canonicalRequester: (id) => canonicalPrincipalId(id),
   }),
-  notify: webhookNotifier(webhookUrlFrom(process.env.NOTIFY_WEBHOOK_URL)),
+  notify: ownerNotifier,
   reviewBase: publicBaseUrl,
 }));

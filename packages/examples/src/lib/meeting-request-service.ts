@@ -201,6 +201,7 @@ export function createMeetingService(deps: MeetingDeps): MeetingService {
         : request.contact.name;
       const review = deps.reviewBase ? ` Review: ${deps.reviewBase}/dashboard/c/${record.id}` : "";
       await deps.notify({
+        kind: "meeting_request",
         text: `Meeting request on "${record.name}": ${who} asks for ${describeSpan(request.start, request.end, record.timezone)}.${request.note ? ` Note: ${request.note}` : ""}${review}`,
         calendarId: record.id,
         requestId: request.id,

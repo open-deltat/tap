@@ -307,6 +307,64 @@ describe("a pass that is not valid", () => {
   });
 });
 
+describe("telling the owner", () => {
+  test("a booking with a pass tells the owner once; holds, refusals, failed commits and revokes tell nothing", async () => {
+    const { mint, passes, notices, state } = setup();
+    const { token, pass } = mint({ uses: 2, label: "for Gina" });
+    must(await passes.findTimes({ token, caller: GUEST }));
+    await passes.hold({ token, caller: GUEST, start: T, lengthMinutes: 45 }); // refused
+    const held = must(await passes.hold({ token, caller: GUEST, start: T }));
+    state.commitFails = true;
+    expect((await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina Guest" })).ok).toBe(false);
+    state.commitFails = false;
+    expect(notices).toEqual([]);
+
+    const again = must(await passes.hold({ token, caller: GUEST, start: T }));
+    must(await passes.book({ token, caller: GUEST, holdId: again.holdId, bookedBy: "Gina Guest", note: "Intro call" }));
+    expect(notices).toEqual([
+      {
+        kind: "pass_booking",
+        calendarId: "cal1",
+        passId: pass.id,
+        text: `Gina Guest booked Sun 6 Jan, 11:00 to 11:30 (Europe/Berlin) on Simon's week with the pass "for Gina" (note: Intro call)`,
+      },
+    ]);
+    expect(JSON.stringify(notices)).not.toContain(token.slice(4));
+
+    const other = mint();
+    must(await passes.hold({ token: other.token, caller: GUEST, start: T + 60 * MIN }));
+    must(await passes.revoke({ owner: OWNER, passId: other.pass.id }));
+    must(await passes.revoke({ owner: OWNER, passId: pass.id }));
+    expect(notices).toHaveLength(1);
+  });
+
+  test("a pass without a label or note reads plainly", async () => {
+    const { mint, passes, notices } = setup();
+    const { token } = mint();
+    const held = must(await passes.hold({ token, caller: GUEST, start: T }));
+    must(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina Guest" }));
+    expect(notices[0]?.text).toBe("Gina Guest booked Sun 6 Jan, 11:00 to 11:30 (Europe/Berlin) on Simon's week with a booking pass");
+  });
+
+  test("a notifier that throws or rejects never fails or undoes the booking", async () => {
+    for (const notify of [
+      async () => {
+        throw new Error("webhook down");
+      },
+      () => {
+        throw new Error("thrown before any promise");
+      },
+    ]) {
+      const { mint, passes, state } = setup({ notify });
+      const { token } = mint();
+      const held = must(await passes.hold({ token, caller: GUEST, start: T }));
+      expect(must(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina" })).usesLeft).toBe(0);
+      expect(state.bookings).toHaveLength(1);
+      expect(state.cancelled).toEqual([]);
+    }
+  });
+});
+
 describe("the record of what happened", () => {
   test("every use is logged with the pass id and the caller, never the pass", async () => {
     const { mint, passes, store, storePath } = setup();

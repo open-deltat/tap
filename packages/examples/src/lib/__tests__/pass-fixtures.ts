@@ -1,6 +1,7 @@
 import { openBookingPassStore } from "../booking-passes";
 import { createBookingPassService } from "../booking-pass-service";
 import { createRateLimiter } from "../rate-limit";
+import type { Notifier } from "../notify";
 import { BEN, MIN, OWNER, T, setupMeetings, tmpPath } from "./meeting-fixtures";
 
 // Shared by the booking-pass tests: the meeting fixture's calendar ("cal1", owned by OWNER, which
@@ -10,7 +11,8 @@ import { BEN, MIN, OWNER, T, setupMeetings, tmpPath } from "./meeting-fixtures";
 export const GUEST = "https://issuer.test#guest";
 export const STRANGER = "https://issuer.test#stranger";
 
-export function setupPasses(opts: { lookupLimit?: number } = {}) {
+/** Owner notices from both services land in the meeting fixture's `notices`, unless a test swaps the notifier. */
+export function setupPasses(opts: { lookupLimit?: number; notify?: Notifier } = {}) {
   const meetings = setupMeetings();
   meetings.registry.register({ id: "cal2", name: "Ben's week", slotMinutes: 60, timezone: "UTC", owner: BEN });
   const storePath = tmpPath(`passes_${crypto.randomUUID()}`);
@@ -20,6 +22,11 @@ export function setupPasses(opts: { lookupLimit?: number } = {}) {
     registry: meetings.registry,
     store,
     lookups: createRateLimiter({ limit: opts.lookupLimit ?? 1_000, windowMs: 3_600_000, now: () => meetings.clock.now }),
+    notify:
+      opts.notify ??
+      (async (n) => {
+        meetings.notices.push(n);
+      }),
     now: () => meetings.clock.now,
   });
   /** A pass on cal1 for [T, T + 4h), with the service's defaults unless overridden. */

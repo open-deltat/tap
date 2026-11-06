@@ -66,9 +66,28 @@ describe("the owner's webhook", () => {
 
   test("posts the line as both text and content, for Slack and Discord alike", async () => {
     const { fetchImpl, calls } = answering({});
-    await webhookNotifier(new URL("https://hooks.example.com/x"), fetchImpl)({ text: "Anna asks for Sunday", calendarId: "c", requestId: "r" });
+    await webhookNotifier(new URL("https://hooks.example.com/x"), fetchImpl)({ kind: "meeting_request", text: "Anna asks for Sunday", calendarId: "c", requestId: "r" });
     expect(calls).toHaveLength(1);
-    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ text: "Anna asks for Sunday", content: "Anna asks for Sunday", calendar_id: "c", request_id: "r" });
+    // The fields a meeting-request notice has always sent, plus `kind`.
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      kind: "meeting_request",
+      text: "Anna asks for Sunday",
+      content: "Anna asks for Sunday",
+      calendar_id: "c",
+      request_id: "r",
+    });
+  });
+
+  test("a booking made with a pass names the pass, not a request", async () => {
+    const { fetchImpl, calls } = answering({});
+    await webhookNotifier(new URL("https://hooks.example.com/x"), fetchImpl)({ kind: "pass_booking", text: "Gina booked Monday", calendarId: "c", passId: "p" });
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      kind: "pass_booking",
+      text: "Gina booked Monday",
+      content: "Gina booked Monday",
+      calendar_id: "c",
+      pass_id: "p",
+    });
   });
 
   test("a webhook that refuses or is unreachable never fails the request", async () => {
@@ -76,7 +95,7 @@ describe("the owner's webhook", () => {
     const down = (async () => {
       throw new Error("getaddrinfo ENOTFOUND");
     }) as unknown as typeof fetch;
-    const notice = { text: "x", calendarId: "c", requestId: "r" };
+    const notice = { kind: "meeting_request", text: "x", calendarId: "c", requestId: "r" } as const;
     await webhookNotifier(new URL("https://hooks.example.com/x"), refused.fetchImpl)(notice);
     await webhookNotifier(new URL("https://hooks.example.com/x"), down)(notice);
   });

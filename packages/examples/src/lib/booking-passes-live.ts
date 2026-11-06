@@ -3,6 +3,7 @@ import { publicRegistry } from "./public-registry";
 import { openBookingPassStore } from "./booking-passes";
 import { createBookingPassService, type BookingPassService } from "./booking-pass-service";
 import { createRateLimiter } from "./rate-limit";
+import { ownerNotifier } from "./owner-notifier";
 
 // The one process-wide booking-pass service, beside the registry it reads (public-registry.ts) and
 // on the same data volume: the same single-container limit applies, and more so here, because the
@@ -18,4 +19,5 @@ export const bookingPasses: BookingPassService = (shared.__deltatBookingPasses ?
   registry: publicRegistry,
   store: openBookingPassStore(process.env.BOOKING_PASSES_PATH?.trim() || "./data/booking-passes.json"),
   lookups: createRateLimiter({ limit: PASS_LOOKUPS_PER_HOUR, windowMs: 3_600_000 }),
+  notify: ownerNotifier,
 }));

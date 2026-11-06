@@ -2,6 +2,8 @@ import { randomBytes } from "node:crypto";
 import type { AvailabilitySlot, DeltaT } from "@open-deltat/client";
 import type { BookableRecord, BookableRegistry } from "./public-bookables";
 import type { RateLimiter } from "./rate-limit";
+import type { Notifier, OwnerNotice } from "./notify";
+import { describeSpan } from "./meeting-request-service";
 import { hashManageKey, verifyManageKey } from "./manage-key";
 import { requireDisplayText } from "./display-text";
 import { HOLD_TTL_MS, HORIZON_DAYS, MAX_QUERY_WINDOW_MS, type Outcome } from "./bookable-service";
@@ -27,6 +29,8 @@ export interface PassDeps {
   store: BookingPassStore;
   /** Bounds how often one caller may present a pass, valid or not. */
   lookups: RateLimiter;
+  /** Tells the owner when a pass books. Best effort: it never fails or undoes the booking. */
+  notify: Notifier;
   now?: () => number;
 }
 
@@ -217,6 +221,20 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
     }
     if (status === "spending") return refuse(pass, caller, BUSY);
     return ok({ pass, record });
+  };
+
+  /**
+   * Tell the owner, after the booking is committed and recorded, without waiting on it: a webhook that
+   * is slow, down or throws must not delay, fail or undo a booking that already stands. The notice
+   * never carries the pass, and neither does this log line.
+   */
+  const announce = (notice: OwnerNotice) => {
+    const warn = () => console.warn("Owner notification for a pass booking failed; the booking stands.");
+    try {
+      deps.notify(notice).catch(warn);
+    } catch {
+      warn();
+    }
   };
 
   /** Give back every live hold on a pass that can no longer book (spent or revoked). */
@@ -411,6 +429,13 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       if (!finished) throw new Error(`Booking pass ${pass.id} left the spending state during its own spend.`);
       if (finished.state.status === "spent") await releaseLive(finished);
       audit(pass, caller, "book", committed.bookingId);
+      const which = pass.label ? `the pass "${pass.label}"` : "a booking pass";
+      announce({
+        kind: "pass_booking",
+        calendarId: pass.calendarId,
+        passId: pass.id,
+        text: `${name.value} booked ${describeSpan(hold.start, hold.end, record.timezone)} on ${record.name} with ${which}${forOwner.value ? ` (note: ${forOwner.value})` : ""}`,
+      });
       return ok({ scope: scopeOf(finished, record), bookingId: committed.bookingId, start: hold.start, end: hold.end, usesLeft: usesLeft(finished) });
     },
 
