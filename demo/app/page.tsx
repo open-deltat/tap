@@ -17,8 +17,7 @@ import { enabledExamples, type ExampleMeta } from "@open-deltat/examples/manifes
 import Meet from "@open-deltat/examples/meet";
 import { InlineStage } from "@open-deltat/examples/components/stage-mode";
 import { pageMetadata, SITE } from "@/lib/seo";
-import { RaceModule } from "@/components/landing/race-module";
-import { DifferenceModule } from "@/components/landing/difference-module";
+import { WithWithout } from "@/components/landing/with-without";
 import { Faq } from "@/components/landing/faq";
 
 export const metadata = pageMetadata({
@@ -45,7 +44,8 @@ const SPECS = [
   { k: "Agents", v: "MCP server", note: "On the official registry" },
 ] as const;
 
-// The four calls an agent makes, in the order it makes them. Human verb first, the tool name beside it.
+// The four calls an agent makes, in the order it makes them: the command the agent types is the
+// title, the human word above it, one sentence under it.
 const VERBS = [
   { title: "Find", tool: "find_slots", body: "See what is free right now, across every calendar you name." },
   { title: "Hold", tool: "hold_slot", body: "Keep a slot for a few minutes while the agent asks. It lets go on its own." },
@@ -169,9 +169,8 @@ export default function Home() {
               Real-Time Calendars for Agents
             </h1>
             <p className="mx-auto mt-6 max-w-xl text-pretty text-[17px] leading-relaxed text-dt-ink-2 sm:text-lg">
-              Your calendar is a list that gets copied around. Δt is a database for time. An agent asks it what is
-              free, holds a slot while it decides, and books it in one step. Everyone sees the change at once.
-              Nothing gets booked twice.
+              Every app that connects to Google Calendar or Outlook keeps its own copy and checks back now and then.
+              Δt is one calendar that people and agents book on at the same moment. Nothing gets booked twice.
             </p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <a href="#pricing" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-dt-ink px-7 text-[15px] font-semibold text-dt-on-ink transition-[background-color,transform] duration-150 hover:bg-dt-ink/85 active:scale-[0.98] sm:w-auto">
@@ -182,12 +181,9 @@ export default function Home() {
                 See how it works
               </a>
             </div>
-            <div className="mt-5 font-mono text-[12.5px] text-dt-ink-3">
-              <span className="select-none text-dt-ink-3/60">$ </span>npx @open-deltat/mcp
-            </div>
           </div>
 
-          <RaceModule />
+          <WithWithout />
         </section>
 
         {/* Spec strip */}
@@ -202,36 +198,6 @@ export default function Home() {
             ))}
           </dl>
         </section>
-
-        {/* The difference: why "my calendar already does that" is not true */}
-        <Section
-          eyebrow="Why not my calendar?"
-          title="A calendar is a list. Δt is a database for time."
-          lead="Google Calendar, Outlook and every calendar feed give you a list of events. Everything else is up to you. Ask a calendar and Δt the same four things."
-        >
-          <DifferenceModule />
-        </Section>
-
-        {/* How it works */}
-        <Section eyebrow="How it works" title="An agent can do four things.">
-          <dl className="grid gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-4">
-            {VERBS.map((v, i) => (
-              <div key={v.title} className="border-t border-dt-line pt-4">
-                <dt className="flex items-baseline gap-2.5">
-                  <span className="font-mono text-[12px] text-dt-ink-3">0{i + 1}</span>
-                  <span className="text-[17px] font-semibold tracking-tight">{v.title}</span>
-                  <code className="font-mono text-[12px] text-dt-accent-ink">{v.tool}</code>
-                </dt>
-                <dd className="mt-1.5 text-[14.5px] leading-relaxed text-dt-ink-2">{v.body}</dd>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-10 max-w-3xl text-[15px] leading-relaxed text-dt-ink-2">
-            Underneath is Δt, a database with one rule: two bookings never share the same time. The database itself
-            says no, not a check in your code. It speaks TAP, the Time Allocation Protocol, over the Postgres wire,
-            so any Postgres driver can talk to it.
-          </p>
-        </Section>
 
         {/* The question a calendar cannot answer, asked of the live example */}
         <Section
@@ -250,6 +216,31 @@ export default function Home() {
               </a>
             </div>
           )}
+        </Section>
+
+        {/* How it works: the four commands, shown as what the agent types */}
+        <Section eyebrow="How it works" title="An agent can do four things.">
+          <dl className="grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+            {VERBS.map((v, i) => (
+              <div key={v.title} className="border-t border-dt-line pt-4">
+                <dt>
+                  <div className="text-[12.5px] text-dt-ink-3">
+                    <span className="font-mono">0{i + 1}</span> · {v.title}
+                  </div>
+                  <code className="mt-2 inline-flex h-9 items-center gap-2 rounded-lg bg-dt-ink px-3 font-mono text-[13.5px] text-dt-on-ink">
+                    <span className="text-dt-on-ink/50">›</span>
+                    {v.tool}
+                  </code>
+                </dt>
+                <dd className="mt-3 text-[14.5px] leading-relaxed text-dt-ink-2">{v.body}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-10 max-w-3xl text-[15px] leading-relaxed text-dt-ink-2">
+            Underneath is Δt, a database with one rule: two bookings never share the same time. The database itself
+            says no, not a check in your code. It speaks TAP, the Time Allocation Protocol, over the Postgres wire,
+            so any Postgres driver can talk to it.
+          </p>
         </Section>
 
         {/* Use cases */}
