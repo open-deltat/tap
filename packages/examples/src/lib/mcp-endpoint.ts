@@ -6,7 +6,6 @@ import type { MyCalendarsService } from "./my-calendars";
 import type { RequestContact } from "./meeting-requests";
 import type { RateLimiter } from "./rate-limit";
 import { createMeetingsMcpServer, type CalendarLookup } from "./meetings-mcp";
-import { mcpResourceUrl } from "./public-base-url";
 
 // The hosted MCP endpoint (`/mcp`), as a plain Request -> Response function so it runs the same in a
 // Next route handler, under Bun.serve, or in a test. OAuth 2.1 resource server per the MCP spec: a
@@ -83,7 +82,7 @@ export async function handleMcpRequest(req: Request, deps: McpEndpointDeps): Pro
 /** RFC 9728 metadata for this resource: which authorization server signs callers in. */
 export function protectedResourceMetadata(base: string, issuer: string) {
   return {
-    resource: mcpResourceUrl(base),
+    resource: `${base}/mcp`,
     authorization_servers: [issuer],
     bearer_methods_supported: ["header"],
     scopes_supported: ["openid", "profile", "email"],

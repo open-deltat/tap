@@ -12,8 +12,8 @@ import { protectedResourceMetadata, type McpEndpointDeps } from "./mcp-endpoint"
 // AUTH_CLIENT_ID), because every call acts as a verified person, and PUBLIC_BASE_URL, because the
 // OAuth metadata must name this resource by the URL clients use, which request headers must not choose.
 //
-// Tokens are checked against the same issuer as the site's sign-in, and must be minted for this MCP
-// resource: mcpAudience (auth-config.ts) says which audience that is and why it is never unchecked.
+// Tokens are checked against the same issuer as the site's sign-in, and against AUTH_MCP_AUDIENCE once
+// it is set; until then the audiences seen are logged so it can be set (mcpAudience, auth-config.ts).
 
 const METADATA_PATH = "/.well-known/oauth-protected-resource/mcp";
 
@@ -23,7 +23,7 @@ function buildDeps(): McpEndpointDeps | null {
   return {
     // One person, one id, whichever of the provider's issuers signed the token: an MCP client's token
     // and the site's session come from different WorkOS issuers for the same user (auth-config.ts).
-    verify: mcpVerifier(config, mcpAudience(publicBaseUrl)),
+    verify: mcpVerifier(config, mcpAudience()),
     resourceMetadataUrl: `${publicBaseUrl}${METADATA_PATH}`,
     service: meetings,
     passes: bookingPasses,

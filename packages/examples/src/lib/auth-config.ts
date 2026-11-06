@@ -1,6 +1,6 @@
 import { OidcAdapter, type VerifiedPrincipal } from "@open-deltat/mcp";
+import { decodeJwt } from "jose";
 import { liveIdentityLinks, type IdentityLinks } from "./identity-links";
-import { mcpResourceUrl } from "./public-base-url";
 
 // The sign-in configuration and the one identity a person has under it. Pure (no request context),
 // so the custom server (server.ts) can use it as well as the Next app: the registry it loads must
@@ -99,27 +99,59 @@ export function canonicalVerifier(
 }
 
 /**
- * The audience a token must carry at /mcp, normalised once here. Set, it is AUTH_MCP_AUDIENCE.
- * Unset or blank, it is this server's own MCP resource, the `resource` its RFC 9728 metadata
- * advertises and the one MCP clients ask the issuer for (RFC 8707). There is no value that turns the
- * check off: unset used to mean "any token this issuer signed", the site's own session included.
+ * The audience a token must carry at /mcp: AUTH_MCP_AUDIENCE, normalised once here (trimmed, blank
+ * means unset). A resource server should only take tokens minted for it, but nobody has seen what
+ * audience live MCP tokens carry, and a guessed value would refuse every MCP client on deploy. So:
  *
- * Deploying this changes nothing for the website (its sessions use AUTH_AUDIENCE). An MCP client
- * whose token carries a different audience is refused and has to sign in again; if the issuer stamps
- * one environment-wide audience instead of the resource (WorkOS does when the resource is not
- * registered with it), register `${PUBLIC_BASE_URL}/mcp` there, or set AUTH_MCP_AUDIENCE to what it
- * stamps, before deploying.
+ *   - Set: enforced. A token for any other audience, or none, is refused.
+ *   - Unset: tokens are accepted as before (issuer, signature, expiry), and each verified token's
+ *     audience is logged once per distinct value: `[mcp] token audience seen: "<aud>"`.
+ *
+ * Operator steps: deploy, let an MCP client sign in, read the logged audience in the Coolify logs,
+ * set AUTH_MCP_AUDIENCE to it, redeploy. If that value is one environment-wide audience rather than
+ * this resource (WorkOS stamps one when the resource is not registered with it), registering
+ * `${PUBLIC_BASE_URL}/mcp` as a resource in WorkOS gives a tighter one; read the log again after.
+ *
+ * The site's session audience (AUTH_AUDIENCE) is not refused here while this is unset: nothing in the
+ * code or tests proves MCP tokens never carry it, and refusing it on a guess is the lockout this
+ * avoids. Website sessions are unaffected either way; they verify with AUTH_AUDIENCE.
  */
-export function mcpAudience(publicBaseUrl: string): string {
-  return setting("AUTH_MCP_AUDIENCE") ?? mcpResourceUrl(publicBaseUrl);
+export function mcpAudience(): string | undefined {
+  return setting("AUTH_MCP_AUDIENCE");
 }
 
-/** The /mcp token verifier: the issuer's signature, the MCP audience, and the one id a person has. */
+/** How many distinct audiences are logged before going quiet: a bound, not an expected number. */
+const MAX_LOGGED_AUDIENCES = 20;
+
+/**
+ * The /mcp token verifier: the issuer's signature, the MCP audience when one is set, and the one id
+ * a person has. Unset, it logs the audiences it sees (mcpAudience), and only for tokens that
+ * verified, so nobody without a valid token can write to the log.
+ */
 export function mcpVerifier(
   config: AuthConfig,
-  audience: string,
-  links?: IdentityLinks
+  audience: string | undefined,
+  opts: { links?: IdentityLinks; log?: (line: string) => void } = {}
 ): (token: string) => Promise<VerifiedPrincipal | null> {
   const adapter = new OidcAdapter({ jwksUri: config.jwksUri, trustedIssuers: config.trustedIssuers, tenant: "public", audience });
-  return canonicalVerifier((token) => adapter.verify(token), config, links);
+  const verify = canonicalVerifier((token) => adapter.verify(token), config, opts.links);
+  if (audience !== undefined) return verify;
+
+  const log = opts.log ?? console.log;
+  const seen = new Set<string>();
+  return async (token) => {
+    const principal = await verify(token);
+    if (principal) {
+      const aud = decodeJwt(token).aud;
+      const values = aud === undefined ? [] : typeof aud === "string" ? [aud] : aud;
+      values
+        .filter((value) => !seen.has(value) && seen.size < MAX_LOGGED_AUDIENCES)
+        .forEach((value) => {
+          seen.add(value);
+          // JSON-quoted, so a value cannot forge a second log line.
+          log(`[mcp] token audience seen: ${JSON.stringify(value)}`);
+        });
+    }
+    return principal;
+  };
 }

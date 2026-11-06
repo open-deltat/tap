@@ -2,12 +2,12 @@ import { afterAll, afterEach, describe, expect, test } from "bun:test";
 import { SignJWT, exportJWK, generateKeyPair } from "jose";
 import { mcpAudience, mcpVerifier, type AuthConfig } from "../auth-config";
 
-// /mcp accepted any token the issuer signed, whoever it was minted for: the site's own session token,
-// or a token another app of the same WorkOS environment obtained. A resource server must only take
-// tokens issued for it (MCP authorization spec), so the audience is now always checked.
+// /mcp accepted any token the issuer signed, whoever it was minted for. Binding it to an audience is
+// right, but nobody can see what audience live MCP tokens carry, and guessing would lock every MCP
+// client out on deploy. So the audience is enforced once AUTH_MCP_AUDIENCE is set, and until then the
+// audience of each verified token is logged (that string, nothing else) so it can be read and set.
 
 const ISSUER = "https://idp.example";
-const BASE = "https://delt.at";
 
 const keys = await generateKeyPair("RS256");
 const jwk = { ...(await exportJWK(keys.publicKey)), kid: "k1", alg: "RS256", use: "sig" };
@@ -25,8 +25,13 @@ const config: AuthConfig = {
   extraAuthorizeParams: {},
 };
 
-const token = (aud: string | null) => {
-  const jwt = new SignJWT({}).setProtectedHeader({ alg: "RS256", kid: "k1" }).setIssuer(ISSUER).setSubject("user_1").setIssuedAt().setExpirationTime("5m");
+const token = (aud: string | null, opts: { iss?: string; email?: string } = {}) => {
+  const jwt = new SignJWT(opts.email ? { email: opts.email } : {})
+    .setProtectedHeader({ alg: "RS256", kid: "k1" })
+    .setIssuer(opts.iss ?? ISSUER)
+    .setSubject("user_secret_sub")
+    .setIssuedAt()
+    .setExpirationTime("5m");
   return (aud === null ? jwt : jwt.setAudience(aud)).sign(keys.privateKey);
 };
 
@@ -36,29 +41,57 @@ afterEach(() => {
   else process.env.AUTH_MCP_AUDIENCE = saved;
 });
 
-describe("the audience /mcp requires", () => {
-  test("unset or blank means this server's own MCP resource, never no check", () => {
+describe("AUTH_MCP_AUDIENCE, normalised at the edge", () => {
+  test("unset or blank is unset", () => {
     delete process.env.AUTH_MCP_AUDIENCE;
-    expect(mcpAudience(BASE)).toBe(`${BASE}/mcp`);
+    expect(mcpAudience()).toBeUndefined();
     process.env.AUTH_MCP_AUDIENCE = "   ";
-    expect(mcpAudience(BASE)).toBe(`${BASE}/mcp`);
+    expect(mcpAudience()).toBeUndefined();
   });
 
-  test("a configured value wins, trimmed", () => {
-    process.env.AUTH_MCP_AUDIENCE = " https://other.example/mcp ";
-    expect(mcpAudience(BASE)).toBe("https://other.example/mcp");
+  test("a set value is trimmed", () => {
+    process.env.AUTH_MCP_AUDIENCE = " https://delt.at/mcp ";
+    expect(mcpAudience()).toBe("https://delt.at/mcp");
   });
 });
 
-describe("tokens at /mcp", () => {
-  const verify = mcpVerifier(config, `${BASE}/mcp`, new Map());
-
-  test("one minted for the MCP resource is accepted", async () => {
-    expect((await verify(await token(`${BASE}/mcp`)))?.principalId).toBe(`${ISSUER}#user_1`);
-  });
-
-  test("the site's session token, and one with no audience, are refused", async () => {
+describe("set: the audience is enforced", () => {
+  test("a token for the MCP resource is accepted; any other audience, or none, is refused", async () => {
+    const logged: string[] = [];
+    const verify = mcpVerifier(config, "https://delt.at/mcp", { links: new Map(), log: (line) => logged.push(line) });
+    expect((await verify(await token("https://delt.at/mcp")))?.principalId).toBe(`${ISSUER}#user_secret_sub`);
     expect(await verify(await token("client_site"))).toBeNull();
     expect(await verify(await token(null))).toBeNull();
+    expect(logged).toEqual([]);
+  });
+});
+
+describe("unset: accepted as before, and the audience is logged once per value", () => {
+  test("verified tokens pass and each distinct audience is logged once, as the bare string", async () => {
+    const logged: string[] = [];
+    const verify = mcpVerifier(config, undefined, { links: new Map(), log: (line) => logged.push(line) });
+    for (const aud of ["client_mcp", "client_mcp", "client_other", null] as const) {
+      expect((await verify(await token(aud, { email: "anna@example.com" })))?.principalId).toBe(`${ISSUER}#user_secret_sub`);
+    }
+    expect(logged).toEqual(['[mcp] token audience seen: "client_mcp"', '[mcp] token audience seen: "client_other"']);
+  });
+
+  test("nothing but the audience is ever logged: not the token, the subject, or any other claim", async () => {
+    const logged: string[] = [];
+    const verify = mcpVerifier(config, undefined, { links: new Map(), log: (line) => logged.push(line) });
+    const t = await token("client_mcp", { email: "anna@example.com" });
+    await verify(t);
+    const all = logged.join("\n");
+    expect(all).not.toContain(t);
+    expect(all).not.toContain("user_secret_sub");
+    expect(all).not.toContain("anna@example.com");
+    expect(all).not.toContain(ISSUER);
+  });
+
+  test("a token that does not verify is refused and logs nothing, so strangers cannot write to the log", async () => {
+    const logged: string[] = [];
+    const verify = mcpVerifier(config, undefined, { links: new Map(), log: (line) => logged.push(line) });
+    expect(await verify(await token("attacker_chosen", { iss: "https://elsewhere.example" }))).toBeNull();
+    expect(logged).toEqual([]);
   });
 });
