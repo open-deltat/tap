@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ALLOWED_SLOT_MINUTES } from "./bookable-service";
 import { calendarGuide } from "./calendar-guide";
 import { MAX_BUFFER_MINUTES, MAX_CALENDARS_PER_OWNER, MAX_CAPACITY, type MyCalendar, type MyCalendarsService } from "./my-calendars";
+import { DEFAULT_DISPLAY, DISPLAY_NAMES, DISPLAYS } from "./calendar-displays";
 import type { WeekHours } from "../examples/builder/schedule";
 import type { MeetingsCaller } from "./meetings-mcp";
 
@@ -46,8 +47,13 @@ const describeCalendar = (c: MyCalendar) => ({
   takes_meeting_requests: c.takesMeetingRequests,
   capacity: c.capacity,
   buffer_minutes: c.bufferMinutes,
+  display: c.display,
   booking_link: c.bookingLink,
 });
+
+const Display = z
+  .enum(DISPLAY_NAMES)
+  .describe(`How the public booking page looks: ${DISPLAY_NAMES.map((d) => `${d} (${DISPLAYS[d].pick})`).join("; ")}`);
 
 export function registerCalendarTools(server: McpServer, calendars: MyCalendarsService, caller: MeetingsCaller): void {
   server.registerTool(
@@ -55,7 +61,7 @@ export function registerCalendarTools(server: McpServer, calendars: MyCalendarsS
     {
       title: "My calendars",
       description:
-        "Use this when you own calendars and need a calendar_id, for create_booking_pass, list_booking_passes or list_meeting_requests: it lists the calendars you own, each with its name, time zone, slot length (slot_minutes), how many bookings can overlap (capacity), turnover after each booking (buffer_minutes), whether it takes meeting requests, and its public booking_link. Only your own calendars are listed; anyone else gets an empty list.",
+        "Use this when you own calendars and need a calendar_id, for create_booking_pass, list_booking_passes or list_meeting_requests: it lists the calendars you own, each with its name, time zone, slot length (slot_minutes), how many bookings can overlap (capacity), turnover after each booking (buffer_minutes), whether it takes meeting requests, how its booking page looks (display), and its public booking_link. Only your own calendars are listed; anyone else gets an empty list.",
       annotations: { readOnlyHint: true, idempotentHint: true },
       inputSchema: {},
     },
@@ -86,9 +92,10 @@ export function registerCalendarTools(server: McpServer, calendars: MyCalendarsS
           .describe("true: people ask and nothing is booked until the owner approves. Defaults to false: people book free slots directly"),
         capacity: z.number().int().optional().describe(`How many bookings can overlap, 1 to ${MAX_CAPACITY}. Defaults to 1`),
         buffer_minutes: z.number().int().optional().describe(`Minutes kept free after each booking, 0 to ${MAX_BUFFER_MINUTES}. Defaults to 0`),
+        display: Display.optional().describe(`How the public booking page looks. Defaults to ${DEFAULT_DISPLAY}; how_to_model_calendars lists the views`),
       },
     },
-    async ({ name, timezone, slot_minutes, weekly_hours, takes_meeting_requests, capacity, buffer_minutes }) => {
+    async ({ name, timezone, slot_minutes, weekly_hours, takes_meeting_requests, capacity, buffer_minutes, display }) => {
       const made = await calendars.create(caller.principalId, {
         name,
         timezone,
@@ -97,12 +104,28 @@ export function registerCalendarTools(server: McpServer, calendars: MyCalendarsS
         takesMeetingRequests: takes_meeting_requests,
         capacity,
         bufferMinutes: buffer_minutes,
+        display,
       });
       if (!made.ok) return refused(made.error);
       return ok({
         ...describeCalendar(made.value),
         next: "Share the booking_link, or call create_booking_pass with this calendar_id to let one person's agent book directly.",
       });
+    }
+  );
+
+  server.registerTool(
+    "set_calendar_display",
+    {
+      title: "Change how a calendar's booking page looks",
+      description: `Use this when you own a calendar and want its public booking page (booking_link) to show a different view. The views are: ${DISPLAY_NAMES.join(
+        ", "
+      )}; how_to_model_calendars says which example each one is and when to pick it. A view that cannot show this calendar is refused with the reason. Only the calendar's owner can change it.`,
+      inputSchema: { calendar_id: z.string().max(64).describe("The calendar's id; list_my_calendars shows yours"), display: Display },
+    },
+    async ({ calendar_id, display }) => {
+      const set = await calendars.setDisplay(caller.principalId, calendar_id, display);
+      return set.ok ? ok(describeCalendar(set.value)) : refused(set.error);
     }
   );
 

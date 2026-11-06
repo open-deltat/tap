@@ -3,6 +3,7 @@ import type { BookableRecord, BookableRegistry } from "./public-bookables";
 import type { WeekHours } from "../examples/builder/schedule";
 import { ALLOWED_SLOT_MINUTES, isKnownTimeZone, validateWeek, type Outcome } from "./bookable-service";
 import { createOwnedCalendar, deleteOwnedCalendar, saveAvailability } from "./owned-calendar-service";
+import { DEFAULT_DISPLAY, checkDisplay, type Display } from "./calendar-displays";
 
 // The signed-in caller's own calendars, for the hosted MCP: list them and create them. Creating a
 // calendar happens only here (the website shows calendars, it never creates one), through the same
@@ -37,6 +38,8 @@ export interface MyCalendar {
   readonly capacity: number;
   /** Turnover kept free after each booking. */
   readonly bufferMinutes: number;
+  /** How its public booking page looks. */
+  readonly display: Display;
   /** The public page where people book (or ask for) a time. */
   readonly bookingLink: string | null;
 }
@@ -49,12 +52,16 @@ export interface CreateCalendarInput {
   takesMeetingRequests?: boolean;
   capacity?: number;
   bufferMinutes?: number;
+  /** A view from calendar-displays.ts; checked, since it arrives from outside. */
+  display?: string;
 }
 
 export interface MyCalendarsService {
   /** The caller's calendars, newest first; nobody else's, ever. */
   list(owner: string): Promise<Outcome<MyCalendar[]>>;
   create(owner: string, input: CreateCalendarInput): Promise<Outcome<MyCalendar>>;
+  /** Change how a calendar the caller owns shows publicly; refused when the view does not fit it. */
+  setDisplay(owner: string, calendarId: string, display: string): Promise<Outcome<MyCalendar>>;
 }
 
 const fail = <T>(error: string): Outcome<T> => ({ ok: false, error });
@@ -80,11 +87,14 @@ export function createMyCalendars(deps: MyCalendarsDeps): MyCalendarsService {
     takesMeetingRequests: record.bookingMode === "request",
     capacity: kernel.capacity,
     bufferMinutes: kernel.bufferAfter ? Math.round(kernel.bufferAfter / 60_000) : 0,
+    display: record.display,
     bookingLink: deps.bookingBase ? `${deps.bookingBase}/b/${record.id}` : null,
   });
 
   /** Everything checkable before a resource exists, so a refusal writes nothing. */
-  const check = (input: CreateCalendarInput): Outcome<{ slotMinutes: number; week: WeekHours; capacity: number; bufferMinutes: number }> => {
+  const check = (
+    input: CreateCalendarInput
+  ): Outcome<{ slotMinutes: number; week: WeekHours; capacity: number; bufferMinutes: number; display: Display }> => {
     if (!input.timezone || !isKnownTimeZone(input.timezone)) {
       return fail("That time zone is not one this server knows. Use an IANA name such as Europe/Berlin or America/New_York.");
     }
@@ -97,7 +107,9 @@ export function createMyCalendars(deps: MyCalendarsDeps): MyCalendarsService {
     const week = input.week ?? DEFAULT_WEEK;
     const hours = validateWeek(week);
     if (!hours.ok) return hours;
-    return ok({ slotMinutes, week, capacity, bufferMinutes });
+    const display = checkDisplay(input.display ?? DEFAULT_DISPLAY, { capacity, bufferMinutes, takesMeetingRequests: input.takesMeetingRequests ?? false });
+    if (!display.ok) return display;
+    return ok({ slotMinutes, week, capacity, bufferMinutes, display: display.value });
   };
 
   return {
@@ -115,7 +127,7 @@ export function createMyCalendars(deps: MyCalendarsDeps): MyCalendarsService {
     async create(owner, input) {
       const checked = check(input);
       if (!checked.ok) return checked;
-      const { slotMinutes, week, capacity, bufferMinutes } = checked.value;
+      const { slotMinutes, week, capacity, bufferMinutes, display } = checked.value;
       if (deps.registry.listOwned(owner).length + (creating.get(owner) ?? 0) >= MAX_CALENDARS_PER_OWNER) {
         return fail(`You already have ${MAX_CALENDARS_PER_OWNER} calendars, the most one account can have. Delete one on the dashboard first.`);
       }
@@ -133,11 +145,29 @@ export function createMyCalendars(deps: MyCalendarsDeps): MyCalendarsService {
           await deleteOwnedCalendar(deps, { id, owner }).catch(() => {});
           return saved;
         }
-        const record = input.takesMeetingRequests ? deps.registry.updateOwned(id, owner, { bookingMode: "request" }) ?? saved.value : saved.value;
+        const record =
+          deps.registry.updateOwned(id, owner, { display, ...(input.takesMeetingRequests && { bookingMode: "request" as const }) }) ?? saved.value;
         return ok(view(record, { capacity, bufferAfter: bufferMinutes ? bufferMinutes * 60_000 : null }));
       } finally {
         adjustCreating(owner, -1);
       }
+    },
+
+    async setDisplay(owner, calendarId, display) {
+      const record = deps.registry.authorizeOwner(calendarId, owner);
+      if (!record) return fail("No such calendar of yours.");
+      const resource = await deps.dt.resources.find(calendarId).catch(() => null);
+      if (!resource) return fail("That calendar could not be read just now. Try again.");
+      const shape = {
+        capacity: resource.capacity,
+        bufferMinutes: resource.bufferAfter ? Math.round(resource.bufferAfter / 60_000) : 0,
+        takesMeetingRequests: record.bookingMode === "request",
+      };
+      const fits = checkDisplay(display, shape);
+      if (!fits.ok) return fits;
+      const updated = deps.registry.updateOwned(calendarId, owner, { display: fits.value });
+      if (!updated) return fail("No such calendar of yours.");
+      return ok(view(updated, resource));
     },
   };
 }

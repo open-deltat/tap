@@ -1,5 +1,6 @@
 import { HORIZON_DAYS, ALLOWED_SLOT_MINUTES } from "./bookable-service";
 import { MAX_BUFFER_MINUTES, MAX_CAPACITY, MAX_CALENDARS_PER_OWNER } from "./my-calendars";
+import { DISPLAY_NAMES, DISPLAYS, NOT_YET } from "./calendar-displays";
 import type { ExampleId } from "../examples/config";
 import type { DaySchedule } from "../actions/schedule-window";
 import type { WeekHours } from "../examples/builder/schedule";
@@ -329,6 +330,11 @@ export function calendarGuide() {
         "Each calendar has its own booking link, its own meeting requests and its own booking passes. Hand a client Anna's link to ask Anna, or mint a pass on the Meeting room to let one agent book the room. A person and a room cannot be booked together in one step yet.",
       who_manages:
         "All of them belong to the account that created them; teammates do not manage their own calendar from their own account yet.",
+    },
+    displays: {
+      about: "How a calendar's public booking page looks. Set it with create_calendar's display, or change it with set_calendar_display.",
+      available: DISPLAY_NAMES.map((d) => ({ display: d, example: DISPLAYS[d].example, when_to_pick: DISPLAYS[d].pick })),
+      not_yet: NOT_YET,
     },
     limits: `One account can own up to ${MAX_CALENDARS_PER_OWNER} calendars.`,
     examples: (Object.keys(GUIDES) as ExampleId[]).map((id) => GUIDES[id]()),

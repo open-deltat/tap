@@ -135,6 +135,7 @@ describe("asking for and answering a meeting through MCP", () => {
       "release_with_pass",
       "request_meeting",
       "revoke_booking_pass",
+      "set_calendar_display",
       "withdraw_meeting_request",
     ]);
     for (const tool of tools) {
@@ -296,11 +297,25 @@ describe("booking directly with a pass through MCP", () => {
           takes_meeting_requests: true,
           capacity: 1,
           buffer_minutes: 0,
+          display: "appointments",
           booking_link: "https://delt.at/b/cal1",
         },
       ],
     });
     expect((await call(stranger, "list_my_calendars", {})).body).toEqual({ calendars: [] });
+  });
+
+  test("set_calendar_display: the owner sets a listed view; a stranger and an unlisted view are refused", async () => {
+    const { deps } = endpoint();
+    const owner = await connect(deps, "owner");
+    const stranger = await connect(deps, "stranger");
+    expect((await call(owner, "set_calendar_display", { calendar_id: "cal1", display: "appointments" })).body).toMatchObject({
+      calendar_id: "cal1",
+      display: "appointments",
+    });
+    expect((await call(stranger, "set_calendar_display", { calendar_id: "cal1", display: "appointments" })).isError).toBe(true);
+    const unlisted = await deps.calendars.setDisplay(OWNER, "cal1", "seats");
+    expect(unlisted.ok).toBe(false);
   });
 });
 
@@ -316,7 +331,7 @@ describe("creating calendars through MCP", () => {
       weekly_hours: { monday: [{ from: "09:00", to: "17:00" }], friday: [{ from: "09:00", to: "12:00" }] },
     });
     expect(made.isError).toBe(false);
-    expect(made.body).toMatchObject({ name: "Consultations", timezone: "Europe/Berlin", slot_minutes: 30, takes_meeting_requests: false, capacity: 1 });
+    expect(made.body).toMatchObject({ name: "Consultations", timezone: "Europe/Berlin", slot_minutes: 30, takes_meeting_requests: false, capacity: 1, display: "appointments" });
     const id = String(made.body.calendar_id);
     expect(made.body.booking_link).toBe(`https://delt.at/b/${id}`);
 

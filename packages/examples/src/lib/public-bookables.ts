@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { hashManageKey, mintManageKey, verifyManageKey } from "./manage-key";
 import { requireDisplayText } from "./display-text";
 import type { WeekHours } from "../examples/builder/schedule";
+import { DEFAULT_DISPLAY, isDisplay, type Display } from "./calendar-displays";
 
 // The registry of bookables strangers created on the live site. deltat owns the timeline; this owns
 // the two things deltat must never learn (NOT-02): who may edit a bookable, and the presentation
@@ -40,6 +41,8 @@ export interface BookableRecord {
    * the owner approves each meeting (meeting-requests.ts); nothing books without the owner.
    */
   readonly bookingMode: BookingMode;
+  /** How its public booking page looks (calendar-displays.ts). */
+  readonly display: Display;
 }
 
 export const BOOKING_MODES = ["instant", "request"] as const;
@@ -51,7 +54,7 @@ export const isBookingMode = (value: unknown): value is BookingMode =>
 // At rest the presentation fields are optional so records written before they existed still load;
 // toPublic fills the defaults, so callers always see a complete BookableRecord.
 interface StoredRecord
-  extends Omit<BookableRecord, "priceCents" | "currency" | "week" | "requireLoginToBook" | "bookingMode"> {
+  extends Omit<BookableRecord, "priceCents" | "currency" | "week" | "requireLoginToBook" | "bookingMode" | "display"> {
   readonly keyHash: string;
   /**
    * The signed-in principal that created this bookable (`iss#sub`), absent for bookables created
@@ -64,6 +67,12 @@ interface StoredRecord
   readonly week?: WeekHours;
   readonly requireLoginToBook?: boolean;
   readonly bookingMode?: BookingMode;
+  /**
+   * Unchecked on load, on purpose: a record written before views existed has none, and one written by
+   * a newer version may name a view this one does not know. Both read as the default (toPublic)
+   * rather than failing the shape check, which would drop the whole calendar.
+   */
+  readonly display?: unknown;
 }
 
 interface RegistryFile {
@@ -100,6 +109,7 @@ export interface BookableRegistry {
       week?: WeekHours;
       requireLoginToBook?: boolean;
       bookingMode?: BookingMode;
+      display?: Display;
     }
   ): BookableRecord | undefined;
   /** Owner-gated removal from the registry. deltat resource deletion is the caller's job. */
@@ -159,6 +169,7 @@ function toPublic({
   week,
   requireLoginToBook,
   bookingMode,
+  display,
   ...record
 }: StoredRecord): BookableRecord {
   return {
@@ -169,6 +180,7 @@ function toPublic({
     // Default ON, including for records written before the field existed.
     requireLoginToBook: requireLoginToBook ?? true,
     bookingMode: bookingMode ?? "instant",
+    display: isDisplay(display) ? display : DEFAULT_DISPLAY,
   };
 }
 
@@ -258,6 +270,7 @@ export function openBookableRegistry(
         ...(patch.week !== undefined && { week: patch.week }),
         ...(patch.requireLoginToBook !== undefined && { requireLoginToBook: patch.requireLoginToBook }),
         ...(patch.bookingMode !== undefined && { bookingMode: patch.bookingMode }),
+        ...(patch.display !== undefined && { display: patch.display }),
       };
       records.set(id, updated);
       flush();

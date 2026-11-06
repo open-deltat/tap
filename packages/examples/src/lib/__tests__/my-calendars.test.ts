@@ -23,6 +23,7 @@ describe("creating a calendar", () => {
       takesMeetingRequests: false,
       capacity: 1,
       bufferMinutes: 0,
+      display: "appointments",
       bookingLink: `${BOOKING_BASE}/b/${made.id}`,
     });
     expect(registry.authorizeOwner(made.id, OWNER)?.week).toEqual(DEFAULT_WEEK);
@@ -104,6 +105,7 @@ describe("listing calendars", () => {
         takesMeetingRequests: true,
         capacity: 1,
         bufferMinutes: 0,
+        display: "appointments",
         bookingLink: `${BOOKING_BASE}/b/cal1`,
       },
     ]);
