@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ArrowRight, Check, RefreshCw } from "lucide-react";
 import { OLD_WORLD } from "./brand-icons";
 import { DeltatMark } from "@/components/deltat-mark";
+import { Asking, Countdown } from "./motion";
 
 // The same Tuesday afternoon on two calendars, shown finished. Three agents booked at the same
 // moment. On a calendar that is copied and checked now and then, three things go wrong, each marked
@@ -47,11 +48,17 @@ function OldCalendar() {
       />
       <Rows>
         <Row t="14:30" tag="double booked">
-          <OldChip tone="clash">Agent A</OldChip>
-          <OldChip tone="clash">Agent B</OldChip>
+          <OldChip tone="clash" pulse>
+            Agent A
+          </OldChip>
+          <OldChip tone="clash" pulse>
+            Agent B
+          </OldChip>
         </Row>
         <Row t="15:00" tag="no hold">
-          <OldChip tone="ghost">Agent C · asking…</OldChip>
+          <OldChip tone="ghost">
+            <Asking who="Agent C" />
+          </OldChip>
           <OldChip tone="clash">Someone else</OldChip>
         </Row>
         <Row t="15:30" />
@@ -74,7 +81,7 @@ function NewCalendar() {
           status={
             <span className="inline-flex items-center gap-1.5 text-[#6ee7b7]">
               <span className="dt-breathe h-1.5 w-1.5 rounded-full bg-[#34d399]" />
-              live
+              <span className="dt-breathe-soft">live</span>
             </span>
           }
           dark
@@ -92,7 +99,9 @@ function NewCalendar() {
           </Row>
           <Row t="15:30" dark>
             <NewChip tone="booked">Agent C</NewChip>
-            <NewChip tone="held">held · 4:59</NewChip>
+            <NewChip tone="held">
+              held ·&nbsp;<Countdown />
+            </NewChip>
           </Row>
         </Rows>
       </div>
@@ -125,9 +134,14 @@ function Row({ t, tag, dark, children }: { t: string; tag?: string; dark?: boole
 }
 
 // On the old calendar: amber for a booking that collides, dashed grey for an agent still asking.
-function OldChip({ tone, children }: { tone: "clash" | "ghost"; children: ReactNode }) {
+// `pulse` gives the double-booked pair one soft amber pulse every five seconds.
+function OldChip({ tone, pulse, children }: { tone: "clash" | "ghost"; pulse?: boolean; children: ReactNode }) {
   const look = tone === "clash" ? "border border-dt-held/40 bg-dt-held-soft text-dt-held-ink" : "border border-dashed border-dt-line-strong text-dt-ink-3";
-  return <span className={`inline-flex h-8 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-2 text-[12.5px] font-medium sm:h-9 sm:text-[13.5px] ${look}`}>{children}</span>;
+  return (
+    <span className={`inline-flex h-8 flex-1 items-center justify-center whitespace-nowrap rounded-lg px-2 text-[12.5px] font-medium sm:h-9 sm:text-[13.5px] ${look} ${pulse ? "dt-clash" : ""}`}>
+      {children}
+    </span>
+  );
 }
 
 // On Δt: white for a booking that stands, dashed for the one that was sent on, green for a hold.

@@ -3,6 +3,7 @@ import { ArrowRight, Check, RefreshCw } from "lucide-react";
 import { FRIEND_NAMES } from "@open-deltat/examples/lib/friends";
 import { DeltatMark } from "@/components/deltat-mark";
 import { OLD_WORLD } from "./brand-icons";
+import { Asking, Countdown } from "./motion";
 
 // The five things an agent runs into on a normal calendar, each shown twice in the hero's own
 // picture language: "Today" on the left with one amber thing wrong, "Δt" on the right ending in
@@ -22,7 +23,9 @@ const WALLS: readonly Wall[] = [
     today: (
       <Rows>
         <Row t="14:30" tag="taken while A asked">
-          <Chip tone="ghost">Agent A · asking…</Chip>
+          <Chip tone="ghost">
+            <Asking who="Agent A" />
+          </Chip>
           <Chip tone="clash">Someone else</Chip>
         </Row>
       </Rows>
@@ -31,7 +34,9 @@ const WALLS: readonly Wall[] = [
       <Rows>
         <Row t="14:30">
           <Chip tone="booked">Agent A</Chip>
-          <Chip tone="held">held · 4:59</Chip>
+          <Chip tone="held">
+            held ·&nbsp;<Countdown />
+          </Chip>
         </Row>
       </Rows>
     ),
@@ -72,8 +77,12 @@ const WALLS: readonly Wall[] = [
     today: (
       <Rows>
         <Row t="14:30" tag="double booked">
-          <Chip tone="clash">Agent A</Chip>
-          <Chip tone="clash">Agent B</Chip>
+          <Chip tone="clash" pulse>
+            Agent A
+          </Chip>
+          <Chip tone="clash" pulse>
+            Agent B
+          </Chip>
         </Row>
       </Rows>
     ),
@@ -184,14 +193,19 @@ function Row({ t, tag, children }: { t: string; tag?: string; children: ReactNod
   );
 }
 
-function Chip({ tone, children }: { tone: "booked" | "clash" | "ghost" | "held"; children: ReactNode }) {
+// `pulse` gives a double-booked pair one soft amber pulse every five seconds.
+function Chip({ tone, pulse, children }: { tone: "booked" | "clash" | "ghost" | "held"; pulse?: boolean; children: ReactNode }) {
   const look = {
     booked: "flex-1 bg-dt-ink text-dt-on-ink",
     clash: "flex-1 border border-dt-held/40 bg-dt-held-soft text-dt-held-ink",
     ghost: "flex-1 border border-dashed border-dt-line-strong text-dt-ink-3",
     held: "shrink-0 bg-dt-accent-soft text-dt-accent-ink",
   }[tone];
-  return <span className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2 text-[12px] font-medium ${look}`}>{children}</span>;
+  return (
+    <span className={`inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2 text-[12px] font-medium ${look} ${pulse ? "dt-clash" : ""}`}>
+      {children}
+    </span>
+  );
 }
 
 function Tick() {
@@ -222,7 +236,7 @@ function Live() {
   return (
     <span className="inline-flex items-center gap-1.5 text-[11.5px] text-dt-accent-ink">
       <span className="dt-breathe h-1.5 w-1.5 rounded-full bg-dt-accent" />
-      listening
+      <span className="dt-breathe-soft">listening</span>
     </span>
   );
 }

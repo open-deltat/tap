@@ -122,6 +122,28 @@ export default function MeetExample() {
   const eveningIndex = chosen ? evenings.findIndex((e) => e.dayStart === dayOf(chosen.start)) : -1;
   const evening = eveningIndex >= 0 ? evenings[eveningIndex] : undefined;
 
+  // Until someone touches the example, it walks through the evening's free start times on its
+  // own, so the page shows the answer moving instead of sitting still. Any interaction stops it
+  // for good; reduced motion never starts it.
+  const [auto, setAuto] = useState(true);
+  const starts = evening?.starts;
+  useEffect(() => {
+    if (!auto || !starts || starts.length < 2) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = window.setInterval(() => {
+      setPickedStart((cur) => {
+        const i = cur == null ? 0 : starts.indexOf(cur);
+        return starts[(i + 1) % starts.length];
+      });
+    }, 2600);
+    return () => clearInterval(id);
+  }, [auto, starts]);
+
+  function pickStart(start: number) {
+    setAuto(false);
+    setPickedStart(start);
+  }
+
   const lanes = useMemo(() => {
     if (!data || !evening) return [];
     const ofDay = (slots: AvailabilitySlot[]) => slots.filter(inDay(evening.dayStart));
@@ -134,15 +156,17 @@ export default function MeetExample() {
   // The pager steps between evenings; landing on one picks its first start.
   function stepEvening(delta: -1 | 1) {
     const next = evenings[eveningIndex + delta];
-    if (next) setPickedStart(next.starts[0]);
+    if (next) pickStart(next.starts[0]);
   }
 
   function pickDuration(m: Duration) {
+    setAuto(false);
     setDuration(m);
     setPickedStart(null);
   }
 
   function book() {
+    setAuto(false);
     if (!ids || !chosen) return;
     const { start, end } = chosen;
     startTransition(async () => {
@@ -261,7 +285,7 @@ export default function MeetExample() {
                     className="justify-start"
                     items={evening.starts.map((s) => ({ value: s, label: <span className="tabular-nums">{formatTime(s)}</span> }))}
                     value={chosen.start}
-                    onChange={setPickedStart}
+                    onChange={pickStart}
                     ariaLabel="Start time"
                   />
                 </div>

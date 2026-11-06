@@ -242,8 +242,26 @@
 @keyframes dt-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 .dt-breathe { animation: dt-breathe 2.4s ease-in-out infinite; }
 
+/* Words next to a breathing dot ("listening", "live") breathe with it, more gently, so the
+   text stays readable at its lowest point. */
+@keyframes dt-breathe-soft { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.dt-breathe-soft { animation: dt-breathe-soft 2.4s ease-in-out infinite; }
+
+/* A double booking, shown as a problem rather than an alarm: one soft amber pulse every five
+   seconds, then stillness. */
+@keyframes dt-clash {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--dt-held) 55%, transparent); }
+  16% { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 7px transparent; }
+}
+.dt-clash { animation: dt-clash 5s var(--ease-dt) infinite; }
+
+/* "asking…": the three dots of someone thinking, one after another. */
+@keyframes dt-dot { 0%, 60%, 100% { opacity: 0.25; } 30% { opacity: 1; } }
+.dt-dot { animation: dt-dot 1.4s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
-  .dt-rise, .dt-ping, .dt-breathe { animation: none; }
+  .dt-rise, .dt-ping, .dt-breathe, .dt-breathe-soft, .dt-clash, .dt-dot { animation: none; }
   .dt-draw-ring, .dt-draw-tick { animation: none; stroke-dashoffset: 0; }
 }
 

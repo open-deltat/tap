@@ -209,15 +209,10 @@ export default function Home() {
         {/* How it works: the four commands, shown as what the agent types, in the colour of their result */}
         <Section eyebrow="How it works" title="An agent can do four things.">
           <Verbs />
-          <p className="mt-10 max-w-3xl text-[15px] leading-relaxed text-dt-ink-2">
-            Underneath is Δt, a database with one rule: two bookings never share the same time. The database itself
-            says no, not a check in your code. It speaks TAP, the Time Allocation Protocol, over the Postgres wire,
-            so any Postgres driver can talk to it.
-          </p>
         </Section>
 
         {/* Use cases */}
-        <Section eyebrow="What runs on Δt" title="A calendar for anything you can book.">
+        <Section eyebrow="What runs on Δt" title="Booking infrastructure for anything with a time.">
           <div className="grid gap-px overflow-hidden rounded-3xl border border-dt-line bg-dt-line sm:grid-cols-2 lg:grid-cols-4">
             {USE_CASES.map((u) => (
               <div key={u.title} className="relative flex flex-col bg-dt-surface p-6">
@@ -310,24 +305,35 @@ export default function Home() {
           <Faq />
         </Section>
 
-        {/* Closing CTA */}
+        {/* Closing call: the Δt tile itself (the logo's dark ground, emerald ring and the light
+            rising from its foot), the same in both themes, so the last thing on the page is the
+            new side of the hero, large. */}
         <section className="mx-auto max-w-6xl px-5 pb-20 sm:px-6">
-          <div className="rounded-[32px] bg-dt-ink px-6 py-14 text-center text-dt-on-ink sm:px-12 sm:py-20">
-            <h2 className="mx-auto max-w-2xl text-balance text-[2rem] font-semibold leading-tight tracking-[-0.03em] sm:text-[2.8rem]">
-              Give your agent a calendar it can’t double-book.
-            </h2>
-            <p className="mx-auto mt-4 max-w-lg text-[16px] leading-relaxed opacity-75">
-              Five founding teams get Δt hosted, wired in and checked by its author. The price holds for a year.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <a href={PILOT_MAILTO} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-dt-on-ink px-7 text-[15px] font-semibold text-dt-ink transition-[opacity,transform] duration-150 hover:opacity-90 active:scale-[0.98] sm:w-auto">
-                Start a pilot
-                <ArrowRight className="h-4 w-4" />
-              </a>
-              <a href={SITE.github} target="_blank" rel="noreferrer" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-dt-on-ink/25 px-7 text-[15px] font-medium transition-colors hover:bg-dt-on-ink/10 sm:w-auto">
-                <Github className="h-4 w-4" />
-                Read the source
-              </a>
+          <div className="relative overflow-hidden rounded-[36px] bg-[#0a0f0d] px-6 py-16 text-center text-white ring-1 ring-inset ring-[#34d399]/30 sm:px-12 sm:py-24">
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_70%_at_50%_118%,rgba(52,211,153,0.42),transparent)]" />
+            <div className="relative">
+              <DeltatMark size="lg" className="mx-auto" />
+              <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3.5 py-1.5 text-[12.5px] text-white/75">
+                <span className="dt-breathe h-1.5 w-1.5 rounded-full bg-[#34d399]" />
+                Founding pilot · five places
+              </div>
+              <h2 className="mx-auto mt-6 max-w-2xl text-balance text-[2.2rem] font-semibold leading-[1.05] tracking-[-0.035em] sm:text-[3.4rem]">
+                Let your agents book. Never twice.
+              </h2>
+              <p className="mx-auto mt-5 max-w-xl text-pretty text-[16px] leading-relaxed text-white/70 sm:text-[17px]">
+                Five founding teams get Δt hosted in the EU, wired into their agent, and checked for double bookings by
+                the person who wrote it. €990 a month, price locked for a year, cancel any month.
+              </p>
+              <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <a href={PILOT_MAILTO} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-7 text-[15px] font-semibold text-[#0a0f0d] transition-[opacity,transform] duration-150 hover:opacity-90 active:scale-[0.98] sm:w-auto">
+                  Start a pilot
+                  <ArrowRight className="h-4 w-4" />
+                </a>
+                <a href={SITE.github} target="_blank" rel="noreferrer" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full border border-white/20 px-7 text-[15px] font-medium text-white transition-colors hover:bg-white/10 sm:w-auto">
+                  <Github className="h-4 w-4" />
+                  Read the source
+                </a>
+              </div>
             </div>
           </div>
         </section>
