@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { AvailabilitySlot, DeltaT } from "@open-deltat/client";
+import { classifyRefusal, sqlstateOf, type AvailabilitySlot, type DeltaT } from "@open-deltat/client";
 import type { BookableRecord, BookableRegistry } from "./public-bookables";
 import type { RateLimiter } from "./rate-limit";
 import type { Notifier, OwnerNotice } from "./notify";
@@ -7,7 +7,7 @@ import { describeSpan } from "./meeting-request-service";
 import { hashManageKey, verifyManageKey } from "./manage-key";
 import { requireDisplayText } from "./display-text";
 import { HOLD_TTL_MS, HORIZON_DAYS, MAX_QUERY_WINDOW_MS, type Outcome } from "./bookable-service";
-import { passStatus, usesLeft, type BookingPass, type BookingPassStore, type PassAction, type PassStatus } from "./booking-passes";
+import { passStatus, usesLeft, type BookingPass, type BookingPassStore, type PassAction, type PassHold, type PassStatus } from "./booking-passes";
 
 // Direct booking on someone's calendar, but only with a pass its owner handed out (booking-passes.ts).
 // The owner mints one for a window, lengths and a number of bookings; whoever holds it may find a
@@ -15,8 +15,11 @@ import { passStatus, usesLeft, type BookingPass, type BookingPassStore, type Pas
 // whatever the reason, so a guessed or stale pass teaches the guesser nothing.
 //
 // Booking spends the pass in the same decision: the pass moves to `spending` before the kernel
-// commit and nothing else can start a booking on it until that commit has answered. If the kernel
-// refuses, the pass goes back to active with its uses intact. The hold and commit calls are the ones
+// commit and nothing else can start a booking on it until that commit has answered. Only a definite
+// refusal (the hold is unknown or expired) puts the pass back to active with its uses intact. A lost
+// reply proves nothing, so the hold and bookings are read back to see what landed; if even that
+// fails, the pass stays `spending` and stops working (INV-01's direction: a lost pass, never an extra
+// booking), and its owner may revoke it. The hold and commit calls are the ones
 // meeting approval makes (meeting-request-service.ts), so the kernel's refusal of an overlapping hold
 // stays the real double-booking guard.
 //
@@ -61,6 +64,22 @@ const DAY_MS = 86_400_000;
 
 const BUSY = "Another booking with this pass is going through. Retry once; if the pass is then not valid, the other booking used it.";
 const NOT_THIS_PASS = "That hold was not made with this pass, or it is already booked or released.";
+const NOT_BOOKED = "Nothing was booked: the hold expired or the booking did not go through. Hold the time again; the pass still works.";
+const COULD_NOT_CONFIRM = "We could not confirm the booking. Ask the owner whether it went through.";
+const RELEASE_CROSSED_BOOKING = "That hold was being booked at the same moment, so it was not released.";
+
+/** What a commit did, as far as anything can tell. `unknown` is the one answer that books nothing more. */
+type CommitOutcome = { readonly kind: "booked"; readonly bookingId: string } | { readonly kind: "not_booked" } | { readonly kind: "unknown" };
+
+/**
+ * The kernel answered and said no: the hold is unknown or expired. Only this lets a failed commit put
+ * the pass straight back; a lost connection proves nothing, because the commit may have landed.
+ */
+function isDefiniteRefusal(err: unknown): boolean {
+  if (sqlstateOf(err) === null) return false;
+  const { code } = classifyRefusal(err);
+  return code === "EXPIRED" || code === "NOT_FOUND";
+}
 
 const fail = <T>(error: string): Outcome<T> => ({ ok: false, error });
 const ok = <T>(value: T): Outcome<T> => ({ ok: true, value });
@@ -162,6 +181,10 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
     if (next > 0) placing.set(passId, next);
     else placing.delete(passId);
   };
+  // Passes whose commit is awaiting the kernel in this process right now. A pass that is `spending`
+  // but not in here is one whose commit nobody could confirm (or a crash left): it is not "going
+  // through", it has stopped working, and its owner may revoke it.
+  const spendingHere = new Set<string>();
 
   const viewOf = (pass: BookingPass, record: BookableRecord | undefined, at: number): PassView => ({
     id: pass.id,
@@ -222,8 +245,36 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       audit(pass, caller, "refused", "claimed by another caller");
       return fail(PASS_NOT_VALID);
     }
-    if (status === "spending") return refuse(pass, caller, BUSY);
+    if (status === "spending") {
+      if (spendingHere.has(pass.id)) return refuse(pass, caller, BUSY);
+      audit(pass, caller, "refused", "booking unconfirmed");
+      return fail(PASS_NOT_VALID);
+    }
     return ok({ pass, record });
+  };
+
+  /**
+   * After a commit failed without a definite refusal, find out what it did. A commit consumes its hold
+   * and leaves a booking on the same span under the same label, so: the hold still there means it did
+   * not land; a booking on exactly that span with our label means it did; neither means the hold
+   * lapsed. If the reads fail too, nobody knows, and the pass must stop rather than book again.
+   */
+  const confirmCommit = async (calendarId: string, hold: PassHold, label: string): Promise<CommitOutcome> => {
+    const span = { start: hold.start, end: hold.end };
+    const read = await Promise.all([deps.dt.holds.get(calendarId, span), deps.dt.bookings.get(calendarId, span)]).catch(() => null);
+    if (!read) return { kind: "unknown" };
+    const [holds, bookings] = read;
+    if (holds.some((h) => h.id === hold.holdId)) return { kind: "not_booked" };
+    const made = bookings.find((b) => b.start === hold.start && b.end === hold.end && b.label === label);
+    return made ? { kind: "booked", bookingId: made.id } : { kind: "not_booked" };
+  };
+
+  const commit = async (calendarId: string, hold: PassHold, label: string): Promise<CommitOutcome> => {
+    const answered = await deps.dt.holds.commit(hold.holdId, { label }).then(
+      ({ bookingId }): CommitOutcome => ({ kind: "booked", bookingId }),
+      (err: unknown): CommitOutcome | null => (isDefiniteRefusal(err) ? { kind: "not_booked" } : null)
+    );
+    return answered ?? confirmCommit(calendarId, hold, label);
   };
 
   /**
@@ -323,10 +374,11 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       const record = pass && deps.registry.authorizeOwner(pass.calendarId, owner);
       if (!pass || !record) return fail("No such pass on a calendar you own.");
       const status = passStatus(pass, now());
-      if (status === "spending") return fail(BUSY);
-      if (status !== "active") return fail(`That pass is already ${status}.`);
+      // Wait only for a commit really in flight here; a pass stuck in `spending` is the owner's to stop.
+      if (status === "spending" && spendingHere.has(pass.id)) return fail(BUSY);
+      if (status !== "active" && status !== "spending") return fail(`That pass is already ${status}.`);
       const revoked = deps.store.revoke(pass.id, now());
-      if (!revoked) return fail(BUSY);
+      if (!revoked) return fail(`That pass is already ${status}.`);
       await releaseLive(revoked);
       return ok(viewOf(deps.store.get(pass.id) ?? revoked, record, now()));
     },
@@ -411,7 +463,7 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       const opened = open(token, caller);
       if (!opened.ok) return opened;
       const { pass, record } = opened.value;
-      const hold = pass.holds.find((h) => h.holdId === holdId && h.outcome.status === "live");
+      const hold = pass.holds.find((h) => h.holdId === holdId && h.outcome.status === "live" && h.placedBy === caller);
       if (!hold) return refuse(pass, caller, NOT_THIS_PASS);
       if (hold.expiresAt <= now()) {
         deps.store.releaseHold(pass.id, holdId, now());
@@ -424,31 +476,39 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
 
       // The compare-and-set: from here until the commit answers, no other booking can start on it.
       if (!deps.store.beginSpend(pass.id)) return refuse(pass, caller, BUSY);
-      const committed = await deps.dt.holds.commit(holdId, { label: name.value }).catch(() => null);
-      if (!committed) {
+      spendingHere.add(pass.id);
+      const outcome = await commit(pass.calendarId, hold, name.value).finally(() => spendingHere.delete(pass.id));
+      if (outcome.kind === "unknown") {
+        // The safe direction: the pass stays `spending`, so it books nothing more; the owner can revoke it.
+        return refuse(pass, caller, COULD_NOT_CONFIRM);
+      }
+      if (outcome.kind === "not_booked") {
+        await deps.dt.holds.release(holdId).catch(() => {});
         deps.store.finishSpend(pass.id, { booked: false, holdId, at: now() });
-        return refuse(pass, caller, "That hold expired before it was booked, so nothing was booked. Hold the time again; the pass still works.");
+        return refuse(pass, caller, NOT_BOOKED);
       }
       const finished = deps.store.finishSpend(pass.id, {
         booked: true,
         holdId,
         at: now(),
-        bookingId: committed.bookingId,
+        bookingId: outcome.bookingId,
         bookedBy: name.value,
         note: forOwner.value,
       });
-      // Only this function moves a pass out of `spending`, and revoke refuses while it is there.
+      // Only this function moves a pass out of `spending`, and revoke waits while it is in flight.
       if (!finished) throw new Error(`Booking pass ${pass.id} left the spending state during its own spend.`);
       if (finished.state.status === "spent") await releaseLive(finished);
-      audit(pass, caller, "book", committed.bookingId);
+      audit(pass, caller, "book", outcome.bookingId);
+      // The guest's name and note are quoted (JSON-escaped), so an owner's agent reads them as data.
       const which = pass.label ? `the pass "${pass.label}"` : "a booking pass";
+      const aside = forOwner.value ? ` (note: ${JSON.stringify(forOwner.value)})` : "";
       announce({
         kind: "pass_booking",
         calendarId: pass.calendarId,
         passId: pass.id,
-        text: `${name.value} booked ${describeSpan(hold.start, hold.end, record.timezone)} on ${record.name} with ${which}${forOwner.value ? ` (note: ${forOwner.value})` : ""}`,
+        text: `${JSON.stringify(name.value)} booked ${describeSpan(hold.start, hold.end, record.timezone)} on ${record.name} with ${which}${aside}`,
       });
-      return ok({ scope: scopeOf(finished, record), bookingId: committed.bookingId, start: hold.start, end: hold.end, usesLeft: usesLeft(finished) });
+      return ok({ scope: scopeOf(finished, record), bookingId: outcome.bookingId, start: hold.start, end: hold.end, usesLeft: usesLeft(finished) });
     },
 
     async release({ token, caller, holdId }) {
@@ -457,6 +517,9 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       const { pass, record } = opened.value;
       if (!pass.holds.some((h) => h.holdId === holdId && h.outcome.status === "live")) return refuse(pass, caller, NOT_THIS_PASS);
       await deps.dt.holds.release(holdId).catch(() => {});
+      // A booking may have started on this hold while the release was out. If it is in flight (or
+      // unconfirmed), the hold may have become a booking: marking it released would hide that.
+      if (deps.store.get(pass.id)?.state.status === "spending") return refuse(pass, caller, RELEASE_CROSSED_BOOKING);
       const released = deps.store.releaseHold(pass.id, holdId, now());
       audit(pass, caller, "release", holdId);
       return ok({ scope: scopeOf(released ?? pass, record), holdId });

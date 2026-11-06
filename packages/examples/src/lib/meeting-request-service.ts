@@ -139,7 +139,7 @@ export function createMeetingService(deps: MeetingDeps): MeetingService {
   return {
     async freeTimes({ calendarId, start, end }) {
       const record = deps.registry.get(calendarId);
-      if (!record || record.bookingMode !== "request") return fail("That calendar does not take meeting requests.");
+      if (!record || record.bookingMode !== "request") return fail("No such calendar, or it does not take meeting requests.");
       if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return fail("That is not a valid window.");
       const from = Math.max(start, now());
       const to = Math.min(end, from + MAX_QUERY_WINDOW_MS, now() + HORIZON_DAYS * DAY_MS);

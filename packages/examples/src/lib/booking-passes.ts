@@ -125,9 +125,15 @@ export interface BookingPassStore {
   releaseHold(id: string, holdId: string, at: number): BookingPass | undefined;
   /** Compare-and-set active -> spending. Undefined when the pass was not active: someone else is spending it, or it is over. */
   beginSpend(id: string): BookingPass | undefined;
-  /** Settle a spend: booked takes one use (spent at zero), not booked puts the pass back to active. */
+  /**
+   * Settle a spend: booked takes one use (spent at zero) and marks the hold booked whatever it said
+   * before, because the kernel's booking is the fact; not booked puts the pass back to active.
+   */
   finishSpend(id: string, result: SpendResult): BookingPass | undefined;
-  /** Revoke an active pass. Undefined when it was not active. */
+  /**
+   * Revoke an active pass, or one left `spending` by a commit nobody could confirm. The caller must
+   * not revoke while its own spend is still in flight. Undefined when it was neither.
+   */
   revoke(id: string, at: number): BookingPass | undefined;
   recordUse(id: string, use: PassUse): void;
   count(): number;
@@ -350,13 +356,14 @@ export function openBookingPassStore(
       return save({
         ...pass,
         state: left > 0 ? { status: "active", usesLeft: left } : { status: "spent", spentAt: at },
-        holds: settle(pass.holds, holdId, { status: "booked", bookedAt: at, bookingId, bookedBy, note }),
+        // Not `settle`: a release that crossed this booking may have marked the hold released first.
+        holds: pass.holds.map((h) => (h.holdId === holdId ? { ...h, outcome: { status: "booked", bookedAt: at, bookingId, bookedBy, note } } : h)),
       });
     },
 
     revoke(id, at) {
       const pass = passes.get(id);
-      if (!pass || pass.state.status !== "active") return undefined;
+      if (!pass || (pass.state.status !== "active" && pass.state.status !== "spending")) return undefined;
       return save({ ...pass, state: { status: "revoked", revokedAt: at } });
     },
 

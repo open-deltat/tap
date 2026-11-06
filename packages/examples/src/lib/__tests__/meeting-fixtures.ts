@@ -34,7 +34,14 @@ export function fakeDeltaT() {
   const state = {
     free: [{ start: NOW, end: NOW + 7 * 24 * 60 * MIN }] as AvailabilitySlot[],
     holdFails: false,
+    /** The kernel refuses the commit: the hold is unknown or expired (SQLSTATE 42704). */
     commitFails: false,
+    /** The kernel applies the commit, then the reply is lost on the way back. */
+    commitReplyLost: false,
+    /** The connection drops before the commit reaches the kernel: nothing is applied. */
+    commitNotSent: false,
+    /** Every read of holds and bookings fails, as during an outage. */
+    readsFail: false,
     latencyMs: 0,
     holds: [] as string[],
     placed: [] as { id: string; start: number; end: number; expiresAt: number }[],
@@ -42,7 +49,15 @@ export function fakeDeltaT() {
     bookings: [] as { id: string; label: string | undefined }[],
     cancelled: [] as string[],
   };
+  /** holdId -> bookingId for every commit the kernel applied: the hold is consumed, the booking takes its span. */
+  const committed = new Map<string, string>();
   const pause = () => (state.latencyMs ? Bun.sleep(state.latencyMs) : Promise.resolve());
+  const overlaps = (s: { start: number; end: number }, f?: { start?: number; end?: number }) =>
+    (f?.end === undefined || s.start < f.end) && (f?.start === undefined || s.end > f.start);
+  const connectionReset = () => Object.assign(new Error("read ECONNRESET"), { errno: -54 });
+  const readOrFail = () => {
+    if (state.readsFail) throw connectionReset();
+  };
   const dt = {
     availability: {
       get: async ({ start, end }: { start: number; end: number }) =>
@@ -61,18 +76,37 @@ export function fakeDeltaT() {
       },
       commit: async (holdId: string, opts?: { label?: string }) => {
         await pause();
-        if (state.commitFails) throw new Error("hold expired");
+        if (state.commitFails) throw Object.assign(new Error("unknown hold (expired?)"), { code: "42704" });
+        if (state.commitNotSent) throw connectionReset();
         const booking = { id: `booking${state.bookings.length + 1}`, label: opts?.label };
         state.bookings.push(booking);
+        committed.set(holdId, booking.id);
+        if (state.commitReplyLost) throw connectionReset();
         return { bookingId: booking.id, holdId };
       },
       release: async (holdId: string) => {
         state.released.push(holdId);
       },
+      get: async (resourceId: string, filter?: { start?: number; end?: number }) => {
+        readOrFail();
+        return state.placed
+          .filter((h) => !committed.has(h.id) && !state.released.includes(h.id) && overlaps(h, filter))
+          .map((h) => ({ id: h.id, resourceId, start: h.start, end: h.end, expiresAt: h.expiresAt }));
+      },
     },
     bookings: {
       cancel: async (id: string) => {
         state.cancelled.push(id);
+      },
+      get: async (resourceId: string, filter?: { start?: number; end?: number }) => {
+        readOrFail();
+        return [...committed].flatMap(([holdId, bookingId]) => {
+          const span = state.placed.find((h) => h.id === holdId);
+          const booking = state.bookings.find((b) => b.id === bookingId);
+          return span && booking && !state.cancelled.includes(bookingId) && overlaps(span, filter)
+            ? [{ id: bookingId, resourceId, start: span.start, end: span.end, label: booking.label ?? null }]
+            : [];
+        });
       },
     },
   };
