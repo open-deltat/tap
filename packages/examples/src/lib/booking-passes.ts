@@ -58,6 +58,13 @@ export interface PassUse {
   readonly detail: string | null;
 }
 
+/** Who a pass belongs to once its first hold is attempted: nobody else can use it after that. */
+export interface PassClaim {
+  readonly principal: string;
+  /** Their sign-in name, for the owner's list; null when the provider shared none. */
+  readonly name: string | null;
+}
+
 export interface BookingPass {
   readonly id: string;
   /** SHA-256 (hex) of the pass. The lookup key; the pass itself is never stored. */
@@ -74,6 +81,8 @@ export interface BookingPass {
   readonly createdAt: number;
   readonly expiresAt: number;
   readonly state: PassState;
+  /** Null until the first hold; until then the string alone opens the pass. */
+  readonly claim: PassClaim | null;
   readonly holds: readonly PassHold[];
   readonly audit: readonly PassUse[];
 }
@@ -98,6 +107,11 @@ export interface BookingPassStore {
   create(input: NewBookingPass): BookingPass;
   get(id: string): BookingPass | undefined;
   findByTokenHash(tokenHash: string): BookingPass | undefined;
+  /**
+   * Claim an active pass for one principal, or confirm they already hold the claim. Undefined when
+   * someone else claimed it first or the pass is no longer active.
+   */
+  claim(id: string, claim: PassClaim): BookingPass | undefined;
   /** Every pass on a calendar, newest first. */
   listForCalendar(calendarId: string): BookingPass[];
   /** Record a hold placed under an active pass. Undefined when the pass is no longer active. */
@@ -172,6 +186,9 @@ const isHold = (v: unknown): v is PassHold =>
   typeof v.placedBy === "string" &&
   isOutcome(v.outcome);
 
+const isClaim = (v: unknown): v is PassClaim | null =>
+  v === null || (isRecord(v) && typeof v.principal === "string" && isNullableString(v.name));
+
 const isUse = (v: unknown): v is PassUse =>
   isRecord(v) && isNumber(v.at) && PASS_ACTIONS.some((a) => a === v.action) && typeof v.principal === "string" && isNullableString(v.detail);
 
@@ -196,6 +213,7 @@ function isPass(value: unknown): value is BookingPass {
     isNumber(value.createdAt) &&
     isNumber(value.expiresAt) &&
     isState(value.state) &&
+    isClaim(value.claim) &&
     Array.isArray(value.holds) &&
     value.holds.every(isHold) &&
     Array.isArray(value.audit) &&
@@ -259,6 +277,7 @@ export function openBookingPassStore(
         lengthsMinutes: [...input.lengthsMinutes],
         createdAt: now(),
         state: { status: "active", usesLeft: input.uses },
+        claim: null,
         holds: [],
         audit: [],
       };
@@ -273,6 +292,13 @@ export function openBookingPassStore(
     findByTokenHash(tokenHash) {
       const id = byHash.get(tokenHash);
       return id === undefined ? undefined : passes.get(id);
+    },
+
+    claim(id, claim) {
+      const pass = passes.get(id);
+      if (!pass || pass.state.status !== "active") return undefined;
+      if (pass.claim) return pass.claim.principal === claim.principal ? pass : undefined;
+      return save({ ...pass, claim });
     },
 
     listForCalendar(calendarId) {

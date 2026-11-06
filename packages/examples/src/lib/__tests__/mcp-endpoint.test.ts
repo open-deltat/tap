@@ -217,7 +217,12 @@ describe("booking directly with a pass through MCP", () => {
     const listed = await call(owner, "list_booking_passes", {});
     later.push(listed.body);
     expect(listed.body.passes).toEqual([
-      expect.objectContaining({ status: "spent", uses_left: 0, bookings: [expect.objectContaining({ booked_by: "Anna Example", note: "Intro" })] }),
+      expect.objectContaining({
+        status: "spent",
+        bookings_left: 0,
+        claimed_by: "Anna Example",
+        bookings: [expect.objectContaining({ booked_by: "Anna Example", note: "Intro" })],
+      }),
     ]);
 
     const again = await call(anna, "find_times_with_pass", { pass: token });
@@ -241,8 +246,9 @@ describe("booking directly with a pass through MCP", () => {
     expect((await call(stranger, "list_booking_passes", {})).body).toEqual({ passes: [] });
     expect((await call(stranger, "revoke_booking_pass", { pass_id: passId })).isError).toBe(true);
 
-    // Guest tools: every guess, including the pass id and a well-formed pass, gets the one answer.
-    const guesses = [`dtp_${Buffer.alloc(32, 1).toString("base64url")}`, passId, "", `${token.slice(0, -1)}A`];
+    // Guest tools: every guess, including the pass id and a well-formed pass, gets the one answer. So
+    // does the real pass itself: Anna's hold claimed it, so it is hers alone now.
+    const guesses = [`dtp_${Buffer.alloc(32, 1).toString("base64url")}`, passId, "", `${token.slice(0, -1)}A`, token];
     for (const pass of guesses) {
       for (const [name, args] of [
         ["find_times_with_pass", { pass }],
@@ -259,6 +265,6 @@ describe("booking directly with a pass through MCP", () => {
     expect(meetings.state.released).toEqual([]);
     expect(meetings.state.placed.map((p) => p.id)).toEqual([holdId]);
     const listed = await call(owner, "list_booking_passes", { calendar_id: "cal1" });
-    expect(listed.body.passes).toEqual([expect.objectContaining({ pass_id: passId, status: "active", uses_left: 1 })]);
+    expect(listed.body.passes).toEqual([expect.objectContaining({ pass_id: passId, status: "active", bookings_left: 1, claimed_by: "Anna Example" })]);
   });
 });

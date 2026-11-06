@@ -168,11 +168,11 @@ describe("booking with a pass", () => {
     const { mint, passes, state } = setup();
     const { token } = mint();
     const one = must(await passes.hold({ token, caller: GUEST, start: T }));
-    const two = must(await passes.hold({ token, caller: STRANGER, start: T + 60 * MIN }));
+    const two = must(await passes.hold({ token, caller: GUEST, start: T + 60 * MIN }));
     state.latencyMs = 20;
     const results = await Promise.all([
       passes.book({ token, caller: GUEST, holdId: one.holdId, bookedBy: "Anna" }),
-      passes.book({ token, caller: STRANGER, holdId: two.holdId, bookedBy: "Eve" }),
+      passes.book({ token, caller: GUEST, holdId: two.holdId, bookedBy: "Anna again" }),
     ]);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(state.bookings).toHaveLength(1);
@@ -217,6 +217,55 @@ describe("booking with a pass", () => {
     must(await passes.revoke({ owner: OWNER, passId: pass.id }));
     expect(state.released).toEqual([held.holdId]);
     expect(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Anna" })).toEqual({ ok: false, error: PASS_NOT_VALID });
+  });
+});
+
+describe("the first agent to hold claims the pass", () => {
+  test("after the claim, anyone else gets the generic refusal on every tool; the claimer carries on", async () => {
+    const { mint, passes, state } = setup();
+    const { token, pass } = mint({ uses: 2 });
+    must(await passes.findTimes({ token, caller: STRANGER })); // looking before the claim locks nothing
+    const held = must(await passes.hold({ token, caller: GUEST, start: T, name: async () => "Gina Guest" }));
+
+    for (const outcome of [
+      await passes.findTimes({ token, caller: STRANGER }),
+      await passes.hold({ token, caller: STRANGER, start: T + 60 * MIN }),
+      await passes.book({ token, caller: STRANGER, holdId: held.holdId, bookedBy: "Eve" }),
+      await passes.release({ token, caller: STRANGER, holdId: held.holdId }),
+    ]) {
+      expect(outcome).toEqual({ ok: false, error: PASS_NOT_VALID });
+    }
+    expect(state.bookings).toEqual([]);
+    expect(state.released).toEqual([]);
+
+    must(await passes.findTimes({ token, caller: GUEST }));
+    expect(must(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina" })).usesLeft).toBe(1);
+    must(await passes.hold({ token, caller: GUEST, start: T + 60 * MIN }));
+    expect(must(passes.list({ owner: OWNER }))).toEqual([expect.objectContaining({ id: pass.id, claimedBy: "Gina Guest" })]);
+  });
+
+  test("two agents holding at once on an unclaimed pass: one claims it, the other is refused", async () => {
+    const { mint, passes, state } = setup();
+    const { token } = mint();
+    const slowName = (n: string) => async () => {
+      await Bun.sleep(10);
+      return n;
+    };
+    const results = await Promise.all([
+      passes.hold({ token, caller: GUEST, start: T, name: slowName("Gina") }),
+      passes.hold({ token, caller: STRANGER, start: T + 60 * MIN, name: slowName("Eve") }),
+    ]);
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    expect(results.filter((r) => !r.ok)).toEqual([{ ok: false, error: PASS_NOT_VALID }]);
+    expect(state.placed).toHaveLength(1);
+  });
+
+  test("an unclaimed pass shows no claimer, and a claimer without a shared name shows their sign-in id", async () => {
+    const { mint, passes } = setup();
+    const { token } = mint();
+    expect(must(passes.list({ owner: OWNER }))[0]?.claimedBy).toBeNull();
+    must(await passes.hold({ token, caller: GUEST, start: T, name: async () => null }));
+    expect(must(passes.list({ owner: OWNER }))[0]?.claimedBy).toBe(GUEST);
   });
 });
 

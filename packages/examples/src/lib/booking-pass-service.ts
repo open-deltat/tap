@@ -52,7 +52,7 @@ const MAX_NOTE_LENGTH = 500;
 const MIN = 60_000;
 const DAY_MS = 86_400_000;
 
-const BUSY = "A booking with that pass is going through right now. Try again in a moment.";
+const BUSY = "Another booking with this pass is going through. Retry once; if the pass is then not valid any more, the other booking used it.";
 const NOT_THIS_PASS = "That hold was not made with this pass, or it is already booked or released.";
 
 const fail = <T>(error: string): Outcome<T> => ({ ok: false, error });
@@ -90,6 +90,8 @@ export interface PassView {
   readonly status: PassStatus;
   readonly createdAt: number;
   readonly expiresAt: number;
+  /** The claimer's sign-in name (their sign-in id when they shared none); null until the first hold. */
+  readonly claimedBy: string | null;
   readonly bookings: readonly { bookingId: string; start: number; end: number; bookedBy: string; note: string | null }[];
 }
 
@@ -122,7 +124,11 @@ export interface BookingPassService {
   list(input: { owner: string; calendarId?: string }): Outcome<PassView[]>;
   revoke(input: { owner: string; passId: string }): Promise<Outcome<PassView>>;
   findTimes(input: { token: string; caller: string; from?: number; to?: number }): Promise<Outcome<{ scope: PassScope; free: AvailabilitySlot[] }>>;
-  hold(input: { token: string; caller: string; start: number; lengthMinutes?: number }): Promise<Outcome<{ scope: PassScope; holdId: string; start: number; end: number; expiresAt: number }>>;
+  /**
+   * The first hold on a pass claims it for the caller; `name` is their sign-in name, asked only then,
+   * for the owner's list.
+   */
+  hold(input: { token: string; caller: string; start: number; lengthMinutes?: number; name?: () => Promise<string | null> }): Promise<Outcome<{ scope: PassScope; holdId: string; start: number; end: number; expiresAt: number }>>;
   book(input: { token: string; caller: string; holdId: string; bookedBy: string; note?: string | null }): Promise<Outcome<{ scope: PassScope; bookingId: string; start: number; end: number; usesLeft: number }>>;
   release(input: { token: string; caller: string; holdId: string }): Promise<Outcome<{ scope: PassScope; holdId: string }>>;
 }
@@ -162,6 +168,7 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
     status: passStatus(pass, at),
     createdAt: pass.createdAt,
     expiresAt: pass.expiresAt,
+    claimedBy: pass.claim ? (pass.claim.name ?? pass.claim.principal) : null,
     bookings: pass.holds.flatMap((h) =>
       h.outcome.status === "booked"
         ? [{ bookingId: h.outcome.bookingId, start: h.start, end: h.end, bookedBy: h.outcome.bookedBy, note: h.outcome.note }]
@@ -199,11 +206,16 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
     if (!pass || !verifyManageKey(token, pass.tokenHash)) return fail(PASS_NOT_VALID);
     const record = deps.registry.get(pass.calendarId);
     const status = passStatus(pass, now());
-    if (status === "spending") return refuse(pass, caller, BUSY);
-    if (!record || status !== "active") {
+    if (!record || (status !== "active" && status !== "spending")) {
       audit(pass, caller, "refused", record ? status : "calendar deleted");
       return fail(PASS_NOT_VALID);
     }
+    // Claimed by someone else: to them it is as dead as a spent pass, and must read the same.
+    if (pass.claim && pass.claim.principal !== caller) {
+      audit(pass, caller, "refused", "claimed by another caller");
+      return fail(PASS_NOT_VALID);
+    }
+    if (status === "spending") return refuse(pass, caller, BUSY);
     return ok({ pass, record });
   };
 
@@ -318,7 +330,7 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       return ok({ scope: scopeOf(pass, record), free });
     },
 
-    async hold({ token, caller, start, lengthMinutes }) {
+    async hold({ token, caller, start, lengthMinutes, name }) {
       const opened = open(token, caller);
       if (!opened.ok) return opened;
       const { pass, record } = opened.value;
@@ -333,7 +345,12 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       if (start < pass.from || end > pass.to) {
         return refuse(pass, caller, "That time is outside what this pass allows. Pick one from find_times_with_pass.");
       }
-      if (liveHolds(pass, at).length + placingFor(pass.id) >= MAX_LIVE_HOLDS_PER_PASS) {
+      // The first hold claims the pass, before anything is placed, so two agents racing for an
+      // unclaimed pass cannot both get a hold: the loser finds it claimed, which reads as not valid.
+      const claimerName = pass.claim || !name ? null : await name().catch(() => null);
+      const current = pass.claim ? pass : deps.store.claim(pass.id, { principal: caller, name: claimerName });
+      if (!current) return refuse(pass, caller, PASS_NOT_VALID);
+      if (liveHolds(current, at).length + placingFor(pass.id) >= MAX_LIVE_HOLDS_PER_PASS) {
         return refuse(pass, caller, `This pass already holds ${MAX_LIVE_HOLDS_PER_PASS} times. Book one or release one first.`);
       }
 

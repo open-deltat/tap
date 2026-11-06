@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { parseInstant } from "@open-deltat/client";
 import type { AvailabilitySlot } from "@open-deltat/client";
-import type { Outcome } from "./bookable-service";
+import { HOLD_TTL_MS, type Outcome } from "./bookable-service";
 import { describeInstant, describeSpan } from "./meeting-request-service";
 import {
   DEFAULT_PASS_MINUTES,
@@ -71,9 +71,10 @@ function describePass(pass: PassView) {
     window: { from: iso(pass.from), to: iso(pass.to), when: describeWindow(pass.from, pass.to, zone) },
     lengths_minutes: pass.lengthsMinutes,
     uses: pass.uses,
-    uses_left: pass.usesLeft,
+    bookings_left: pass.usesLeft,
     expires_at: iso(pass.expiresAt),
     expires: describeInstant(pass.expiresAt, zone),
+    claimed_by: pass.claimedBy,
     bookings: pass.bookings.map((b) => ({
       booking_id: b.bookingId,
       start: iso(b.start),
@@ -92,7 +93,7 @@ const describeSlot = (slot: AvailabilitySlot, timeZone: string) => ({
 });
 
 export const BOOKING_PASS_INSTRUCTIONS =
-  "If someone gave you a booking pass (a code starting dtp_), book with it directly: find_times_with_pass, then hold_with_pass, then book_with_pass, which spends the pass. If you own a calendar, create_booking_pass mints one for you to send to the person you choose.";
+  "If someone gave you a booking pass (a code starting dtp_), book with it directly: find_times_with_pass, then hold_with_pass, then book_with_pass, which spends the pass. If you own a calendar, create_booking_pass mints one for you to send to the person you choose, list_booking_passes shows them, and revoke_booking_pass stops one.";
 
 export function registerBookingPassTools(server: McpServer, passes: BookingPassService, caller: MeetingsCaller): void {
   server.registerTool(
@@ -100,7 +101,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
     {
       title: "Create a booking pass",
       description:
-        `Use this when you own a calendar and want one specific person's agent to book a time on it directly, without sending a meeting request. It returns a booking pass (a code starting dtp_) exactly once and never again: send it to that person yourself, however you like (Δt never sends it). Whoever holds the pass can book, so share it only with the person meant. It allows bookings only inside the window [from, to), only for the lengths you allow (default: the calendar's slot length), for \`uses\` bookings (default 1, at most ${MAX_PASS_USES}), and stops working after expires_in_minutes (default ${DEFAULT_PASS_MINUTES}, at most 7 days). Revoke it any time with revoke_booking_pass.`,
+        `Use this when you own a calendar and want someone's agent to book a time on it directly, without sending a meeting request. It returns a booking pass (a code starting dtp_) exactly once and never again: send it to that person yourself, however you like (Δt never sends it). The first agent to hold a time with it claims it; nobody else can use it after that. It allows bookings only inside the window [from, to), only for the lengths you allow, for \`uses\` bookings (default 1, at most ${MAX_PASS_USES}), and stops working after expires_in_minutes (default ${DEFAULT_PASS_MINUTES}; short is normal for a one-off, at most 7 days). Revoke it any time with revoke_booking_pass.`,
       inputSchema: {
         calendar_id: z.string().max(64),
         from: Instant.describe("Start of the window the booking must fall in (RFC 3339 with an offset)"),
@@ -110,7 +111,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
           .min(1)
           .max(MAX_LENGTHS_PER_PASS)
           .optional()
-          .describe("Meeting lengths the holder may book, in minutes. Defaults to the calendar's slot length"),
+          .describe("Meeting lengths the holder may book, in minutes. Defaults to the calendar's slot length (slot_minutes in find_meeting_times)"),
         uses: z.number().int().min(1).max(MAX_PASS_USES).optional().describe("How many bookings the pass allows. Defaults to 1"),
         expires_in_minutes: z
           .number()
@@ -118,7 +119,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
           .min(1)
           .max(MAX_PASS_MINUTES)
           .optional()
-          .describe(`Minutes until the pass stops working. Defaults to ${DEFAULT_PASS_MINUTES}`),
+          .describe(`Minutes until the pass stops working. Defaults to ${DEFAULT_PASS_MINUTES}; short is normal for a one-off`),
         label: z.string().max(60).optional().describe("A note for you about who it is for, e.g. \"for Acme's agent\". The holder never sees it"),
       },
     },
@@ -151,7 +152,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
     {
       title: "My booking passes",
       description:
-        "Use this when you own a calendar and want to see the booking passes you created: each one's status (active, spending while a booking goes through, spent, revoked or expired), bookings left, expiry, and what was booked with it and by whom. The passes themselves are never shown again; use pass_id to revoke one.",
+        "Use this when you own a calendar and want to see the booking passes you created: each one's status, bookings left, expiry, who claimed it (claimed_by), and what was booked with it and by whom. Statuses: active: usable; spending: a booking is going through; spent: every booking it allowed is made; revoked: you stopped it; expired: its time ran out. The passes themselves are never shown again; use pass_id to revoke one.",
       annotations: { readOnlyHint: true, idempotentHint: true },
       inputSchema: { calendar_id: z.string().max(64).optional().describe("Only this calendar. Defaults to every calendar you own") },
     },
@@ -181,7 +182,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
     {
       title: "Find times a pass can book",
       description:
-        `Use this first when someone gave you a booking pass (a code starting dtp_): it lists the free windows on that calendar inside what the pass allows, the meeting lengths it allows, and how many bookings it has left. Then call hold_with_pass, then book_with_pass. Free now does not mean yours until it is held. A pass that is wrong, expired, used up or revoked gets the one answer "${PASS_NOT_VALID}"; ask the person who sent it for a new one.`,
+        `Use this first when someone gave you a booking pass (a code starting dtp_): it lists the free windows on that calendar inside what the pass allows, the meeting lengths it allows, and how many bookings it has left. Then call hold_with_pass, then book_with_pass. Free now does not mean yours until it is held. A pass that is wrong, expired, used up, revoked or claimed by another agent gets the one answer "${PASS_NOT_VALID}"; ask the person who sent it for a new one.`,
       annotations: { readOnlyHint: true, idempotentHint: true },
       inputSchema: {
         pass: Pass,
@@ -210,7 +211,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
     {
       title: "Hold a time with a pass",
       description:
-        `Use this after find_times_with_pass to reserve one time while you confirm it: pass the start and a length the pass allows. The hold lasts only a few minutes (hold_expires_at says when) and is not a booking: call book_with_pass with the hold_id to book it, or release_with_pass if the person changes their mind. A pass holds at most ${MAX_LIVE_HOLDS_PER_PASS} times at once. If the time was just taken, you get a refusal; pick another free time.`,
+        `Use this after find_times_with_pass and before book_with_pass (the order is find, hold, book): pass the start and a length the pass allows. A hold lasts ${HOLD_TTL_MS / 60_000} minutes (hold_expires_at says when) and is not a booking: call book_with_pass with the hold_id to book it, or release_with_pass if the person changes their mind. Your first hold claims the pass for you. A pass holds at most ${MAX_LIVE_HOLDS_PER_PASS} times at once. If the time was just taken, you get a refusal; pick another free time.`,
       inputSchema: {
         pass: Pass,
         start: Instant,
@@ -220,7 +221,13 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
     async ({ pass, start, length_minutes }) => {
       const from = instant(start);
       if (!from.ok) return refused(from.error);
-      const held = await passes.hold({ token: pass, caller: caller.principalId, start: from.value, lengthMinutes: length_minutes });
+      const held = await passes.hold({
+        token: pass,
+        caller: caller.principalId,
+        start: from.value,
+        lengthMinutes: length_minutes,
+        name: async () => (await caller.contact())?.name ?? null,
+      });
       if (!held.ok) return refused(held.error);
       const { scope, holdId, end, expiresAt } = held.value;
       const zone = scope.calendar.timezone;
@@ -246,7 +253,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
       inputSchema: {
         pass: Pass,
         hold_id: z.string().max(64),
-        name: z.string().max(60).optional().describe("The name to book under, shown to the owner. Defaults to the name from your sign-in"),
+        name: z.string().max(60).optional().describe("Pass `name` as your human gave it; otherwise your sign-in name is used. Shown to the owner"),
         note: z.string().max(500).optional().describe("What the meeting is about, for the owner"),
       },
     },
