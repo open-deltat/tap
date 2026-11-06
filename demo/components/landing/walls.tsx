@@ -15,7 +15,7 @@ type Wall = {
 
 const WALLS: readonly Wall[] = [
   {
-    title: "It can’t keep a slot for you while you ask.",
+    title: "It can’t hold a slot for you while you ask.",
     link: { label: "How holds work", href: "/docs/guides/booking-holds" },
     today: (
       <Rows>
@@ -35,7 +35,7 @@ const WALLS: readonly Wall[] = [
     ),
   },
   {
-    title: "It lets two people book the same slot.",
+    title: "It can’t stop two people booking the same slot.",
     link: { label: "How Δt refuses", href: "/docs/guides/prevent-double-booking" },
     today: (
       <Rows>
@@ -61,7 +61,7 @@ const WALLS: readonly Wall[] = [
     ),
   },
   {
-    title: "Every app sees an old copy.",
+    title: "Every app sees an outdated calendar.",
     link: { label: "How live updates work", href: "/docs/guides/real-time-scheduling" },
     today: (
       <Rows>
@@ -85,8 +85,8 @@ const WALLS: readonly Wall[] = [
     deltat: <Lanes answer />,
   },
   {
-    title: "It can’t book several things as one.",
-    link: { label: "Booking several as one", href: "/docs/guides/capacity" },
+    title: "It can’t book a whole set at once.",
+    link: { label: "How a set is booked", href: "/docs/guides/capacity" },
     today: <Machines booked={5} failedAt={5} />,
     deltat: <Machines booked={8} />,
   },
@@ -240,7 +240,7 @@ function Machines({ booked, failedAt }: { booked: number; failedAt?: number }) {
       </div>
       <div className={`mt-3 flex items-center gap-1.5 text-[12px] font-medium ${all ? "text-dt-accent-ink" : "text-dt-held-ink"}`}>
         {all && <Check className="h-3.5 w-3.5" strokeWidth={2.5} />}
-        {all ? "8 of 8, or none" : "5 of 8, stuck"}
+        {all ? "all 8 machines, or none" : "5 of 8 machines, then stuck"}
       </div>
     </div>
   );
