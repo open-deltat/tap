@@ -92,34 +92,64 @@ const WALLS: readonly Wall[] = [
   },
 ];
 
+// A zigzag: the line and its picture swap sides on every row, so the eye travels left and right
+// down the page instead of only down. Each picture is one card holding "today" and "Δt" with an
+// arrow between them: the hero's "from this to this", told again small, five times.
 export function Walls() {
   return (
-    <ol className="divide-y divide-dt-line border-y border-dt-line">
-      {WALLS.map((w) => (
-        <li key={w.title} className="grid gap-6 py-10 lg:grid-cols-[1fr_1.25fr] lg:items-center lg:gap-12 lg:py-12">
-          {/* One line says the pain; the pictures beside it are the proof, so nothing explains them. */}
-          <div>
-            <h3 className="text-balance text-[22px] font-semibold leading-tight tracking-[-0.02em] sm:text-[26px]">{w.title}</h3>
-            <a href={w.link.href} className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-dt-accent-ink hover:text-dt-ink sm:min-h-0">
-              {w.link.label}
-              <ArrowRight className="h-4 w-4" />
-            </a>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Mini label="Today">{w.today}</Mini>
-            <Mini label="Δt" good>
-              {w.deltat}
-            </Mini>
-          </div>
-        </li>
-      ))}
+    <ol className="space-y-6 sm:space-y-4">
+      {WALLS.map((w, i) => {
+        const flip = i % 2 === 1;
+        return (
+          <li key={w.title} className="grid items-center gap-6 py-6 lg:grid-cols-[1fr_1.35fr] lg:gap-14 lg:py-8">
+            <div className={`flex gap-5 ${flip ? "lg:order-2" : ""}`}>
+              <span aria-hidden className="font-mono text-[44px] font-semibold leading-none tracking-tighter text-dt-line-strong sm:text-[56px]">
+                0{i + 1}
+              </span>
+              <div className="pt-1 sm:pt-2">
+                <h3 className="text-balance text-[22px] font-semibold leading-tight tracking-[-0.02em] sm:text-[26px]">{w.title}</h3>
+                <a href={w.link.href} className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-[14px] font-medium text-dt-accent-ink hover:text-dt-ink sm:min-h-0">
+                  {w.link.label}
+                  <ArrowRight className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+            <BeforeAfter today={w.today} deltat={w.deltat} className={flip ? "lg:order-1" : ""} />
+          </li>
+        );
+      })}
     </ol>
   );
 }
 
-function Mini({ label, good, children }: { label: string; good?: boolean; children: ReactNode }) {
+// One card, two halves: the old calendar on the left, Δt on the right in the logo's faint emerald,
+// a small arrow on the seam. Stacked on a phone, with the arrow pointing down.
+function BeforeAfter({ today, deltat, className = "" }: { today: ReactNode; deltat: ReactNode; className?: string }) {
   return (
-    <div className={`flex min-h-[150px] flex-col rounded-2xl border bg-dt-surface p-4 ${good ? "border-dt-accent/40" : "border-dt-line"}`}>
+    <div className={`relative grid overflow-hidden rounded-3xl border border-dt-line bg-dt-surface shadow-dt-surface sm:grid-cols-2 ${className}`}>
+      <Half label="Today">{today}</Half>
+      <Half label="Δt" good>
+        {deltat}
+      </Half>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 rotate-90 place-items-center rounded-full border border-dt-line bg-dt-surface text-dt-ink-2 shadow-dt-surface sm:rotate-0"
+      >
+        <ArrowRight className="h-3.5 w-3.5" />
+      </span>
+    </div>
+  );
+}
+
+function Half({ label, good, children }: { label: string; good?: boolean; children: ReactNode }) {
+  return (
+    <div
+      className={`flex min-h-[170px] flex-col p-5 ${
+        good
+          ? "border-t border-dt-line bg-[radial-gradient(90%_70%_at_50%_120%,color-mix(in_oklab,var(--dt-accent)_10%,transparent),transparent)] sm:border-l sm:border-t-0"
+          : ""
+      }`}
+    >
       <div className={`text-[12px] font-medium ${good ? "text-dt-accent-ink" : "text-dt-ink-3"}`}>{label}</div>
       <div className="mt-3 flex flex-1 flex-col justify-center">{children}</div>
     </div>

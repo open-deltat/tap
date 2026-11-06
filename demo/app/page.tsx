@@ -38,14 +38,6 @@ const PILOT_MAILTO = mailto(
 );
 const ENTERPRISE_MAILTO = mailto("Δt enterprise", "Company:\nWhat you want to run on Δt:\nSelf-hosted or managed:\n");
 
-// Every line here is a property the code enforces today; each links to the page that explains it.
-const SPECS = [
-  { k: "Double bookings", v: "Impossible", note: "The database says no", href: "/docs/guides/prevent-double-booking" },
-  { k: "Holds", v: "Built in", note: "They let go on their own", href: "/docs/guides/booking-holds" },
-  { k: "Protocol", v: "TAP", note: "Works with any Postgres driver", href: "/docs/protocol-and-engine" },
-  { k: "Agents", v: "MCP server", note: "Plug it into any agent", href: "/docs/guides/ai-agent-scheduling" },
-] as const;
-
 // The four calls an agent makes, in the order it makes them: the command the agent types is the
 // title, the human word above it, one sentence under it. Each wears the colour its result has in
 // the examples: green is free, amber is held, ink is booked, the live dot is a change arriving.
@@ -190,27 +182,6 @@ export default function Home() {
           </div>
 
           <WithWithout />
-        </section>
-
-        {/* Spec strip: four facts, each a link to the page that proves it */}
-        <section className="border-y border-dt-line bg-dt-surface/60">
-          <div className="mx-auto grid max-w-6xl grid-cols-2 px-5 sm:px-6 lg:grid-cols-4">
-            {SPECS.map((s, i) => (
-              <div
-                key={s.k}
-                className={`group relative flex items-center gap-3 py-7 transition-colors hover:bg-dt-sunken/60 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-inset has-[a:focus-visible]:ring-dt-ink sm:py-9 ${i % 2 === 1 ? "pl-5 sm:pl-8" : ""} ${i % 2 === 0 ? "pr-4" : "pr-1"} ${i > 0 ? "lg:border-l lg:border-dt-line lg:pl-8" : ""} ${i >= 2 ? "border-t border-dt-line lg:border-t-0" : ""} lg:pr-6`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="text-[12.5px] text-dt-ink-3">{s.k}</div>
-                  <a href={s.href} className="mt-1.5 block text-[1.35rem] font-semibold tracking-tight outline-none after:absolute after:inset-0 sm:text-2xl">
-                    {s.v}
-                  </a>
-                  <div className="mt-1 text-[12.5px] text-dt-ink-3">{s.note}</div>
-                </div>
-                <ArrowRight className="h-4 w-4 shrink-0 text-dt-ink-3 transition-[color,transform] duration-150 group-hover:translate-x-0.5 group-hover:text-dt-ink" />
-              </div>
-            ))}
-          </div>
         </section>
 
         {/* The five walls, each shown today and with Δt */}
