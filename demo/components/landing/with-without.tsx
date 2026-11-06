@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Check, RefreshCw } from "lucide-react";
 import { AppleMark, GoogleCalendarMark, OutlookMark } from "./brand-icons";
+import { DeltatMark } from "@/components/deltat-mark";
 
 const ROWS = ["14:00", "14:30", "15:00", "15:30"] as const;
 type Row = (typeof ROWS)[number];
@@ -50,9 +51,7 @@ export function WithWithout() {
 
         <div>
           <div className="mb-3 flex h-8 items-center justify-center">
-            <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-dt-ink text-[13px] font-semibold text-dt-on-ink" aria-label="Δt">
-              Δt
-            </span>
+            <DeltatMark />
           </div>
           <Calendar
             status={

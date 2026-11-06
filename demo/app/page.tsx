@@ -18,6 +18,8 @@ import Meet from "@open-deltat/examples/meet";
 import { InlineStage } from "@open-deltat/examples/components/stage-mode";
 import { pageMetadata, SITE } from "@/lib/seo";
 import { WithWithout } from "@/components/landing/with-without";
+import { Walls } from "@/components/landing/walls";
+import { DeltatMark } from "@/components/deltat-mark";
 import { Faq } from "@/components/landing/faq";
 
 export const metadata = pageMetadata({
@@ -208,8 +210,14 @@ export default function Home() {
           </div>
         </section>
 
+        {/* The five walls, each shown today and with Δt */}
+        <Section eyebrow="Why agents fail on today’s calendars" title="Five things a normal calendar can’t do.">
+          <Walls />
+        </Section>
+
         {/* The question a calendar cannot answer, asked of the live example */}
         <Section
+          id="live"
           eyebrow="Live example"
           title="When are five people free for an hour?"
           lead="A calendar can only show you five lists. Δt works out when they overlap, every time you ask. This is the real thing, running on Δt right now. Try it."
@@ -372,7 +380,7 @@ export default function Home() {
       <footer className="border-t border-dt-line">
         <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-10 text-[13px] text-dt-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-6 w-6 place-items-center rounded-[7px] bg-dt-ink text-[11px] font-semibold text-dt-on-ink">Δt</span>
+            <DeltatMark size="sm" />
             <span>Real-Time Calendars for Agents</span>
           </div>
           <nav className="flex flex-wrap gap-x-6 gap-y-2" aria-label="Footer">
