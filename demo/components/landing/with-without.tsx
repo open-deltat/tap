@@ -5,7 +5,7 @@ import { DeltatMark } from "@/components/deltat-mark";
 
 // The same Tuesday afternoon on two calendars, shown finished. Three agents booked at the same
 // moment. On a calendar that is copied and checked now and then, three things go wrong, each marked
-// in amber where it happens: the copy is minutes behind, two bookings share one slot, and a slot
+// in amber where it happens: the copy was last updated minutes ago, two bookings share one slot, and a slot
 // an agent was still asking about was taken under it. On Δt the same three moments end in green:
 // live, the second booking refused and moved to a time that still worked, the third held while its
 // agent asks. The Δt card wears the logo's own material (dark tile, emerald ring, glow) so old and
@@ -41,7 +41,7 @@ function OldCalendar() {
         day="Tuesday"
         status={
           <span className="inline-flex items-center gap-1.5 text-dt-held-ink">
-            <RefreshCw className="h-3 w-3" />4 min behind
+            <RefreshCw className="h-3 w-3" />updated 4 min ago
           </span>
         }
       />

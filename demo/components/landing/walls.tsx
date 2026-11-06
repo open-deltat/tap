@@ -41,9 +41,9 @@ const WALLS: readonly Wall[] = [
     link: { label: "How live updates work", href: "/docs/guides/real-time-scheduling" },
     today: (
       <Rows>
-        <Line who="Website" status={<Stale when="4 min ago" />} />
-        <Line who="Voice agent" status={<Stale when="12 min ago" />} />
-        <Line who="Booking app" status={<Stale when="1 hr ago" warn />} />
+        <Line who="Website" status={<Stale when="updated 4 min ago" />} />
+        <Line who="Voice agent" status={<Stale when="updated 12 min ago" />} />
+        <Line who="Booking app" status={<Stale when="updated 1 hr ago" warn />} />
       </Rows>
     ),
     deltat: (
@@ -198,18 +198,20 @@ function Tick() {
   return <Check className="ml-1.5 h-3.5 w-3.5 text-dt-accent" strokeWidth={2.5} />;
 }
 
+// The app's name, with what last happened to it on a line of its own underneath, so a precise
+// status ("updated 12 min ago") fits even in the narrow half of a card.
 function Line({ who, status }: { who: string; status: ReactNode }) {
   return (
-    <div className="flex h-[38px] items-center justify-between gap-3 text-[12.5px]">
+    <div className="flex min-h-[46px] flex-col justify-center py-1.5 text-[12.5px]">
       <span className="text-dt-ink-2">{who}</span>
-      {status}
+      <span className="mt-0.5">{status}</span>
     </div>
   );
 }
 
 function Stale({ when, warn }: { when: string; warn?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 font-mono text-[11.5px] tabular-nums ${warn ? "text-dt-held-ink" : "text-dt-ink-3"}`}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap text-[11.5px] tabular-nums ${warn ? "text-dt-held-ink" : "text-dt-ink-3"}`}>
       <RefreshCw className="h-3 w-3" />
       {when}
     </span>
@@ -238,11 +240,12 @@ const FREE = [
 
 function Lanes({ answer }: { answer: boolean }) {
   return (
-    <div className="relative space-y-1.5">
-      {/* With the answer, the same box the live example draws: the chosen time, across every lane. */}
+    <div className="relative space-y-1.5 pb-2">
+      {/* With the answer, the same box the live example draws, around the whole time everyone is
+          free (the full green stretch), with room below so its bottom edge stays visible. */}
       {answer && (
-        <div aria-hidden className="pointer-events-none absolute -bottom-1 -top-1 left-14 right-0">
-          <div className="absolute inset-y-0 rounded-md bg-dt-ink/[0.07] ring-1 ring-dt-ink/25" style={{ left: "22%", width: "18%" }} />
+        <div aria-hidden className="pointer-events-none absolute -top-1 bottom-0 left-14 right-0">
+          <div className="absolute inset-y-0 rounded-md bg-dt-ink/[0.07] ring-1 ring-dt-ink/25" style={{ left: "21%", width: "42%" }} />
         </div>
       )}
       {FREE.map(([a, b], i) => (

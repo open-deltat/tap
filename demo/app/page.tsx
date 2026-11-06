@@ -16,12 +16,13 @@ import {
 import { enabledExamples, type ExampleMeta } from "@open-deltat/examples/manifest";
 import Meet from "@open-deltat/examples/meet";
 import { InlineStage } from "@open-deltat/examples/components/stage-mode";
-import { pageMetadata, SITE } from "@/lib/seo";
+import { pageMetadata, webPageLd, faqPageLd, SITE } from "@/lib/seo";
+import { JsonLd } from "@/components/json-ld";
 import { WithWithout } from "@/components/landing/with-without";
 import { Walls } from "@/components/landing/walls";
 import { Verbs } from "@/components/landing/verbs";
 import { DeltatMark } from "@/components/deltat-mark";
-import { Faq } from "@/components/landing/faq";
+import { Faq, FAQ } from "@/components/landing/faq";
 
 export const metadata = pageMetadata({
   title: SITE.defaultTitle,
@@ -138,6 +139,13 @@ export default function Home() {
 
   return (
     <div className="dt-canvas h-full overflow-auto text-dt-ink">
+      {/* The landing as a page, plus the questions below as an FAQ, in the site's one JSON-LD graph. */}
+      <JsonLd
+        graph={[
+          webPageLd({ title: SITE.defaultTitle, description: SITE.description, path: "/" }),
+          faqPageLd("/", FAQ),
+        ]}
+      />
       <main>
         {/* Hero */}
         <section className="mx-auto max-w-6xl px-5 pb-16 pt-16 sm:px-6 sm:pb-24 sm:pt-24">
@@ -209,7 +217,7 @@ export default function Home() {
         </Section>
 
         {/* Use cases */}
-        <Section eyebrow="What runs on Δt" title="Anything with limited places and a time.">
+        <Section eyebrow="What runs on Δt" title="A calendar for anything you can book.">
           <div className="grid gap-px overflow-hidden rounded-3xl border border-dt-line bg-dt-line sm:grid-cols-2 lg:grid-cols-4">
             {USE_CASES.map((u) => (
               <div key={u.title} className="relative flex flex-col bg-dt-surface p-6">

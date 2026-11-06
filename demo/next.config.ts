@@ -12,9 +12,14 @@ const nextConfig: NextConfig = {
   // The examples (components + their "use server" actions) live in a workspace package. Next only
   // honors the "use server"/"use client" directives in packages it transpiles, so this is required.
   transpilePackages: ["@open-deltat/examples"],
-  // The "How it works" explainer is now folded into /docs; keep old deep links working.
+  // Retired pages keep their old links working: the "How it works" explainer and "What is TAP"
+  // folded into the docs, and the Postgres-comparison essay gave way to the agent-first docs.
   async redirects() {
-    return [{ source: "/demos/explainer", destination: "/docs", permanent: true }];
+    return [
+      { source: "/demos/explainer", destination: "/docs", permanent: true },
+      { source: "/docs/sdk", destination: "/docs/protocol-and-engine", permanent: true },
+      { source: "/docs/guides/scheduling-database", destination: "/docs", permanent: true },
+    ];
   },
   async headers() {
     return [
