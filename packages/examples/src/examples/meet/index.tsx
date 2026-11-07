@@ -94,11 +94,11 @@ export default function MeetExample() {
   const reload = useCallback(() => {
     if (ids && !isPending) void load(ids);
   }, [ids, isPending, load]);
-  useWebSocket(ids?.[0] ? { type: "subscribe", resourceId: ids[0], onEvent: reload } : null);
-  useWebSocket(ids?.[1] ? { type: "subscribe", resourceId: ids[1], onEvent: reload } : null);
-  useWebSocket(ids?.[2] ? { type: "subscribe", resourceId: ids[2], onEvent: reload } : null);
-  useWebSocket(ids?.[3] ? { type: "subscribe", resourceId: ids[3], onEvent: reload } : null);
-  useWebSocket(ids?.[4] ? { type: "subscribe", resourceId: ids[4], onEvent: reload } : null);
+  useWebSocket(ids?.[0] ? { type: "subscribe", resourceId: ids[0], onChange: reload } : null);
+  useWebSocket(ids?.[1] ? { type: "subscribe", resourceId: ids[1], onChange: reload } : null);
+  useWebSocket(ids?.[2] ? { type: "subscribe", resourceId: ids[2], onChange: reload } : null);
+  useWebSocket(ids?.[3] ? { type: "subscribe", resourceId: ids[3], onChange: reload } : null);
+  useWebSocket(ids?.[4] ? { type: "subscribe", resourceId: ids[4], onChange: reload } : null);
 
   // Only the evenings where the chosen length fits for everyone, each with its bookable starts: the
   // answer, not the raw calendars.

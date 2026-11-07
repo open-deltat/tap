@@ -209,7 +209,7 @@ function Booker({
     pulseTimer.current = setTimeout(() => setLive(false), 700);
   }, [reload]);
 
-  const { status } = useWebSocket(venueId ? { type: "subscribe", resourceId: venueId, onEvent: onWsEvent } : null);
+  const { status } = useWebSocket(venueId ? { type: "subscribe", resourceId: venueId, onChange: onWsEvent } : null);
   useEffect(() => { onStatus?.(status); }, [status, onStatus]);
 
   function handleToggleSeat(seatId: string) {

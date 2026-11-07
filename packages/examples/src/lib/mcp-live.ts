@@ -1,5 +1,4 @@
-import { OidcAdapter } from "@open-deltat/mcp";
-import { authConfig, canonicalVerifier } from "./auth-config";
+import { authConfig, mcpAudience, mcpVerifier } from "./auth-config";
 import { meetings } from "./meetings";
 import { bookingPasses } from "./booking-passes-live";
 import { myCalendars } from "./my-calendars-live";
@@ -13,26 +12,18 @@ import { protectedResourceMetadata, type McpEndpointDeps } from "./mcp-endpoint"
 // AUTH_CLIENT_ID), because every call acts as a verified person, and PUBLIC_BASE_URL, because the
 // OAuth metadata must name this resource by the URL clients use, which request headers must not choose.
 //
-// Tokens are checked against the same issuer as the site's sign-in. MCP clients register their own
-// OAuth client with that issuer, so their tokens carry their own audience; AUTH_MCP_AUDIENCE binds
-// them to one when the issuer stamps a resource audience, otherwise trust is issuer-wide, as for the
-// site when AUTH_AUDIENCE is unset.
+// Tokens are checked against the same issuer as the site's sign-in, and against AUTH_MCP_AUDIENCE once
+// it is set; until then the audiences seen are logged so it can be set (mcpAudience, auth-config.ts).
 
 const METADATA_PATH = "/.well-known/oauth-protected-resource/mcp";
 
 function buildDeps(): McpEndpointDeps | null {
   const config = authConfig();
   if (!config || !publicBaseUrl) return null;
-  const adapter = new OidcAdapter({
-    jwksUri: config.jwksUri,
-    trustedIssuers: config.trustedIssuers,
-    tenant: "public",
-    audience: process.env.AUTH_MCP_AUDIENCE?.trim() || undefined,
-  });
   return {
     // One person, one id, whichever of the provider's issuers signed the token: an MCP client's token
     // and the site's session come from different WorkOS issuers for the same user (auth-config.ts).
-    verify: canonicalVerifier((token) => adapter.verify(token), config),
+    verify: mcpVerifier(config, mcpAudience()),
     resourceMetadataUrl: `${publicBaseUrl}${METADATA_PATH}`,
     service: meetings,
     passes: bookingPasses,

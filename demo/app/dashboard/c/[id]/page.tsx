@@ -29,7 +29,7 @@ export default async function ManageCalendarPage({ params }: { params: Promise<{
   const { id } = await params;
   const result = await getCalendar(id);
   if (!result.ok) notFound();
-  const { record, bookings } = result.value;
+  const { record, bookings, holds } = result.value;
   const inbox = await calendarMeetingRequests(id);
   const requests = inbox.ok ? inbox.value : [];
   const waiting = requests.filter((r) => r.status === "pending").length;
@@ -92,6 +92,7 @@ export default async function ManageCalendarPage({ params }: { params: Promise<{
             timezone={record.timezone}
             week={record.week}
             initialBookings={bookings.map((b) => ({ id: b.id, start: b.start, end: b.end, label: b.label }))}
+            initialHolds={holds}
           />
         </TabsContent>
 

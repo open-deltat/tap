@@ -7,6 +7,8 @@ import { dt, dtPublic } from "@open-deltat/examples/lib/deltat";
 import { trackBookings } from "@open-deltat/examples/lib/session-bookings";
 import { publicRegistry } from "@open-deltat/examples/lib/public-registry";
 import * as bookable from "@open-deltat/examples/lib/bookable-service";
+import { forwardChanges } from "@open-deltat/examples/lib/live-changes";
+import { rollOpenHours } from "@open-deltat/examples/lib/owned-calendar-service";
 
 // A subscription names its tenant; only these two exist. Default is the demo tenant (the examples'
 // resources); user-owned calendars live in the public tenant. An unknown value maps to demo rather
@@ -84,13 +86,16 @@ async function handleInit(ws: WebSocket, state: WsState, msg: InitMessage) {
   }
   state.resourceId = msg.resourceId;
   state.database = msg.database;
-  state.client = clientFor(msg.database);
+  const client = clientFor(msg.database);
+  state.client = client;
 
-  state.unlisten = await state.client.events.listen(msg.resourceId, (event) => {
-    if (ws.readyState === ws.OPEN) {
-      ws.send(JSON.stringify(event));
+  state.unlisten = await forwardChanges(
+    (resourceId, onEvent) => client.events.listen(resourceId, onEvent),
+    msg.resourceId,
+    (frame) => {
+      if (ws.readyState === ws.OPEN) ws.send(frame);
     }
-  });
+  );
 
   if (msg.type === "hold") {
     state.start = msg.start;
@@ -287,3 +292,18 @@ wss.on("connection", (ws) => {
 server.listen(port, () => {
   console.log(`> Ready on http://localhost:${port}`);
 });
+
+// A save writes open hours HORIZON_DAYS ahead and nothing else does, so a calendar nobody re-saves
+// would stop taking bookings two months on. This rewrites every calendar's window from its stored
+// pattern: once now (each deploy restarts the clock on a missed day) and then daily. A missed run
+// costs nothing while the window still has weeks left.
+const ROLL_EVERY_MS = 86_400_000;
+async function rollForward(): Promise<void> {
+  const report = await rollOpenHours({ dt: dtPublic, registry: publicRegistry, now: Date.now }).catch(
+    (err: unknown) => ({ rolled: [], failed: [{ id: "(all)", error: String(err) }] })
+  );
+  console.log(`open hours rolled forward: ${report.rolled.length} calendars, ${report.failed.length} failed`);
+  report.failed.forEach((f) => console.error(`open hours roll failed for ${f.id}: ${f.error}`));
+}
+void rollForward();
+setInterval(() => void rollForward(), ROLL_EVERY_MS);

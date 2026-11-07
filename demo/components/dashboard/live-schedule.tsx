@@ -1,8 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DeltaTEvent } from "@open-deltat/client";
 import { getCalendar } from "@open-deltat/examples/actions/my-bookables";
+import {
+  scheduleChanges,
+  type HeldSpan,
+  type ScheduleChange,
+  type ScheduleSnapshot,
+} from "@open-deltat/examples/lib/schedule-diff";
 import { useWebSocket, type StreamStatus } from "@open-deltat/examples/hooks/use-websocket";
 import {
   LabeledTimeline,
@@ -16,8 +21,9 @@ import { BookingsMonth } from "@/components/dashboard/bookings-month";
 
 // The daily view, the thing an operator actually looks at: a live day schedule showing open hours
 // (grey), bookings (green), and active holds (amber) on an hour axis, plus a real-time activity
-// log. It subscribes to the calendar's event stream over the tap protocol (deltat LISTEN/NOTIFY via
-// the demo WebSocket bridge), so a booking by a human or an AI agent appears within a moment.
+// log. The demo WebSocket bridge (deltat LISTEN/NOTIFY) ticks on every change and this reads the
+// calendar again, so a booking by a human or an AI agent appears within a moment. The tick carries
+// nothing: kernel payloads hold hold ids, which are authority, so the log is built from the reads.
 
 const DAY = 86_400_000;
 
@@ -26,11 +32,6 @@ export interface LiveBooking {
   start: number;
   end: number;
   label: string | null;
-}
-interface Hold {
-  id: string;
-  start: number;
-  end: number;
 }
 interface LogLine {
   key: string;
@@ -106,14 +107,16 @@ export function LiveSchedule({
   timezone,
   week,
   initialBookings,
+  initialHolds,
 }: {
   calendarId: string;
   timezone: string;
   week: WeekHours;
   initialBookings: LiveBooking[];
+  initialHolds: HeldSpan[];
 }) {
   const [bookings, setBookings] = useState<LiveBooking[]>(initialBookings);
-  const [holds, setHolds] = useState<Hold[]>([]);
+  const [holds, setHolds] = useState<HeldSpan[]>(initialHolds);
   const [log, setLog] = useState<LogLine[]>([]);
   const [dayOffset, setDayOffset] = useState(0);
   const [windowMs, setWindowMs] = useState<number>(WINDOWS[1].ms);
@@ -166,10 +169,27 @@ export function LiveSchedule({
     () => new Map(initialBookings.map((b) => [b.id, b.label]))
   );
 
-  // Events show a change the moment it happens; the read then says which bookings exist. A read
-  // goes out at most 200 ms after the first change of a burst, so steady traffic cannot starve it.
-  // Its list lands only if no change came in after it was sent, so a slow reply cannot undo what a
-  // later event showed; that change has already asked for the next read.
+  const logChange = useCallback(
+    (change: ScheduleChange) => {
+      switch (change.kind) {
+        case "booked":
+          return push({ kind: "Booking confirmed", tone: "book", detail: timeOnly(change.start), bookingId: change.bookingId });
+        case "cancelled":
+          return push({ kind: "Booking cancelled", tone: "cancel", detail: `#${change.bookingId.slice(-6)}` });
+        case "held":
+          return push({ kind: "Hold placed", tone: "hold", detail: `${timeOnly(change.start)} · expires ${clock(change.expiresAt)}` });
+        case "released":
+          return push({ kind: "Hold released", tone: "release", detail: timeOnly(change.start) });
+      }
+    },
+    [push, timeOnly, clock]
+  );
+
+  // Each tick asks for a read. A read goes out at most 200 ms after the first tick of a burst, so
+  // steady traffic cannot starve it. Its result lands only if no tick came in after it was sent, so
+  // a slow reply cannot undo a later change; that tick has already asked for the next read. The log
+  // is the difference from the last read that landed.
+  const shownSnapshot = useRef<ScheduleSnapshot>({ bookings: initialBookings, holds: initialHolds });
   const changes = useRef(0);
   const readTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const reread = useCallback(() => {
@@ -181,12 +201,18 @@ export function LiveSchedule({
       getCalendar(calendarId)
         .then((fresh) => {
           if (!fresh.ok) return;
-          setNames((prev) => new Map([...prev, ...fresh.value.bookings.map((b) => [b.id, b.label] as const)]));
-          if (asked === changes.current) setBookings(fresh.value.bookings);
+          const { bookings: nextBookings, holds: nextHolds } = fresh.value;
+          setNames((prev) => new Map([...prev, ...nextBookings.map((b) => [b.id, b.label] as const)]));
+          if (asked !== changes.current) return;
+          const next = { bookings: nextBookings, holds: nextHolds };
+          scheduleChanges(shownSnapshot.current, next).forEach(logChange);
+          shownSnapshot.current = next;
+          setBookings(nextBookings);
+          setHolds(nextHolds);
         })
-        .catch(() => {}); // keep what the events showed; the next change reads again
+        .catch(() => {}); // keep what is shown; the next tick reads again
     }, 200);
-  }, [calendarId]);
+  }, [calendarId, logChange]);
   useEffect(
     () => () => {
       clearTimeout(readTimer.current);
@@ -196,41 +222,8 @@ export function LiveSchedule({
     [calendarId]
   );
 
-  const onEvent = useCallback(
-    (event: DeltaTEvent) => {
-      if ("BookingConfirmed" in event) {
-        const b = event.BookingConfirmed;
-        setBookings((prev) =>
-          prev.some((x) => x.id === b.id) ? prev : [...prev, { id: b.id, start: b.span.start, end: b.span.end, label: null }]
-        );
-        setHolds((prev) => prev.filter((h) => !(h.start === b.span.start && h.end === b.span.end)));
-        push({ kind: "Booking confirmed", tone: "book", detail: timeOnly(b.span.start), bookingId: b.id });
-        reread();
-      } else if ("BookingCancelled" in event) {
-        const id = event.BookingCancelled.id;
-        setBookings((prev) => prev.filter((x) => x.id !== id));
-        push({ kind: "Booking cancelled", tone: "cancel", detail: `#${id.slice(-6)}` });
-        reread();
-      } else if ("HoldPlaced" in event) {
-        const h = event.HoldPlaced;
-        setHolds((prev) => [...prev, { id: h.id, start: h.span.start, end: h.span.end }]);
-        push({ kind: "Hold placed", tone: "hold", detail: `${timeOnly(h.span.start)} · expires ${clock(h.expires_at)}` });
-      } else if ("HoldReleased" in event) {
-        setHolds((prev) => prev.filter((h) => h.id !== event.HoldReleased.id));
-        push({ kind: "Hold released", tone: "release", detail: `#${event.HoldReleased.id.slice(-6)}` });
-      } else if ("Lagged" in event) {
-        // Changes were dropped on the way here, so what the events showed may be stale.
-        push({ kind: "Lagged", tone: "other", detail: "" });
-        reread();
-      } else {
-        push({ kind: Object.keys(event)[0] ?? "Event", tone: "other", detail: "" });
-      }
-    },
-    [push, timeOnly, clock, reread]
-  );
-
   // Owned calendars live in the public tenant; tell the bridge so it LISTENs on the right one.
-  const { status } = useWebSocket({ type: "subscribe", resourceId: calendarId, database: "public", onEvent });
+  const { status } = useWebSocket({ type: "subscribe", resourceId: calendarId, database: "public", onChange: reread });
   const badge = STATUS[status];
 
   // Connecting (on mount, back from another tab, after a reconnect) means changes may have been

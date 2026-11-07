@@ -133,7 +133,7 @@ export default function AvailabilityExample() {
       loadAvailableDays(resourceId);
     }
   }, [resourceId, date, loadSlots, loadAvailableDays]);
-  useWebSocket(resourceId ? { type: "subscribe", resourceId, onEvent: onWsEvent } : null);
+  useWebSocket(resourceId ? { type: "subscribe", resourceId, onChange: onWsEvent } : null);
 
   const isDayDisabled = (day: Date) => {
     const m = midnight(day);
