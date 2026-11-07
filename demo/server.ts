@@ -103,6 +103,11 @@ async function handleInit(ws: WebSocket, state: WsState, msg: InitMessage) {
     // A real person's calendar goes through the service's gate, as the confirm path below does:
     // placing the hold directly would let a request-only calendar be booked around its owner.
     if (state.database === "public") {
+      // This socket cannot see the site session, so it asks as signed out: where the owner wants an
+      // account, the hold is refused here and the booking page's own path (which can) is the way in.
+      if (bookable.holdNeedsSignIn(publicRegistry.get(msg.resourceId), false)) {
+        throw new Error("Sign in to book this time.");
+      }
       const held = await bookable.holdSlot(
         { dt: state.client, registry: publicRegistry },
         msg.resourceId,

@@ -58,10 +58,10 @@ export async function holdPublicSlot(
   if (!perCallerHolds.check(await callerIp()).allowed || !siteWideHolds.check("site").allowed) {
     return { ok: false, error: "Too many holds from here just now. Give it a minute." };
   }
-  // Reading the schedule is always public; BOOKING can require an account. Enforced here rather
-  // than in the UI, so hiding the button is a courtesy and this is the actual gate.
+  // Enforced here rather than in the UI, so the booker's sign-in prompt is a courtesy and this is
+  // the actual gate. The session is read only when the calendar asks for one.
   const record = publicRegistry.get(id);
-  if (record?.requireLoginToBook && !(await getSessionPrincipal())) {
+  if (record?.requireLoginToBook && service.holdNeedsSignIn(record, (await getSessionPrincipal()) !== null)) {
     return { ok: false, error: "SIGN_IN_REQUIRED" };
   }
   return service.holdSlot(deps, id, start, end);

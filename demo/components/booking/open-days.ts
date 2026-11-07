@@ -25,6 +25,11 @@ export function firstOpenDay(byDay: ReadonlyMap<DayKey, Slot[]>, today: DayKey):
   return [...byDay.keys()].sort().find((key) => key >= today) ?? null;
 }
 
+/** The day asked for in the link (after signing in) when it still has a slot, else the first open day. */
+export function openingDay(byDay: ReadonlyMap<DayKey, Slot[]>, today: DayKey, requested: string | null): DayKey | null {
+  return requested !== null && requested >= today && byDay.has(requested) ? requested : firstOpenDay(byDay, today);
+}
+
 export const noFreeTimesMessage = (horizonDays: number): string =>
   `No free times in the next ${Math.floor(horizonDays / 7)} weeks.`;
 
