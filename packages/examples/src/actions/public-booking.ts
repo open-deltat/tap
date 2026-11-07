@@ -39,6 +39,17 @@ export async function getPublicSlots(
   return service.listSlots(deps, id, start, end);
 }
 
+/**
+ * Free time from now to the end of the horizon open hours are written for, in one read: the booking
+ * page derives both its open days and each day's slots from it. One day past the horizon, because
+ * the horizon's last day is a whole day in the calendar's zone.
+ */
+export async function getPublicOpenTime(id: string): Promise<{ horizonDays: number; spans: AvailabilitySlot[] }> {
+  const now = Date.now();
+  const spans = await service.listSlots(deps, id, now, now + (service.HORIZON_DAYS + 1) * 24 * HOUR_MS);
+  return { horizonDays: service.HORIZON_DAYS, spans };
+}
+
 export async function holdPublicSlot(
   id: string,
   start: number,

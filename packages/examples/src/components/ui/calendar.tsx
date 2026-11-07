@@ -215,6 +215,9 @@ function CalendarDayButton({
         className
       )}
       {...props}
+      // After the spread: the picker sets aria-disabled only on a focused day, so a screen reader would
+      // hear every other day nobody can pick as available.
+      aria-disabled={modifiers.disabled || undefined}
     />
   )
 }
