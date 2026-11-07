@@ -23,6 +23,8 @@ import { Walls } from "@/components/landing/walls";
 import { Verbs } from "@/components/landing/verbs";
 import { DeltatMark } from "@/components/deltat-mark";
 import { Faq, FAQ } from "@/components/landing/faq";
+import { SiteFooter } from "@/components/site-footer";
+import { PILOT_MAILTO, ENTERPRISE_MAILTO } from "@/lib/contact";
 
 export const metadata = pageMetadata({
   title: SITE.defaultTitle,
@@ -30,16 +32,6 @@ export const metadata = pageMetadata({
   path: "/",
   absoluteTitle: true,
 });
-
-// delt.at has no inbound mail (no MX record), so every sales CTA goes to the founder's published address.
-const mailto = (subject: string, body: string) =>
-  `mailto:simonorzel@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-const PILOT_MAILTO = mailto(
-  "Δt founding pilot",
-  "What the agent books:\nHow many calendars or resources:\nWhere the calendar lives today:\n"
-);
-const ENTERPRISE_MAILTO = mailto("Δt enterprise", "Company:\nWhat you want to run on Δt:\nSelf-hosted or managed:\n");
-
 
 type UseCase = { icon: LucideIcon; title: string; body: string; demo?: { href: string; label: string } };
 
@@ -339,21 +331,7 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-dt-line">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-10 text-[13px] text-dt-ink-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div className="flex items-center gap-2.5">
-            <DeltatMark size="sm" />
-            <span>Real-Time Calendars for Agents</span>
-          </div>
-          <nav className="flex flex-wrap gap-x-6 gap-y-2" aria-label="Footer">
-            <a href="/docs" className="hover:text-dt-ink">Docs</a>
-            <a href={SITE.github} target="_blank" rel="noreferrer" className="hover:text-dt-ink">GitHub</a>
-            <a href="https://www.npmjs.com/package/@open-deltat/mcp" target="_blank" rel="noreferrer" className="hover:text-dt-ink">npm</a>
-            <a href="https://crates.io/crates/deltat" target="_blank" rel="noreferrer" className="hover:text-dt-ink">crates.io</a>
-            <a href="/llms.txt" className="hover:text-dt-ink">llms.txt</a>
-          </nav>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

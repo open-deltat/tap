@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { DocsSidebar } from "@/components/docs-sidebar";
+import { SiteFooter } from "@/components/site-footer";
 import { TITLE_TEMPLATE } from "@/lib/seo";
 
 // Defining a title here replaces the root layout's title object, template included, so the
@@ -19,6 +20,7 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
         <DocsSidebar />
         <main className="min-w-0 flex-1 pb-20">{children}</main>
       </div>
+      <SiteFooter />
     </div>
   );
 }
