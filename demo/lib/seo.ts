@@ -11,6 +11,7 @@ export const SITE = {
   org: "open-deltat",
   github: "https://github.com/open-deltat",
   deltatRepo: "https://github.com/open-deltat/deltat",
+  email: "simon@delt.at",
   headline: "Real-Time Calendars for Agents",
   defaultTitle: "Δt: Real-Time Calendars for Agents",
   description:
@@ -81,6 +82,7 @@ export function organizationLd(): Ld {
     "@id": `${SITE.url}/#org`,
     name: SITE.org,
     url: SITE.url,
+    email: SITE.email,
     sameAs: [SITE.github, SITE.deltatRepo],
   };
 }
