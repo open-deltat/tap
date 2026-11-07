@@ -130,6 +130,15 @@ export async function listSlots(
  */
 export const REQUESTS_ONLY = "This calendar takes meeting requests: ask for a time and the owner confirms it.";
 
+/**
+ * Whether placing a hold here needs an account the caller does not have. Reading the schedule is
+ * always public; booking can require sign-in. Every hold path asks this, including the /ws bridge,
+ * which cannot see the site session and so always asks as signed out.
+ */
+export function holdNeedsSignIn(record: Pick<BookableRecord, "requireLoginToBook"> | undefined, signedIn: boolean): boolean {
+  return record?.requireLoginToBook === true && !signedIn;
+}
+
 export async function holdSlot(
   deps: BookableDeps,
   id: string,

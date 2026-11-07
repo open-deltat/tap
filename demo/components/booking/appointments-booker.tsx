@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { CalendarCheck, Clock, Globe, Loader2, TriangleAlert } from "lucide-react";
 import { Calendar } from "@open-deltat/examples/components/ui/calendar";
@@ -23,7 +24,8 @@ import type { BookableRecord } from "@open-deltat/examples/lib/public-bookables"
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Slot } from "./slots";
-import { dayKeyIn, firstOpenDay, keyOfPickerDate, noFreeTimesMessage, pickerDateOf, slotsByDay, type DayKey } from "./open-days";
+import { dayKeyIn, keyOfPickerDate, noFreeTimesMessage, openingDay, pickerDateOf, slotsByDay, type DayKey } from "./open-days";
+import { refusalOf, signInHref, SIGN_IN_TO_BOOK } from "./booker-refusal";
 
 // The prime public booking UI: a month calendar and the selected day's time slots, then hold →
 // confirm. Bound to the real calendar's availability (deltat), theme-aware, with the owner's slot
@@ -48,6 +50,8 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
   const [month, setMonth] = useState<Date>(() => new Date());
   const [loadFailed, setLoadFailed] = useState(false);
   const [held, setHeld] = useState<Held | null>(null);
+  /** The time a signed-out visitor picked on a calendar that books only for signed-in people. */
+  const [signInFor, setSignInFor] = useState<Slot | null>(null);
   /** Seconds left on the current hold, so the visitor can see their time running out. */
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [name, setName] = useState("");
@@ -71,8 +75,9 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
     }
   }, [record.priceCents, record.currency]);
 
-  // The first read opens the page on the first day with a free slot, not on a closed today. Later
-  // reads keep the day the visitor is looking at.
+  // The first read opens the page on the day the link names (coming back from sign-in), else on the
+  // first day with a free slot, not on a closed today. Later reads keep the visitor's day.
+  const requestedDay = useSearchParams().get("day");
   const placed = useRef(false);
   const load = useCallback(async () => {
     setLoadFailed(false);
@@ -83,7 +88,7 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
       setOpen({ byDay, horizonDays });
       if (!placed.current) {
         placed.current = true;
-        const first = firstOpenDay(byDay, dayKeyIn(now, tz));
+        const first = openingDay(byDay, dayKeyIn(now, tz), requestedDay);
         setDay(first);
         if (first) setMonth(pickerDateOf(first));
       }
@@ -92,7 +97,7 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
       // and give them the one action that helps.
       setLoadFailed(true);
     }
-  }, [record.id, slotMs, tz]);
+  }, [record.id, slotMs, tz, requestedDay]);
 
   useEffect(() => {
     void load();
@@ -187,7 +192,13 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
     start(async () => {
       const result = await holdPublicSlot(record.id, slot.start, slot.end);
       if (!result.ok) {
-        toast.error(result.error);
+        const refused = refusalOf(result.error);
+        // Signing in is a way forward, so it is shown in place of the slots, not flashed as a toast.
+        if (refused.kind === "sign-in") {
+          setSignInFor(slot);
+          return;
+        }
+        toast.error(refused.text);
         void load();
         return;
       }
@@ -204,7 +215,8 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
     start(async () => {
       const result = await commitPublicHold(record.id, held.holdId, name.trim());
       if (!result.ok) {
-        toast.error(result.error);
+        const refused = refusalOf(result.error);
+        toast.error(refused.kind === "message" ? refused.text : SIGN_IN_TO_BOOK);
         return;
       }
       toast.success("Booked! You're confirmed.");
@@ -248,6 +260,7 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
               // Walking to another day abandons the hold as surely as pressing Back does.
               releaseOutstanding();
               setHeld(null);
+              setSignInFor(null);
               // Refresh so the day's times are current, not as old as the page.
               void load();
             }}
@@ -310,6 +323,23 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
                   Confirm booking
                 </Button>
                 <Button variant="ghost" onClick={cancelHold} disabled={pending}>
+                  Back
+                </Button>
+              </div>
+            </div>
+          ) : signInFor && day ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+              <div className="flex flex-col gap-1">
+                <p className="text-dt-ink text-lg font-semibold tabular-nums">
+                  {dateLabel.split(",")[0]} at {time(signInFor.start)}
+                </p>
+                <p className="text-dt-ink-2 text-sm">{SIGN_IN_TO_BOOK}</p>
+              </div>
+              <div className="flex gap-2">
+                <Button asChild>
+                  <a href={signInHref(record.id, day)}>Sign in</a>
+                </Button>
+                <Button variant="ghost" onClick={() => setSignInFor(null)}>
                   Back
                 </Button>
               </div>
