@@ -1,10 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  CONTACT_COOKIE,
   PKCE_COOKIE,
   PROFILE_COOKIE,
   REFRESH_COOKIE,
   SESSION_COOKIE,
   authConfig,
+  contactCookieValue,
   cookieSecure,
   exchangeCode,
   profileFromGrant,
@@ -53,6 +55,19 @@ export async function GET(req: NextRequest) {
   const deps = await liveRefreshDeps();
   if (deps && typeof grant.refresh_token === "string" && grant.refresh_token !== "") {
     res.cookies.set(REFRESH_COOKIE, await sealRefresh(deps.key, { refreshToken: grant.refresh_token, startedAt: Date.now() }), {
+      httpOnly: true,
+      secure: cookieSecure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: Math.floor(SESSION_LIFETIME_MS / 1000),
+    });
+  }
+  // The person's name and email from the grant, so forms can start filled in without asking userinfo,
+  // which does not answer for this session's token (it is the User Management API's, not AuthKit's).
+  // httpOnly and bound to the token's subject; it lives as long as a session can.
+  const contact = contactCookieValue(grant);
+  if (contact) {
+    res.cookies.set(CONTACT_COOKIE, contact, {
       httpOnly: true,
       secure: cookieSecure,
       sameSite: "lax",

@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { OidcAdapter, type VerifiedPrincipal } from "@open-deltat/mcp";
 import { authConfig, canonicalVerifier, setting } from "./auth-config";
-import { PROFILE_COOKIE, SESSION_COOKIE } from "./session-cookies";
+import { CONTACT_COOKIE, PROFILE_COOKIE, SESSION_COOKIE } from "./session-cookies";
 
 export { authConfig, canonicalPrincipalId, type AuthConfig } from "./auth-config";
 
@@ -22,7 +22,7 @@ export function safeReturnTo(raw: string | null | undefined, fallback = "/dashbo
   return raw;
 }
 
-export { cookieSecure, SESSION_COOKIE, REFRESH_COOKIE, PROFILE_COOKIE, PKCE_COOKIE } from "./session-cookies";
+export { cookieSecure, SESSION_COOKIE, REFRESH_COOKIE, PROFILE_COOKIE, PKCE_COOKIE, CONTACT_COOKIE } from "./session-cookies";
 
 export function authEnabled(): boolean {
   return authConfig() !== null;
@@ -102,8 +102,8 @@ export interface TokenGrant {
   refresh_token?: string;
   id_token?: string;
   expires_in?: number;
-  /** Some providers return a profile object beside the tokens; used only for the display avatar. */
-  user?: { email?: string; first_name?: string; profile_picture_url?: string };
+  /** Some providers (WorkOS User Management) return the person beside the tokens instead of an id_token. */
+  user?: { email?: string; first_name?: string; last_name?: string; profile_picture_url?: string };
 }
 
 /** Exchange an authorization code (PKCE public client: no secret involved). */
@@ -151,4 +151,58 @@ export function profileFromGrant(grant: TokenGrant): DisplayProfile {
 
   const initial = (name ?? email ?? "").trim().slice(0, 1).toUpperCase() || "U";
   return { initial, picture };
+}
+
+export interface SignInContact {
+  name: string;
+  email: string | null;
+}
+
+const nonEmpty = (v: unknown): string | undefined => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+
+/**
+ * The person's name and email as the sign-in grant states them: an id_token's claims first, then the
+ * `user` object WorkOS's User Management API returns instead of one. For prefilling forms, which the
+ * person can edit; not a verified contact (myContact is that).
+ */
+export function contactFromGrant(grant: TokenGrant): SignInContact | null {
+  const claims = idTokenClaims(grant.id_token);
+  const user = grant.user ?? {};
+  const email = nonEmpty(claims.email) ?? nonEmpty(user.email) ?? null;
+  const joined = [nonEmpty(claims.given_name) ?? nonEmpty(user.first_name), nonEmpty(claims.family_name) ?? nonEmpty(user.last_name)]
+    .filter(Boolean)
+    .join(" ");
+  const name = nonEmpty(claims.name) ?? (joined || undefined);
+  return name || email ? { name: name ?? "", email } : null;
+}
+
+/** The value of the contact cookie: bound to the token's subject, so another session never reads it. */
+export function contactCookieValue(grant: TokenGrant): string | null {
+  const contact = contactFromGrant(grant);
+  const sub = nonEmpty(idTokenClaims(grant.access_token).sub);
+  return contact && sub ? JSON.stringify({ sub, ...contact }) : null;
+}
+
+/**
+ * The contact kept at sign-in, if it belongs to this session's subject. Anything else (no cookie, a
+ * different person's, a malformed one) is nothing: the form starts empty, as it would signed out.
+ */
+export function readSignInContact(value: string | undefined, sub: string): SignInContact | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const r: Record<string, unknown> = Object.fromEntries(Object.entries(parsed));
+    if (r.sub !== sub || typeof r.name !== "string" || !(r.email === null || typeof r.email === "string")) return null;
+    return { name: r.name, email: r.email };
+  } catch {
+    return null;
+  }
+}
+
+/** The signed-in visitor's name and email for prefilling, read from what sign-in kept; no network. */
+export async function getSignInContact(): Promise<SignInContact | null> {
+  const principal = await getSessionPrincipal();
+  if (!principal?.sub) return null;
+  return readSignInContact((await cookies()).get(CONTACT_COOKIE)?.value, principal.sub);
 }

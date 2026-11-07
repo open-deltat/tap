@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
+  CONTACT_COOKIE,
   PROFILE_COOKIE,
   REFRESH_COOKIE,
   SESSION_COOKIE,
@@ -14,5 +15,6 @@ export async function POST(req: NextRequest) {
   res.cookies.delete(SESSION_COOKIE);
   res.cookies.delete(REFRESH_COOKIE);
   res.cookies.delete(PROFILE_COOKIE);
+  res.cookies.delete(CONTACT_COOKIE);
   return res;
 }

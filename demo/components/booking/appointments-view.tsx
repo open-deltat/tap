@@ -1,6 +1,6 @@
 import type { BookableRecord } from "@open-deltat/examples/lib/public-bookables";
 import { myContact, myMeetingRequests } from "@open-deltat/examples/actions/meeting-requests";
-import { authEnabled, getSessionPrincipal } from "@open-deltat/examples/lib/auth-session";
+import { authEnabled, getSessionPrincipal, getSignInContact } from "@open-deltat/examples/lib/auth-session";
 import { liveProtectedResourceMetadata } from "@open-deltat/examples/lib/mcp-live";
 import { AppointmentsBooker } from "@/components/booking/appointments-booker";
 import { MeetingRequester } from "@/components/booking/meeting-requester";
@@ -35,8 +35,9 @@ export async function AppointmentsView({ record }: { record: BookableRecord }) {
     );
   }
 
-  // A signed-in visitor's name and email, as their identity provider gives them, start the form.
-  const contact = (await getSessionPrincipal()) !== null ? await myContact() : null;
+  // A signed-in visitor's name and email start the form: what sign-in kept (no network), else, for a
+  // session from before that was kept, the identity provider's userinfo where it answers.
+  const contact = (await getSignInContact()) ?? ((await getSessionPrincipal()) !== null ? await myContact() : null);
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
       <AmbientBackground />
