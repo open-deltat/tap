@@ -8,3 +8,5 @@ export const SESSION_COOKIE = "dt_session";
 export const REFRESH_COOKIE = "dt_refresh";
 export const PROFILE_COOKIE = "dt_profile"; // display-only: an initial and optional avatar URL
 export const PKCE_COOKIE = "dt_pkce";
+/** The signed-in person's name and email from the sign-in grant, for prefilling forms (httpOnly). */
+export const CONTACT_COOKIE = "dt_contact";
