@@ -48,6 +48,9 @@ services:
       # The audience /mcp tokens must carry. Blank: not enforced, and each audience seen is logged as
       # "[mcp] token audience seen" so you can read it and set it here (auth-config.ts mcpAudience).
       AUTH_MCP_AUDIENCE: ${AUTH_MCP_AUDIENCE:-}
+      # Keeps website sessions past the access token's few minutes (session-refresh.ts): 32 random
+      # bytes, base64, e.g. from `openssl rand -base64 32`. Blank: no silent refresh, as before.
+      SESSION_SECRET: ${SESSION_SECRET:-}
       # The public origin, e.g. https://delt.at. Needed for the hosted MCP endpoint (/mcp) and the
       # review link in owner notifications; /mcp stays off without it.
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
