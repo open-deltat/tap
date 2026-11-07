@@ -9,7 +9,7 @@ import { Input } from "@open-deltat/examples/components/ui/input";
 import { Label } from "@open-deltat/examples/components/ui/label";
 import {
   commitPublicHold,
-  getPublicSlots,
+  getPublicOpenTime,
   holdPublicSlot,
   releasePublicHold,
 } from "@open-deltat/examples/actions/public-booking";
@@ -22,13 +22,20 @@ import {
 import type { BookableRecord } from "@open-deltat/examples/lib/public-bookables";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { sliceIntoSlots, type Slot } from "./slots";
+import type { Slot } from "./slots";
+import { dayKeyIn, firstOpenDay, keyOfPickerDate, noFreeTimesMessage, pickerDateOf, slotsByDay, type DayKey } from "./open-days";
 
 // The prime public booking UI: a month calendar and the selected day's time slots, then hold →
 // confirm. Bound to the real calendar's availability (deltat), theme-aware, with the owner's slot
 // length and price. This is what anyone — or an AI agent — sees at /b/<id>.
+//
+// One availability read covers the whole horizon. The open days in the month and the chosen day's
+// slots both come from it, so a day looks open exactly when it has a slot to book.
 
-const DAY_MS = 86_400_000;
+interface OpenTime {
+  byDay: ReadonlyMap<DayKey, Slot[]>;
+  horizonDays: number;
+}
 interface Held extends Slot {
   holdId: string;
   expiresAt: number;
@@ -36,14 +43,9 @@ interface Held extends Slot {
 
 export function AppointmentsBooker({ record }: { record: BookableRecord }) {
   const slotMs = record.slotMinutes * 60_000;
-  const [date, setDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
-  const [month, setMonth] = useState<Date>(date);
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState<OpenTime | null>(null);
+  const [day, setDay] = useState<DayKey | null>(null);
+  const [month, setMonth] = useState<Date>(() => new Date());
   const [loadFailed, setLoadFailed] = useState(false);
   const [held, setHeld] = useState<Held | null>(null);
   /** Seconds left on the current hold, so the visitor can see their time running out. */
@@ -69,22 +71,28 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
     }
   }, [record.priceCents, record.currency]);
 
+  // The first read opens the page on the first day with a free slot, not on a closed today. Later
+  // reads keep the day the visitor is looking at.
+  const placed = useRef(false);
   const load = useCallback(async () => {
-    setLoading(true);
     setLoadFailed(false);
-    const dayStart = date.getTime();
     try {
-      const spans = await getPublicSlots(record.id, dayStart, dayStart + DAY_MS);
-      setSlots(sliceIntoSlots(spans, slotMs, Date.now()));
+      const { horizonDays, spans } = await getPublicOpenTime(record.id);
+      const now = Date.now();
+      const byDay = slotsByDay(spans, slotMs, now, tz);
+      setOpen({ byDay, horizonDays });
+      if (!placed.current) {
+        placed.current = true;
+        const first = firstOpenDay(byDay, dayKeyIn(now, tz));
+        setDay(first);
+        if (first) setMonth(pickerDateOf(first));
+      }
     } catch {
       // A stranger's first impression must never be a spinner that never resolves; say what happened
       // and give them the one action that helps.
       setLoadFailed(true);
-      setSlots([]);
-    } finally {
-      setLoading(false);
     }
-  }, [date, record.id, slotMs]);
+  }, [record.id, slotMs, tz]);
 
   useEffect(() => {
     void load();
@@ -215,7 +223,10 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
     setName("");
   };
 
-  const dateLabel = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric", timeZone: tz }).format(date);
+  // A calendar day is a date, not an instant: format its parts as they are, in no zone.
+  const dateLabel = day ? new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(pickerDateOf(day)) : "";
+  const slots = (day && open?.byDay.get(day)) || [];
+  const nothingFree = open !== null && open.byDay.size === 0;
 
   // Every time on this page is the calendar's local time. Say so when the visitor is somewhere else,
   // otherwise they read "14:00" as their own afternoon and arrive at the wrong hour.
@@ -230,21 +241,22 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
         <div className="sm:border-r sm:pr-6">
           <Calendar
             mode="single"
-            required
-            selected={date}
+            selected={day ? pickerDateOf(day) : undefined}
             onSelect={(d) => {
               if (!d) return;
-              const next = new Date(d);
-              next.setHours(0, 0, 0, 0);
-              setDate(next);
+              setDay(keyOfPickerDate(d));
               // Walking to another day abandons the hold as surely as pressing Back does.
               releaseOutstanding();
               setHeld(null);
+              // Refresh so the day's times are current, not as old as the page.
+              void load();
             }}
             month={month}
             onMonthChange={setMonth}
             startMonth={new Date()}
-            disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
+            endMonth={open ? pickerDateOf(dayKeyIn(Date.now() + open.horizonDays * 86_400_000, tz)) : undefined}
+            // A day is bookable only when the read has a slot on it. Before the first read, none is.
+            disabled={(d) => !open?.byDay.has(keyOfPickerDate(d))}
             className="bg-transparent p-0"
           />
         </div>
@@ -252,7 +264,9 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
         <div className="flex min-h-80 flex-col">
           <div className="mb-3 flex flex-col gap-1">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm font-medium">{dateLabel}</span>
+              <span className="text-sm font-medium" aria-live="polite">
+                {dateLabel}
+              </span>
               <Badge variant="muted" className="gap-1">
                 <Clock className="size-3" />
                 {record.slotMinutes}m · {priceLabel}
@@ -300,10 +314,6 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
                 </Button>
               </div>
             </div>
-          ) : loading ? (
-            <div className="text-muted-foreground flex flex-1 items-center justify-center text-sm">
-              <Loader2 className="mr-2 size-4 animate-spin" /> Loading…
-            </div>
           ) : loadFailed ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-6 text-center">
               <TriangleAlert className="text-muted-foreground size-5" />
@@ -312,6 +322,14 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
                 Try again
               </Button>
             </div>
+          ) : open === null ? (
+            <div className="text-muted-foreground flex flex-1 items-center justify-center text-sm">
+              <Loader2 className="mr-2 size-4 animate-spin" /> Loading…
+            </div>
+          ) : nothingFree ? (
+            <p className="text-dt-ink-2 flex flex-1 items-center justify-center text-center text-sm">
+              {noFreeTimesMessage(open.horizonDays)}
+            </p>
           ) : slots.length === 0 ? (
             <div className="text-muted-foreground flex flex-1 items-center justify-center rounded-lg border border-dashed text-center text-sm">
               Nothing open this day. Try another.
