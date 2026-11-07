@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { OidcAdapter, type VerifiedPrincipal } from "@open-deltat/mcp";
 import { authConfig, canonicalVerifier, setting } from "./auth-config";
+import { PROFILE_COOKIE, SESSION_COOKIE } from "./session-cookies";
 
 export { authConfig, canonicalPrincipalId, type AuthConfig } from "./auth-config";
 
@@ -21,13 +22,7 @@ export function safeReturnTo(raw: string | null | undefined, fallback = "/dashbo
   return raw;
 }
 
-/** Cookies must not travel in cleartext outside local development. */
-export const cookieSecure = process.env.NODE_ENV === "production";
-
-export const SESSION_COOKIE = "dt_session";
-export const REFRESH_COOKIE = "dt_refresh";
-export const PROFILE_COOKIE = "dt_profile"; // display-only: an initial and optional avatar URL
-export const PKCE_COOKIE = "dt_pkce";
+export { cookieSecure, SESSION_COOKIE, REFRESH_COOKIE, PROFILE_COOKIE, PKCE_COOKIE } from "./session-cookies";
 
 export function authEnabled(): boolean {
   return authConfig() !== null;

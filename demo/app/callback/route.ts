@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   PKCE_COOKIE,
   PROFILE_COOKIE,
+  REFRESH_COOKIE,
   SESSION_COOKIE,
   authConfig,
   cookieSecure,
@@ -10,6 +11,8 @@ import {
   safeReturnTo,
 } from "@open-deltat/examples/lib/auth-session";
 import { siteOrigin } from "@open-deltat/examples/lib/public-base-url";
+import { liveRefreshDeps } from "@open-deltat/examples/lib/session-refresh-live";
+import { SESSION_LIFETIME_MS, sealRefresh } from "@open-deltat/examples/lib/session-refresh";
 
 // The OIDC callback: state check, code-for-token exchange (PKCE), session cookies, then the
 // post-login destination. Tokens go into httpOnly cookies and are never rendered; verification
@@ -44,9 +47,19 @@ export async function GET(req: NextRequest) {
     path: "/",
     maxAge: grant.expires_in ?? 300,
   });
-  // The refresh token is deliberately NOT persisted: nothing consumes it yet, and a long-lived
-  // credential at rest with no use is pure liability. When a silent-refresh flow is added, store it
-  // then. For now a session simply ends when the access token expires.
+  // The refresh token is what keeps the session past the access token's few minutes: the proxy trades
+  // it for a fresh one (session-refresh.ts). Stored only sealed under SESSION_SECRET; without that
+  // secret it is dropped, as before, and the session ends with the access token.
+  const deps = await liveRefreshDeps();
+  if (deps && typeof grant.refresh_token === "string" && grant.refresh_token !== "") {
+    res.cookies.set(REFRESH_COOKIE, await sealRefresh(deps.key, { refreshToken: grant.refresh_token, startedAt: Date.now() }), {
+      httpOnly: true,
+      secure: cookieSecure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: Math.floor(SESSION_LIFETIME_MS / 1000),
+    });
+  }
   //
   // Display-only, readable by the server-rendered nav to draw the avatar. Carries just an initial
   // and an optional picture URL, never a token or anything sensitive.
