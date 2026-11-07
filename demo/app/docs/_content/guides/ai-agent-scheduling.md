@@ -52,7 +52,8 @@ const hold = await db.holds.place({
 // ...the agent talks to the user, the user agrees...
 
 // 3. confirm: one atomic statement, no gap
-const { bookingId } = await db.holds.commit(hold.id, { label: "Dana R." });
+const { bookingId } = await db.holds.commit(hold.id, { label: "order-4417" });
+// Who it is for lives in your app, saved against bookingId. Δt keeps the time only.
 ```
 
 The commit is a single server-side statement under one lock. The hold becomes the booking in place. There is no moment where the slot is released and re-taken, so no competing writer can slip in between, which is exactly the failure the naive two-step version has.
@@ -71,7 +72,7 @@ A conflict is an ordinary, expected answer. When `place` or `commit` is rejected
 
 ```ts
 try {
-  await db.holds.commit(hold.id, { label: name });
+  await db.holds.commit(hold.id, { label: orderRef });
 } catch {
   // The hold expired or the slot went. Re-read and offer again.
   const next = await db.availability.get({ resourceId: room.id, start, end });

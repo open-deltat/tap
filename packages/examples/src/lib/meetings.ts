@@ -5,6 +5,7 @@ import { createMeetingService, type MeetingService } from "./meeting-request-ser
 import { ownerNotifier } from "./owner-notifier";
 import { publicBaseUrl } from "./public-base-url";
 import { canonicalPrincipalId } from "./auth-config";
+import { bookingDetails } from "./booking-details-live";
 
 // The one process-wide meeting service, beside the one registry it reads (public-registry.ts): the
 // same single-container limit applies, and the requests file lives on the same data volume. Kept on
@@ -18,6 +19,7 @@ export const meetings: MeetingService = (shared.__deltatMeetings ??= createMeeti
   store: openMeetingRequestStore(process.env.MEETING_REQUESTS_PATH ?? "./data/meeting-requests.json", {
     canonicalRequester: (id) => canonicalPrincipalId(id),
   }),
+  details: bookingDetails,
   notify: ownerNotifier,
   reviewBase: publicBaseUrl,
 }));

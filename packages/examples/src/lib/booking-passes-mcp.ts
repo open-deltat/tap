@@ -161,7 +161,7 @@ export function registerBookingPassTools(server: McpServer, passes: BookingPassS
       inputSchema: { calendar_id: z.string().max(64).optional().describe("Only this calendar. Defaults to every calendar you own") },
     },
     async ({ calendar_id }) => {
-      const listed = passes.list({ owner: caller.principalId, calendarId: calendar_id });
+      const listed = await passes.list({ owner: caller.principalId, calendarId: calendar_id });
       return listed.ok ? ok({ passes: listed.value.map(describePass) }) : refused(listed.error);
     }
   );

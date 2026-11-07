@@ -173,7 +173,8 @@ describe("asking for and answering a meeting through MCP", () => {
 
     const approved = await call(owner, "approve_meeting_request", { request_id: asked.body.request_id });
     expect(approved.body).toMatchObject({ status: "approved", booked: true });
-    expect(meetings.state.bookings).toEqual([{ id: "booking1", label: "Anna Example" }]);
+    expect(meetings.state.bookings.map((b) => b.id)).toEqual(["booking1"]);
+    expect(await meetings.details.get("booking1")).toMatchObject({ name: "Anna Example" });
 
     const mine = await call(anna, "my_meeting_requests", {});
     expect(mine.body.requests).toEqual([expect.objectContaining({ status: "approved" })]);
@@ -224,7 +225,8 @@ describe("booking directly with a pass through MCP", () => {
     const booked = await call(anna, "book_with_pass", { pass: token, hold_id: held.body.hold_id, note: "Intro" });
     later.push(booked.body);
     expect(booked.body).toMatchObject({ booked: true, booked_by: "Anna Example", bookings_left: 0 });
-    expect(meetings.state.bookings).toEqual([{ id: "booking1", label: "Anna Example" }]);
+    expect(meetings.state.bookings.map((b) => b.id)).toEqual(["booking1"]);
+    expect(await meetings.details.get("booking1")).toMatchObject({ name: "Anna Example", note: "Intro", source: "pass" });
 
     const listed = await call(owner, "list_booking_passes", {});
     later.push(listed.body);

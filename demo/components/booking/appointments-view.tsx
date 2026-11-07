@@ -5,6 +5,7 @@ import { liveProtectedResourceMetadata } from "@open-deltat/examples/lib/mcp-liv
 import { AppointmentsBooker } from "@/components/booking/appointments-booker";
 import { MeetingRequester } from "@/components/booking/meeting-requester";
 import { AmbientBackground } from "@/components/ambient-background";
+import { prefillFrom } from "@/components/booking/prefill";
 
 // The `appointments` view of a calendar's public booking page: a month and the chosen day's free
 // times. A calendar that takes meeting requests asks instead of booking.
@@ -34,6 +35,8 @@ export async function AppointmentsView({ record }: { record: BookableRecord }) {
     );
   }
 
+  // A signed-in visitor's name and email, as their identity provider gives them, start the form.
+  const contact = (await getSessionPrincipal()) !== null ? await myContact() : null;
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-6 py-12">
       <AmbientBackground />
@@ -41,7 +44,7 @@ export async function AppointmentsView({ record }: { record: BookableRecord }) {
         <h1 className="text-2xl font-semibold tracking-tight">{record.name}</h1>
         <p className="text-muted-foreground text-sm">Pick a time that works. Your slot is held while you confirm.</p>
       </div>
-      <AppointmentsBooker record={record} />
+      <AppointmentsBooker record={record} prefill={prefillFrom(contact)} />
     </main>
   );
 }

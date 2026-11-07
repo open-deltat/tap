@@ -6,6 +6,7 @@ import { openBookableRegistry } from "../public-bookables";
 import { openMeetingRequestStore, type RequestContact } from "../meeting-requests";
 import { createMeetingService } from "../meeting-request-service";
 import type { OwnerNotice } from "../notify";
+import { openBookingDetailsStore } from "../booking-details";
 
 // Shared by the meeting-request tests: a calendar that takes requests, a fake deltat that records
 // what the service did to it, and a clock the test moves.
@@ -197,10 +198,12 @@ export function setupMeetings(opts: { mode?: "instant" | "request"; reviewBase?:
   const { dt, state } = fakeDeltaT();
   // The registry entry's kernel twin, so a read of the calendar's resource finds it.
   state.resources.set("cal1", { id: "cal1", parentId: null, name: "Simon's week", capacity: 1, bufferAfter: null });
+  const details = openBookingDetailsStore(tmpPath(`details_${crypto.randomUUID()}`), { now: () => clock.now });
   const service = createMeetingService({
     dt,
     registry,
     store,
+    details,
     notify: async (n) => {
       notices.push(n);
     },
@@ -209,5 +212,5 @@ export function setupMeetings(opts: { mode?: "instant" | "request"; reviewBase?:
   });
   const ask = (overrides: Partial<Parameters<typeof service.request>[0]> = {}) =>
     service.request({ calendarId: "cal1", requester: ANNA, contact: annaContact, start: T, end: T + 30 * MIN, ...overrides });
-  return { registry, store, service, state, notices, clock, dt, ask };
+  return { registry, store, service, state, notices, clock, dt, ask, details };
 }

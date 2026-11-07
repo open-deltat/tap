@@ -19,7 +19,10 @@ export interface CommitTarget {
   readonly holdId: string;
   readonly start: number;
   readonly end: number;
-  /** The booking's label. Also how the read-back recognises the booking as ours. */
+  /**
+   * The booking's kernel label: an opaque reference unique to this commit (booking-details.ts
+   * `opaqueRef`), never a person's name. Its uniqueness is how the read-back recognises the booking.
+   */
   readonly label: string;
 }
 

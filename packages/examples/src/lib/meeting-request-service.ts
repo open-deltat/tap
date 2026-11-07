@@ -5,6 +5,7 @@ import type { Notifier } from "./notify";
 import { requireDisplayText } from "./display-text";
 import { HORIZON_DAYS, MAX_QUERY_WINDOW_MS, type Outcome } from "./bookable-service";
 import { commitAndConfirm } from "./commit-outcome";
+import { opaqueRef, type BookingDetailsStore } from "./booking-details";
 
 // Asking for a meeting on a calendar whose owner approves each one, and the owner's answer. The web
 // actions and the hosted MCP endpoint are thin edges over this, so both enforce the same rules.
@@ -19,6 +20,8 @@ export interface MeetingDeps {
   dt: DeltaT;
   registry: BookableRegistry;
   store: MeetingRequestStore;
+  /** Who booked, kept app-side: the kernel booking carries only an opaque label. */
+  details: BookingDetailsStore;
   notify: Notifier;
   /** Absolute base for the review link in the owner's notification, e.g. https://delt.at. */
   reviewBase?: string | null;
@@ -252,7 +255,7 @@ export function createMeetingService(deps: MeetingDeps): MeetingService {
           holdId: hold.id,
           start: request.start,
           end: request.end,
-          label: request.contact.name,
+          label: opaqueRef(),
         });
         if (outcome.kind === "unknown") {
           // It may have booked. Pending would invite a second approval and a second booking.
@@ -269,6 +272,19 @@ export function createMeetingService(deps: MeetingDeps): MeetingService {
           await deps.dt.bookings.cancel(outcome.bookingId).catch(() => {});
           return fail("The request was withdrawn just now, so nothing was booked.");
         }
+        // After the kernel booking, never before: a row without a booking is hidden and swept, and a
+        // failed write here loses only the name on the owner's calendar, never the booking.
+        await deps.details
+          .put({
+            bookingId: outcome.bookingId,
+            calendarId: request.calendarId,
+            name: request.contact.name,
+            email: request.contact.email,
+            note: request.note,
+            source: "meeting_request",
+            createdAt: now(),
+          })
+          .catch(() => {});
         return ok(approved);
       } finally {
         approving.delete(requestId);

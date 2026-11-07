@@ -24,6 +24,7 @@ import type { BookableRecord } from "@open-deltat/examples/lib/public-bookables"
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Slot } from "./slots";
+import type { Prefill } from "./prefill";
 import { dayKeyIn, keyOfPickerDate, noFreeTimesMessage, openingDay, pickerDateOf, slotsByDay, type DayKey } from "./open-days";
 import { refusalOf, signInHref, SIGN_IN_TO_BOOK } from "./booker-refusal";
 
@@ -43,7 +44,7 @@ interface Held extends Slot {
   expiresAt: number;
 }
 
-export function AppointmentsBooker({ record }: { record: BookableRecord }) {
+export function AppointmentsBooker({ record, prefill }: { record: BookableRecord; prefill: Prefill }) {
   const slotMs = record.slotMinutes * 60_000;
   const [open, setOpen] = useState<OpenTime | null>(null);
   const [day, setDay] = useState<DayKey | null>(null);
@@ -54,7 +55,13 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
   const [signInFor, setSignInFor] = useState<Slot | null>(null);
   /** Seconds left on the current hold, so the visitor can see their time running out. */
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(prefill.name);
+  /** Optional. Kept app-side for the owner (booking-details), never in deltat, never shown publicly. */
+  const [email, setEmail] = useState(prefill.email);
+  const resetForm = useCallback(() => {
+    setName(prefill.name);
+    setEmail(prefill.email);
+  }, [prefill.name, prefill.email]);
   const [pending, start] = useTransition();
 
   // The hold that still owes a release, in a ref rather than state so the teardown listener and the
@@ -135,7 +142,7 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
       if (remaining === 0) {
         dropHold();
         setHeld(null);
-        setName("");
+        resetForm();
         toast.info("That hold expired. Pick a time again.");
         void load();
       }
@@ -143,7 +150,7 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [held, dropHold, load]);
+  }, [held, dropHold, load, resetForm]);
 
   // A hold this tab placed before a reload or a crash. The teardown beacon below usually got there
   // first and release is idempotent, so this costs a round trip in the common case and is the only
@@ -213,7 +220,7 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
   const confirm = () => {
     if (!held) return;
     start(async () => {
-      const result = await commitPublicHold(record.id, held.holdId, name.trim());
+      const result = await commitPublicHold(record.id, held.holdId, name.trim(), email.trim() || null);
       if (!result.ok) {
         const refused = refusalOf(result.error);
         toast.error(refused.kind === "message" ? refused.text : SIGN_IN_TO_BOOK);
@@ -224,7 +231,7 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
       // be a round trip that can only fail.
       dropHold();
       setHeld(null);
-      setName("");
+      resetForm();
       void load();
     });
   };
@@ -232,7 +239,7 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
   const cancelHold = () => {
     releaseOutstanding();
     setHeld(null);
-    setName("");
+    resetForm();
   };
 
   // A calendar day is a date, not an instant: format its parts as they are, in no zone.
@@ -314,7 +321,20 @@ export function AppointmentsBooker({ record }: { record: BookableRecord }) {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="So they know who is coming"
                   maxLength={60}
-                  autoFocus
+                  autoComplete="name"
+                  autoFocus={prefill.name === ""}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="booker-email">Email (optional)</Label>
+                <Input
+                  id="booker-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Only the owner sees it"
+                  maxLength={254}
+                  autoComplete="email"
                 />
               </div>
               <div className="flex gap-2">

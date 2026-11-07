@@ -202,6 +202,8 @@ async create(items: { resourceId: string; start: number; end: number; label?: st
 
 Create one or many bookings in one round-trip, returned with generated ids. `label` is optional. An empty array returns an empty array.
 
+Δt is a database of time, so a label is for a reference such as an order number, never a person. Keep names, emails and notes in your own store, keyed by the booking id: then they can be shown, changed and erased without touching the log of time.
+
 ```ts
 const [b] = await db.bookings.create([{ resourceId: seat12.id, start: 1719216000000, end: 1719219600000, label: "Match night" }]);
 ```

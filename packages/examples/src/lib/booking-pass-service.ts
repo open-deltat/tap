@@ -9,6 +9,7 @@ import { requireDisplayText } from "./display-text";
 import { HOLD_TTL_MS, HORIZON_DAYS, MAX_QUERY_WINDOW_MS, type Outcome } from "./bookable-service";
 import { commitAndConfirm } from "./commit-outcome";
 import { passStatus, usesLeft, type BookingPass, type BookingPassStore, type PassAction, type PassStatus } from "./booking-passes";
+import { opaqueRef, type BookingDetailsStore } from "./booking-details";
 
 // Direct booking on someone's calendar, but only with a pass its owner handed out (booking-passes.ts).
 // The owner mints one for a window, lengths and a number of bookings; whoever holds it may find a
@@ -30,6 +31,8 @@ export interface PassDeps {
   dt: DeltaT;
   registry: BookableRegistry;
   store: BookingPassStore;
+  /** Who booked, kept app-side: the kernel booking carries only an opaque label. */
+  details: BookingDetailsStore;
   /** Bounds how often one caller may present a pass, valid or not. */
   lookups: RateLimiter;
   /** Tells the owner when a pass books. Best effort: it never fails or undoes the booking. */
@@ -109,7 +112,8 @@ export interface PassView {
   readonly expiresAt: number;
   /** The claimer's sign-in name (their sign-in id when they shared none); null until the first hold. */
   readonly claimedBy: string | null;
-  readonly bookings: readonly { bookingId: string; start: number; end: number; bookedBy: string; note: string | null }[];
+  /** `bookedBy` is null when no name is on record (the details write failed after the booking). */
+  readonly bookings: readonly { bookingId: string; start: number; end: number; bookedBy: string | null; note: string | null }[];
 }
 
 /** What the holder sees: what the pass allows, nothing about the owner's other passes or bookings. */
@@ -138,7 +142,7 @@ export interface BookingPassService {
   /** The pass is in this result and nowhere else, ever. */
   create(input: CreatePassInput): Outcome<{ token: string; pass: PassView }>;
   /** Passes on one calendar the owner owns, or on all of them; newest first. */
-  list(input: { owner: string; calendarId?: string }): Outcome<PassView[]>;
+  list(input: { owner: string; calendarId?: string }): Promise<Outcome<PassView[]>>;
   revoke(input: { owner: string; passId: string }): Promise<Outcome<PassView>>;
   /**
    * Revoke every live pass on a calendar the owner owns, for deleting it; the count revoked. Refused,
@@ -184,9 +188,11 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
 
   const viewOf = (pass: BookingPass, record: BookableRecord | undefined, at: number): PassView => {
     const status = passStatus(pass, at);
+    // The names here are only those of passes booked before names moved to booking-details; `named`
+    // replaces them with the details rows.
     const bookings = pass.holds.flatMap((h) =>
       h.outcome.status === "booked"
-        ? [{ bookingId: h.outcome.bookingId, start: h.start, end: h.end, bookedBy: h.outcome.bookedBy, note: h.outcome.note }]
+        ? [{ bookingId: h.outcome.bookingId, start: h.start, end: h.end, bookedBy: h.outcome.bookedBy || null, note: h.outcome.note }]
         : []
     );
     return {
@@ -207,6 +213,17 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       bookings,
     };
   };
+
+  /** Who booked each of a pass's bookings, from booking-details (the only place a name is kept now). */
+  const named = async (view: PassView): Promise<PassView> => ({
+    ...view,
+    bookings: await Promise.all(
+      view.bookings.map(async (b) => {
+        const who = await deps.details.get(b.bookingId).catch(() => undefined);
+        return who ? { ...b, bookedBy: who.name, note: who.note } : b;
+      })
+    ),
+  });
 
   const scopeOf = (pass: BookingPass, record: BookableRecord): PassScope => ({
     calendar: calendarOf(pass.calendarId, record),
@@ -332,19 +349,18 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       }
     },
 
-    list({ owner, calendarId }) {
+    async list({ owner, calendarId }) {
       const at = now();
       if (calendarId !== undefined) {
         const record = deps.registry.authorizeOwner(calendarId, owner);
         if (!record) return fail("You do not own this calendar.");
-        return ok(deps.store.listForCalendar(calendarId).map((p) => viewOf(p, record, at)));
+        return ok(await Promise.all(deps.store.listForCalendar(calendarId).map((p) => named(viewOf(p, record, at)))));
       }
-      return ok(
-        deps.registry
-          .listOwned(owner)
-          .flatMap((record) => deps.store.listForCalendar(record.id).map((p) => viewOf(p, record, at)))
-          .sort((a, b) => b.createdAt - a.createdAt)
-      );
+      const views = deps.registry
+        .listOwned(owner)
+        .flatMap((record) => deps.store.listForCalendar(record.id).map((p) => viewOf(p, record, at)))
+        .sort((a, b) => b.createdAt - a.createdAt);
+      return ok(await Promise.all(views.map(named)));
     },
 
     async revoke({ owner, passId }) {
@@ -358,7 +374,7 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       const revoked = deps.store.revoke(pass.id, now());
       if (!revoked) return fail(`That pass is already ${status}.`);
       await releaseLive(revoked);
-      return ok(viewOf(deps.store.get(pass.id) ?? revoked, record, now()));
+      return ok(await named(viewOf(deps.store.get(pass.id) ?? revoked, record, now())));
     },
 
     async revokeAllOn(owner, calendarId) {
@@ -471,7 +487,7 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
       if (!deps.store.beginSpend(pass.id)) return refuse(pass, caller, BUSY);
       spendingHere.add(pass.id);
       // commit-outcome.ts decides what the commit did, lost replies included; `unknown` keeps the pass spending.
-      const outcome = await commitAndConfirm(deps.dt, { resourceId: pass.calendarId, holdId, start: hold.start, end: hold.end, label: name.value }).finally(() =>
+      const outcome = await commitAndConfirm(deps.dt, { resourceId: pass.calendarId, holdId, start: hold.start, end: hold.end, label: opaqueRef() }).finally(() =>
         spendingHere.delete(pass.id)
       );
       if (outcome.kind === "unknown") {
@@ -488,11 +504,24 @@ export function createBookingPassService(deps: PassDeps): BookingPassService {
         holdId,
         at: now(),
         bookingId: outcome.bookingId,
-        bookedBy: name.value,
-        note: forOwner.value,
+        // The name and note go to booking-details below, the one place a person is kept.
+        bookedBy: "",
+        note: null,
       });
       // Only this function moves a pass out of `spending`, and revoke waits while it is in flight.
       if (!finished) throw new Error(`Booking pass ${pass.id} left the spending state during its own spend.`);
+      // After the kernel booking: a failed write loses the name on the owner's side, never the booking.
+      await deps.details
+        .put({
+          bookingId: outcome.bookingId,
+          calendarId: pass.calendarId,
+          name: name.value,
+          email: null,
+          note: forOwner.value,
+          source: "pass",
+          createdAt: now(),
+        })
+        .catch(() => {});
       if (finished.state.status === "spent") await releaseLive(finished);
       audit(pass, caller, "book", outcome.bookingId);
       // The guest's name and note are quoted (JSON-escaped), so an owner's agent reads them as data.

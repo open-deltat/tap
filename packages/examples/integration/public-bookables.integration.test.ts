@@ -36,6 +36,7 @@ import {
   type BookableDeps,
 } from "../src/lib/bookable-service";
 import { createMyCalendars } from "../src/lib/my-calendars";
+import { isOpaqueRef, openBookingDetailsStore, type BookingDetailsStore } from "../src/lib/booking-details";
 import type { WeekHours } from "../src/examples/builder/schedule";
 
 const PORT_ENV = process.env.DELTAT_INTEGRATION_PORT;
@@ -47,8 +48,9 @@ const DAY_MS = 86_400_000;
 // never sees another run's bookables.
 const scratchDir = enabled ? mkdtempSync(join(tmpdir(), "tap-public-it-")) : "";
 
-const deps: BookableDeps | null = enabled
+const deps: (BookableDeps & { details: BookingDetailsStore }) | null = enabled
   ? {
+      details: openBookingDetailsStore(join(scratchDir, "details.json")),
       dt: new DeltaT({
         host: process.env.DELTAT_INTEGRATION_HOST ?? "127.0.0.1",
         port: Number(PORT_ENV),
@@ -60,7 +62,7 @@ const deps: BookableDeps | null = enabled
     }
   : null;
 
-function d(): BookableDeps {
+function d(): BookableDeps & { details: BookingDetailsStore } {
   if (deps === null) throw new Error("integration deps used while the suite is disabled");
   return deps;
 }
@@ -212,29 +214,31 @@ describe.skipIf(!enabled)("holding and booking", () => {
     const held = await holdSlot(d(), id, slot.start, slot.end);
     if (!held.ok) throw new Error(held.error);
 
-    const committed = await commitHold(d(), id, held.value.holdId, "Simon");
-    expect(committed.ok).toBe(true);
+    const committed = await commitHold(d(), id, held.value.holdId, "Simon", "simon@example.com");
+    if (!committed.ok) throw new Error(committed.error);
 
     const after = await listSlots(d(), id, slot.dayStart, slot.dayStart + DAY_MS);
     expect(after.some((s) => s.start <= slot.start && s.end >= slot.end)).toBe(false);
 
+    // The kernel booking holds time and an opaque label; the person is in booking-details.
     const booked = await d().dt.bookings.get(id, { start: slot.dayStart, end: slot.dayStart + DAY_MS });
     expect(booked).toHaveLength(1);
-    expect(booked[0].label).toBe("Simon");
+    expect(isOpaqueRef(booked[0].label ?? "")).toBe(true);
+    expect(JSON.stringify(booked)).not.toContain("Simon");
+    expect(JSON.stringify(booked)).not.toContain("simon@example.com");
+    expect(await d().details.get(committed.value.bookingId)).toMatchObject({ name: "Simon", email: "simon@example.com" });
   });
 
-  test("the booker's name is sanitized on its way into the WAL", async () => {
-    // GAP-02: label is free text in the kernel, so this is the one stranger-supplied string that
-    // reaches the log. A newline in it must not survive as a newline.
-    const { id } = await makeBookable("Sanitized label");
+  test("the booker's name is sanitized before the owner reads it", async () => {
+    // A newline in a stranger's name must not survive as a newline in what the owner sees.
+    const { id } = await makeBookable("Sanitized name");
     const slot = await firstFutureSlot(id, 30);
 
     const held = await holdSlot(d(), id, slot.start, slot.end);
     if (!held.ok) throw new Error(held.error);
-    expect((await commitHold(d(), id, held.value.holdId, "Line\nBreak")).ok).toBe(true);
-
-    const booked = await d().dt.bookings.get(id, { start: slot.dayStart, end: slot.dayStart + DAY_MS });
-    expect(booked[0].label).toBe("Line Break");
+    const committed = await commitHold(d(), id, held.value.holdId, "Line\nBreak");
+    if (!committed.ok) throw new Error(committed.error);
+    expect((await d().details.get(committed.value.bookingId))?.name).toBe("Line Break");
   });
 
   test("an empty booker name is refused and the hold survives for a retry", async () => {

@@ -6,7 +6,7 @@ import { calendarMeetingRequests } from "@open-deltat/examples/actions/meeting-r
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AvailabilityEditor } from "@/components/dashboard/availability-editor";
-import { LiveSchedule } from "@/components/dashboard/live-schedule";
+import { LiveSchedule, liveBooking } from "@/components/dashboard/live-schedule";
 import { ShareLinks } from "@/components/dashboard/share-links";
 import { BookingAccess } from "@/components/dashboard/booking-access";
 import { BookingMode } from "@/components/dashboard/booking-mode";
@@ -91,7 +91,7 @@ export default async function ManageCalendarPage({ params }: { params: Promise<{
             calendarId={id}
             timezone={record.timezone}
             week={record.week}
-            initialBookings={bookings.map((b) => ({ id: b.id, start: b.start, end: b.end, label: b.label }))}
+            initialBookings={bookings.map(liveBooking)}
             initialHolds={holds}
           />
         </TabsContent>

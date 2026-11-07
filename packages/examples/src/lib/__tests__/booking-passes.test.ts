@@ -17,7 +17,7 @@ function must<T>(outcome: { ok: true; value: T } | { ok: false; error: string })
 }
 
 describe("minting a pass", () => {
-  test("hands out a dtp_ pass of 32 random bytes once and stores only its SHA-256", () => {
+  test("hands out a dtp_ pass of 32 random bytes once and stores only its SHA-256", async () => {
     const { mint, storePath, passes } = setup();
     const { token, pass } = mint();
     expect(token.startsWith("dtp_")).toBe(true);
@@ -31,7 +31,7 @@ describe("minting a pass", () => {
 
     // Defaults: one use, fifteen minutes, the calendar's slot length.
     expect(pass).toMatchObject({ uses: 1, usesLeft: 1, status: "active", lengthsMinutes: [30], expiresAt: NOW + 15 * MIN });
-    expect(JSON.stringify(must(passes.list({ owner: OWNER })))).not.toContain(token);
+    expect(JSON.stringify(must(await passes.list({ owner: OWNER })))).not.toContain(token);
   });
 
   test("only the calendar's owner can mint one, and a missing calendar reads the same", () => {
@@ -71,9 +71,9 @@ describe("minting a pass", () => {
   test("the owner lists passes without the pass itself and can revoke one; nobody else can do either", async () => {
     const { mint, passes } = setup();
     const { pass } = mint({ label: "for Acme" });
-    expect(must(passes.list({ owner: OWNER, calendarId: "cal1" }))).toEqual([expect.objectContaining({ id: pass.id, status: "active", usesLeft: 1, label: "for Acme" })]);
-    expect(passes.list({ owner: BEN, calendarId: "cal1" }).ok).toBe(false);
-    expect(must(passes.list({ owner: BEN }))).toEqual([]);
+    expect(must(await passes.list({ owner: OWNER, calendarId: "cal1" }))).toEqual([expect.objectContaining({ id: pass.id, status: "active", usesLeft: 1, label: "for Acme" })]);
+    expect((await passes.list({ owner: BEN, calendarId: "cal1" })).ok).toBe(false);
+    expect(must(await passes.list({ owner: BEN }))).toEqual([]);
 
     expect((await passes.revoke({ owner: BEN, passId: pass.id })).ok).toBe(false);
     expect(must(await passes.revoke({ owner: OWNER, passId: pass.id })).status).toBe("revoked");
@@ -89,7 +89,7 @@ describe("minting a pass", () => {
 
     const lapsed = mint({ uses: 2, expiresInMinutes: 1 });
     clock.now += MIN;
-    expect(must(passes.list({ owner: OWNER })).find((p) => p.id === lapsed.pass.id)).toMatchObject({ status: "expired", usesLeft: 0, bookingsUnused: 2 });
+    expect(must(await passes.list({ owner: OWNER })).find((p) => p.id === lapsed.pass.id)).toMatchObject({ status: "expired", usesLeft: 0, bookingsUnused: 2 });
   });
 });
 
@@ -147,17 +147,19 @@ describe("booking with a pass", () => {
   });
 
   test("books a hold made with the pass, under the given name, and the pass is spent", async () => {
-    const { mint, passes, state } = setup();
+    const { mint, passes, state, details } = setup();
     const { token, pass } = mint();
     const keep = must(await passes.hold({ token, caller: GUEST, start: T }));
     const spare = must(await passes.hold({ token, caller: GUEST, start: T + 60 * MIN }));
     const booked = must(await passes.book({ token, caller: GUEST, holdId: keep.holdId, bookedBy: "Anna from Acme", note: "Intro call" }));
     expect(booked).toMatchObject({ bookingId: "booking1", start: T, end: T + 30 * MIN, usesLeft: 0 });
-    expect(state.bookings).toEqual([{ id: "booking1", label: "Anna from Acme" }]);
+    // The kernel booking holds time only; the name is in booking-details.
+    expect(state.bookings.map((b) => b.id)).toEqual(["booking1"]);
+    expect(await details.get("booking1")).toMatchObject({ name: "Anna from Acme", note: "Intro call", source: "pass" });
     expect(state.released).toEqual([spare.holdId]); // the other hold goes back the moment the pass is spent
 
     expect(await passes.findTimes({ token, caller: GUEST })).toEqual({ ok: false, error: PASS_NOT_VALID });
-    expect(must(passes.list({ owner: OWNER }))).toEqual([
+    expect(must(await passes.list({ owner: OWNER }))).toEqual([
       expect.objectContaining({ id: pass.id, status: "spent", usesLeft: 0, bookings: [{ bookingId: "booking1", start: T, end: T + 30 * MIN, bookedBy: "Anna from Acme", note: "Intro call" }] }),
     ]);
   });
@@ -173,7 +175,7 @@ describe("booking with a pass", () => {
     }
     expect(state.bookings).toEqual([]);
     expect(state.released).toEqual([]);
-    expect(must(passes.list({ owner: OWNER })).map((p) => p.usesLeft)).toEqual([1, 1]);
+    expect(must(await passes.list({ owner: OWNER })).map((p) => p.usesLeft)).toEqual([1, 1]);
   });
 
   test("two bookings on a single-use pass at once: exactly one wins", async () => {
@@ -188,7 +190,7 @@ describe("booking with a pass", () => {
     ]);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(state.bookings).toHaveLength(1);
-    expect(must(passes.list({ owner: OWNER }))[0]?.status).toBe("spent");
+    expect(must(await passes.list({ owner: OWNER }))[0]?.status).toBe("spent");
   });
 
   test("a pass with three uses books three times, then stops", async () => {
@@ -253,25 +255,25 @@ describe("the first agent to hold claims the pass", () => {
     must(await passes.findTimes({ token, caller: GUEST }));
     expect(must(await passes.book({ token, caller: GUEST, holdId: held.holdId, bookedBy: "Gina" })).usesLeft).toBe(1);
     must(await passes.hold({ token, caller: GUEST, start: T + 60 * MIN }));
-    expect(must(passes.list({ owner: OWNER }))).toEqual([expect.objectContaining({ id: pass.id, claimedBy: "Gina Guest" })]);
+    expect(must(await passes.list({ owner: OWNER }))).toEqual([expect.objectContaining({ id: pass.id, claimedBy: "Gina Guest" })]);
   });
 
   test("a first hold that fails gives the claim back, so one bad hold cannot lock the intended agent out", async () => {
     const { mint, passes, state } = setup();
     const { token } = mint();
-    const claimer = () => must(passes.list({ owner: OWNER }))[0]?.claimedBy;
+    const claimer = async () => must(await passes.list({ owner: OWNER }))[0]?.claimedBy;
 
     state.free = []; // the time is not free
     expect((await passes.hold({ token, caller: STRANGER, start: T, name: async () => "Eve" })).ok).toBe(false);
-    expect(claimer()).toBeNull();
+    expect(await claimer()).toBeNull();
     state.free = [{ start: NOW, end: NOW + 7 * DAY }];
     state.holdFails = true; // the kernel refuses the placement
     expect((await passes.hold({ token, caller: STRANGER, start: T, name: async () => "Eve" })).ok).toBe(false);
-    expect(claimer()).toBeNull();
+    expect(await claimer()).toBeNull();
 
     state.holdFails = false;
     must(await passes.hold({ token, caller: GUEST, start: T, name: async () => "Gina Guest" }));
-    expect(claimer()).toBe("Gina Guest");
+    expect(await claimer()).toBe("Gina Guest");
   });
 
   test("a claimer whose later hold fails keeps the claim", async () => {
@@ -280,7 +282,7 @@ describe("the first agent to hold claims the pass", () => {
     must(await passes.hold({ token, caller: GUEST, start: T, name: async () => "Gina Guest" }));
     state.holdFails = true;
     expect((await passes.hold({ token, caller: GUEST, start: T + 60 * MIN })).ok).toBe(false);
-    expect(must(passes.list({ owner: OWNER }))[0]?.claimedBy).toBe("Gina Guest");
+    expect(must(await passes.list({ owner: OWNER }))[0]?.claimedBy).toBe("Gina Guest");
     expect(await passes.findTimes({ token, caller: STRANGER })).toEqual({ ok: false, error: PASS_NOT_VALID });
   });
 
@@ -296,7 +298,7 @@ describe("the first agent to hold claims the pass", () => {
     ]);
     expect(failed?.ok).toBe(false);
     expect(landed?.ok).toBe(true);
-    expect(must(passes.list({ owner: OWNER }))[0]?.claimedBy).toBe("Gina Guest");
+    expect(must(await passes.list({ owner: OWNER }))[0]?.claimedBy).toBe("Gina Guest");
   });
 
   test("two agents holding at once on an unclaimed pass: one claims it, the other is refused", async () => {
@@ -318,9 +320,9 @@ describe("the first agent to hold claims the pass", () => {
   test("an unclaimed pass shows no claimer, and a claimer without a shared name shows their sign-in id", async () => {
     const { mint, passes } = setup();
     const { token } = mint();
-    expect(must(passes.list({ owner: OWNER }))[0]?.claimedBy).toBeNull();
+    expect(must(await passes.list({ owner: OWNER }))[0]?.claimedBy).toBeNull();
     must(await passes.hold({ token, caller: GUEST, start: T, name: async () => null }));
-    expect(must(passes.list({ owner: OWNER }))[0]?.claimedBy).toBe(GUEST);
+    expect(must(await passes.list({ owner: OWNER }))[0]?.claimedBy).toBe(GUEST);
   });
 });
 
@@ -503,7 +505,7 @@ describe("when the kernel's answer is lost or crosses another call", () => {
     // Single use: the pass is spent, so it cannot book a second time.
     expect(await passes.hold({ token, caller: GUEST, start: T + 60 * MIN })).toEqual({ ok: false, error: PASS_NOT_VALID });
     expect(state.bookings).toHaveLength(1);
-    expect(must(passes.list({ owner: OWNER }))[0]).toMatchObject({ id: pass.id, status: "spent", bookings: [expect.objectContaining({ bookingId: "booking1" })] });
+    expect(must(await passes.list({ owner: OWNER }))[0]).toMatchObject({ id: pass.id, status: "spent", bookings: [expect.objectContaining({ bookingId: "booking1" })] });
     expect(notices).toHaveLength(1);
   });
 
@@ -533,7 +535,7 @@ describe("when the kernel's answer is lost or crosses another call", () => {
 
     // Not "going through": nothing is in flight. It simply stops working, and never books again.
     expect(await passes.hold({ token, caller: GUEST, start: T + 60 * MIN })).toEqual({ ok: false, error: PASS_NOT_VALID });
-    expect(must(passes.list({ owner: OWNER }))[0]?.status).toBe("spending");
+    expect(must(await passes.list({ owner: OWNER }))[0]?.status).toBe("spending");
     expect(must(await passes.revoke({ owner: OWNER, passId: pass.id })).status).toBe("revoked");
     expect(state.bookings).toHaveLength(1);
   });
@@ -568,7 +570,7 @@ describe("when the kernel's answer is lost or crosses another call", () => {
 
     expect(released.ok).toBe(false);
     expect(booked.ok).toBe(true);
-    const view = must(passes.list({ owner: OWNER })).find((p) => p.id === pass.id);
+    const view = must(await passes.list({ owner: OWNER })).find((p) => p.id === pass.id);
     expect(view).toMatchObject({ usesLeft: 1, bookings: [expect.objectContaining({ bookingId: "bk1" })] });
     expect(store.get(pass.id)?.holds[0]?.outcome.status).toBe("booked");
   });

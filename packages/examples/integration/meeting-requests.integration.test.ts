@@ -20,6 +20,7 @@ import { openMeetingRequestStore, type RequestContact } from "../src/lib/meeting
 import { createMeetingService } from "../src/lib/meeting-request-service";
 import { createOwnedCalendar, saveAvailability } from "../src/lib/owned-calendar-service";
 import { silentNotifier } from "../src/lib/notify";
+import { isOpaqueRef, openBookingDetailsStore } from "../src/lib/booking-details";
 
 const PORT_ENV = process.env.DELTAT_INTEGRATION_PORT;
 const enabled = PORT_ENV !== undefined && PORT_ENV !== "";
@@ -56,17 +57,19 @@ async function requestCalendar(client: DeltaT) {
   const saved = await saveAvailability({ dt: client, registry }, { id: made.value.id, owner: OWNER, week, slotMinutes: 30, priceCents: null });
   if (!saved.ok) throw new Error(saved.error);
   registry.updateOwned(made.value.id, OWNER, { bookingMode: "request" });
+  const details = openBookingDetailsStore(join(scratchDir, `details-${randomUUID()}.json`));
   const service = createMeetingService({
     dt: client,
     registry,
     store: openMeetingRequestStore(join(scratchDir, `requests-${randomUUID()}.json`)),
+    details,
     notify: silentNotifier,
   });
   // Tomorrow 10:00 UTC: inside the open hours, in the future, within the horizon.
   const tomorrow = new Date();
   tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   const t = Date.UTC(tomorrow.getUTCFullYear(), tomorrow.getUTCMonth(), tomorrow.getUTCDate(), 10);
-  return { id: made.value.id, service, t };
+  return { id: made.value.id, service, t, details };
 }
 
 describe("meeting requests against a live deltat", () => {
@@ -81,15 +84,19 @@ describe("meeting requests against a live deltat", () => {
     expect(await dt.holds.get(id)).toEqual([]);
   });
 
-  liveTest("approving books it under the requester's name, and the time is then no longer free to ask for", async () => {
+  liveTest("approving books it for the requester, and the time is then no longer free to ask for", async () => {
     if (!dt) throw new Error("live suite without a client");
-    const { id, service, t } = await requestCalendar(dt);
+    const { id, service, t, details } = await requestCalendar(dt);
     const asked = await service.request({ calendarId: id, requester: ANNA, contact: anna, start: t, end: t + 30 * MIN });
     if (!asked.ok) throw new Error(asked.error);
 
     const approved = await service.approve({ requestId: asked.value.id, owner: OWNER });
-    expect(approved).toMatchObject({ ok: true, value: { decision: { status: "approved" } } });
-    expect(await dt.bookings.get(id)).toEqual([expect.objectContaining({ start: t, end: t + 30 * MIN, label: "Anna Example" })]);
+    if (!approved.ok || approved.value.decision.status !== "approved") throw new Error("not approved");
+    // The kernel holds the time and an opaque label; the requester is in booking-details.
+    const booked = await dt.bookings.get(id);
+    expect(booked).toEqual([expect.objectContaining({ start: t, end: t + 30 * MIN })]);
+    expect(isOpaqueRef(booked[0]?.label ?? "")).toBe(true);
+    expect(await details.get(approved.value.decision.bookingId)).toMatchObject({ name: "Anna Example", email: "anna@example.com" });
 
     const again = await service.request({ calendarId: id, requester: "https://issuer.test#ben", contact: anna, start: t, end: t + 30 * MIN });
     expect(again).toEqual({ ok: false, error: "That time is not free. Pick another." });

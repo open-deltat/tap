@@ -26,6 +26,7 @@ export function setupPasses(opts: { lookupLimit?: number; notify?: Notifier } = 
     dt: meetings.dt,
     registry: meetings.registry,
     store,
+    details: meetings.details,
     lookups: createRateLimiter({ limit: opts.lookupLimit ?? 1_000, windowMs: 3_600_000, now: () => meetings.clock.now }),
     notify:
       opts.notify ??

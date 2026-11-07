@@ -31,8 +31,21 @@ export interface LiveBooking {
   id: string;
   start: number;
   end: number;
-  label: string | null;
+  /** Who booked, from booking-details (never the kernel); null when no one is on record. */
+  name: string | null;
+  email: string | null;
 }
+
+type Person = Pick<LiveBooking, "name" | "email">;
+
+/** The owner's view of a booking from the calendar read: time from the kernel, person from booking-details. */
+export const liveBooking = (b: { id: string; start: number; end: number; who: { name: string; email: string | null } | null }): LiveBooking => ({
+  id: b.id,
+  start: b.start,
+  end: b.end,
+  name: b.who?.name ?? null,
+  email: b.who?.email ?? null,
+});
 interface LogLine {
   key: string;
   at: number;
@@ -162,11 +175,11 @@ export function LiveSchedule({
     setLog((prev) => [{ ...line, key: `${Date.now()}-${seq}`, at: Date.now() }, ...prev].slice(0, 60));
   }, []);
 
-  // Names come only from the owner's read: deltat#49 keeps them out of change notifications. A
-  // booking's name never changes, so every reply adds to this, and a log line keeps its name after
+  // Who booked comes only from the owner's read (booking-details; the kernel holds time only). A
+  // booking's person never changes, so every reply adds to this, and a log line keeps its name after
   // the booking is cancelled.
-  const [names, setNames] = useState<ReadonlyMap<string, string | null>>(
-    () => new Map(initialBookings.map((b) => [b.id, b.label]))
+  const [people, setPeople] = useState<ReadonlyMap<string, Person>>(
+    () => new Map(initialBookings.map((b) => [b.id, { name: b.name, email: b.email }]))
   );
 
   const logChange = useCallback(
@@ -201,8 +214,9 @@ export function LiveSchedule({
       getCalendar(calendarId)
         .then((fresh) => {
           if (!fresh.ok) return;
-          const { bookings: nextBookings, holds: nextHolds } = fresh.value;
-          setNames((prev) => new Map([...prev, ...nextBookings.map((b) => [b.id, b.label] as const)]));
+          const nextBookings = fresh.value.bookings.map(liveBooking);
+          const nextHolds = fresh.value.holds;
+          setPeople((prev) => new Map([...prev, ...nextBookings.map((b) => [b.id, { name: b.name, email: b.email }] as const)]));
           if (asked !== changes.current) return;
           const next = { bookings: nextBookings, holds: nextHolds };
           scheduleChanges(shownSnapshot.current, next).forEach(logChange);
@@ -232,7 +246,7 @@ export function LiveSchedule({
     if (status === "live") reread();
   }, [status, reread]);
 
-  const shown = useMemo(() => bookings.map((b) => ({ ...b, label: names.get(b.id) ?? null })), [bookings, names]);
+  const shown = useMemo(() => bookings.map((b) => ({ ...b, ...(people.get(b.id) ?? { name: null, email: null }) })), [bookings, people]);
 
   // Filtering is derived, never a second copy of the log: one source of truth, two views of it.
   const visibleLog = useMemo(() => {
@@ -275,7 +289,8 @@ export function LiveSchedule({
         start: minOfDay(b.start, timezone),
         end: minOfDay(b.end, timezone),
         color: "emerald" as const,
-        text: b.label ?? "Booked",
+        // The owner's own dashboard: the only place the booker's email is shown.
+        text: b.name ? (b.email ? `${b.name} · ${b.email}` : b.name) : "Booked",
       })),
     });
     // Always present, even with no holds: a row that appears and disappears makes the timeline jump
@@ -423,7 +438,7 @@ export function LiveSchedule({
                   {l.detail ? (
                     <span className="text-muted-foreground truncate">
                       {l.detail}
-                      {l.bookingId && names.get(l.bookingId) ? ` · ${names.get(l.bookingId)}` : null}
+                      {l.bookingId && people.get(l.bookingId)?.name ? ` · ${people.get(l.bookingId)?.name}` : null}
                     </span>
                   ) : null}
                 </li>
