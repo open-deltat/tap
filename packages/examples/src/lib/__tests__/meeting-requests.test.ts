@@ -120,12 +120,14 @@ describe("asking for a meeting", () => {
 
 describe("the owner's answer", () => {
   test("approving holds and books the time under the requester's name", async () => {
-    const { ask, service, state } = setup();
+    const { ask, service, state, details } = setup();
     const asked = await ask();
     if (!asked.ok) throw new Error(asked.error);
     const approved = await service.approve({ requestId: asked.value.id, owner: OWNER });
     expect(approved).toMatchObject({ ok: true, value: { decision: { status: "approved", bookingId: "booking1" } } });
-    expect(state.bookings).toEqual([{ id: "booking1", label: "Anna Example" }]);
+    // The kernel booking holds time only; the requester's name is in booking-details.
+    expect(state.bookings.map((b) => b.id)).toEqual(["booking1"]);
+    expect(await details.get("booking1")).toMatchObject({ name: "Anna Example", source: "meeting_request" });
     expect((await service.approve({ requestId: asked.value.id, owner: OWNER })).ok).toBe(false);
   });
 

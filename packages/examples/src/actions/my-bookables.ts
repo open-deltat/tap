@@ -2,6 +2,7 @@
 
 import { dtPublic } from "../lib/deltat";
 import { publicRegistry } from "../lib/public-registry";
+import { bookingDetails } from "../lib/booking-details-live";
 import { isBookingMode, type BookableRecord } from "../lib/public-bookables";
 import * as owned from "../lib/owned-calendar-service";
 import type { AvailabilityInput, CalendarView } from "../lib/owned-calendar-service";
@@ -20,7 +21,7 @@ import { getSessionPrincipal } from "../lib/auth-session";
 // Saving availability expands a week into rules; cap it so a script cannot hammer replaceOpenHours.
 const perPrincipalSaves = createRateLimiter({ limit: 120, windowMs: 3_600_000 });
 
-const deps = { dt: dtPublic, registry: publicRegistry };
+const deps = { dt: dtPublic, registry: publicRegistry, details: bookingDetails };
 
 async function owner(): Promise<string | null> {
   return (await getSessionPrincipal())?.principalId ?? null;

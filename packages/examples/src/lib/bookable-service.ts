@@ -1,7 +1,8 @@
-import type { AvailabilitySlot, Booking, DeltaT } from "@open-deltat/client";
+import type { AvailabilitySlot, DeltaT } from "@open-deltat/client";
 import { normalizeBookableName, type BookableRecord, type BookableRegistry } from "./public-bookables";
 import { requireDisplayText } from "./display-text";
 import { weekToRanges, type WeekHours } from "../examples/builder/schedule";
+import { opaqueRef, withWho, type BookingDetailsStore, type BookingWithWho } from "./booking-details";
 
 // Everything the public bookable feature does once a bookable exists, with its two dependencies
 // passed in: list slots, hold, book, release, and the manage-link writes (rename, delete, bookings).
@@ -168,38 +169,67 @@ export async function holdSlot(
   }
 }
 
+const MAX_EMAIL_LENGTH = 254;
+
+/** An optional email as typed: blank is none; anything else must have the shape of one address. */
+export function bookerEmail(raw: string | null | undefined): Outcome<string | null> {
+  const value = raw?.trim() ?? "";
+  if (value === "") return { ok: true, value: null };
+  const at = value.indexOf("@");
+  const domain = value.slice(at + 1);
+  const shaped =
+    value.length <= MAX_EMAIL_LENGTH &&
+    at > 0 &&
+    value.lastIndexOf("@") === at &&
+    domain.includes(".") &&
+    !domain.startsWith(".") &&
+    !domain.endsWith(".") &&
+    ![...value].some((c) => c.trim() === "" || c === "<" || c === ">");
+  return shaped ? { ok: true, value } : { ok: false, error: "That email does not look right. Check it, or leave it empty." };
+}
+
+/**
+ * Book a held slot for the person who held it. The kernel gets an opaque label and nothing about the
+ * person (NOT-02, GAP-02); their name and email go to booking-details, written after the kernel
+ * booking so a refused commit leaves no row.
+ */
 export async function commitHold(
-  deps: BookableDeps,
+  deps: BookableDeps & { details: BookingDetailsStore },
   id: string,
   holdId: string,
-  bookedBy: string
+  bookedBy: string,
+  email: string | null = null
 ): Promise<Outcome<{ bookingId: string }>> {
   const record = deps.registry.get(id);
   if (!record) return { ok: false, error: "That bookable no longer exists." };
   // A hold placed before the owner switched to requests must not become a booking either.
   if (record.bookingMode === "request") return { ok: false, error: REQUESTS_ONLY };
 
-  // GAP-02: `label` is still free text in the kernel, so this is the one place a stranger's string
-  // reaches the WAL. Sanitized under the same rule as every other public display string until
-  // `external_ref` lands and the name can live app-side against an opaque id.
-  const label = ((): Outcome<string> => {
+  // Sanitized under the same rule as every other display string: the owner reads it.
+  const name = ((): Outcome<string> => {
     try {
       return { ok: true, value: requireDisplayText(bookedBy, { field: "name", maxLength: MAX_BOOKER_NAME_LENGTH }) };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : "That name will not work." };
     }
   })();
-  if (!label.ok) return label;
+  if (!name.ok) return name;
+  const mail = bookerEmail(email);
+  if (!mail.ok) return mail;
 
-  try {
-    // The hold id is a bare ULID, which SEC-03 says must never authorize a commit on its own. Here
-    // it is 80 bits of randomness handed only to the browser that placed the hold, the app-tier
-    // version of that guarantee rather than the signed capability MCP-T1 specifies.
-    const { bookingId } = await deps.dt.holds.commit(holdId, { label: label.value });
-    return { ok: true, value: { bookingId } };
-  } catch {
-    return { ok: false, error: "That hold expired before it was confirmed. Pick the slot again." };
-  }
+  // The hold id is a bare ULID, which SEC-03 says must never authorize a commit on its own. Here it is
+  // 80 bits of randomness handed only to the browser that placed the hold, the app-tier version of
+  // that guarantee rather than the signed capability MCP-T1 specifies.
+  const committed = await deps.dt.holds.commit(holdId, { label: opaqueRef() }).then(
+    ({ bookingId }) => bookingId,
+    () => null
+  );
+  if (committed === null) return { ok: false, error: "That hold expired before it was confirmed. Pick the slot again." };
+  // A failed write loses the name on the owner's side, never the booking the person was told about.
+  await deps.details
+    .put({ bookingId: committed, calendarId: id, name: name.value, email: mail.value, note: null, source: "web", createdAt: Date.now() })
+    .catch(() => {});
+  return { ok: true, value: { bookingId: committed } };
 }
 
 /**
@@ -216,13 +246,13 @@ export async function releaseHold(deps: BookableDeps, id: string, holdId: string
 
 /** The owner's view of who booked. Gated on the manage key: the public page must never list this. */
 export async function listBookings(
-  deps: BookableDeps,
+  deps: BookableDeps & { details: BookingDetailsStore },
   id: string,
   manageKey: string,
   window: { start: number; end: number }
-): Promise<Outcome<Booking[]>> {
+): Promise<Outcome<BookingWithWho[]>> {
   if (!deps.registry.authorize(id, manageKey)) {
     return { ok: false, error: "That manage link does not open this bookable." };
   }
-  return { ok: true, value: await deps.dt.bookings.get(id, window) };
+  return { ok: true, value: await withWho(deps.details, await deps.dt.bookings.get(id, window)) };
 }

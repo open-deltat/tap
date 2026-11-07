@@ -19,7 +19,8 @@ export interface MonthBooking {
   id: string;
   start: number;
   end: number;
-  label: string | null;
+  /** Who booked, from booking-details; null when no one is on record. */
+  name: string | null;
 }
 
 const BOOKED = { id: "booked", name: "Booked", color: "#10b981" } as const;
@@ -42,7 +43,7 @@ export function BookingsMonth({
     () =>
       bookings.map((b) => ({
         id: b.id,
-        name: `${time.format(b.start)} ${b.label ?? "Booked"}`,
+        name: `${time.format(b.start)} ${b.name ?? "Booked"}`,
         startAt: new Date(b.start),
         endAt: new Date(b.end),
         status: BOOKED,

@@ -9,6 +9,7 @@ import { publicRegistry } from "@open-deltat/examples/lib/public-registry";
 import * as bookable from "@open-deltat/examples/lib/bookable-service";
 import { forwardChanges } from "@open-deltat/examples/lib/live-changes";
 import { rollOpenHours } from "@open-deltat/examples/lib/owned-calendar-service";
+import { bookingDetails } from "@open-deltat/examples/lib/booking-details-live";
 
 // A subscription names its tenant; only these two exist. Default is the demo tenant (the examples'
 // resources); user-owned calendars live in the public tenant. An unknown value maps to demo rather
@@ -139,11 +140,11 @@ async function handleConfirm(ws: WebSocket, state: WsState, msg: ConfirmMessage)
     state.holdId = null;
 
     // A real person's calendar goes through the same service the HTTP booking path uses, so the
-    // booker name is sanitized (never raw stranger text into an append-only log) and the hold is
-    // committed atomically rather than released-then-rebooked. Demo fixtures keep the legacy path.
+    // booker's name goes to booking-details, never into the kernel, and the hold is committed
+    // atomically rather than released-then-rebooked. Demo fixtures keep the legacy path.
     if (state.database === "public") {
       const result = await bookable.commitHold(
-        { dt: state.client, registry: publicRegistry },
+        { dt: state.client, registry: publicRegistry, details: bookingDetails },
         state.resourceId,
         holdId,
         msg.label ?? ""
@@ -312,3 +313,20 @@ async function rollForward(): Promise<void> {
 }
 void rollForward();
 setInterval(() => void rollForward(), ROLL_EVERY_MS);
+
+// Booking details whose kernel booking is gone (cancelled, collected after the retention window, or
+// on a deleted calendar) are removed on the same schedule. A calendar no longer registered has no
+// bookings to keep a person for; one whose read fails keeps its rows until the next run.
+async function sweepDetails(): Promise<void> {
+  const removed = await bookingDetails
+    .sweep(async (calendarId) =>
+      publicRegistry.get(calendarId) ? new Set((await dtPublic.bookings.get(calendarId)).map((b) => b.id)) : new Set<string>()
+    )
+    .catch((err: unknown) => {
+      console.error(`booking details sweep failed: ${String(err)}`);
+      return 0;
+    });
+  console.log(`booking details swept: ${removed} removed`);
+}
+void sweepDetails();
+setInterval(() => void sweepDetails(), ROLL_EVERY_MS);

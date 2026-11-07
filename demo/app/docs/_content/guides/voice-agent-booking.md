@@ -43,7 +43,8 @@ const offered = await Promise.all(
 
 // "I have 10:15, 1:30, or 3:00." ... "Three o'clock, please."
 
-const { bookingId } = await db.holds.commit(offered[2].id, { label: caller.name });
+const { bookingId } = await db.holds.commit(offered[2].id, { label: call.id });
+// The caller's name and number go in your app, saved against bookingId. Δt keeps the time only.
 
 // Let the other two go straight back, do not wait for the timer.
 await Promise.all(offered.filter((_, i) => i !== 2).map((h) => db.holds.release(h.id)));
@@ -83,7 +84,7 @@ A `commit` on an expired or consumed hold is rejected. On a call this is a line 
 
 ```ts
 try {
-  await db.holds.commit(hold.id, { label: caller.name });
+  await db.holds.commit(hold.id, { label: call.id });
 } catch {
   const next = await db.availability.get({ resourceId: chair.id, start, end });
   // "Ah, that one just went while we were talking. I can do 3:30?"

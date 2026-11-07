@@ -1,8 +1,10 @@
 "use server";
 
-import type { AvailabilitySlot, Booking } from "@open-deltat/client";
+import type { AvailabilitySlot } from "@open-deltat/client";
 import { dtPublic } from "../lib/deltat";
 import { publicRegistry } from "../lib/public-registry";
+import { bookingDetails } from "../lib/booking-details-live";
+import type { BookingWithWho } from "../lib/booking-details";
 import * as service from "../lib/bookable-service";
 import type { Outcome } from "../lib/bookable-service";
 import { createRateLimiter } from "../lib/rate-limit";
@@ -13,7 +15,7 @@ import { ReleaseHoldInput } from "../lib/hold-release";
 // The booking edge. Same split as the create side: rate limiting and caller identity here, the
 // logic (including the registry gate on every entry point) in `lib/bookable-service`.
 
-const deps = { dt: dtPublic, registry: publicRegistry };
+const deps = { dt: dtPublic, registry: publicRegistry, details: bookingDetails };
 
 const HOUR_MS = 3_600_000;
 
@@ -70,9 +72,10 @@ export async function holdPublicSlot(
 export async function commitPublicHold(
   id: string,
   holdId: string,
-  bookedBy: string
+  bookedBy: string,
+  email: string | null = null
 ): Promise<Outcome<{ bookingId: string }>> {
-  return service.commitHold(deps, id, holdId, bookedBy);
+  return service.commitHold(deps, id, holdId, bookedBy, email);
 }
 
 /**
@@ -96,6 +99,6 @@ export async function getPublicBookings(
   id: string,
   manageKey: string,
   window: { start: number; end: number }
-): Promise<Outcome<Booking[]>> {
+): Promise<Outcome<BookingWithWho[]>> {
   return service.listBookings(deps, id, manageKey, window);
 }

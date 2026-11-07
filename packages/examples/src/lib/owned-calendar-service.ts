@@ -1,4 +1,5 @@
-import { expandRecurrence, type Booking, type DeltaT } from "@open-deltat/client";
+import { expandRecurrence, type DeltaT } from "@open-deltat/client";
+import { withWho, type BookingDetailsStore, type BookingWithWho } from "./booking-details";
 import type { BookableRecord, BookableRegistry, BookingMode } from "./public-bookables";
 import type { Display } from "./calendar-displays";
 import type { HeldSpan } from "./schedule-diff";
@@ -58,7 +59,8 @@ function openHourSegments(ranges: WeekRanges, timeZone: string, now: number): { 
 
 export interface CalendarView {
   record: BookableRecord;
-  bookings: Booking[];
+  /** Each booking's time and who booked it (booking-details; a legacy label for old bookings). */
+  bookings: BookingWithWho[];
   holds: HeldSpan[];
 }
 
@@ -233,15 +235,15 @@ async function rollOne(
 
 /** The calendar plus its current bookings and holds, for the management page. */
 export async function getOwnedCalendar(
-  deps: OwnedDeps,
+  deps: OwnedDeps & { details: BookingDetailsStore },
   input: { id: string; owner: string }
 ): Promise<Outcome<CalendarView>> {
   const record = deps.registry.authorizeOwner(input.id, input.owner);
   if (!record) return { ok: false, error: "You do not own this calendar." };
-  const [bookings, held] = await Promise.all([deps.dt.bookings.get(input.id), deps.dt.holds.get(input.id)]);
+  const [kernelBookings, held] = await Promise.all([deps.dt.bookings.get(input.id), deps.dt.holds.get(input.id)]);
   // The id is left behind on purpose: it is what release and commit accept as authority.
   const holds = held.map(({ start, end, expiresAt }) => ({ start, end, expiresAt }));
-  return { ok: true, value: { record, bookings, holds } };
+  return { ok: true, value: { record, bookings: await withWho(deps.details, kernelBookings), holds } };
 }
 
 export async function renameOwnedCalendar(
@@ -280,7 +282,7 @@ export async function setOwnedCalendarShape(
 
 /** Cancel one booking on a calendar the caller owns. */
 export async function cancelOwnedBooking(
-  deps: OwnedDeps,
+  deps: OwnedDeps & { details: BookingDetailsStore },
   input: { id: string; owner: string; bookingId: string }
 ): Promise<Outcome<null>> {
   if (!deps.registry.authorizeOwner(input.id, input.owner)) {
@@ -294,6 +296,8 @@ export async function cancelOwnedBooking(
     return { ok: false, error: "That booking is not on this calendar." };
   }
   await deps.dt.bookings.cancel(input.bookingId);
+  // A cancelled booking's person has no reason to be kept; the sweep would get there, this is sooner.
+  await deps.details.erase({ bookingId: input.bookingId }).catch(() => 0);
   return { ok: true, value: null };
 }
 

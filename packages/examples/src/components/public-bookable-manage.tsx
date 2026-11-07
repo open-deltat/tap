@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { Loader2, TriangleAlert } from "lucide-react";
-import type { Booking } from "@open-deltat/client";
+import type { BookingWithWho } from "../lib/booking-details";
 import { Stage } from "./stage";
 import { ACCENT_CTA, PILL_BASE, PILL_IDLE } from "../lib/accent";
 import { cn } from "@open-deltat/shared/utils";
@@ -22,7 +22,7 @@ export function PublicBookableManage({
 }) {
   const [record, setRecord] = useState(initial);
   const [name, setName] = useState(initial.name);
-  const [bookings, setBookings] = useState<Booking[] | null>(null);
+  const [bookings, setBookings] = useState<BookingWithWho[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleted, setDeleted] = useState(false);
@@ -132,7 +132,7 @@ export function PublicBookableManage({
                       })}{" "}
                       {formatTime(b.start)}
                     </span>
-                    <span className="text-dt-ink-3">{b.label ?? "no name"}</span>
+                    <span className="text-dt-ink-3">{b.who?.name ?? "no name"}</span>
                   </li>
                 ))}
             </ul>
