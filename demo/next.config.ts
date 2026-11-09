@@ -16,6 +16,14 @@ const nextConfig: NextConfig = {
   // folded into the docs, and the Postgres-comparison essay gave way to the agent-first docs.
   async redirects() {
     return [
+      // www.delt.at resolves to this app and served every page a second time; Search Console
+      // listed those copies as "alternate page with proper canonical". One host, so one URL each.
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www\\.delt\\.at" }],
+        destination: "https://delt.at/:path*",
+        permanent: true,
+      },
       { source: "/demos/explainer", destination: "/docs", permanent: true },
       { source: "/docs/sdk", destination: "/docs/protocol-and-engine", permanent: true },
       { source: "/docs/guides/scheduling-database", destination: "/docs", permanent: true },
