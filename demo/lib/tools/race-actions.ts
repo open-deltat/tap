@@ -56,6 +56,13 @@ export async function runRace(): Promise<RaceResult> {
 
     const winnerIndex = holds.findIndex((h) => h.outcome.ok);
     const winner: Racer | null = winnerIndex === 0 ? "A" : winnerIndex === 1 ? "B" : null;
+    // Both refused for a reason other than losing the slot (a missing calendar, an engine fault):
+    // that is not a race result, so say so instead of blaming another visitor.
+    const codes = holds.flatMap((h) => (h.outcome.ok ? [] : [h.outcome.code]));
+    if (!winner && !codes.every((c) => c === "CONFLICT")) {
+      forgetCalendar("race");
+      return { ok: false, message: "Δt refused both holds for a reason other than the race. Try again in a moment." };
+    }
     const won = winnerIndex >= 0 ? holds[winnerIndex].outcome : null;
     const holdId = won?.ok && typeof won.reply === "object" && won.reply !== null && "id" in won.reply ? String(won.reply.id) : null;
 

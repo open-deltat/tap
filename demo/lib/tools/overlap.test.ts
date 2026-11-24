@@ -54,6 +54,13 @@ describe("planDay", () => {
     ]);
   });
 
+  test("zones more than a day apart keep all of the working time", () => {
+    // Kiritimati (+14) 00:00-08:00 on 16 January is 10:00-18:00Z on the 15th, which ends inside
+    // Pago Pago's (-11) 14 January only for its first hour.
+    const plan = planDay("2026-01-14", "Pacific/Pago_Pago", [{ zone: "Pacific/Kiritimati", from: "00:00", to: "08:00" }]);
+    expect(plan.working[0]).toContainEqual({ start: utc("2026-01-15T10:00:00Z"), end: utc("2026-01-15T11:00:00Z") });
+  });
+
   test("no common time gives an empty overlap", () => {
     const plan = planDay("2026-01-14", "Europe/Berlin", [nineToFive("Europe/Berlin"), nineToFive("Pacific/Auckland")]);
     expect(plan.overlap).toEqual([]);

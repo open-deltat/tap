@@ -51,11 +51,11 @@ export function merge(spans: readonly Span[]): Span[] {
 
 export function planDay(date: string, organiserZone: string, people: readonly Person[]): DayPlan {
   const [day] = expandRecurrence({ daysOfWeek: ALL_DAYS, startTime: "00:00", endTime: "24:00", fromDate: date, toDate: date, timeZone: organiserZone });
-  // A person's working day can start the day before or after the organiser's date, so expand one day
-  // either side and keep what falls inside the organiser's day.
+  // A person's working day can start on another date than the organiser's: zones are up to 26 hours
+  // apart (Pago Pago to Kiritimati), so expand two days either side and keep what falls inside.
   const working = people.map((p) =>
     intersect(
-      merge(expandRecurrence({ daysOfWeek: ALL_DAYS, startTime: p.from, endTime: p.to, fromDate: addDays(date, -1), toDate: addDays(date, 1), timeZone: p.zone })),
+      merge(expandRecurrence({ daysOfWeek: ALL_DAYS, startTime: p.from, endTime: p.to, fromDate: addDays(date, -2), toDate: addDays(date, 2), timeZone: p.zone })),
       [day]
     )
   );

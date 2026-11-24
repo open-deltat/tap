@@ -2,7 +2,6 @@ import { dt } from "@open-deltat/examples/lib/deltat";
 import { ensureOpenWindow, findRootByName } from "@open-deltat/examples/actions/seed-helpers";
 import { trackBookings } from "@open-deltat/examples/lib/session-bookings";
 import { createRateLimiter } from "@open-deltat/examples/lib/rate-limit";
-import { getSessionId } from "@open-deltat/examples/lib/session";
 import { callerIp } from "@open-deltat/examples/lib/caller";
 import { classifyRefusal, type Booking } from "@open-deltat/client";
 
@@ -56,19 +55,28 @@ export function forgetCalendar(which: ToolCalendar): void {
 const perCaller = createRateLimiter({ limit: 30, windowMs: 60_000 });
 const siteWide = createRateLimiter({ limit: 6_000, windowMs: HOUR_MS });
 
-export type Gate = { ok: true; sid: string | null } | { ok: false; message: string };
+export type Gate = { ok: true } | { ok: false; message: string };
 
 export async function gate(): Promise<Gate> {
   const caller = perCaller.check(await callerIp());
   const site = caller.allowed ? siteWide.check("site") : null;
-  if (site?.allowed) return { ok: true, sid: await getSessionId() };
+  if (site?.allowed) return { ok: true };
   const wait = Math.ceil((site ? site.retryAfterMs : caller.retryAfterMs) / 1000);
   return { ok: false, message: `Too many tries right now. Wait ${wait} seconds and run it again.` };
 }
 
-/** Bookings the tools make clear themselves after a short while, like every demo booking. */
-export function forgetLater(sid: string | null, bookings: Booking[]): void {
-  trackBookings(sid ?? "tools", bookings, Date.now());
+/**
+ * Bookings the tools make clear themselves after 30 seconds, through the same reaper as every demo
+ * booking. Filed under their own key, not the visitor's session, so they never show up in (or get
+ * cleared from) the demos' "your bookings" sidebar.
+ */
+export function forgetLater(bookings: Booking[]): void {
+  trackBookings("tools", bookings, Date.now());
+}
+
+/** A calendar that has gone missing answers NOT_FOUND; drop the cached id so the next press heals. */
+export function forgetIfMissing(which: ToolCalendar, codes: readonly string[]): void {
+  if (codes.includes("NOT_FOUND")) forgetCalendar(which);
 }
 
 /** The SDK's own refusal reading: the same code and alternatives the MCP server and CLI report. */

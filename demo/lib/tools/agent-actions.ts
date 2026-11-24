@@ -73,7 +73,7 @@ export async function runAgent(input: unknown): Promise<AgentRun> {
     const calendar = await toolCalendar("agent");
     const [agent, rival] = await Promise.all([connect("page-agent"), connect("rival-agent")]);
     try {
-      return await script(calendar, agent, rival, parsed.data.rival, timezone, g.sid, placed);
+      return await script(calendar, agent, rival, parsed.data.rival, timezone, placed);
     } finally {
       await Promise.all([agent.close(), rival.close()]);
     }
@@ -84,7 +84,7 @@ export async function runAgent(input: unknown): Promise<AgentRun> {
   }
 }
 
-async function script(calendar: string, agent: Client, rival: Client, withRival: boolean, timezone: string, sid: string | null, placed: string[]): Promise<AgentRun> {
+async function script(calendar: string, agent: Client, rival: Client, withRival: boolean, timezone: string, placed: string[]): Promise<AgentRun> {
     const steps: AgentStep[] = [];
     const from = new Date(nextHalfHour(Date.now(), HALF_HOUR)).toISOString();
     const to = new Date(Date.parse(from) + 3 * 60 * 60_000).toISOString();
@@ -92,7 +92,12 @@ async function script(calendar: string, agent: Client, rival: Client, withRival:
     const found = await tool(agent, "Agent", "find_slots", { calendar_ids: [calendar], from, to, timezone, min_minutes: 30 });
     steps.push({ say: "First I look at what is actually free in the next three hours.", call: found.call });
     const first = startOf(Array.isArray(found.body.slots) ? found.body.slots[0] : null);
-    if (!first) return { ok: false, message: "No free time in the next three hours on the demo calendar. Try again shortly." };
+    if (!first) {
+      // An always-open calendar with nothing free usually means it went missing (a tenant reset);
+      // look it up again on the next press rather than in an hour.
+      forgetCalendar("agent");
+      return { ok: false, message: "No free time in the next three hours on the demo calendar. Try again shortly." };
+    }
 
     const rivalHolds: string[] = [];
     if (withRival) {
@@ -125,7 +130,7 @@ async function script(calendar: string, agent: Client, rival: Client, withRival:
     const bookingIds = strings(committed?.body.booking_ids);
     if (bookingIds.length > 0) {
       const slotStart = Date.parse(retry ? (fallback ?? first) : first);
-      forgetLater(sid, bookingIds.map((id) => ({ id, resourceId: calendar, start: slotStart, end: slotStart + HALF_HOUR, label: null })));
+      forgetLater(bookingIds.map((id) => ({ id, resourceId: calendar, start: slotStart, end: slotStart + HALF_HOUR, label: null })));
     } else if (holdIds.length > 0) {
       // A refused commit leaves the agent's hold standing for its full five minutes; give it back.
       const released = await tool(agent, "Agent", "release_hold", { hold_ids: holdIds });

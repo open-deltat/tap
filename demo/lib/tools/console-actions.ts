@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { dt } from "@open-deltat/examples/lib/deltat";
-import { HALF_HOUR, forgetCalendar, forgetLater, gate, nextHalfHour, refusal, toolCalendar } from "./calendars";
+import { HALF_HOUR, forgetCalendar, forgetIfMissing, forgetLater, gate, nextHalfHour, refusal, toolCalendar } from "./calendars";
 import { timed, type Call } from "./trace";
 
 // The API console's four calls, each the SDK method a developer would write, run on the console's own
@@ -34,7 +34,9 @@ export async function consoleStep(input: unknown): Promise<ConsoleResult> {
     if (s.step === "find") {
       const now = Date.now();
       const args = { resourceId, start: nextHalfHour(now), end: nextHalfHour(now) + WINDOW_MS, minDuration: HALF_HOUR };
-      return { ok: true, call: await timed({ who: "You", kind: "find", name: "dt.availability.get", args }, () => dt.availability.get(args), refusal) };
+      const call = await timed({ who: "You", kind: "find", name: "dt.availability.get", args }, () => dt.availability.get(args), refusal);
+      forgetIfMissing("console", call.outcome.ok ? [] : [call.outcome.code]);
+      return { ok: true, call };
     }
 
     if (s.step === "hold") {
@@ -45,7 +47,15 @@ export async function consoleStep(input: unknown): Promise<ConsoleResult> {
         return { ok: false, message: "That time has passed or was not found. Run find again, then hold one of the times it returned." };
       }
       const args = { resourceId, start: s.start, end: s.start + HALF_HOUR, expiresAt: Date.now() + HOLD_TTL_MS };
-      return { ok: true, call: await timed({ who: who(s.who), kind: "hold", name: "dt.holds.place", args }, () => dt.holds.place(args), refusal) };
+      const call = await timed({ who: who(s.who), kind: "hold", name: "dt.holds.place", args }, () => dt.holds.place(args), refusal);
+      forgetIfMissing("console", call.outcome.ok ? [] : [call.outcome.code]);
+      // "Someone else" exists to show the refusal. If it got the slot instead (the visitor's own hold
+      // had run out), nobody owns that hold, so give it straight back rather than block the time.
+      const reply = call.outcome.reply;
+      if (s.who === "someone-else" && call.outcome.ok && typeof reply === "object" && reply !== null && "id" in reply) {
+        await dt.holds.release(String(reply.id));
+      }
+      return { ok: true, call };
     }
 
     const held = (await dt.holds.get(resourceId)).find((h) => h.id === s.holdId);
@@ -61,7 +71,7 @@ export async function consoleStep(input: unknown): Promise<ConsoleResult> {
       if (call.outcome.ok) {
         const reply = call.outcome.reply;
         const bookingId = typeof reply === "object" && reply !== null && "bookingId" in reply ? String(reply.bookingId) : null;
-        if (bookingId) forgetLater(g.sid, [{ id: bookingId, resourceId, start: held.start, end: held.end, label: null }]);
+        if (bookingId) forgetLater([{ id: bookingId, resourceId, start: held.start, end: held.end, label: null }]);
       }
       return { ok: true, call };
     }

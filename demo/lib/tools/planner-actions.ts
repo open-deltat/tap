@@ -7,7 +7,7 @@ import { isZone } from "./zone";
 // The planner runs its arithmetic here, on the server, because the SDK's root import also carries
 // the Postgres driver, which cannot ship to a browser. No Δt write happens, so there is no gate.
 
-const HHMM = z.string().length(5);
+const HHMM = z.string().length(5, "Fill in every start and end time.");
 const Input = z.object({
   date: z.iso.date(),
   people: z

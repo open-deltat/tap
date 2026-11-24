@@ -88,7 +88,17 @@ export function ApiConsole() {
           </pre>
           <div className="mt-4 flex flex-wrap gap-2">
             {phase.at === "find" && (
-              <RunButton pending={pending} label="Run find" onClick={() => run({ step: "find" }, (c) => { const s = firstStart(c); return s ? { at: "hold", start: s } : null; })} />
+              <RunButton
+                pending={pending}
+                label="Run find"
+                onClick={() =>
+                  run({ step: "find" }, (c) => {
+                    const s = firstStart(c);
+                    if (!s) setError("No free half hour in the next four hours right now. Run find again in a moment.");
+                    return s ? { at: "hold", start: s } : null;
+                  })
+                }
+              />
             )}
             {phase.at === "hold" && (
               <RunButton

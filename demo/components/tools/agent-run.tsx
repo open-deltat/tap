@@ -26,6 +26,8 @@ export function AgentRun() {
 
   const go = () =>
     start(async () => {
+      // Clear the last run first, or its steps replay while this one is on its way.
+      setRun(null);
       setShown(0);
       setRun(await runAgent({ rival, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone }));
     });
