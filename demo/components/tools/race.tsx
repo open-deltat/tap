@@ -81,6 +81,8 @@ function Lane({ who, result, wins }: { who: Racer; result: Extract<RaceResult, {
   const hold = mine.find((c) => c.kind === "hold");
   const won = result?.winner === who;
   const alternatives = offered(hold);
+  // Free means the read returned the slot, not merely that the call worked: an empty answer is taken.
+  const sawFree = read?.outcome.ok === true && Array.isArray(read.outcome.reply) && read.outcome.reply.length > 0;
 
   return (
     <div className={cn("relative px-5 py-6 transition-colors sm:px-7", won && "bg-dt-accent-soft/50")}>
@@ -91,7 +93,7 @@ function Lane({ who, result, wins }: { who: Racer; result: Extract<RaceResult, {
         </div>
       </div>
       <ol className="mt-4 space-y-3 text-[14.5px]">
-        <Row n={1} label="Reads the slot" state={read ? (read.outcome.ok ? "Free" : "Error") : null} tone="free" ms={read?.ms} />
+        <Row n={1} label="Reads the slot" state={read ? (sawFree ? "Free" : "Taken") : null} tone={sawFree ? "free" : "lost"} ms={read?.ms} />
         <Row
           n={2}
           label="Holds it"
@@ -109,7 +111,7 @@ function Lane({ who, result, wins }: { who: Racer; result: Extract<RaceResult, {
         )}
         {result && !won && (
           <span className="dt-rise text-dt-ink-2">
-            Saw it free, lost the hold. Sent {result.firstSent === who ? "first" : "second"}.
+            {sawFree ? "Saw it free, lost the hold." : "It was already taken when it looked."} Sent {result.firstSent === who ? "first" : "second"}.
             {alternatives.length > 0 && <> Δt offered {alternatives.map(timeFmt).join(", ")} in the same reply.</>}
           </span>
         )}

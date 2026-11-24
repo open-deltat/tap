@@ -8,7 +8,7 @@ import { liveRefreshDeps } from "@open-deltat/examples/lib/session-refresh-live"
 
 const needsVisitor = (req: NextRequest): boolean => {
   const path = req.nextUrl.pathname;
-  // The live tools write to Δt too, so they key their rate limit and booking clean-up on the same id.
+  // The live tools make demo bookings too, and file them under this id for the 30-second clean-up.
   const live = path === "/" || path === "/demos" || path.startsWith("/demos/") || path.startsWith("/tools/");
   return live && !req.cookies.get(VISITOR_COOKIE)?.value;
 };

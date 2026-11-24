@@ -1,5 +1,5 @@
 import { dt } from "@open-deltat/examples/lib/deltat";
-import { daily, ensureSchedule, findRootByName } from "@open-deltat/examples/actions/seed-helpers";
+import { ensureOpenWindow, findRootByName } from "@open-deltat/examples/actions/seed-helpers";
 import { trackBookings } from "@open-deltat/examples/lib/session-bookings";
 import { createRateLimiter } from "@open-deltat/examples/lib/rate-limit";
 import { getSessionId } from "@open-deltat/examples/lib/session";
@@ -19,51 +19,50 @@ export const TOOL_CALENDARS = {
 
 export type ToolCalendar = keyof typeof TOOL_CALENDARS;
 
-const ALWAYS_OPEN = daily([{ h: 0, m: 0, dur: 1440 }]);
-
 const HOUR_MS = 60 * 60_000;
 
-// The calendar is looked up by name on every call, never cached by id, so a deleted or reset demo
-// tenant heals on the next press instead of failing until a restart. In-flight lookups are shared,
-// so two first visitors at once create one calendar, not two.
-const lookups = new Map<ToolCalendar, Promise<string>>();
-// Open hours are topped up at most hourly per calendar, and concurrent callers share one top-up, so
-// two presses cannot both lay down the same missing days (ensureSchedule reads, then writes).
-const toppedUp = new Map<string, { at: number; done: Promise<unknown> }>();
+// Each calendar is found (or created) by name and its one open window widened, once an hour, with
+// concurrent callers sharing that one lookup: two first visitors create one calendar, and the hot
+// path costs nothing. A failed tool call drops the entry (forgetCalendar), so a reset demo tenant
+// heals on the next press rather than at the next hour.
+const ready = new Map<ToolCalendar, { at: number; id: Promise<string> }>();
 
-async function findOrCreate(name: string): Promise<string> {
-  return (await findRootByName(name)) ?? (await dt.resources.create({ name })).id;
+async function prepare(name: string): Promise<string> {
+  const id = (await findRootByName(name)) ?? (await dt.resources.create({ name })).id;
+  // One always-open rule, widened in place, rather than a 24-hour rule per day.
+  await ensureOpenWindow(id);
+  return id;
 }
 
 export async function toolCalendar(which: ToolCalendar): Promise<string> {
-  const pending = lookups.get(which) ?? findOrCreate(TOOL_CALENDARS[which]).finally(() => lookups.delete(which));
-  lookups.set(which, pending);
-  const id = await pending;
-  const last = toppedUp.get(id);
-  if (!last || Date.now() - last.at > HOUR_MS) {
-    const done = ensureSchedule(id, ALWAYS_OPEN).catch((err: unknown) => {
-      toppedUp.delete(id);
-      throw err;
-    });
-    toppedUp.set(id, { at: Date.now(), done });
-  }
-  await toppedUp.get(id)?.done;
+  const cached = ready.get(which);
+  if (cached && Date.now() - cached.at < HOUR_MS) return cached.id;
+  const id = prepare(TOOL_CALENDARS[which]).catch((err: unknown) => {
+    ready.delete(which);
+    throw err;
+  });
+  ready.set(which, { at: Date.now(), id });
   return id;
+}
+
+export function forgetCalendar(which: ToolCalendar): void {
+  ready.delete(which);
 }
 
 // Strangers can press these buttons as fast as they like, and each press is real writes to Δt.
 // Keyed by address, as the public booking actions are, because the visitor cookie is the caller's
-// to drop; a site-wide cap bounds everyone together.
+// to drop. The site-wide cap bounds everyone together, and is only charged once a caller is within
+// their own limit, so one caller hammering away cannot use up everyone's hour.
 const perCaller = createRateLimiter({ limit: 30, windowMs: 60_000 });
-const siteWide = createRateLimiter({ limit: 1_500, windowMs: HOUR_MS });
+const siteWide = createRateLimiter({ limit: 6_000, windowMs: HOUR_MS });
 
 export type Gate = { ok: true; sid: string | null } | { ok: false; message: string };
 
 export async function gate(): Promise<Gate> {
   const caller = perCaller.check(await callerIp());
-  const site = siteWide.check("site");
-  if (caller.allowed && site.allowed) return { ok: true, sid: await getSessionId() };
-  const wait = Math.ceil(Math.max(caller.retryAfterMs, site.retryAfterMs) / 1000);
+  const site = caller.allowed ? siteWide.check("site") : null;
+  if (site?.allowed) return { ok: true, sid: await getSessionId() };
+  const wait = Math.ceil((site ? site.retryAfterMs : caller.retryAfterMs) / 1000);
   return { ok: false, message: `Too many tries right now. Wait ${wait} seconds and run it again.` };
 }
 

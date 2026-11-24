@@ -1,7 +1,7 @@
 "use server";
 
 import { dt } from "@open-deltat/examples/lib/deltat";
-import { HALF_HOUR, gate, nextHalfHour, refusal, toolCalendar } from "./calendars";
+import { HALF_HOUR, forgetCalendar, gate, nextHalfHour, refusal, toolCalendar } from "./calendars";
 import { timed, type Call } from "./trace";
 
 export type Racer = "A" | "B";
@@ -66,6 +66,7 @@ export async function runRace(): Promise<RaceResult> {
 
     return { ok: true, slot, winner, firstSent, calls: [...reads, ...holds, ...release] };
   } catch {
+    forgetCalendar("race");
     return { ok: false, message: "Could not reach Δt just now. Try again in a moment." };
   }
 }

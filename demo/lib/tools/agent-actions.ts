@@ -5,7 +5,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createDeltatMcpServer } from "@open-deltat/mcp";
 import { dt } from "@open-deltat/examples/lib/deltat";
-import { HALF_HOUR, forgetLater, gate, nextHalfHour, toolCalendar } from "./calendars";
+import { HALF_HOUR, forgetCalendar, forgetLater, gate, nextHalfHour, toolCalendar } from "./calendars";
 import type { Call, CallKind } from "./trace";
 import { isZone } from "./zone";
 
@@ -66,20 +66,25 @@ export async function runAgent(input: unknown): Promise<AgentRun> {
   if (!g.ok) return g;
   const timezone = isZone(parsed.data.timezone) ? parsed.data.timezone : "UTC";
 
+  // Every hold the run places, so a run that dies halfway does not leave the shared calendar's
+  // earliest time blocked for the MCP server's five-minute hold.
+  const placed: string[] = [];
   try {
     const calendar = await toolCalendar("agent");
     const [agent, rival] = await Promise.all([connect("page-agent"), connect("rival-agent")]);
     try {
-      return await script(calendar, agent, rival, parsed.data.rival, timezone, g.sid);
+      return await script(calendar, agent, rival, parsed.data.rival, timezone, g.sid, placed);
     } finally {
       await Promise.all([agent.close(), rival.close()]);
     }
   } catch {
+    await Promise.allSettled(placed.map((id) => dt.holds.release(id)));
+    forgetCalendar("agent");
     return { ok: false, message: "Could not reach Δt just now. Try again in a moment." };
   }
 }
 
-async function script(calendar: string, agent: Client, rival: Client, withRival: boolean, timezone: string, sid: string | null): Promise<AgentRun> {
+async function script(calendar: string, agent: Client, rival: Client, withRival: boolean, timezone: string, sid: string | null, placed: string[]): Promise<AgentRun> {
     const steps: AgentStep[] = [];
     const from = new Date(nextHalfHour(Date.now(), HALF_HOUR)).toISOString();
     const to = new Date(Date.parse(from) + 3 * 60 * 60_000).toISOString();
@@ -93,10 +98,17 @@ async function script(calendar: string, agent: Client, rival: Client, withRival:
     if (withRival) {
       const r = await tool(rival, "Another agent", "hold_slot", { calendar_ids: [calendar], start: first, end: plus30(first), timezone });
       rivalHolds.push(...strings(r.body.hold_ids));
-      steps.push({ say: "Meanwhile another agent, booking for someone else, holds that same time.", call: r.call });
+      placed.push(...rivalHolds);
+      steps.push({
+        say: r.call.outcome.ok
+          ? "Meanwhile another agent, booking for someone else, holds that same time."
+          : "Another agent tries for that same time, but someone else on the site already has it.",
+        call: r.call,
+      });
     }
 
     const held = await tool(agent, "Agent", "hold_slot", { calendar_ids: [calendar], start: first, end: plus30(first), timezone });
+    placed.push(...strings(held.body.hold_ids));
     steps.push({ say: "Before I offer the earliest time to you, I hold it, so the time I say is the time I can book.", call: held.call });
 
     const fallback = startOf(Array.isArray(held.body.alternatives) ? held.body.alternatives[0] : null);
@@ -104,6 +116,7 @@ async function script(calendar: string, agent: Client, rival: Client, withRival:
       !held.call.outcome.ok && fallback
         ? await tool(agent, "Agent", "hold_slot", { calendar_ids: [calendar], start: fallback, end: plus30(fallback), timezone })
         : null;
+    placed.push(...strings(retry?.body.hold_ids));
     if (retry) steps.push({ say: "That one just went. The refusal already lists times that still work, so I hold the next one, with no second search.", call: retry.call });
 
     const holdIds = strings((retry ?? held).body.hold_ids);

@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { dt } from "@open-deltat/examples/lib/deltat";
-import { HALF_HOUR, forgetLater, gate, nextHalfHour, refusal, toolCalendar } from "./calendars";
+import { HALF_HOUR, forgetCalendar, forgetLater, gate, nextHalfHour, refusal, toolCalendar } from "./calendars";
 import { timed, type Call } from "./trace";
 
 // The API console's four calls, each the SDK method a developer would write, run on the console's own
@@ -38,11 +38,11 @@ export async function consoleStep(input: unknown): Promise<ConsoleResult> {
     }
 
     if (s.step === "hold") {
-      // Only a half-hour boundary inside the next window: the console books on its own calendar,
-      // and an arbitrary span from the browser has no business there.
+      // Only a future half-hour boundary inside the next window: the console books on its own
+      // calendar, and an arbitrary or already-started span from the browser has no business there.
       const now = Date.now();
-      if (s.start % HALF_HOUR !== 0 || s.start < now - HALF_HOUR || s.start > now + WINDOW_MS + HALF_HOUR) {
-        return { ok: false, message: "Run find first, then hold one of the times it returned." };
+      if (s.start % HALF_HOUR !== 0 || s.start < now || s.start > now + WINDOW_MS + HALF_HOUR) {
+        return { ok: false, message: "That time has passed or was not found. Run find again, then hold one of the times it returned." };
       }
       const args = { resourceId, start: s.start, end: s.start + HALF_HOUR, expiresAt: Date.now() + HOLD_TTL_MS };
       return { ok: true, call: await timed({ who: who(s.who), kind: "hold", name: "dt.holds.place", args }, () => dt.holds.place(args), refusal) };
@@ -71,6 +71,7 @@ export async function consoleStep(input: unknown): Promise<ConsoleResult> {
       call: await timed({ who: "You", kind: "release", name: "dt.holds.release", args: { holdId: s.holdId } }, () => dt.holds.release(s.holdId).then(() => null), refusal),
     };
   } catch {
+    forgetCalendar("console");
     return { ok: false, message: "Could not reach Δt just now. Try again in a moment." };
   }
 }

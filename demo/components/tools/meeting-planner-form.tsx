@@ -141,7 +141,7 @@ export default function MeetingPlannerForm() {
                 <div className="mt-1 text-[14px] text-dt-ink-2">
                   {done.overlap.length === 0
                     ? "Widen someone's hours, or split the meeting."
-                    : `${done.overlap.reduce((n, s) => n + hours(s), 0)} hours, in ${city(organiser)} time`}
+                    : `${hours({ start: 0, end: done.overlap.reduce((n, s) => n + s.end - s.start, 0) })} hours, in ${city(organiser)} time`}
                 </div>
               </div>
               <button

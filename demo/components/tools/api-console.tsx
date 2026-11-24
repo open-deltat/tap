@@ -44,7 +44,11 @@ export function ApiConsole() {
   const run = (input: Parameters<typeof consoleStep>[0], next: (call: Call) => Phase | null) =>
     start(async () => {
       const r = await consoleStep(input);
-      if (!r.ok) return setError(r.message);
+      if (!r.ok) {
+        // Refused before reaching Δt (a stale time, the rate limit): start again from a fresh find.
+        setPhase({ at: "find" });
+        return setError(r.message);
+      }
       setError(null);
       setCalls((cs) => [r.call, ...cs]);
       const p = next(r.call);
