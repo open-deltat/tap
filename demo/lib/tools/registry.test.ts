@@ -8,9 +8,9 @@ describe("tools registry", () => {
   });
 
   // lib/seo keeps descriptions in the range a search result shows without cutting.
-  test("every description is 120 to 160 characters", () => {
+  test("every description is 140 to 160 characters", () => {
     for (const d of [TOOLS_HUB.description, ...TOOLS.map((t) => t.description)]) {
-      expect(d.length).toBeGreaterThanOrEqual(120);
+      expect(d.length).toBeGreaterThanOrEqual(140);
       expect(d.length).toBeLessThanOrEqual(160);
     }
   });

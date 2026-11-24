@@ -74,7 +74,7 @@ export const TOOLS = [
     title: "Booking API with a live console",
     h1: "Booking API, live console",
     description:
-      "A booking API you can try before you install it: find free time, hold a slot, commit it and read every real reply from a live Δt calendar.",
+      "A booking API you can try before you install anything: find free time, hold a slot, commit it and read every real reply from a live Δt calendar.",
   },
   {
     href: "/tools/mcp-calendar",

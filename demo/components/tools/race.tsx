@@ -51,6 +51,9 @@ export function DoubleBookingRace() {
           {done ? "Race again" : "Start the race"}
         </button>
         {result && !result.ok && <p className="text-[14px] text-dt-held-ink">{result.message}</p>}
+        {done && !done.winner && (
+          <p className="text-[14px] text-dt-held-ink">Neither got it: another visitor&apos;s race held this slot a moment earlier. Run it again.</p>
+        )}
       </div>
 
       <div className="grid divide-y divide-dt-line sm:grid-cols-2 sm:divide-x sm:divide-y-0">

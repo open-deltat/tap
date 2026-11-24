@@ -65,7 +65,8 @@ export function AgentRun() {
         ))}
         {finished && (
           <p className="dt-rise text-[13.5px] text-dt-ink-3">
-            {steps.length} tool calls, {Math.round(total)} ms of tool time in all. The booking clears itself after 30 seconds.
+            {steps.length} tool calls, {Math.round(total)} ms of tool time in all.{" "}
+            {run.booked ? "The booking clears itself after 30 seconds." : "Nothing was booked this time: every time it tried was taken. Run it again."}
           </p>
         )}
       </div>

@@ -27,7 +27,15 @@ export async function runRace(): Promise<RaceResult> {
     const resourceId = await toolCalendar("race");
     const now = Date.now();
     const free = await dt.availability.get({ resourceId, start: now, end: now + SEARCH_MS, minDuration: HALF_HOUR });
-    const start = free.map((s) => Math.max(nextHalfHour(s.start), nextHalfHour(now, HALF_HOUR))).find((t, i) => t + HALF_HOUR <= free[i].end);
+    // Every free half hour in the window, then one at random: two visitors racing in the same
+    // seconds would otherwise both pick the first one and spoil each other's round.
+    const earliest = nextHalfHour(now, HALF_HOUR);
+    const candidates = free.flatMap((s) => {
+      const first = Math.max(nextHalfHour(s.start), earliest);
+      const count = Math.max(0, Math.floor((s.end - first) / HALF_HOUR));
+      return Array.from({ length: count }, (_, i) => first + i * HALF_HOUR);
+    });
+    const start = candidates[Math.floor(Math.random() * candidates.length)];
     if (start === undefined) return { ok: false, message: "Every slot in the next six hours is taken right now. Try again in a moment." };
     const slot = { start, end: start + HALF_HOUR };
 

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Check, Copy, Loader2, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { plan, type PlanResult } from "@/lib/tools/planner-actions";
-import type { Span } from "@/lib/tools/overlap";
+import type { DayPlan, Span } from "@/lib/tools/overlap";
 
 interface Row {
   readonly id: number;
@@ -29,28 +29,40 @@ export default function MeetingPlannerForm() {
   const [rows, setRows] = useState<Row[]>(() => [ownZone(), ...DEFAULT_OTHERS.filter((z) => z !== ownZone())].map((zone, id) => ({ id, zone, from: "09:00", to: "17:00" })));
   const [date, setDate] = useState(() => todayIn(ownZone()));
   const [zones] = useState<readonly string[]>(() => Intl.supportedValuesOf("timeZone"));
-  const [result, setResult] = useState<PlanResult | null>(null);
+  // A plan is shown with the rows and date it was computed for, never paired with rows edited since:
+  // while the next answer is on its way, the last good one stays whole. A refusal (a half-typed
+  // zone) is shown beside it rather than blanking it.
+  const [shown, setShown] = useState<{ plan: DayPlan; rows: readonly Row[]; date: string } | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pending, start] = useTransition();
 
   useEffect(() => {
-    const t = setTimeout(() => start(async () => setResult(await plan({ date, people: rows.map(({ zone, from, to }) => ({ zone, from, to })) }))), 200);
+    const t = setTimeout(
+      () =>
+        start(async () => {
+          const r: PlanResult = await plan({ date, people: rows.map(({ zone, from, to }) => ({ zone, from, to })) });
+          if (r.ok) setShown({ plan: r.plan, rows, date });
+          setProblem(r.ok ? null : r.message);
+        }),
+      200
+    );
     return () => clearTimeout(t);
   }, [rows, date]);
 
   const update = (id: number, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  const organiser = rows[0]?.zone ?? "UTC";
-  const done = result?.ok ? result.plan : null;
+  const done = shown?.plan ?? null;
+  const organiser = shown?.rows[0]?.zone ?? "UTC";
 
   const summary = useMemo(() => {
-    if (!done) return "";
-    if (done.overlap.length === 0) return `${date}: no hour when everyone is working.`;
-    return done.overlap.map((s) => rows.map((r) => `${city(r.zone)} ${range(s, r.zone)}`).join(" · ")).join("\n");
-  }, [done, rows, date]);
+    if (!shown) return "";
+    if (shown.plan.overlap.length === 0) return `${shown.date}: no hour when everyone is working.`;
+    return shown.plan.overlap.map((s) => shown.rows.map((r) => `${city(r.zone)} ${range(s, r.zone)}`).join(" · ")).join("\n");
+  }, [shown]);
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(`${date}\n${summary}`);
+      await navigator.clipboard.writeText(`${shown?.date ?? date}\n${summary}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -113,7 +125,7 @@ export default function MeetingPlannerForm() {
       </div>
 
       <div className="p-4 sm:p-6" aria-live="polite">
-        {result && !result.ok && <p className="text-[14.5px] text-dt-held-ink">{result.message}</p>}
+        {problem && <p className="mb-3 text-[14.5px] text-dt-held-ink">{problem}</p>}
         {done && (
           <>
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -143,7 +155,7 @@ export default function MeetingPlannerForm() {
                 {copied ? "Copied" : "Copy the times"}
               </button>
             </div>
-            <Ribbons rows={rows} day={done.day} working={done.working} overlap={done.overlap} organiser={organiser} />
+            <Ribbons rows={shown?.rows ?? []} day={done.day} working={done.working} overlap={done.overlap} organiser={organiser} />
           </>
         )}
       </div>

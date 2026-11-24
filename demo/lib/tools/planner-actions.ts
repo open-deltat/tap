@@ -2,18 +2,10 @@
 
 import { z } from "zod";
 import { planDay, type DayPlan } from "./overlap";
+import { isZone } from "./zone";
 
 // The planner runs its arithmetic here, on the server, because the SDK's root import also carries
 // the Postgres driver, which cannot ship to a browser. No Δt write happens, so there is no gate.
-
-const isZone = (zone: string): boolean => {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 const HHMM = z.string().length(5);
 const Input = z.object({

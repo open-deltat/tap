@@ -3,6 +3,7 @@ import { daily, ensureSchedule, findRootByName } from "@open-deltat/examples/act
 import { trackBookings } from "@open-deltat/examples/lib/session-bookings";
 import { createRateLimiter } from "@open-deltat/examples/lib/rate-limit";
 import { getSessionId } from "@open-deltat/examples/lib/session";
+import { callerIp } from "@open-deltat/examples/lib/caller";
 import { classifyRefusal, type Booking } from "@open-deltat/client";
 
 // Server-side plumbing the live tools share. Each tool books on its own calendar in the demo tenant
@@ -20,37 +21,50 @@ export type ToolCalendar = keyof typeof TOOL_CALENDARS;
 
 const ALWAYS_OPEN = daily([{ h: 0, m: 0, dur: 1440 }]);
 
-// One creation per calendar per process: two first visitors at once would otherwise both find no
-// root and both create one. A failed attempt is dropped so the next call tries again.
-const roots = new Map<ToolCalendar, Promise<string>>();
+const HOUR_MS = 60 * 60_000;
 
-async function createOrFind(name: string): Promise<string> {
+// The calendar is looked up by name on every call, never cached by id, so a deleted or reset demo
+// tenant heals on the next press instead of failing until a restart. In-flight lookups are shared,
+// so two first visitors at once create one calendar, not two.
+const lookups = new Map<ToolCalendar, Promise<string>>();
+// Open hours are topped up at most hourly per calendar, and concurrent callers share one top-up, so
+// two presses cannot both lay down the same missing days (ensureSchedule reads, then writes).
+const toppedUp = new Map<string, { at: number; done: Promise<unknown> }>();
+
+async function findOrCreate(name: string): Promise<string> {
   return (await findRootByName(name)) ?? (await dt.resources.create({ name })).id;
 }
 
 export async function toolCalendar(which: ToolCalendar): Promise<string> {
-  const cached = roots.get(which) ?? createOrFind(TOOL_CALENDARS[which]);
-  roots.set(which, cached);
-  const id = await cached.catch((err: unknown) => {
-    roots.delete(which);
-    throw err;
-  });
-  // Every call, not once: the open hours roll forward with the calendar date (see ensureSchedule).
-  await ensureSchedule(id, ALWAYS_OPEN);
+  const pending = lookups.get(which) ?? findOrCreate(TOOL_CALENDARS[which]).finally(() => lookups.delete(which));
+  lookups.set(which, pending);
+  const id = await pending;
+  const last = toppedUp.get(id);
+  if (!last || Date.now() - last.at > HOUR_MS) {
+    const done = ensureSchedule(id, ALWAYS_OPEN).catch((err: unknown) => {
+      toppedUp.delete(id);
+      throw err;
+    });
+    toppedUp.set(id, { at: Date.now(), done });
+  }
+  await toppedUp.get(id)?.done;
   return id;
 }
 
 // Strangers can press these buttons as fast as they like, and each press is real writes to Δt.
-// Per visitor, a generous budget for a person and a wall for a script.
-const limiter = createRateLimiter({ limit: 30, windowMs: 60_000 });
+// Keyed by address, as the public booking actions are, because the visitor cookie is the caller's
+// to drop; a site-wide cap bounds everyone together.
+const perCaller = createRateLimiter({ limit: 30, windowMs: 60_000 });
+const siteWide = createRateLimiter({ limit: 1_500, windowMs: HOUR_MS });
 
 export type Gate = { ok: true; sid: string | null } | { ok: false; message: string };
 
 export async function gate(): Promise<Gate> {
-  const sid = await getSessionId();
-  const verdict = limiter.check(sid ?? "anonymous");
-  if (verdict.allowed) return { ok: true, sid };
-  return { ok: false, message: `Too many tries. Wait ${Math.ceil(verdict.retryAfterMs / 1000)} seconds and run it again.` };
+  const caller = perCaller.check(await callerIp());
+  const site = siteWide.check("site");
+  if (caller.allowed && site.allowed) return { ok: true, sid: await getSessionId() };
+  const wait = Math.ceil(Math.max(caller.retryAfterMs, site.retryAfterMs) / 1000);
+  return { ok: false, message: `Too many tries right now. Wait ${wait} seconds and run it again.` };
 }
 
 /** Bookings the tools make clear themselves after a short while, like every demo booking. */

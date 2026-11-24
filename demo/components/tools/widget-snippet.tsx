@@ -33,7 +33,7 @@ function parseBookingLink(input: string): ParsedLink {
   if (value === "") return { kind: "empty" };
   try {
     const url = new URL(value);
-    const ok = url.protocol === "https:" && url.hostname === "delt.at" && url.pathname.startsWith("/b/") && url.pathname.length > "/b/".length;
+    const ok = url.protocol === "https:" && url.hostname === new URL(SITE.url).hostname && url.pathname.startsWith("/b/") && url.pathname.length > "/b/".length;
     return ok ? { kind: "valid", href: `${url.origin}${url.pathname}` } : { kind: "invalid" };
   } catch {
     return { kind: "invalid" };

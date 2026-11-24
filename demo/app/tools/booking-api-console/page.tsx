@@ -33,8 +33,8 @@ export default function BookingApiConsolePage() {
       ld={[webApplicationLd({ title: TOOL.title, description: TOOL.description, path: TOOL.href, category: "DeveloperApplication" })]}
       lead={
         <p>
-          A booking API is three calls: find what is free, hold a slot, commit it. Run each one here against a live Δt calendar. The code on the
-          left is the TypeScript SDK call, and the reply on the right is what the engine sent back, unedited.
+          A booking API is three calls: find what is free, hold a slot, commit it. Run each one here against a live Δt calendar. The code is the
+          TypeScript SDK call, and each reply is what the engine sent back, unedited.
         </p>
       }
     >

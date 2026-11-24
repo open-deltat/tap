@@ -7,6 +7,7 @@ import { createDeltatMcpServer } from "@open-deltat/mcp";
 import { dt } from "@open-deltat/examples/lib/deltat";
 import { HALF_HOUR, forgetLater, gate, nextHalfHour, toolCalendar } from "./calendars";
 import type { Call, CallKind } from "./trace";
+import { isZone } from "./zone";
 
 // An agent booking run, on the real MCP tools. The page's agent and its rival are two MCP clients,
 // each talking to the open-source Δt MCP server (@open-deltat/mcp, the one `npx @open-deltat/mcp`
@@ -16,7 +17,7 @@ import type { Call, CallKind } from "./trace";
 const Input = z.object({ rival: z.boolean(), timezone: z.string().max(64) });
 
 export type AgentStep = { readonly say: string; readonly call: Call };
-export type AgentRun = { ok: true; steps: readonly AgentStep[] } | { ok: false; message: string };
+export type AgentRun = { ok: true; steps: readonly AgentStep[]; booked: boolean } | { ok: false; message: string };
 
 const KIND: Record<string, CallKind> = { find_slots: "find", hold_slot: "hold", commit_hold: "commit", release_hold: "release" };
 
@@ -53,15 +54,6 @@ async function tool(client: Client, who: string, name: string, args: Record<stri
   const outcome = result.isError ? { ok: false as const, code, reply: raw } : { ok: true as const, reply: raw };
   return { call: { who, kind: KIND[name] ?? "read", name, args, outcome, ms }, body };
 }
-
-const isZone = (zone: string): boolean => {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: zone });
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 const startOf = (v: unknown): string | null => (typeof v === "object" && v !== null && "start" in v && typeof v.start === "string" ? v.start : null);
 const plus30 = (iso: string) => new Date(Date.parse(iso) + HALF_HOUR).toISOString();
@@ -115,12 +107,16 @@ async function script(calendar: string, agent: Client, rival: Client, withRival:
     if (retry) steps.push({ say: "That one just went. The refusal already lists times that still work, so I hold the next one, with no second search.", call: retry.call });
 
     const holdIds = strings((retry ?? held).body.hold_ids);
-    if (holdIds.length > 0) {
-      const committed = await tool(agent, "Agent", "commit_hold", { hold_ids: holdIds, timezone });
-      steps.push({ say: "You said yes, so I commit the hold. Only now do I tell you it is booked.", call: committed.call });
+    const committed = holdIds.length > 0 ? await tool(agent, "Agent", "commit_hold", { hold_ids: holdIds, timezone }) : null;
+    if (committed) steps.push({ say: "You said yes, so I commit the hold. Only now do I tell you it is booked.", call: committed.call });
+    const bookingIds = strings(committed?.body.booking_ids);
+    if (bookingIds.length > 0) {
       const slotStart = Date.parse(retry ? (fallback ?? first) : first);
-      const ids = strings(committed.body.booking_ids);
-      forgetLater(sid, ids.map((id) => ({ id, resourceId: calendar, start: slotStart, end: slotStart + HALF_HOUR, label: null })));
+      forgetLater(sid, bookingIds.map((id) => ({ id, resourceId: calendar, start: slotStart, end: slotStart + HALF_HOUR, label: null })));
+    } else if (holdIds.length > 0) {
+      // A refused commit leaves the agent's hold standing for its full five minutes; give it back.
+      const released = await tool(agent, "Agent", "release_hold", { hold_ids: holdIds });
+      steps.push({ say: "The booking did not go through, so I let my hold go rather than sit on the time.", call: released.call });
     }
 
     if (rivalHolds.length > 0) {
@@ -128,5 +124,5 @@ async function script(calendar: string, agent: Client, rival: Client, withRival:
       steps.push({ say: "The other agent's person said no, so it lets its hold go and the time is free again.", call: released.call });
     }
 
-    return { ok: true, steps };
+    return { ok: true, steps, booked: bookingIds.length > 0 };
 }

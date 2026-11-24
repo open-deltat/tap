@@ -21,11 +21,16 @@ function replyField(call: Call, key: string): unknown {
   return typeof r === "object" && r !== null && key in r ? (r as Record<string, unknown>)[key] : undefined;
 }
 
-/** The first bookable half hour in what find returned. */
+const HALF_HOUR = 1_800_000;
+
+/** The first half hour, on a half-hour boundary, that fits wholly inside a free stretch find returned. */
 function firstStart(call: Call): number | null {
   if (!call.outcome.ok || !Array.isArray(call.outcome.reply)) return null;
-  const [first] = call.outcome.reply as { start: number }[];
-  return first ? Math.ceil(first.start / 1_800_000) * 1_800_000 : null;
+  const spans = call.outcome.reply.flatMap((s: unknown) =>
+    typeof s === "object" && s !== null && "start" in s && "end" in s && typeof s.start === "number" && typeof s.end === "number" ? [{ start: s.start, end: s.end }] : []
+  );
+  const fit = spans.map((s) => ({ at: Math.ceil(s.start / HALF_HOUR) * HALF_HOUR, end: s.end })).find((s) => s.at + HALF_HOUR <= s.end);
+  return fit?.at ?? null;
 }
 
 const STEPS = ["find", "hold", "commit"] as const;
@@ -51,7 +56,7 @@ export function ApiConsole() {
       case "find":
         return `const free = await dt.availability.get({\n  resourceId: calendar,\n  start: Date.now(),\n  end: Date.now() + 4 * HOUR,\n  minDuration: 30 * MINUTE,\n});`;
       case "hold":
-        return `const hold = await dt.holds.place({\n  resourceId: calendar,\n  start: Date.parse("${iso(phase.start)}"),\n  end: Date.parse("${iso(phase.start + 1_800_000)}"),\n  expiresAt: Date.now() + 60_000, // lets go on its own\n});`;
+        return `const hold = await dt.holds.place({\n  resourceId: calendar,\n  start: Date.parse("${iso(phase.start)}"),\n  end: Date.parse("${iso(phase.start + HALF_HOUR)}"),\n  expiresAt: Date.now() + 60_000, // lets go on its own\n});`;
       case "held":
         return `// Nobody else can take ${timeFmt(phase.start)} now. Confirm it:\nconst { bookingId } = await dt.holds.commit("${phase.holdId}");`;
       case "booked":
