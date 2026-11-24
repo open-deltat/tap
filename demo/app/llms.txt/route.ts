@@ -1,6 +1,7 @@
 import { enabledExamples } from "@open-deltat/examples/manifest";
 import { DOCS_SECTIONS } from "@/lib/docs-nav";
 import { SITE } from "@/lib/seo";
+import { TOOLS } from "@/lib/tools/registry";
 
 // llms.txt (https://llmstxt.org): one plain-markdown index of the site for models that fetch a page
 // instead of crawling it. Derived from the same docs tree the sidebar and sitemap use, so a new
@@ -51,6 +52,11 @@ function body(): string {
       },
       ...demos,
     ]),
+    "",
+    section(
+      "Tools",
+      TOOLS.map(({ href, label, blurb }) => ({ href, label, note: blurb }))
+    ),
     "",
     "## Source",
     "",

@@ -3,6 +3,7 @@ import { SITE } from "@/lib/seo";
 
 const LINKS = [
   { href: "/docs", label: "Docs" },
+  { href: "/tools", label: "Tools" },
   { href: SITE.github, label: "GitHub", external: true },
   { href: "https://www.npmjs.com/package/@open-deltat/mcp", label: "npm", external: true },
   { href: "https://crates.io/crates/deltat", label: "crates.io", external: true },

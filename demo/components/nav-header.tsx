@@ -14,6 +14,7 @@ import { SITE } from "@/lib/seo";
 const LINKS = [
   { href: "/#examples", label: "Examples", match: (p: string) => p.startsWith("/demos") },
   { href: "/docs", label: "Docs", match: (p: string) => p.startsWith("/docs") },
+  { href: "/tools", label: "Tools", match: (p: string) => p.startsWith("/tools") || p.startsWith("/compare") || p.startsWith("/templates") },
   { href: "/#pricing", label: "Pricing", match: () => false },
 ] as const;
 
