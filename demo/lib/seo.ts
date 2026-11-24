@@ -181,6 +181,58 @@ export function webPageLd(opts: { title: string; description: string; path: stri
   };
 }
 
+// A tool that runs in the page. Free, no sign-in, so the offer is the zero-price one.
+export function webApplicationLd(opts: { title: string; description: string; path: string; category: string }): Ld {
+  const url = abs(opts.path);
+  return {
+    "@type": "WebApplication",
+    "@id": `${url}#app`,
+    name: opts.title,
+    description: opts.description,
+    url,
+    applicationCategory: opts.category,
+    operatingSystem: "Any (runs in the browser)",
+    browserRequirements: "Requires JavaScript",
+    isAccessibleForFree: true,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+    inLanguage: "en",
+    isPartOf: { "@id": `${SITE.url}/#website` },
+    provider: { "@id": `${SITE.url}/#org` },
+  };
+}
+
+// A page that lists other pages: the tools hub and the templates.
+export function collectionPageLd(opts: { title: string; description: string; path: string; items: readonly { name: string; path: string }[] }): Ld {
+  const url = abs(opts.path);
+  return {
+    "@type": "CollectionPage",
+    "@id": `${url}#webpage`,
+    url,
+    name: opts.title,
+    description: opts.description,
+    inLanguage: "en",
+    isPartOf: { "@id": `${SITE.url}/#website` },
+    mainEntity: {
+      "@type": "ItemList",
+      itemListElement: opts.items.map((it, i) => ({ "@type": "ListItem", position: i + 1, name: it.name, url: abs(it.path) })),
+    },
+  };
+}
+
+// Steps exactly as the page shows them, like faqPageLd.
+export function howToLd(opts: { title: string; description: string; path: string; totalTime: string; steps: readonly { name: string; text: string }[] }): Ld {
+  const url = abs(opts.path);
+  return {
+    "@type": "HowTo",
+    "@id": `${url}#howto`,
+    name: opts.title,
+    description: opts.description,
+    totalTime: opts.totalTime,
+    inLanguage: "en",
+    step: opts.steps.map((s, i) => ({ "@type": "HowToStep", position: i + 1, name: s.name, text: s.text, url: `${url}#step-${i + 1}` })),
+  };
+}
+
 export function breadcrumbLd(items: { name: string; path: string }[]): Ld {
   return {
     "@type": "BreadcrumbList",

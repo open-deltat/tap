@@ -119,4 +119,4 @@ An agent reaches Δt three ways: the MCP server for any MCP client, the TypeScri
 
 ## Next
 
-[What a booking hold is](/docs/guides/booking-holds) covers holds on their own, including expiry and renewal. [Preventing double bookings](/docs/guides/prevent-double-booking) is the same race without an agent in it. [Voice agents that book](/docs/guides/voice-agent-booking) is this pattern under the timing pressure of a live phone call. To watch two clients fight over one slot, open the [realtime seats demo](/demos/live) in two windows.
+[What a booking hold is](/docs/guides/booking-holds) covers holds on their own, including expiry and renewal. [Preventing double bookings](/docs/guides/prevent-double-booking) is the same race without an agent in it. [Voice agents that book](/docs/guides/voice-agent-booking) is this pattern under the timing pressure of a live phone call. To watch two clients fight over one slot, open the [realtime seats demo](/demos/live) in two windows. To watch an agent run find, hold and commit over the real MCP tools, with a rival agent in the way, see [AI agent booking, live](/tools/ai-agent-booking).

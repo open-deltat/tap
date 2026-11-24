@@ -145,3 +145,5 @@ await db.close();
 ```
 
 That is zero to a booking. From here, two conventions carry everywhere you go next: all times are integer Unix milliseconds, and intervals are half-open `[start, end)`, so a segment that ends exactly where the next one starts does not overlap. Calendars, timezones, and recurrence stay in your own code: expand them to plain instants and feed those in.
+
+To try find, hold and commit before installing anything, the [booking API console](/tools/booking-api-console) runs them against a live calendar and shows each reply.

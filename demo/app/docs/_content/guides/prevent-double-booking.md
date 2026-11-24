@@ -73,4 +73,4 @@ Sometimes "double booked" is the requirement: a class holds twenty people, a par
 
 ## See it race
 
-The [realtime seats demo](/demos/live) is this page running live: open it in two windows, grab the same seat in both, and watch one hold land and the other lose. For the model underneath, start at [What is Δt](/docs).
+The [realtime seats demo](/demos/live) is this page running live: open it in two windows, grab the same seat in both, and watch one hold land and the other lose. [The double-booking race](/tools/double-booking-race) does the same with one button, sending both holds in the same instant and showing every reply. For the model underneath, start at [What is Δt](/docs).
